@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{C0E518EA-D72F-4D0B-BAF2-AA2C1C933FA4}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>ModelClass</RootNamespace>
+    <AssemblyName>ModelClass</AssemblyName>
+    <TargetFrameworkVersion>v4.6.1</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <Deterministic>true</Deterministic>
+    <TargetFrameworkProfile />
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Accounts\AccountHead.cs" />
+    <Compile Include="Accounts\ChartOfAccount.cs" />
+    <Compile Include="Accounts\CreditNoteModel.cs" />
+    <Compile Include="Accounts\CustomerReceiptInofo.cs" />
+    <Compile Include="Accounts\DebitNoteModel.cs" />
+    <Compile Include="Accounts\Ledger.cs" />
+    <Compile Include="Accounts\ManualPartyBalanceModel.cs" />
+    <Compile Include="Accounts\Role.cs" />
+    <Compile Include="Accounts\VendorPayment.cs" />
+    <Compile Include="BaseModels.cs" />
+    <Compile Include="ClosingModel.cs" />
+    <Compile Include="ClsCustomers.cs" />
+    <Compile Include="ClsVendors.cs" />
+    <Compile Include="DataBase.cs" />
+    <Compile Include="DefaultTableValues.cs" />
+    <Compile Include="Ledger.cs" />
+    <Compile Include="Master\BranchModel.cs" />
+    <Compile Include="Master\BrandModel.cs" />
+    <Compile Include="Master\CategoryModel.cs" />
+    <Compile Include="Master\CompanyModel.cs" />
+    <Compile Include="Master\CountryModel.cs" />
+    <Compile Include="Master\CurrencyModel.cs" />
+    <Compile Include="Master\GroupModel.cs" />
+    <Compile Include="Master\ItemMaster.cs" />
+    <Compile Include="Master\PluModel.cs" />
+    <Compile Include="Master\RolePermission.cs" />
+    <Compile Include="Master\StateModel.cs" />
+    <Compile Include="Master\TaxTypeModel.cs" />
+    <Compile Include="Master\UnitMasterModel.cs" />
+    <Compile Include="Master\Users.cs" />
+    <Compile Include="Master\VendorDetailsForItemmaster.cs" />
+    <Compile Include="OpeningStockModel.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="PurchaseInvoiceModel.cs" />
+    <Compile Include="Report\ItemReportModel.cs" />
+    <Compile Include="Report\SalesmanIncentiveReportModel.cs" />
+    <Compile Include="Report\SmartReorderItemModel.cs" />
+    <Compile Include="Report\AuditTrailModel.cs" />
+    <Compile Include="Report\PurchaseReportMaster.cs" />
+    <Compile Include="Report\PurchaseReturnReport.cs" />
+    <Compile Include="Report\Reports.cs" />
+    <Compile Include="Report\CounterReportModel.cs" />
+    <Compile Include="Report\SalesReturnReport.cs" />
+    <Compile Include="Report\StockReportAdvanceModel.cs" />
+    <Compile Include="Report\TradingPLModel.cs" />
+    <Compile Include="Report\BalanceSheetModel.cs" />
+    <Compile Include="Report\TrialBalanceModel.cs" />
+    <Compile Include="Report\CashBankBookModel.cs" />
+    <Compile Include="Report\BankStatementReportModel.cs" />
+    <Compile Include="Report\CombinedPartyBalanceReportModel.cs" />
+    <Compile Include="Report\CustomerOutstandingReportModel.cs" />
+    <Compile Include="Report\CustomerLedgerReportModel.cs" />
+    <Compile Include="Report\CustomerReceiptReportModel.cs" />
+    <Compile Include="Report\DayBookModel.cs" />
+    <Compile Include="Report\VendorPaymentReportModel.cs" />
+    <Compile Include="Report\VendorOutstandingReportModel.cs" />
+    <Compile Include="Report\CustomerwiseSalesSummaryModel.cs" />
+    <Compile Include="Report\SalesmanwiseSalesSummaryModel.cs" />
+    <Compile Include="Report\ItemwiseSalesSummaryModel.cs" />
+    <Compile Include="Report\LowStockAlertModel.cs" />
+    <Compile Include="Report\StockAdjustmentReportModel.cs" />
+    <Compile Include="SessionContext.cs" />
+    <Compile Include="Settings\POSSetting.cs" />
+    <Compile Include="Settings\FinancialYearModel.cs" />
+    <Compile Include="SessionContextExtensions.cs" />
+    <Compile Include="TransactionModels\GeneralVoucherModel.cs" />
+    <Compile Include="TransactionModels\BankReconciliationModel.cs" />
+    <Compile Include="TransactionModels\HoldItemDetails.cs" />
+    <Compile Include="TransactionModels\JournalVoucherModel.cs" />
+    <Compile Include="TransactionModels\PurchaseModel.cs" />
+    <Compile Include="TransactionModels\PurchaseOrderModel.cs" />
+    <Compile Include="TransactionModels\PurchaseReturnModel.cs" />
+    <Compile Include="TransactionModels\ReasonModel.cs" />
+    <Compile Include="TransactionModels\SalesModel.cs" />
+    <Compile Include="TransactionModels\SalesPaymentDetail.cs" />
+    <Compile Include="TransactionModels\SalesReturnModel.cs" />
+    <Compile Include="TransactionModels\SalesRNItem.cs" />
+    <Compile Include="TransactionModels\SoldItemHistory.cs" />
+    <Compile Include="TransactionModels\StockAdjustmentModel.cs" />
+    <Compile Include="TransactionModels\StockTransferModel.cs" />
+    <Compile Include="TransactionModels\VoucherModel4Trn.cs" />
+  </ItemGroup>
+  <ItemGroup />
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+</Project>
