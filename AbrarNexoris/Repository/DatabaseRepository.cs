@@ -46,10 +46,11 @@ namespace Repository
                     return false;
                 }
 
-                string fileName = $"{dbName}_Backup_{DateTime.Now:yyyyMMdd_HHmmss}.bak";
+                // One backup file per day — same file is overwritten on repeat runs
+                string fileName = $"{dbName}_Backup_{DateTime.Now:yyyyMMdd}.bak";
                 backupFilePath = Path.Combine(backupFolder, fileName);
 
-                // SQL command to perform native backup
+                // SQL command to perform native backup (FORMAT + INIT replaces any existing file for the day)
                 string query = "BACKUP DATABASE [" + dbName + "] TO DISK = @BackupPath WITH FORMAT, INIT, SKIP, NOREWIND, NOUNLOAD, STATS = 10";
 
                 using (SqlConnection conn = new SqlConnection(DataConnection.ConnectionString))

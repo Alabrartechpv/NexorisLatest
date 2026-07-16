@@ -3,7 +3,7 @@
 
 [Setup]
 AppName=Nexoris POS
-AppVersion=1.0.0
+AppVersion=1.0.1
 AppPublisher=Nexoris
 DefaultDirName={autopf}\Nexoris POS
 DefaultGroupName=Nexoris POS
@@ -11,11 +11,12 @@ OutputDir=.\OutputInstaller
 OutputBaseFilename=Nexoris_POS_Setup
 Compression=lzma
 SolidCompression=yes
-SetupIconFile=
+SetupIconFile=PosBranch-Win\Resources\app_icon.ico
 PrivilegesRequired=admin
 DisableWelcomePage=no
 DisableDirPage=no
 DisableProgramGroupPage=yes
+MinVersion=6.1sp1
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -26,12 +27,18 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 [Files]
 ; Copy all compiled binaries and assets recursively from the build folder
 Source: "PosBranch-Win\bin\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Copy Crystal Report (.rpt) files — NOT output to bin\Release by the build, must be explicitly included
+Source: "CrsReports\SalesInvoicePrint.rpt"; DestDir: "{app}\Reports"; Flags: ignoreversion
+Source: "CrsReports\CrystalReportPurcase.rpt"; DestDir: "{app}\Reports"; Flags: ignoreversion
+Source: "PosBranch-Win\Reportrpt\Sales_Daily.rpt"; DestDir: "{app}\Reports"; Flags: ignoreversion
+; Copy application icon to install folder (used for shortcuts)
+Source: "PosBranch-Win\Resources\app_icon.ico"; DestDir: "{app}"; Flags: ignoreversion
 ; Copy the Crystal Reports runtime installer MSI to the temp directory during setup
 Source: "Prerequisites\CRRuntime_32bit.msi"; DestDir: "{tmp}"; Flags: nocompression deleteafterinstall
 
 [Icons]
-Name: "{group}\Nexoris POS"; Filename: "{app}\NexorisPOS.exe"
-Name: "{commondesktop}\Nexoris POS"; Filename: "{app}\NexorisPOS.exe"; Tasks: desktopicon
+Name: "{group}\Nexoris POS"; Filename: "{app}\NexorisPOS.exe"; IconFilename: "{app}\app_icon.ico"
+Name: "{commondesktop}\Nexoris POS"; Filename: "{app}\NexorisPOS.exe"; IconFilename: "{app}\app_icon.ico"; Tasks: desktopicon
 
 [Run]
 ; Install SAP Crystal Reports Runtime silently with basic progress bar (/qb) during installation
@@ -83,10 +90,10 @@ begin
   DbConfigPage.Add('Database Password:', True); // password masked
 
   // Default values
-  ServerVal := '192.168.1.232\SQLEXPRESS';
-  DbVal := 'RambaiTest';
+  ServerVal := 'localhost\SQLEXPRESS';
+  DbVal := 'NexorisPOS';
   UserVal := 'sa';
-  PassVal := 'Abrar@123';
+  PassVal := '';
 
   // Check if an existing config file exists, if so read and parse it to pre-fill the form
   ConfigPath := 'C:\Connection\Config.txt';

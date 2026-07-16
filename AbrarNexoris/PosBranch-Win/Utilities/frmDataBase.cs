@@ -46,34 +46,34 @@ namespace PosBranch_Win.Utilities
         {
             try
             {
-                string path = @"C:\Backup\";
+                string savedPath = string.Empty;
 
-                // Retrieve company configuration path if available
+                // Retrieve the previously saved backup path from company settings
                 if (AppSession.CompanyID > 0)
                 {
                     LogMessage($"Fetching settings for Company ID: {AppSession.CompanyID}...");
                     var company = _companyRepo.GetCompanyById(AppSession.CompanyID);
                     if (company != null && !string.IsNullOrWhiteSpace(company.BackupPath))
                     {
-                        path = company.BackupPath.Trim();
-                        LogMessage("Default backup path loaded from company settings.");
+                        savedPath = company.BackupPath.Trim();
+                        LogMessage($"Saved backup path loaded: {savedPath}");
                     }
                     else
                     {
-                        LogMessage("No custom backup path found in company configuration. Using system default.");
+                        LogMessage("No backup path saved yet. Please browse and select a folder.");
                     }
                 }
                 else
                 {
-                    LogMessage("Session company context missing. Using system default path.");
+                    LogMessage("Session company context missing. Please browse and select a backup folder.");
                 }
 
-                txtBackupPath.Text = path;
+                txtBackupPath.Text = savedPath;
             }
             catch (Exception ex)
             {
-                LogMessage($"Warning loading default path: {ex.Message}");
-                txtBackupPath.Text = @"C:\Backup\";
+                LogMessage($"Warning loading saved path: {ex.Message}");
+                txtBackupPath.Text = string.Empty;
             }
         }
 

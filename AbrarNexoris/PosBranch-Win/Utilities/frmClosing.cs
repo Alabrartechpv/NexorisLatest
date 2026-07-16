@@ -837,9 +837,9 @@ namespace PosBranch_Win.Utilities
         {
             try
             {
-                string backupFolder = @"C:\Backup\";
+                string backupFolder = string.Empty;
 
-                // Retrieve company configuration path if available
+                // Retrieve the configured backup path from company settings
                 if (SessionContext.CompanyId > 0)
                 {
                     var compRepo = new Repository.MasterRepositry.CompanyRepo();
@@ -850,7 +850,20 @@ namespace PosBranch_Win.Utilities
                     }
                 }
 
-                // Show information to the user that database backup is running
+                // If no path has been configured, prompt the user to set one
+                if (string.IsNullOrWhiteSpace(backupFolder))
+                {
+                    MessageBox.Show(
+                        "No backup folder has been configured yet.\n\n" +
+                        "Please go to:\nUtilities → Database → Browse and select a backup folder, then save.\n\n" +
+                        "Day End Closing was saved successfully; backup was skipped.",
+                        "Backup Path Not Set",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // Inform the user the backup is starting
                 MessageBox.Show(
                     $"Day End Closing completed successfully.\n\n" +
                     $"Automatic database backup has been initiated to:\n{backupFolder}\n\n" +

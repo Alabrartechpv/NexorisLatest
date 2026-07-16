@@ -53,10 +53,10 @@ namespace PosBranch_Win
                 else
                 {
                     // Default values if no file exists
-                    txtServer.Text = "192.168.1.232\\SQLEXPRESS";
-                    txtDatabase.Text = "RambaiTest";
+                    txtServer.Text = "localhost\\SQLEXPRESS";
+                    txtDatabase.Text = "NexorisPOS";
                     txtUsername.Text = "sa";
-                    txtPassword.Text = "Abrar@123";
+                    txtPassword.Text = "";
                     txtCounterId.Text = "1";
                 }
             }
