@@ -80,6 +80,7 @@ namespace Repository
         public static string _POS_SPaymentDetails = "_POS_SPaymentDetails";
         public static string POS_ItemStockActivityLog = "POS_ItemStockActivityLog";
         public static string POS_ItemActivityLog = "POS_ItemActivityLog";
+        public static string POS_UserActivityLog = "POS_UserActivityLog";
         public static string POS_TransactionActivityLog = "POS_TransactionActivityLog";
         public static string POS_VendorOutstandingListing = "POS_VendorOutstandingListing";
 

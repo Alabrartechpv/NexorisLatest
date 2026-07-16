@@ -323,7 +323,30 @@ namespace PosBranch_Win
 
                             LoadPOSSettings(Convert.ToInt32(DataBase.CompanyId), Convert.ToInt32(DataBase.BranchId));
 
+                            try
+                            {
+                                using (var userActivityRepo = new UserActivityLogRepository())
+                                {
+                                    userActivityRepo.SaveUserActivity(
+                                        userId: SessionContext.UserId,
+                                        userName: SessionContext.UserName,
+                                        userRole: SessionContext.UserLevel,
+                                        counterId: SessionContext.CounterId,
+                                        counterName: SessionContext.CounterName,
+                                        activityType: "Login",
+                                        activityDetails: "User logged in successfully",
+                                        formName: null,
+                                        sessionId: SessionContext.CounterSessionId
+                                    );
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"Failed to write user login log: {ex.Message}");
+                            }
+
                             Home hm = new Home();
+                            hm.FormClosed += (s, args) => this.Close();
                             hm.Show();
                             this.Hide();
                         }

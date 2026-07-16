@@ -7,6 +7,7 @@ using PosBranch_Win.Transaction;
 using PosBranch_Win.Utilities;
 using PosBranch_Win.Settings;
 using Repository;
+using Repository.SettingsRepo;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -484,6 +485,69 @@ namespace PosBranch_Win
             closeButtonRects.Clear();
         }
 
+        private void LogLogout(string details)
+        {
+            try
+            {
+                if (SessionContext.UserId > 0)
+                {
+                    using (var repo = new UserActivityLogRepository())
+                    {
+                        repo.SaveUserActivity(
+                            userId: SessionContext.UserId,
+                            userName: SessionContext.UserName,
+                            userRole: SessionContext.UserLevel,
+                            counterId: SessionContext.CounterId,
+                            counterName: SessionContext.CounterName,
+                            activityType: "Logout",
+                            activityDetails: details,
+                            formName: null,
+                            sessionId: SessionContext.CounterSessionId
+                        );
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error logging logout: {ex.Message}");
+            }
+        }
+
+        private void LogFormEntry(string formName)
+        {
+            try
+            {
+                if (SessionContext.UserId > 0)
+                {
+                    using (var repo = new UserActivityLogRepository())
+                    {
+                        repo.SaveUserActivity(
+                            userId: SessionContext.UserId,
+                            userName: SessionContext.UserName,
+                            userRole: SessionContext.UserLevel,
+                            counterId: SessionContext.CounterId,
+                            counterName: SessionContext.CounterName,
+                            activityType: "FormEntry",
+                            activityDetails: $"Entered form: {formName}",
+                            formName: formName,
+                            sessionId: SessionContext.CounterSessionId
+                        );
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error logging form entry: {ex.Message}");
+            }
+        }
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            LogLogout("User closed application");
+            SessionContext.Clear();
+            base.OnFormClosing(e);
+        }
+
         /// <summary>
         /// Opens a form in a new tab or switches to its tab if already open
         /// </summary>
@@ -491,6 +555,7 @@ namespace PosBranch_Win
         {
             try
             {
+                LogFormEntry(tabName);
                 // Auto-close Report Navigator when any form is opened, unless the user pinned it.
                 if (_isReportNavigatorVisible && !_isReportNavigatorPinned) HideReportNavigator();
                 // Check if tab already exists (skip when opening from favourites to allow multiple instances)
@@ -730,6 +795,7 @@ namespace PosBranch_Win
         {
             try
             {
+                LogFormEntry(tabName);
                 // Auto-close Report Navigator when any form is opened, unless the user pinned it.
                 if (_isReportNavigatorVisible && !_isReportNavigatorPinned) HideReportNavigator();
                 // Check if tab already exists (skip when opening from favourites to allow multiple instances)
@@ -1459,11 +1525,11 @@ namespace PosBranch_Win
 
                 if (result == DialogResult.Yes)
                 {
+                    LogLogout("User logged off via menu");
                     // Close all tabs to free resources
                     CloseAllTabs();
 
-                    // Optional: clear session data if SessionContext has a clear method
-                    // SessionContext.Clear();
+                    SessionContext.Clear();
 
                     // Show the Login form
                     this.Hide();

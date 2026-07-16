@@ -16,6 +16,11 @@ namespace Repository.ReportRepository
             return GetReport("ITEM", fromDate, toDate, 0, itemId, companyId, branchId, finYearId);
         }
 
+        public DataTable GetVendorItemPurchases(DateTime fromDate, DateTime toDate, int vendorLedgerId, int itemId, int companyId, int branchId, int finYearId)
+        {
+            return GetReport("BOTH", fromDate, toDate, vendorLedgerId, itemId, companyId, branchId, finYearId);
+        }
+
         private DataTable GetReport(string mode, DateTime fromDate, DateTime toDate, int vendorLedgerId, int itemId, int companyId, int branchId, int finYearId)
         {
             DataTable result = new DataTable();

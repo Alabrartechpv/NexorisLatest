@@ -184,7 +184,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             // 
             // btnVendorPicker
             // 
-            this.btnVendorPicker.Location = new System.Drawing.Point(706, 15);
+            this.btnVendorPicker.Location = new System.Drawing.Point(706, 16);
             this.btnVendorPicker.Name = "btnVendorPicker";
             this.btnVendorPicker.Size = new System.Drawing.Size(33, 24);
             this.btnVendorPicker.TabIndex = 7;
@@ -193,7 +193,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             // 
             // btnVendorFromPicker
             // 
-            this.btnVendorFromPicker.Location = new System.Drawing.Point(833, 13);
+            this.btnVendorFromPicker.Location = new System.Drawing.Point(833, 14);
             this.btnVendorFromPicker.Name = "btnVendorFromPicker";
             this.btnVendorFromPicker.Size = new System.Drawing.Size(33, 24);
             this.btnVendorFromPicker.TabIndex = 22;
@@ -203,7 +203,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             // 
             // btnVendorToPicker
             // 
-            this.btnVendorToPicker.Location = new System.Drawing.Point(578, 14);
+            this.btnVendorToPicker.Location = new System.Drawing.Point(578, 15);
             this.btnVendorToPicker.Name = "btnVendorToPicker";
             this.btnVendorToPicker.Size = new System.Drawing.Size(33, 24);
             this.btnVendorToPicker.TabIndex = 23;
@@ -394,7 +394,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             this.gridReport.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            appearance1.BackColor = System.Drawing.Color.White;
+            appearance1.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(232)))), ((int)(((byte)(246)))), ((int)(((byte)(255)))));
             this.gridReport.DisplayLayout.Appearance = appearance1;
             this.gridReport.DisplayLayout.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
             appearance2.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(93)))), ((int)(((byte)(151)))), ((int)(((byte)(214)))));

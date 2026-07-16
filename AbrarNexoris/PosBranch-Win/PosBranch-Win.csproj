@@ -1033,6 +1033,12 @@
     <Compile Include="Settings\ActivityLogSelector.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="Settings\UserActivityLog.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Settings\UserActivityLog.Designer.cs">
+      <DependentUpon>UserActivityLog.cs</DependentUpon>
+    </Compile>
     <Compile Include="Settings\frmItemStockHistoryPopup.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -1686,6 +1692,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Reports\FinancialReports\FrmShiftReconciliationReport.resx">
       <DependentUpon>FrmShiftReconciliationReport.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Reports\FinancialReports\frmVendorOutstandingReport.resx">
+      <DependentUpon>frmVendorOutstandingReport.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Reports\FinancialReports\frmVendorPaymentReport.resx">
       <DependentUpon>frmVendorPaymentReport.cs</DependentUpon>

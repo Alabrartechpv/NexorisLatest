@@ -16,8 +16,8 @@ namespace PosBranch_Win.Reports.FinancialReports
 {
     public partial class frmVendorOutstandingReport : Form
     {
-        private static readonly Color FormBackColor = Color.FromArgb(214, 230, 240);
-        private static readonly Color FilterPanelBackColor = Color.FromArgb(214, 229, 241);
+        private static readonly Color FormBackColor = Color.FromArgb(232, 246, 255);
+        private static readonly Color FilterPanelBackColor = Color.FromArgb(232, 246, 255);
         private static readonly Color ActionPanelBackColor = Color.FromArgb(206, 223, 238);
         private static readonly Color BorderBlue = Color.FromArgb(118, 154, 198);
         private static readonly Color ControlBackColor = Color.White;
@@ -328,7 +328,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             layout.Override.RowSelectorWidth = 20;
             layout.Override.RowSelectorNumberStyle = RowSelectorNumberStyle.RowIndex;
 
-            layout.Appearance.BackColor = Color.White;
+            layout.Appearance.BackColor = FormBackColor;
             layout.Appearance.BorderColor = BorderBlue;
             layout.Appearance.BackColor2 = FormBackColor;
             layout.Appearance.BackGradientStyle = GradientStyle.None;

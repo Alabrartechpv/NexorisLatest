@@ -131,6 +131,7 @@
     <Compile Include="SettingsRepo\FinancialYearRepository.cs" />
     <Compile Include="SettingsRepo\ItemActivityLogRepository.cs" />
     <Compile Include="SettingsRepo\TransactionActivityLogRepository.cs" />
+    <Compile Include="SettingsRepo\UserActivityLogRepository.cs" />
     <Compile Include="ShiftSessionGuard.cs" />
     <Compile Include="ShiftSessionRepo.cs" />
     <Compile Include="VendorRepository.cs" />

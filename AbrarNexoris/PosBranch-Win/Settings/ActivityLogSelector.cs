@@ -62,7 +62,7 @@ namespace PosBranch_Win.Settings
             {
                 Dock = DockStyle.Fill,
                 FlowDirection = FlowDirection.LeftToRight,
-                WrapContents = false,
+                WrapContents = true,
                 BackColor = Color.Transparent,
                 Padding = new Padding(0, 8, 0, 0)
             };
@@ -70,6 +70,7 @@ namespace PosBranch_Win.Settings
             buttonRow.Controls.Add(CreateLogButton("itemstockactivity", "Activity Log - Item Stock", () => new ItemStockActivity()));
             buttonRow.Controls.Add(CreateLogButton("PurchaseLog", "Activity Log - Purchase", () => new PurchaseLog()));
             buttonRow.Controls.Add(CreateLogButton("SalesLog", "Activity Log - Sales", () => new SalesLog()));
+            buttonRow.Controls.Add(CreateLogButton("UserLog", "Activity Log - User Logging", () => new UserActivityLog()));
 
             root.Controls.Add(titlePanel, 0, 0);
             root.Controls.Add(buttonRow, 0, 1);

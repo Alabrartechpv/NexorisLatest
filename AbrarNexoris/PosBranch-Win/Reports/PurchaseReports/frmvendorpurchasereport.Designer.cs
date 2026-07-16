@@ -35,10 +35,15 @@ namespace PosBranch_Win.Reports.PurchaseReports
             this.panelPage = new System.Windows.Forms.Panel();
             this.tableContent = new System.Windows.Forms.TableLayoutPanel();
             this.panelGrid = new System.Windows.Forms.Panel();
-            this.gridReport = new System.Windows.Forms.DataGridView();
+            this.gridReport = new Infragistics.Win.UltraWinGrid.UltraGrid();
+            this.ultraPanelGridFooter = new Infragistics.Win.Misc.UltraPanel();
             this.panelGridFooter = new System.Windows.Forms.Panel();
             this.lblShowing = new System.Windows.Forms.Label();
-            this.btnExport = new System.Windows.Forms.Button();
+            this.btnPreviewReport = new Infragistics.Win.Misc.UltraButton();
+            this.footerButtonSpacer1 = new System.Windows.Forms.Panel();
+            this.btnPreviewGrid = new Infragistics.Win.Misc.UltraButton();
+            this.footerButtonSpacer2 = new System.Windows.Forms.Panel();
+            this.btnExportGrid = new Infragistics.Win.Misc.UltraButton();
             this.tableSummary = new System.Windows.Forms.TableLayoutPanel();
             this.panelRowsCard = new System.Windows.Forms.Panel();
             this.ultraLabel1 = new Infragistics.Win.Misc.UltraLabel();
@@ -73,11 +78,13 @@ namespace PosBranch_Win.Reports.PurchaseReports
             this.lblItem = new System.Windows.Forms.Label();
             this.btnVendor = new System.Windows.Forms.Button();
             this.btnItem = new System.Windows.Forms.Button();
+            this.btnBoth = new System.Windows.Forms.Button();
             this.lblTitle = new System.Windows.Forms.Label();
             this.panelPage.SuspendLayout();
             this.tableContent.SuspendLayout();
             this.panelGrid.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.gridReport)).BeginInit();
+            this.ultraPanelGridFooter.SuspendLayout();
             this.panelGridFooter.SuspendLayout();
             this.tableSummary.SuspendLayout();
             this.panelRowsCard.SuspendLayout();
@@ -132,6 +139,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
             // 
             this.panelGrid.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(250)))), ((int)(((byte)(253)))), ((int)(((byte)(255)))));
             this.panelGrid.Controls.Add(this.gridReport);
+            this.panelGrid.Controls.Add(this.ultraPanelGridFooter);
             this.panelGrid.Dock = System.Windows.Forms.DockStyle.Fill;
             this.panelGrid.Location = new System.Drawing.Point(0, 0);
             this.panelGrid.Margin = new System.Windows.Forms.Padding(0, 0, 0, 6);
@@ -142,29 +150,30 @@ namespace PosBranch_Win.Reports.PurchaseReports
             // 
             // gridReport
             // 
-            this.gridReport.AllowUserToAddRows = false;
-            this.gridReport.AllowUserToDeleteRows = false;
-            this.gridReport.AllowUserToResizeRows = false;
-            this.gridReport.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.Fill;
-            this.gridReport.BackgroundColor = System.Drawing.Color.FromArgb(((int)(((byte)(250)))), ((int)(((byte)(253)))), ((int)(((byte)(255)))));
-            this.gridReport.BorderStyle = System.Windows.Forms.BorderStyle.None;
             this.gridReport.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.gridReport.EnableHeadersVisualStyles = false;
-            this.gridReport.GridColor = System.Drawing.Color.FromArgb(((int)(((byte)(218)))), ((int)(((byte)(232)))), ((int)(((byte)(247)))));
             this.gridReport.Location = new System.Drawing.Point(2, 2);
-            this.gridReport.MultiSelect = false;
             this.gridReport.Name = "gridReport";
-            this.gridReport.ReadOnly = true;
-            this.gridReport.RowHeadersVisible = false;
-            this.gridReport.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
-            this.gridReport.Size = new System.Drawing.Size(996, 228);
+            this.gridReport.Size = new System.Drawing.Size(996, 202);
             this.gridReport.TabIndex = 1;
+            this.gridReport.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
+            // 
+            // ultraPanelGridFooter
+            // 
+            this.ultraPanelGridFooter.Dock = System.Windows.Forms.DockStyle.Bottom;
+            this.ultraPanelGridFooter.Location = new System.Drawing.Point(2, 204);
+            this.ultraPanelGridFooter.Name = "ultraPanelGridFooter";
+            this.ultraPanelGridFooter.Size = new System.Drawing.Size(996, 26);
+            this.ultraPanelGridFooter.TabIndex = 2;
             // 
             // panelGridFooter
             // 
             this.panelGridFooter.BackColor = System.Drawing.Color.Transparent;
             this.panelGridFooter.Controls.Add(this.lblShowing);
-            this.panelGridFooter.Controls.Add(this.btnExport);
+            this.panelGridFooter.Controls.Add(this.btnPreviewReport);
+            this.panelGridFooter.Controls.Add(this.footerButtonSpacer1);
+            this.panelGridFooter.Controls.Add(this.btnPreviewGrid);
+            this.panelGridFooter.Controls.Add(this.footerButtonSpacer2);
+            this.panelGridFooter.Controls.Add(this.btnExportGrid);
             this.panelGridFooter.Dock = System.Windows.Forms.DockStyle.Fill;
             this.panelGridFooter.Location = new System.Drawing.Point(0, 238);
             this.panelGridFooter.Margin = new System.Windows.Forms.Padding(0);
@@ -181,22 +190,59 @@ namespace PosBranch_Win.Reports.PurchaseReports
             this.lblShowing.Location = new System.Drawing.Point(0, 4);
             this.lblShowing.Name = "lblShowing";
             this.lblShowing.Padding = new System.Windows.Forms.Padding(3, 0, 0, 0);
-            this.lblShowing.Size = new System.Drawing.Size(888, 32);
+            this.lblShowing.Size = new System.Drawing.Size(644, 32);
             this.lblShowing.TabIndex = 0;
             this.lblShowing.Text = "Showing 0 record(s)";
             this.lblShowing.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
             // 
-            // btnExport
+            // btnPreviewReport
             // 
-            this.btnExport.Dock = System.Windows.Forms.DockStyle.Right;
-            this.btnExport.Location = new System.Drawing.Point(888, 4);
-            this.btnExport.Margin = new System.Windows.Forms.Padding(4, 4, 4, 3);
-            this.btnExport.Name = "btnExport";
-            this.btnExport.Size = new System.Drawing.Size(112, 32);
-            this.btnExport.TabIndex = 6;
-            this.btnExport.Text = "Export";
-            this.btnExport.UseVisualStyleBackColor = false;
-            this.btnExport.Click += new System.EventHandler(this.btnExport_Click);
+            this.btnPreviewReport.Dock = System.Windows.Forms.DockStyle.Right;
+            this.btnPreviewReport.Location = new System.Drawing.Point(644, 4);
+            this.btnPreviewReport.Margin = new System.Windows.Forms.Padding(4, 4, 4, 3);
+            this.btnPreviewReport.Name = "btnPreviewReport";
+            this.btnPreviewReport.Size = new System.Drawing.Size(112, 32);
+            this.btnPreviewReport.TabIndex = 8;
+            this.btnPreviewReport.Text = "Preview Report";
+            this.btnPreviewReport.Click += new System.EventHandler(this.btnPreviewReport_Click);
+            // 
+            // footerButtonSpacer1
+            // 
+            this.footerButtonSpacer1.Dock = System.Windows.Forms.DockStyle.Right;
+            this.footerButtonSpacer1.Location = new System.Drawing.Point(756, 4);
+            this.footerButtonSpacer1.Name = "footerButtonSpacer1";
+            this.footerButtonSpacer1.Size = new System.Drawing.Size(10, 32);
+            this.footerButtonSpacer1.TabIndex = 9;
+            // 
+            // btnPreviewGrid
+            // 
+            this.btnPreviewGrid.Dock = System.Windows.Forms.DockStyle.Right;
+            this.btnPreviewGrid.Location = new System.Drawing.Point(766, 4);
+            this.btnPreviewGrid.Margin = new System.Windows.Forms.Padding(4, 4, 4, 3);
+            this.btnPreviewGrid.Name = "btnPreviewGrid";
+            this.btnPreviewGrid.Size = new System.Drawing.Size(112, 32);
+            this.btnPreviewGrid.TabIndex = 7;
+            this.btnPreviewGrid.Text = "Preview Grid";
+            this.btnPreviewGrid.Click += new System.EventHandler(this.btnPreviewGrid_Click);
+            // 
+            // footerButtonSpacer2
+            // 
+            this.footerButtonSpacer2.Dock = System.Windows.Forms.DockStyle.Right;
+            this.footerButtonSpacer2.Location = new System.Drawing.Point(878, 4);
+            this.footerButtonSpacer2.Name = "footerButtonSpacer2";
+            this.footerButtonSpacer2.Size = new System.Drawing.Size(10, 32);
+            this.footerButtonSpacer2.TabIndex = 10;
+            // 
+            // btnExportGrid
+            // 
+            this.btnExportGrid.Dock = System.Windows.Forms.DockStyle.Right;
+            this.btnExportGrid.Location = new System.Drawing.Point(888, 4);
+            this.btnExportGrid.Margin = new System.Windows.Forms.Padding(4, 4, 4, 3);
+            this.btnExportGrid.Name = "btnExportGrid";
+            this.btnExportGrid.Size = new System.Drawing.Size(112, 32);
+            this.btnExportGrid.TabIndex = 6;
+            this.btnExportGrid.Text = "Export Grid";
+            this.btnExportGrid.Click += new System.EventHandler(this.btnExportGrid_Click);
             // 
             // tableSummary
             // 
@@ -390,8 +436,9 @@ namespace PosBranch_Win.Reports.PurchaseReports
             this.tableFilters.Controls.Add(this.btnClear, 7, 0);
             this.tableFilters.Controls.Add(this.panelVendor, 0, 1);
             this.tableFilters.Controls.Add(this.panelItem, 4, 1);
-            this.tableFilters.Controls.Add(this.btnVendor, 8, 1);
-            this.tableFilters.Controls.Add(this.btnItem, 9, 1);
+            this.tableFilters.Controls.Add(this.btnVendor, 7, 1);
+            this.tableFilters.Controls.Add(this.btnItem, 8, 1);
+            this.tableFilters.Controls.Add(this.btnBoth, 9, 1);
             this.tableFilters.Dock = System.Windows.Forms.DockStyle.Fill;
             this.tableFilters.Location = new System.Drawing.Point(0, 0);
             this.tableFilters.Name = "tableFilters";
@@ -560,14 +607,14 @@ namespace PosBranch_Win.Reports.PurchaseReports
             // 
             // panelItem
             // 
-            this.tableFilters.SetColumnSpan(this.panelItem, 4);
+            this.tableFilters.SetColumnSpan(this.panelItem, 3);
             this.panelItem.Controls.Add(this.txtItem);
             this.panelItem.Controls.Add(this.lblItem);
             this.panelItem.Dock = System.Windows.Forms.DockStyle.Fill;
             this.panelItem.Location = new System.Drawing.Point(336, 56);
             this.panelItem.Margin = new System.Windows.Forms.Padding(0, 0, 8, 2);
             this.panelItem.Name = "panelItem";
-            this.panelItem.Size = new System.Drawing.Size(316, 44);
+            this.panelItem.Size = new System.Drawing.Size(235, 44);
             this.panelItem.TabIndex = 8;
             // 
             // txtItem
@@ -577,7 +624,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
             this.txtItem.Location = new System.Drawing.Point(0, 18);
             this.txtItem.Name = "txtItem";
             this.txtItem.ReadOnly = true;
-            this.txtItem.Size = new System.Drawing.Size(316, 25);
+            this.txtItem.Size = new System.Drawing.Size(235, 25);
             this.txtItem.TabIndex = 1;
             // 
             // lblItem
@@ -587,17 +634,17 @@ namespace PosBranch_Win.Reports.PurchaseReports
             this.lblItem.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(72)))), ((int)(((byte)(98)))), ((int)(((byte)(138)))));
             this.lblItem.Location = new System.Drawing.Point(0, 0);
             this.lblItem.Name = "lblItem";
-            this.lblItem.Size = new System.Drawing.Size(316, 18);
+            this.lblItem.Size = new System.Drawing.Size(235, 18);
             this.lblItem.TabIndex = 0;
             this.lblItem.Text = "Item";
             // 
             // btnVendor
             // 
             this.btnVendor.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.btnVendor.Location = new System.Drawing.Point(664, 76);
+            this.btnVendor.Location = new System.Drawing.Point(583, 76);
             this.btnVendor.Margin = new System.Windows.Forms.Padding(4, 20, 4, 3);
             this.btnVendor.Name = "btnVendor";
-            this.btnVendor.Size = new System.Drawing.Size(66, 23);
+            this.btnVendor.Size = new System.Drawing.Size(73, 23);
             this.btnVendor.TabIndex = 9;
             this.btnVendor.Text = "Vendor";
             this.btnVendor.UseVisualStyleBackColor = false;
@@ -606,14 +653,26 @@ namespace PosBranch_Win.Reports.PurchaseReports
             // btnItem
             // 
             this.btnItem.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.btnItem.Location = new System.Drawing.Point(738, 76);
+            this.btnItem.Location = new System.Drawing.Point(664, 76);
             this.btnItem.Margin = new System.Windows.Forms.Padding(4, 20, 4, 3);
             this.btnItem.Name = "btnItem";
-            this.btnItem.Size = new System.Drawing.Size(80, 23);
+            this.btnItem.Size = new System.Drawing.Size(66, 23);
             this.btnItem.TabIndex = 10;
             this.btnItem.Text = "Item";
             this.btnItem.UseVisualStyleBackColor = false;
             this.btnItem.Click += new System.EventHandler(this.btnItem_Click);
+            // 
+            // btnBoth
+            // 
+            this.btnBoth.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.btnBoth.Location = new System.Drawing.Point(738, 76);
+            this.btnBoth.Margin = new System.Windows.Forms.Padding(4, 20, 4, 3);
+            this.btnBoth.Name = "btnBoth";
+            this.btnBoth.Size = new System.Drawing.Size(80, 23);
+            this.btnBoth.TabIndex = 11;
+            this.btnBoth.Text = "Both";
+            this.btnBoth.UseVisualStyleBackColor = false;
+            this.btnBoth.Click += new System.EventHandler(this.btnBoth_Click);
             // 
             // lblTitle
             // 
@@ -642,6 +701,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
             this.tableContent.ResumeLayout(false);
             this.panelGrid.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.gridReport)).EndInit();
+            this.ultraPanelGridFooter.ResumeLayout(false);
             this.panelGridFooter.ResumeLayout(false);
             this.tableSummary.ResumeLayout(false);
             this.panelRowsCard.ResumeLayout(false);
@@ -688,7 +748,9 @@ namespace PosBranch_Win.Reports.PurchaseReports
         private System.Windows.Forms.Label lblTo;
         private System.Windows.Forms.Button btnApply;
         private System.Windows.Forms.Button btnClear;
-        private System.Windows.Forms.Button btnExport;
+        private Infragistics.Win.Misc.UltraButton btnExportGrid;
+        private Infragistics.Win.Misc.UltraButton btnPreviewGrid;
+        private Infragistics.Win.Misc.UltraButton btnPreviewReport;
         private System.Windows.Forms.Panel panelVendor;
         private Infragistics.Win.UltraWinEditors.UltraTextEditor txtVendor;
         private System.Windows.Forms.Label lblVendor;
@@ -697,6 +759,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
         private System.Windows.Forms.Label lblItem;
         private System.Windows.Forms.Button btnVendor;
         private System.Windows.Forms.Button btnItem;
+        private System.Windows.Forms.Button btnBoth;
         private System.Windows.Forms.TableLayoutPanel tableSummary;
         private System.Windows.Forms.Panel panelRowsCard;
         private System.Windows.Forms.Label lblTotalRows;
@@ -707,8 +770,11 @@ namespace PosBranch_Win.Reports.PurchaseReports
         private System.Windows.Forms.Panel panelAmountCard;
         private System.Windows.Forms.Label lblTotalAmount;
         private System.Windows.Forms.Panel panelGrid;
-        private System.Windows.Forms.DataGridView gridReport;
+        private Infragistics.Win.Misc.UltraPanel ultraPanelGridFooter;
+        private Infragistics.Win.UltraWinGrid.UltraGrid gridReport;
         private System.Windows.Forms.Label lblShowing;
+        private System.Windows.Forms.Panel footerButtonSpacer1;
+        private System.Windows.Forms.Panel footerButtonSpacer2;
         private Infragistics.Win.Misc.UltraLabel ultraLabel1;
         private Infragistics.Win.Misc.UltraLabel ultraLabel4;
         private Infragistics.Win.Misc.UltraLabel ultraLabel3;
