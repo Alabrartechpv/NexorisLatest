@@ -118,79 +118,42 @@ namespace Repository.TransactionRepository
         public int PReturnNo = 0;
         public int GeneratePReturnNo(SqlTransaction trans = null)
         {
-            int PReturnNo = 0;
-            bool newConnection = false;
+            int generatedNo = 0;
 
             try
             {
-                // Ensure connection is open
                 if (DataConnection.State != ConnectionState.Open)
-                {
                     DataConnection.Open();
-                    newConnection = true;
-                }
 
-                // Simple approach: Get max PR number directly from database and add 1
-                string maxPRQuery = @"
-                    SELECT ISNULL(MAX(PReturnNo), 0)
-                    FROM PReturnMaster";
-
-                using (SqlCommand maxCmd = new SqlCommand(maxPRQuery, (SqlConnection)DataConnection, trans))
+                // Use the stored procedure which reads from TrackTrans for the
+                // specific BranchID + FinYearID — keeping each branch's counter isolated.
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._POS_PurchaseReturn, (SqlConnection)DataConnection))
                 {
-                    object result = maxCmd.ExecuteScalar();
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Transaction = trans;
+                    cmd.Parameters.AddWithValue("@BranchId", Convert.ToInt32(DataBase.BranchId));
+                    cmd.Parameters.AddWithValue("@FinYearId", Convert.ToInt32(DataBase.FinyearId));
+                    cmd.Parameters.AddWithValue("@_Operation", "GENERATENUMBER");
+
+                    object result = cmd.ExecuteScalar();
                     if (result != null && result != DBNull.Value)
                     {
-                        int currentMaxPR = Convert.ToInt32(result);
-
-                        // Ensure min value is 768 (first PR will be 769)
-                        if (currentMaxPR < 768)
-                        {
-                            currentMaxPR = 768;
-                        }
-
-                        // Next PR number is max + 1
-                        PReturnNo = currentMaxPR + 1;
-
-                        System.Diagnostics.Debug.WriteLine($"Generated PR number: Max={currentMaxPR}, Next={PReturnNo}");
-
-                        // Update TrackTrans with the current max PR number
-                        try
-                        {
-                            string updateQuery = "UPDATE TrackTrans SET PRBillNo = @PRBillNo";
-                            using (SqlCommand updateCmd = new SqlCommand(updateQuery, (SqlConnection)DataConnection, trans))
-                            {
-                                updateCmd.Parameters.AddWithValue("@PRBillNo", currentMaxPR);
-                                updateCmd.ExecuteNonQuery();
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"Warning: Could not update TrackTrans: {ex.Message}");
-                            // Continue even if update fails
-                        }
+                        generatedNo = Convert.ToInt32(result);
+                        System.Diagnostics.Debug.WriteLine($"GeneratePReturnNo (SP): Branch={DataBase.BranchId}, FinYear={DataBase.FinyearId}, Next={generatedNo}");
                     }
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error in GeneratePReturnNo: {ex.Message}");
-                // Use 769 as fallback if there's an error
-                PReturnNo = 769;
             }
             finally
             {
-                if (newConnection && DataConnection.State == ConnectionState.Open && trans == null)
-                {
+                if (trans == null && DataConnection.State == ConnectionState.Open)
                     DataConnection.Close();
-                }
             }
 
-            // If we couldn't get a valid PR number, use 769 as fallback
-            if (PReturnNo < 769)
-            {
-                PReturnNo = 769;
-            }
-
+            PReturnNo = generatedNo > 0 ? generatedNo : 1;
             return PReturnNo;
         }
 

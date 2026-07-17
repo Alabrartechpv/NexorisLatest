@@ -234,11 +234,8 @@ namespace PosBranch_Win.Transaction
                 // Load branch data
                 LoadBranchData();
 
-                // DIRECTLY FIX TRACKTRANS TABLE WITH CORRECT PR NUMBER AND SET TxtSRNO
-                DirectlyFixTrackTransTable();
-
-                // Skip the generate number method - we're directly setting it in DirectlyFixTrackTransTable
-                // GeneratePurchaseReturnNumber();
+                // Generate branch-scoped PR number via stored procedure
+                GeneratePurchaseReturnNumber();
 
                 // Make the PR number field read-only
                 TxtSRNO.ReadOnly = true;
@@ -295,35 +292,7 @@ namespace PosBranch_Win.Transaction
                 // Force an initial resize to set column proportions
                 ResizeGridColumns();
 
-                // Double-check the TxtSRNO value after load
-                if (TxtSRNO.Text == "0001" || TxtSRNO.Text.StartsWith("000"))
-                {
-                    // Silent emergency fix without MessageBoxes
-                    System.Diagnostics.Debug.WriteLine("Emergency fix: TxtSRNO still shows small number, applying silent fix");
 
-                    using (SqlConnection conn = new SqlConnection(GetConnectionString()))
-                    {
-                        conn.Open();
-                        using (SqlCommand cmd = new SqlCommand("SELECT ISNULL(MAX(PReturnNo), 0) FROM PReturnMaster", conn))
-                        {
-                            int maxPR = Convert.ToInt32(cmd.ExecuteScalar());
-
-                            // Force it to be at least 768 (so next is 769)
-                            if (maxPR < 768)
-                            {
-                                maxPR = 768;
-                            }
-
-                            int nextPR = maxPR + 1;
-
-                            // Update repository's PReturnNo field as well
-                            prRepo.PReturnNo = nextPR;
-
-                            TxtSRNO.Text = FormatPRNumber(nextPR);
-                            System.Diagnostics.Debug.WriteLine($"Silent emergency fix: Set TxtSRNO to {TxtSRNO.Text} (next after max {maxPR})");
-                        }
-                    }
-                }
             }
             catch (Exception ex)
             {
@@ -331,71 +300,13 @@ namespace PosBranch_Win.Transaction
             }
         }
 
-        // Direct fix for the TrackTrans table
+        // Generates the next purchase return number scoped to the current branch and financial year.
+        // Delegates entirely to the stored procedure _POS_PurchaseReturn (GENERATENUMBER)
+        // which reads from TrackTrans WHERE BranchID = @BranchId AND FinYearID = @FinYearId.
         private void DirectlyFixTrackTransTable()
         {
-            try
-            {
-                using (SqlConnection conn = new SqlConnection(GetConnectionString()))
-                {
-                    conn.Open();
-
-                    // Direct query to get the max PR number - without parameters
-                    string maxPRQuery = @"
-                        SELECT ISNULL(MAX(PReturnNo), 0)
-                        FROM PReturnMaster";
-
-                    int maxPRNo = 0;
-
-                    using (SqlCommand maxCmd = new SqlCommand(maxPRQuery, conn))
-                    {
-                        object result = maxCmd.ExecuteScalar();
-                        if (result != null && result != DBNull.Value)
-                        {
-                            maxPRNo = Convert.ToInt32(result);
-                            System.Diagnostics.Debug.WriteLine($"DIRECT FIX: Found max PR number in database: {maxPRNo}");
-                        }
-                    }
-
-                    // Make sure the number is at least 768 so next number is 769
-                    if (maxPRNo < 768)
-                    {
-                        maxPRNo = 768;
-                        System.Diagnostics.Debug.WriteLine("DIRECT FIX: Setting minimum value of 768 (next will be 769)");
-                    }
-
-                    // Update the TrackTrans table with max PR number - all tables
-                    string updateQuery = @"
-                        UPDATE TrackTrans 
-                        SET PRBillNo = @PRBillNo";
-
-                    using (SqlCommand cmd = new SqlCommand(updateQuery, conn))
-                    {
-                        cmd.Parameters.AddWithValue("@PRBillNo", maxPRNo);
-
-                        int rowsAffected = cmd.ExecuteNonQuery();
-                        System.Diagnostics.Debug.WriteLine($"DIRECT FIX: Updated TrackTrans.PRBillNo to {maxPRNo}, {rowsAffected} rows affected");
-                    }
-
-                    // FORCE next PR number directly
-                    int nextPRNo = maxPRNo + 1;
-
-                    // Update repository's PReturnNo field
-                    prRepo.PReturnNo = nextPRNo;
-
-                    string formattedNumber = FormatPRNumber(nextPRNo);
-                    TxtSRNO.Text = formattedNumber;
-                    System.Diagnostics.Debug.WriteLine($"DIRECT FIX: FORCED TxtSRNO.Text = {formattedNumber} (numeric: {nextPRNo})");
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"DIRECT FIX ERROR: {ex.Message}");
-                if (ex.InnerException != null)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Inner exception: {ex.InnerException.Message}");
-                }
-            }
+            // Kept for backward compatibility — simply calls the proper generator.
+            GeneratePurchaseReturnNumber();
         }
 
         private void SetupGridDocking()
