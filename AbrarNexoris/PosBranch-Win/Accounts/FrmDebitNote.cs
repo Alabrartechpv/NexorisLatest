@@ -172,10 +172,22 @@ namespace PosBranch_Win.Accounts
                 // If a purchase return is loaded and its source invoice is not in the list, force-append it!
                 if (dt != null && !string.IsNullOrEmpty(_invoiceNo) && !IsPurchaseReturnWithoutInvoice() && currentVendorLedgerId > 0)
                 {
+                    string normalizedInvoiceNo = _invoiceNo.Trim();
+                    if (normalizedInvoiceNo.StartsWith("GRN-", StringComparison.OrdinalIgnoreCase))
+                    {
+                        normalizedInvoiceNo = normalizedInvoiceNo.Substring(4).Trim();
+                    }
+
                     bool found = false;
                     foreach (DataRow row in dt.Rows)
                     {
-                        if (row["BillNo"].ToString().Trim().Equals(_invoiceNo.Trim(), StringComparison.OrdinalIgnoreCase))
+                        string billNoStr = row["BillNo"].ToString().Trim();
+                        if (billNoStr.StartsWith("GRN-", StringComparison.OrdinalIgnoreCase))
+                        {
+                            billNoStr = billNoStr.Substring(4).Trim();
+                        }
+
+                        if (billNoStr.Equals(normalizedInvoiceNo, StringComparison.OrdinalIgnoreCase))
                         {
                             found = true;
                             break;
@@ -254,10 +266,20 @@ namespace PosBranch_Win.Accounts
                     var rows = dt.AsEnumerable()
                         .Where(row => {
                             decimal balance = GetSafeDecimal(row["Balance"]);
-                            // Don't filter out the source invoice even if its balance is 0
-                            bool isSourceInvoice = !string.IsNullOrEmpty(_invoiceNo) && 
-                                                 row["BillNo"].ToString().Trim().Equals(_invoiceNo.Trim(), StringComparison.OrdinalIgnoreCase);
-                            return balance > 0 || isSourceInvoice;
+                             bool isSourceInvoice = false;
+                             if (!string.IsNullOrEmpty(_invoiceNo))
+                             {
+                                 string normalizedSrcInv = _invoiceNo.Trim();
+                                 if (normalizedSrcInv.StartsWith("GRN-", StringComparison.OrdinalIgnoreCase))
+                                     normalizedSrcInv = normalizedSrcInv.Substring(4).Trim();
+
+                                 string rowBillNo = row["BillNo"].ToString().Trim();
+                                 if (rowBillNo.StartsWith("GRN-", StringComparison.OrdinalIgnoreCase))
+                                     rowBillNo = rowBillNo.Substring(4).Trim();
+
+                                 isSourceInvoice = rowBillNo.Equals(normalizedSrcInv, StringComparison.OrdinalIgnoreCase);
+                             }
+                             return balance > 0 || isSourceInvoice;
                         })
                         .ToList();
 

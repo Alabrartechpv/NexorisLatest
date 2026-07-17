@@ -8218,7 +8218,8 @@ namespace PosBranch_Win.Transaction
                     itemsPanel.Controls.Add(itemNameLabel);
 
                     Label qtyLabel = new Label();
-                    qtyLabel.Text = row.Cells[_quantityColumnName].Value?.ToString() ?? "";
+                    string returnQtyKey = row.Cells.Exists("Returned qty") ? "Returned qty" : _quantityColumnName;
+                    qtyLabel.Text = row.Cells[returnQtyKey].Value?.ToString() ?? "";
                     qtyLabel.Font = new Font("Arial", 9);
                     qtyLabel.Size = new Size(40, 20);
                     qtyLabel.Location = new Point(200, yOffset);
@@ -9010,8 +9011,8 @@ namespace PosBranch_Win.Transaction
                     itemsPanel.Controls.Add(itemNameLabel);
 
                     Label qtyLabel = new Label();
-                    qtyLabel.Text = row.Cells.Exists("Quantity") ?
-                        row.Cells["Quantity"].Value?.ToString() ?? "" : "";
+                    qtyLabel.Text = row.Cells.Exists("Returned qty") ?
+                        row.Cells["Returned qty"].Value?.ToString() ?? "" : "";
                     qtyLabel.Font = new Font("Arial", 9);
                     qtyLabel.Size = new Size(50, 20);
                     qtyLabel.Location = new Point(220, yOffset);
