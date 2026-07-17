@@ -955,7 +955,7 @@ namespace Repository.TransactionRepository
                     }
 
                     trans.Commit();
-                    return "Sales return saved successfully!";
+                    return $"Sales return saved successfully! #{sr.SReturnNo}";
                 }
                 catch (Exception ex)
                 {
