@@ -15,10 +15,15 @@ namespace ModelClass.Report
         public DateTime? PostDate { get; set; }
         public decimal DocAmt { get; set; }
         public decimal Balance { get; set; }
+        public int IsPR { get; set; }
 
         public string DocNo
         {
-            get { return PurchaseNo > 0 ? "GRN-" + PurchaseNo : string.Empty; }
+            get 
+            {
+                if (IsPR == 1) return "PR-" + PurchaseNo;
+                return PurchaseNo > 0 ? "GRN-" + PurchaseNo : string.Empty;
+            }
         }
 
         public int LedgerID
@@ -66,5 +71,6 @@ namespace ModelClass.Report
         public bool UseDateFilter { get; set; }
         public bool PaymentDueOnly { get; set; }
         public bool IncludePaymentNotWithinSelectionDate { get; set; }
+        public bool GetUnallocatedReturnsOnly { get; set; }
     }
 }

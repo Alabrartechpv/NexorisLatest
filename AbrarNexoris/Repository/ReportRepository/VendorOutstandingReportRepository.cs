@@ -36,6 +36,7 @@ namespace Repository.ReportRepository
                     cmd.Parameters.Add("@FromDate", SqlDbType.Date).Value = filter.FromDate.Date;
                     cmd.Parameters.Add("@ToDate", SqlDbType.Date).Value = filter.ToDate.Date;
                     cmd.Parameters.Add("@PaymentDueOnly", SqlDbType.Bit).Value = filter.PaymentDueOnly;
+                    cmd.Parameters.Add("@GetUnallocatedReturnsOnly", SqlDbType.Bit).Value = filter.GetUnallocatedReturnsOnly;
 
                     using (SqlDataAdapter adapter = new SqlDataAdapter(cmd))
                     {
@@ -56,7 +57,8 @@ namespace Repository.ReportRepository
                                 InvoiceDate = ToNullableDateTime(row, "InvoiceDate"),
                                 PostDate = ToNullableDateTime(row, "PostDate"),
                                 DocAmt = ToDecimal(row, "DocAmt"),
-                                Balance = ToDecimal(row, "Balance")
+                                Balance = ToDecimal(row, "Balance"),
+                                IsPR = ToInt(row, "IsPR")
                             });
                         }
                     }

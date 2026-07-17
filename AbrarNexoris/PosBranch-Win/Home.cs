@@ -86,6 +86,7 @@ namespace PosBranch_Win
             new ReportNavigatorDefinition("Customer", "Customer Ledger Statement", "CustomerLedgerReport"),
             new ReportNavigatorDefinition("Vendor", "Vendor Outstanding Listing", "VendorOutstandingReport"),
             new ReportNavigatorDefinition("Vendor", "DN/payment", "VendorDNPaymentReport"),
+            new ReportNavigatorDefinition("Vendor", "Unallocated Purchase Returns", "UnallocatedPurchaseReturns"),
             new ReportNavigatorDefinition("Analysis", "Trading Account", "TradingAccount"),
             new ReportNavigatorDefinition("Analysis", "Profit & Loss Account", "ProfitLossAccount"),
             new ReportNavigatorDefinition("Analysis", "Balance Sheet", "BalanceSheet"),
@@ -2297,6 +2298,11 @@ namespace PosBranch_Win
                 PosBranch_Win.Reports.FinancialReports.frmVendorPaymentReport vendorPaymentReport = new PosBranch_Win.Reports.FinancialReports.frmVendorPaymentReport();
                 OpenFormInTab(vendorPaymentReport, "Vendor DN/Payment Report");
             }
+            if (e.Tool.Key == "UnallocatedPurchaseReturns")
+            {
+                PosBranch_Win.Reports.FinancialReports.frmVendorOutstandingReport unallocatedReturnsReport = new PosBranch_Win.Reports.FinancialReports.frmVendorOutstandingReport(true);
+                OpenFormInTab(unallocatedReturnsReport, "Unallocated Purchase Returns");
+            }
 
             #region here for reports sections menu
             if (e.Tool.Key == "DSales")
@@ -3965,6 +3971,7 @@ namespace PosBranch_Win
                     keyToExecute == "CounterReport" ||
                     keyToExecute == "ShiftReconciliationReport" ||
                     keyToExecute == "TradingAccount" ||
+                    keyToExecute == "UnallocatedPurchaseReturns" ||
                     keyToExecute == "ProfitLossAccount")
                 {
                     Infragistics.Win.UltraWinToolbars.ToolBase toolToExecute;

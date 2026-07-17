@@ -42,6 +42,9 @@ namespace PosBranch_Win.Reports.FinancialReports
         private readonly Dictionary<string, string> _columnAggregations;
         private bool _isLoading;
         private bool _isSyncingVendorControls;
+        private readonly bool _getUnallocatedReturnsOnly;
+        private Panel pnlWarning;
+        private Label lblWarning;
 
         public frmVendorOutstandingReport()
         {
@@ -80,6 +83,11 @@ namespace PosBranch_Win.Reports.FinancialReports
             KeyDown += frmVendorOutstandingReport_KeyDown;
         }
 
+        public frmVendorOutstandingReport(bool getUnallocatedReturnsOnly) : this()
+        {
+            _getUnallocatedReturnsOnly = getUnallocatedReturnsOnly;
+        }
+
         private void frmVendorOutstandingReport_Load(object sender, EventArgs e)
         {
             InitializeForm();
@@ -91,7 +99,7 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             try
             {
-                Text = "Vendor Outstanding Listing";
+                Text = _getUnallocatedReturnsOnly ? "Unallocated Purchase Returns" : "Vendor Outstanding Listing";
                 WindowState = FormWindowState.Maximized;
                 StartPosition = FormStartPosition.CenterScreen;
 
@@ -103,6 +111,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                 LoadVendors();
                 InitializeGridFooter();
                 ResetReportView();
+                InitializeWarningPanel();
             }
             finally
             {
@@ -379,6 +388,7 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             gridReport.BackColor = FormBackColor;
             gridReport.Font = new Font("Microsoft Sans Serif", 8.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            gridReport.DoubleClickRow += gridReport_DoubleClickRow;
         }
 
         private void LoadVendors()
@@ -435,7 +445,8 @@ namespace PosBranch_Win.Reports.FinancialReports
                     DateFilterMode = Convert.ToString(ultraComboDateMode.Value),
                     UseDateFilter = IsDateRangeMode() && !chkIncludeOutsideSelection.Checked,
                     PaymentDueOnly = chkPaymentDueOnly.Checked,
-                    IncludePaymentNotWithinSelectionDate = chkIncludeOutsideSelection.Checked
+                    IncludePaymentNotWithinSelectionDate = chkIncludeOutsideSelection.Checked,
+                    GetUnallocatedReturnsOnly = _getUnallocatedReturnsOnly
                 };
 
                 _reportRows = _repository.GetReport(filter);
@@ -498,6 +509,11 @@ namespace PosBranch_Win.Reports.FinancialReports
                 .ToList();
 
             gridReport.DataSource = boundRows;
+            if (pnlWarning != null)
+            {
+                pnlWarning.Visible = boundRows.Any(x => x.IsPR == 1);
+                this.PerformLayout();
+            }
             CreateFooterCells();
             UpdateFooterCellPositions();
             UpdateFooterValues(boundRows);
@@ -829,7 +845,11 @@ namespace PosBranch_Win.Reports.FinancialReports
                     return;
 
                 StringBuilder builder = new StringBuilder();
-                builder.AppendLine("AcctCode,Company,Name,Phone,Doc No,Date,Reference,Invoice Date,Post Date,Doc Amt,Balance");
+                string docNoHeader = _getUnallocatedReturnsOnly ? "Return No" : "Doc No";
+                string dateHeader = _getUnallocatedReturnsOnly ? "Return Date" : "Date";
+                string docAmtHeader = _getUnallocatedReturnsOnly ? "Return Amt" : "Doc Amt";
+                string balanceHeader = _getUnallocatedReturnsOnly ? "Unallocated Amt" : "Balance";
+                builder.AppendLine($"AcctCode,Company,Name,Phone,{docNoHeader},{dateHeader},Reference,Invoice Date,Post Date,{docAmtHeader},{balanceHeader}");
 
                 foreach (VendorOutstandingReportRow row in rows)
                 {
@@ -899,13 +919,13 @@ namespace PosBranch_Win.Reports.FinancialReports
             ConfigureGridColumn(band, "Company", "Company", 210, null, HAlign.Left, 1);
             ConfigureGridColumn(band, "Name", "Name", 170, null, HAlign.Left, 2);
             ConfigureGridColumn(band, "Phone", "Phone", 120, null, HAlign.Left, 3);
-            ConfigureGridColumn(band, "DocNo", "Doc No", 102, null, HAlign.Left, 4);
-            ConfigureGridColumn(band, "Date", "Date", 105, "dd-MMM-yyyy", HAlign.Left, 5);
+            ConfigureGridColumn(band, "DocNo", _getUnallocatedReturnsOnly ? "Return No" : "Doc No", 102, null, HAlign.Left, 4);
+            ConfigureGridColumn(band, "Date", _getUnallocatedReturnsOnly ? "Return Date" : "Date", 105, "dd-MMM-yyyy", HAlign.Left, 5);
             ConfigureGridColumn(band, "Reference", "Reference", 128, null, HAlign.Left, 6);
             ConfigureGridColumn(band, "InvoiceDate", "Invoice Date", 105, "dd-MMM-yyyy", HAlign.Left, 7);
             ConfigureGridColumn(band, "PostDate", "Post Date", 105, "dd-MMM-yyyy", HAlign.Left, 8);
-            ConfigureGridColumn(band, "DocAmt", "Doc Amt", 95, "#,##0.00", HAlign.Right, 9);
-            ConfigureGridColumn(band, "Balance", "Balance", 95, "#,##0.00", HAlign.Right, 10);
+            ConfigureGridColumn(band, "DocAmt", _getUnallocatedReturnsOnly ? "Return Amt" : "Doc Amt", 95, "#,##0.00", HAlign.Right, 9);
+            ConfigureGridColumn(band, "Balance", _getUnallocatedReturnsOnly ? "Unallocated Amt" : "Balance", 95, "#,##0.00", HAlign.Right, 10);
 
             if (band.Columns.Exists("Company"))
             {
@@ -1253,7 +1273,9 @@ namespace PosBranch_Win.Reports.FinancialReports
                 Label footerLabel = new Label
                 {
                     Dock = DockStyle.Fill,
-                    Text = string.Format("Documents: {0:N0}    |    Document Total: {1:N2}    |    Outstanding Balance: {2:N2}",
+                    Text = string.Format(_getUnallocatedReturnsOnly 
+                        ? "Returns: {0:N0}    |    Return Total: {1:N2}    |    Pending Unallocated: {2:N2}"
+                        : "Documents: {0:N0}    |    Document Total: {1:N2}    |    Outstanding Balance: {2:N2}",
                         rows.Count, documentTotal, balanceTotal),
                     ForeColor = Color.White,
                     BackColor = Color.Transparent,
@@ -1415,6 +1437,99 @@ namespace PosBranch_Win.Reports.FinancialReports
             return string.IsNullOrWhiteSpace(vendor.LedgerName)
                 ? vendor.LedgerID.ToString()
                 : string.Format("{0} - {1}", vendor.LedgerID, vendor.LedgerName);
+        }
+
+        private void InitializeWarningPanel()
+        {
+            if (_getUnallocatedReturnsOnly) return;
+
+            pnlWarning = new Panel();
+            pnlWarning.Dock = DockStyle.Top;
+            pnlWarning.Height = 35;
+            pnlWarning.BackColor = Color.FromArgb(254, 243, 199);
+            pnlWarning.Visible = false;
+            pnlWarning.BorderStyle = BorderStyle.FixedSingle;
+
+            lblWarning = new Label();
+            lblWarning.Text = "⚠️ There are unallocated purchase returns. Click here to view/allocate them.";
+            lblWarning.ForeColor = Color.FromArgb(146, 64, 14);
+            lblWarning.Font = new Font("Tahoma", 9.5F, FontStyle.Bold);
+            lblWarning.TextAlign = ContentAlignment.MiddleLeft;
+            lblWarning.Dock = DockStyle.Fill;
+            lblWarning.Cursor = Cursors.Hand;
+            lblWarning.Click += (s, e) =>
+            {
+                try
+                {
+                    var homeForm = Application.OpenForms.OfType<Home>().FirstOrDefault();
+                    if (homeForm != null)
+                    {
+                        var openFormInTabMethod = homeForm.GetType().GetMethod("OpenFormInTab",
+                            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                        if (openFormInTabMethod != null)
+                        {
+                            var newForm = new frmVendorOutstandingReport(true);
+                            openFormInTabMethod.Invoke(homeForm, new object[] { newForm, "Unallocated Purchase Returns" });
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Error opening Unallocated Purchase Returns: " + ex.Message);
+                }
+            };
+
+            pnlWarning.Controls.Add(lblWarning);
+            this.Controls.Add(pnlWarning);
+            ultraPanelMaster.BringToFront();
+        }
+
+        private void gridReport_DoubleClickRow(object sender, DoubleClickRowEventArgs e)
+        {
+            try
+            {
+                if (e.Row == null || !e.Row.IsDataRow) return;
+
+                var row = e.Row.ListObject as VendorOutstandingReportRow;
+                if (row == null) return;
+
+                if (row.IsPR == 1)
+                {
+                    decimal returnAmount = Math.Abs(row.Balance);
+                    if (returnAmount <= 0)
+                    {
+                        MessageBox.Show("This purchase return has already been fully allocated.", "Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        return;
+                    }
+
+                    var frmDebitNote = new PosBranch_Win.Accounts.FrmDebitNote(
+                        Convert.ToInt32(row.PurchaseNo),
+                        row.LedgerID,
+                        row.Company,
+                        returnAmount,
+                        row.Reference
+                    );
+
+                    var homeForm = Application.OpenForms.OfType<Home>().FirstOrDefault();
+                    if (homeForm != null)
+                    {
+                        var openFormInTabMethod = homeForm.GetType().GetMethod("OpenFormInTab",
+                            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                        if (openFormInTabMethod != null)
+                        {
+                            openFormInTabMethod.Invoke(homeForm, new object[] { frmDebitNote, $"Debit Note - {row.Company}" });
+                            return;
+                        }
+                    }
+
+                    frmDebitNote.Show();
+                    frmDebitNote.BringToFront();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error opening Debit Note: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
     }
 }
