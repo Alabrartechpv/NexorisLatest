@@ -35,6 +35,7 @@ namespace PosBranch_Win
         private Timer closingAlertTimer = new Timer();
         private bool closingAlertShown = false;
         private bool closingRequiredAlertShown = false;
+        public bool IsLoggingOff { get; set; } = false;
 
         // Report Navigator fields
         private Infragistics.Win.UltraWinExplorerBar.UltraExplorerBar ultraExplorerBarReportNavigator;
@@ -544,7 +545,10 @@ namespace PosBranch_Win
 
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
-            LogLogout("User closed application");
+            if (!IsLoggingOff)
+            {
+                LogLogout("User closed application");
+            }
             SessionContext.Clear();
             base.OnFormClosing(e);
         }
@@ -1532,18 +1536,27 @@ namespace PosBranch_Win
 
                     SessionContext.Clear();
 
-                    // Show the Login form
-                    this.Hide();
-                    Login loginForm = new Login();
-                    loginForm.Show();
-
-                    // Close this form completely once login is shown
-                    // but we can't just this.Close() if Home is the main Application Context form.
-                    // Assuming Program.cs opens Login first, or Home is the main form but Login will take over.
-                    // Usually in these systems, we just Dispose the Home form or Application.Restart()
-                    // If Login is shown via Show(), we shouldn't Application.Exit(). 
-                    // Let's hide this form, show login, and attach a closed handler to login to exit app.
-                    loginForm.FormClosed += (s, args) => Application.Exit();
+                    // Find and reuse the original Login form without hardcoding
+                    var existingLoginForm = Application.OpenForms.OfType<Login>().FirstOrDefault();
+                    if (existingLoginForm != null)
+                    {
+                        existingLoginForm.ResetLoginFields();
+                        
+                        this.IsLoggingOff = true;
+                        this.Close();
+                        
+                        existingLoginForm.Show();
+                    }
+                    else
+                    {
+                        // Fallback logic
+                        Login loginForm = new Login();
+                        loginForm.Show();
+                        loginForm.FormClosed += (s, args) => Application.Exit();
+                        
+                        this.IsLoggingOff = true;
+                        this.Close();
+                    }
                     return;
                 }
                 return;
