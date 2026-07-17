@@ -346,7 +346,13 @@ namespace PosBranch_Win
                             }
 
                             Home hm = new Home();
-                            hm.FormClosed += (s, args) => this.Close();
+                            hm.FormClosed += (s, args) =>
+                            {
+                                if (!hm.IsLoggingOff)
+                                {
+                                    this.Close();
+                                }
+                            };
                             hm.Show();
                             this.Hide();
                         }
@@ -595,6 +601,13 @@ namespace PosBranch_Win
             ultraPictureBox1.Location = new Point(newX, picOriginalLocation.Y);
         }
 
+        public void ResetLoginFields()
+        {
+            txtUserName.Text = string.Empty;
+            txtPassword.Text = string.Empty;
+            this.ActiveControl = txtUserName;
+            activeTextBox = txtUserName;
+        }
 
     }
 }
