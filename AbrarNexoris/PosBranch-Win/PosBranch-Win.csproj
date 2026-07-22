@@ -1093,6 +1093,12 @@
     <Compile Include="Reports\InventoryReport\frmStockReportAdvanced.Designer.cs">
       <DependentUpon>frmStockReportAdvanced.cs</DependentUpon>
     </Compile>
+    <Compile Include="Reports\InventoryReport\frmStockReport.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Reports\InventoryReport\frmStockReport.Designer.cs">
+      <DependentUpon>frmStockReport.cs</DependentUpon>
+    </Compile>
     <Compile Include="Reports\PurchaseReports\frmPurchaseReportDetails.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -1710,6 +1716,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Reports\InventoryReport\frmStockReportAdvanced.resx">
       <DependentUpon>frmStockReportAdvanced.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Reports\InventoryReport\frmStockReport.resx">
+      <DependentUpon>frmStockReport.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Reports\PurchaseReports\frmvendorpurchasereport.resx">
       <DependentUpon>frmvendorpurchasereport.cs</DependentUpon>

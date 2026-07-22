@@ -440,7 +440,6 @@
             this.ultraPictureBox4.Name = "ultraPictureBox4";
             this.ultraPictureBox4.Size = new System.Drawing.Size(84, 35);
             this.ultraPictureBox4.TabIndex = 41;
-
             // 
             // ultraPanel9
             // 
@@ -508,7 +507,7 @@
             this.ultPanelPurchaseDisplay.Name = "ultPanelPurchaseDisplay";
             this.ultPanelPurchaseDisplay.Size = new System.Drawing.Size(801, 481);
             this.ultPanelPurchaseDisplay.TabIndex = 3;
-
+            // 
             // PurcahseReturnUpdate
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);

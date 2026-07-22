@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -239,6 +239,7 @@ namespace PosBranch_Win.DialogBox
                     {
                         cmd.CommandType = CommandType.StoredProcedure;
                         cmd.Parameters.AddWithValue("@_Operation", "GETAllPurchaseReturn");
+                        cmd.Parameters.AddWithValue("@BranchId", ModelClass.SessionContext.BranchId);
 
                         using (System.Data.SqlClient.SqlDataAdapter adapter = new System.Data.SqlClient.SqlDataAdapter(cmd))
                         {

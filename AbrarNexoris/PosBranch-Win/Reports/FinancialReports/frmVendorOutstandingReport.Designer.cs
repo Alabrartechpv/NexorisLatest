@@ -41,7 +41,6 @@ namespace PosBranch_Win.Reports.FinancialReports
             this.dtFrom = new Infragistics.Win.UltraWinEditors.UltraDateTimeEditor();
             this.dtTo = new Infragistics.Win.UltraWinEditors.UltraDateTimeEditor();
             this.chkPaymentDueOnly = new Infragistics.Win.UltraWinEditors.UltraCheckEditor();
-            this.chkIncludeOutsideSelection = new Infragistics.Win.UltraWinEditors.UltraCheckEditor();
             this.ultraLabel2 = new Infragistics.Win.Misc.UltraLabel();
             this.lblToDate = new Infragistics.Win.Misc.UltraLabel();
             this.lblFromVendor = new Infragistics.Win.Misc.UltraLabel();
@@ -68,7 +67,6 @@ namespace PosBranch_Win.Reports.FinancialReports
             ((System.ComponentModel.ISupportInitialize)(this.dtFrom)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.dtTo)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.chkPaymentDueOnly)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.chkIncludeOutsideSelection)).BeginInit();
             this.ultraPanelAction.ClientArea.SuspendLayout();
             this.ultraPanelAction.SuspendLayout();
             this.ultraPanelMaster.ClientArea.SuspendLayout();
@@ -101,7 +99,6 @@ namespace PosBranch_Win.Reports.FinancialReports
             this.ultraPanelControls.ClientArea.Controls.Add(this.dtFrom);
             this.ultraPanelControls.ClientArea.Controls.Add(this.dtTo);
             this.ultraPanelControls.ClientArea.Controls.Add(this.chkPaymentDueOnly);
-            this.ultraPanelControls.ClientArea.Controls.Add(this.chkIncludeOutsideSelection);
             this.ultraPanelControls.ClientArea.Controls.Add(this.ultraLabel2);
             this.ultraPanelControls.ClientArea.Controls.Add(this.lblToDate);
             this.ultraPanelControls.ClientArea.Controls.Add(this.lblFromVendor);
@@ -268,14 +265,6 @@ namespace PosBranch_Win.Reports.FinancialReports
             this.chkPaymentDueOnly.TabIndex = 12;
             this.chkPaymentDueOnly.Text = "Payment Due Only";
             // 
-            // chkIncludeOutsideSelection
-            // 
-            this.chkIncludeOutsideSelection.Location = new System.Drawing.Point(122, 96);
-            this.chkIncludeOutsideSelection.Name = "chkIncludeOutsideSelection";
-            this.chkIncludeOutsideSelection.Size = new System.Drawing.Size(275, 20);
-            this.chkIncludeOutsideSelection.TabIndex = 13;
-            this.chkIncludeOutsideSelection.Text = "Include Payment Not Within Selection Date";
-            // 
             // ultraLabel2
             // 
             this.ultraLabel2.Location = new System.Drawing.Point(494, 72);
@@ -434,7 +423,6 @@ namespace PosBranch_Win.Reports.FinancialReports
             ((System.ComponentModel.ISupportInitialize)(this.dtFrom)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.dtTo)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.chkPaymentDueOnly)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.chkIncludeOutsideSelection)).EndInit();
             this.ultraPanelAction.ClientArea.ResumeLayout(false);
             this.ultraPanelAction.ResumeLayout(false);
             this.ultraPanelMaster.ClientArea.ResumeLayout(false);
@@ -469,7 +457,6 @@ namespace PosBranch_Win.Reports.FinancialReports
         private Infragistics.Win.UltraWinEditors.UltraDateTimeEditor dtFrom;
         private Infragistics.Win.UltraWinEditors.UltraDateTimeEditor dtTo;
         private Infragistics.Win.UltraWinEditors.UltraCheckEditor chkPaymentDueOnly;
-        private Infragistics.Win.UltraWinEditors.UltraCheckEditor chkIncludeOutsideSelection;
         private Infragistics.Win.Misc.UltraButton btnViewGrid;
         private Infragistics.Win.Misc.UltraButton btnPreviewGrid;
         private Infragistics.Win.Misc.UltraButton btnPreviewReport;

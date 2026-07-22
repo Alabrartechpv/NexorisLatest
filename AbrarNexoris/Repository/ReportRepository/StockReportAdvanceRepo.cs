@@ -408,5 +408,46 @@ ORDER BY SortDate DESC, SortLogId DESC, SortDocNumber DESC, SortLineNo DESC, Ite
 
             return result;
         }
+
+        public class ItemAttributeMapping
+        {
+            public int BrandId { get; set; }
+            public int ItemTypeId { get; set; }
+        }
+
+        public Dictionary<int, ItemAttributeMapping> GetItemAttributeMapping()
+        {
+            var mapping = new Dictionary<int, ItemAttributeMapping>();
+            
+            try
+            {
+                if (DataConnection.State != ConnectionState.Open)
+                    DataConnection.Open();
+                
+                using (SqlCommand cmd = new SqlCommand("SELECT ItemId, BrandId, ItemTypeId FROM ItemMaster WHERE Active = 0", (SqlConnection)DataConnection))
+                {
+                    using (SqlDataReader reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            int itemId = Convert.ToInt32(reader["ItemId"]);
+                            int brandId = reader["BrandId"] != DBNull.Value ? Convert.ToInt32(reader["BrandId"]) : 0;
+                            int itemTypeId = reader["ItemTypeId"] != DBNull.Value ? Convert.ToInt32(reader["ItemTypeId"]) : 0;
+                            mapping[itemId] = new ItemAttributeMapping { BrandId = brandId, ItemTypeId = itemTypeId };
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error getting item-brand-type mapping: {ex.Message}");
+            }
+            finally
+            {
+                if (DataConnection.State == ConnectionState.Open)
+                    DataConnection.Close();
+            }
+            return mapping;
+        }
     }
 }

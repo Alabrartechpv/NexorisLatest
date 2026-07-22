@@ -63,7 +63,7 @@ namespace PosBranch_Win
 
         private static readonly ReportNavigatorDefinition[] ReportNavigatorDefinitions = new[]
         {
-            new ReportNavigatorDefinition("Item", "Stock Listing", "StockReport"),
+            new ReportNavigatorDefinition("Item", "Stock Listing", "StockListingReport"),
             new ReportNavigatorDefinition("Item", "Item Report", "ItemReport"),
             new ReportNavigatorDefinition("Item", "Stock Report Advanced", "StockReportAdv", "StockReport"),
             new ReportNavigatorDefinition("Item", "Inventory Audit Trail", "AuditTrail"),
@@ -2228,6 +2228,11 @@ namespace PosBranch_Win
                 OpenFormInTab(frmitemRpt, "ItemReport");
 
             }
+            if (e.Tool.Key == "StockListingReport")
+            {
+                Reports.InventoryReport.frmStockReport frmStockRpt = new Reports.InventoryReport.frmStockReport();
+                OpenFormInTab(frmStockRpt, "Stock Report");
+            }
             if (e.Tool.Key == "StockReport")
             {
                 Reports.InventoryReport.frmStockReportAdvanced frmStkRptAdv = new Reports.InventoryReport.frmStockReportAdvanced();
@@ -3985,7 +3990,8 @@ namespace PosBranch_Win
                     keyToExecute == "ShiftReconciliationReport" ||
                     keyToExecute == "TradingAccount" ||
                     keyToExecute == "UnallocatedPurchaseReturns" ||
-                    keyToExecute == "ProfitLossAccount")
+                    keyToExecute == "ProfitLossAccount" ||
+                    keyToExecute == "StockListingReport")
                 {
                     Infragistics.Win.UltraWinToolbars.ToolBase toolToExecute;
 

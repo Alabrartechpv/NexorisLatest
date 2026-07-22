@@ -5767,10 +5767,12 @@ namespace PosBranch_Win.Transaction
                     System.Diagnostics.Debug.WriteLine($"SQL connection opened for PR: {prNo}");
 
                     // Direct query to find PR by PR number
-                    string directPRQuery = "SELECT * FROM PReturnMaster WHERE PReturnNo = @PReturnNo";
+                    string directPRQuery = "SELECT * FROM PReturnMaster WHERE PReturnNo = @PReturnNo AND BranchId = @BranchId AND CompanyId = @CompanyId";
                     using (SqlCommand cmd = new SqlCommand(directPRQuery, conn))
                     {
                         cmd.Parameters.AddWithValue("@PReturnNo", prNo);
+                        cmd.Parameters.AddWithValue("@BranchId", ModelClass.SessionContext.BranchId);
+                        cmd.Parameters.AddWithValue("@CompanyId", ModelClass.SessionContext.CompanyId);
 
                         using (SqlDataReader reader = cmd.ExecuteReader())
                         {

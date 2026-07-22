@@ -74,7 +74,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             ultraComboVendorFrom.ValueChanged += ultraComboVendorRange_ValueChanged;
             ultraComboVendorTo.ValueChanged += ultraComboVendorRange_ValueChanged;
             chkPaymentDueOnly.CheckedChanged += filter_CheckedChanged;
-            chkIncludeOutsideSelection.CheckedChanged += filter_CheckedChanged;
+            
             gridReport.InitializeLayout += gridReport_InitializeLayout;
             gridReport.InitializeRow += gridReport_InitializeRow;
             gridReport.Resize += gridReport_Resize;
@@ -149,7 +149,6 @@ namespace PosBranch_Win.Reports.FinancialReports
             ultraComboDateMode.Value = "ALL";
 
             chkPaymentDueOnly.Checked = false;
-            chkIncludeOutsideSelection.Checked = false;
             txtVendorSearch.Text = string.Empty;
             ultraComboVendorFrom.Value = 0;
             ultraComboVendorTo.Value = 0;
@@ -251,7 +250,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             StyleDateEditor(ultraDateTimeEditor1);
             StyleDateEditor(ultraDateTimeEditor2);
             StyleCheckEditor(chkPaymentDueOnly);
-            StyleCheckEditor(chkIncludeOutsideSelection);
+           
         }
 
         private static void StyleLabel(Infragistics.Win.Misc.UltraLabel label)
@@ -422,9 +421,35 @@ namespace PosBranch_Win.Reports.FinancialReports
             ultraComboVendorTo.Value = 0;
         }
 
+        private bool ValidatePaymentDueDateRange()
+        {
+            if (!chkPaymentDueOnly.Checked)
+                return true;
+
+            if (ultraDateTimeEditor1.Value == null || ultraDateTimeEditor2.Value == null)
+            {
+                MessageBox.Show("Please select both the From and To dates for Payment Due.", "Validation",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
+
+            DateTime fromDate = Convert.ToDateTime(ultraDateTimeEditor1.Value).Date;
+            DateTime toDate = Convert.ToDateTime(ultraDateTimeEditor2.Value).Date;
+
+            if (fromDate > toDate)
+            {
+                MessageBox.Show("Payment Due From date cannot be greater than To date.", "Validation",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                ultraDateTimeEditor1.Focus();
+                return false;
+            }
+
+            return true;
+        }
+
         private void LoadReport()
         {
-            if (!ValidateDateRange())
+            if (!ValidateDateRange() || !ValidatePaymentDueDateRange())
                 return;
 
             Cursor previousCursor = Cursor;
@@ -434,18 +459,17 @@ namespace PosBranch_Win.Reports.FinancialReports
             {
                 VendorOutstandingReportFilter filter = new VendorOutstandingReportFilter
                 {
-                    FromDate = Convert.ToDateTime(dtFrom.Value).Date,
-                    ToDate = Convert.ToDateTime(dtTo.Value).Date,
+                    FromDate = chkPaymentDueOnly.Checked ? Convert.ToDateTime(ultraDateTimeEditor1.Value).Date : Convert.ToDateTime(dtFrom.Value).Date,
+                    ToDate = chkPaymentDueOnly.Checked ? Convert.ToDateTime(ultraDateTimeEditor2.Value).Date : Convert.ToDateTime(dtTo.Value).Date,
                     CompanyId = SessionContext.CompanyId,
                     BranchId = SessionContext.BranchId,
                     FinYearId = SessionContext.FinYearId,
                     LedgerId = IsVendorSelectionMode() ? GetSelectedLedgerId() : 0,
                     FromLedgerId = IsVendorRangeMode() ? GetLedgerId(ultraComboVendorFrom) : 0,
                     ToLedgerId = IsVendorRangeMode() ? GetLedgerId(ultraComboVendorTo) : 0,
-                    DateFilterMode = Convert.ToString(ultraComboDateMode.Value),
-                    UseDateFilter = IsDateRangeMode() && !chkIncludeOutsideSelection.Checked,
+                    DateFilterMode = chkPaymentDueOnly.Checked ? "DOC_DATE" : Convert.ToString(ultraComboDateMode.Value),
+                    UseDateFilter = chkPaymentDueOnly.Checked || IsDateRangeMode(),
                     PaymentDueOnly = chkPaymentDueOnly.Checked,
-                    IncludePaymentNotWithinSelectionDate = chkIncludeOutsideSelection.Checked,
                     GetUnallocatedReturnsOnly = _getUnallocatedReturnsOnly
                 };
 
@@ -1055,6 +1079,11 @@ namespace PosBranch_Win.Reports.FinancialReports
                 return;
 
             UpdateDateControlState();
+
+            if (chkPaymentDueOnly.Checked)
+            {
+                ValidatePaymentDueDateRange();
+            }
         }
 
         private void frmVendorOutstandingReport_KeyDown(object sender, KeyEventArgs e)
@@ -1109,7 +1138,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             lblToDate.Visible = dateRange;
             dtFrom.Visible = dateRange;
             dtTo.Visible = dateRange;
-            chkIncludeOutsideSelection.Enabled = IsDateRangeMode();
+           
             ultraLabel1.Visible = paymentDue;
             ultraLabel2.Visible = paymentDue;
             ultraDateTimeEditor1.Visible = paymentDue;
@@ -1295,15 +1324,28 @@ namespace PosBranch_Win.Reports.FinancialReports
         {
             string vendorMode = Convert.ToString(ultraComboVendorMode.Value);
             string dateMode = Convert.ToString(ultraComboDateMode.Value);
-            string dateText = IsDateRangeMode()
-                ? string.Format("{0:dd-MMM-yyyy} to {1:dd-MMM-yyyy}", Convert.ToDateTime(dtFrom.Value), Convert.ToDateTime(dtTo.Value))
-                : "All dates";
+            string dateText;
+
+            if (chkPaymentDueOnly.Checked)
+            {
+                dateText = string.Format("{0:dd-MMM-yyyy} to {1:dd-MMM-yyyy}", 
+                    Convert.ToDateTime(ultraDateTimeEditor1.Value), 
+                    Convert.ToDateTime(ultraDateTimeEditor2.Value));
+            }
+            else
+            {
+                dateText = IsDateRangeMode()
+                    ? string.Format("{0:dd-MMM-yyyy} to {1:dd-MMM-yyyy}", Convert.ToDateTime(dtFrom.Value), Convert.ToDateTime(dtTo.Value))
+                    : "All dates";
+            }
 
             return string.Format("Vendor: {0}    |    Date: {1}    |    Payment Due Only: {2}",
                 string.IsNullOrWhiteSpace(vendorMode) ? "All" : vendorMode,
-                string.IsNullOrWhiteSpace(dateMode) || string.Equals(dateMode, "ALL", StringComparison.OrdinalIgnoreCase)
-                    ? dateText
-                    : string.Format("{0} ({1})", dateText, dateMode),
+                chkPaymentDueOnly.Checked 
+                    ? dateText 
+                    : (string.IsNullOrWhiteSpace(dateMode) || string.Equals(dateMode, "ALL", StringComparison.OrdinalIgnoreCase)
+                        ? dateText
+                        : string.Format("{0} ({1})", dateText, dateMode)),
                 chkPaymentDueOnly.Checked ? "Yes" : "No");
         }
 
