@@ -204,8 +204,8 @@ namespace PosBranch_Win.Reports.InventoryReport
             button7.Click += (s, e) => OpenGroupDialogForCombo(ultraComboEditor13);
 
             button3.Click += (s, e) => OpenCategoryDialogForCombo(ultraComboEditor9);
-            button4.Click += (s, e) => OpenItemCategoryDialogForCombo();
-            button8.Click += (s, e) => OpenItemCategoryDialogForCombo();
+            button4.Click += (s, e) => OpenCategoryDialogForCombo(ultraComboEditor10);
+            button8.Click += (s, e) => OpenCategoryDialogForCombo(ultraComboEditor14);
 
             button5.Click += (s, e) => OpenBrandDialogForCombo(ultraComboEditor12);
             button6.Click += (s, e) => OpenBrandDialogForCombo(ultraComboEditor11);
@@ -660,7 +660,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             // Must add footer to ClientArea controls BEFORE setting Dock so ordering is respected.
             // Footer = Bottom, then grid = Fill → grid sits above footer automatically.
             ultraPanelGridFooter.Dock   = DockStyle.Bottom;
-            ultraPanelGridFooter.Height = 26;
+            ultraPanelGridFooter.Height = 32;   // tall enough so labels are not clipped
 
             gridReport.Dock = DockStyle.Fill;
 
@@ -907,7 +907,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             layout.Override.HeaderClickAction = HeaderClickAction.SortSingle;
             layout.Override.SelectTypeRow  = SelectType.Single;
             layout.Override.RowSelectors   = DefaultableBoolean.True;
-            layout.Override.RowSelectorWidth = 20;
+            layout.Override.RowSelectorWidth = 35;   // wide enough for 3-digit row numbers
             layout.Override.RowSelectorNumberStyle = RowSelectorNumberStyle.RowIndex;
 
             layout.Appearance.BackColor  = FormBackColor;

@@ -1573,5 +1573,126 @@ namespace PosBranch_Win.Reports.FinancialReports
                 MessageBox.Show("Error opening Debit Note: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+
+        public void Clear()
+        {
+            ClearForm();
+        }
+
+        public void ClearForm()
+        {
+            _isLoading = true;
+            try
+            {
+                ResetFilterControls(ultraPanelControls);
+                UpdateDateControlState();
+                UpdateVendorControlState();
+                _reportRows = new List<VendorOutstandingReportRow>();
+                ResetReportView();
+                if (pnlWarning != null)
+                {
+                    pnlWarning.Visible = false;
+                }
+            }
+            finally
+            {
+                _isLoading = false;
+            }
+        }
+
+        private void ResetFilterControls(Control parent)
+        {
+            if (parent == null)
+                return;
+
+            var ultraPanel = parent as Infragistics.Win.Misc.UltraPanel;
+            if (ultraPanel != null)
+            {
+                ResetFilterControls(ultraPanel.ClientArea);
+            }
+
+            foreach (Control control in parent.Controls)
+            {
+                ResetFilterControl(control);
+                ResetFilterControls(control);
+            }
+        }
+
+        private void ResetFilterControl(Control control)
+        {
+            var combo = control as Infragistics.Win.UltraWinEditors.UltraComboEditor;
+            if (combo != null)
+            {
+                ResetComboToDefault(combo);
+                return;
+            }
+
+            var textEditor = control as Infragistics.Win.UltraWinEditors.UltraTextEditor;
+            if (textEditor != null)
+            {
+                textEditor.Text = string.Empty;
+                return;
+            }
+
+            var textBox = control as TextBox;
+            if (textBox != null)
+            {
+                textBox.Text = string.Empty;
+                return;
+            }
+
+            var checkEditor = control as Infragistics.Win.UltraWinEditors.UltraCheckEditor;
+            if (checkEditor != null)
+            {
+                checkEditor.Checked = false;
+                return;
+            }
+
+            var checkBox = control as CheckBox;
+            if (checkBox != null)
+            {
+                checkBox.Checked = false;
+                return;
+            }
+
+            var dateEditor = control as Infragistics.Win.UltraWinEditors.UltraDateTimeEditor;
+            if (dateEditor != null)
+            {
+                dateEditor.Value = DateTime.Today;
+            }
+        }
+
+        private void ResetComboToDefault(Infragistics.Win.UltraWinEditors.UltraComboEditor combo)
+        {
+            foreach (ValueListItem item in combo.Items)
+            {
+                object value = item.DataValue;
+                if (value != null && (string.Equals(Convert.ToString(value), "ALL", StringComparison.OrdinalIgnoreCase) ||
+                                      string.Equals(Convert.ToString(value), "0", StringComparison.OrdinalIgnoreCase)))
+                {
+                    SetComboValue(combo, value);
+                    return;
+                }
+            }
+
+            SetComboValue(combo, null);
+        }
+
+        private void SetComboValue(Infragistics.Win.UltraWinEditors.UltraComboEditor combo, object value)
+        {
+            try
+            {
+                combo.Value = value;
+                if (value == null)
+                {
+                    combo.Text = string.Empty;
+                }
+            }
+            catch
+            {
+                combo.SelectedIndex = -1;
+                combo.Text = string.Empty;
+            }
+        }
     }
 }

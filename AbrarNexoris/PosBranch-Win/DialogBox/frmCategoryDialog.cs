@@ -1,4 +1,4 @@
-﻿using Infragistics.Win.UltraWinGrid;
+using Infragistics.Win.UltraWinGrid;
 using ModelClass;
 using ModelClass.Master;
 using PosBranch_Win.Master;
@@ -1683,6 +1683,12 @@ namespace PosBranch_Win.DialogBox
                     stockadj = (FrmStockAdjustment)Application.OpenForms["FrmStockAdjustment"];
                     stockadj.txtb_category.Text = name;
                     stockadj.ultlbl_catid.Text = id;
+                    this.DialogResult = DialogResult.OK;
+                }
+                else
+                {
+                    // For any other caller (e.g. StockReport, SalesmanIncentiveReport, etc.)
+                    // just return OK so the caller can read SelectedCategoryId / SelectedCategoryName.
                     this.DialogResult = DialogResult.OK;
                 }
                 this.Close();

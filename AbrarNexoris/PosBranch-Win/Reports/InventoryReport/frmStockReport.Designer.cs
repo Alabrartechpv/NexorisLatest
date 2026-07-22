@@ -155,7 +155,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             this.ultraPanel1.Dock = System.Windows.Forms.DockStyle.Top;
             this.ultraPanel1.Location = new System.Drawing.Point(0, 0);
             this.ultraPanel1.Name = "ultraPanel1";
-            this.ultraPanel1.Size = new System.Drawing.Size(1364, 151);
+            this.ultraPanel1.Size = new System.Drawing.Size(1364, 149);
             this.ultraPanel1.TabIndex = 12;
             this.ultraPanel1.PaintClient += new System.Windows.Forms.PaintEventHandler(this.ultraPanel1_PaintClient);
             // 
@@ -436,7 +436,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             // 
             // lblBarcode
             // 
-            this.lblBarcode.Location = new System.Drawing.Point(20, 158);
+            this.lblBarcode.Location = new System.Drawing.Point(20, 152);
             this.lblBarcode.Name = "lblBarcode";
             this.lblBarcode.Size = new System.Drawing.Size(60, 18);
             this.lblBarcode.TabIndex = 6;
@@ -444,14 +444,14 @@ namespace PosBranch_Win.Reports.InventoryReport
             // 
             // txtBarcodeSearch
             // 
-            this.txtBarcodeSearch.Location = new System.Drawing.Point(95, 155);
+            this.txtBarcodeSearch.Location = new System.Drawing.Point(95, 149);
             this.txtBarcodeSearch.Name = "txtBarcodeSearch";
             this.txtBarcodeSearch.Size = new System.Drawing.Size(150, 21);
             this.txtBarcodeSearch.TabIndex = 7;
             // 
             // btnBarcodeSearch
             // 
-            this.btnBarcodeSearch.Location = new System.Drawing.Point(247, 155);
+            this.btnBarcodeSearch.Location = new System.Drawing.Point(247, 149);
             this.btnBarcodeSearch.Name = "btnBarcodeSearch";
             this.btnBarcodeSearch.Size = new System.Drawing.Size(25, 21);
             this.btnBarcodeSearch.TabIndex = 13;
