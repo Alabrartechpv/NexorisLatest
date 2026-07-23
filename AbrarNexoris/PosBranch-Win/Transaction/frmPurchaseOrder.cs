@@ -1218,8 +1218,8 @@ namespace PosBranch_Win.Transaction
 
                 if (exportFormat.Value == GridExportFormat.Excel)
                 {
-                    dialog.Filter = "Excel files (*.xls)|*.xls";
-                    dialog.FileName = string.Format("PurchaseOrder_{0}_{1:yyyyMMdd_HHmmss}.xls", documentNo, DateTime.Now);
+                    dialog.Filter = "Excel CSV files (*.csv)|*.csv";
+                    dialog.FileName = string.Format("PurchaseOrder_{0}_{1:yyyyMMdd_HHmmss}.csv", documentNo, DateTime.Now);
                 }
                 else
                 {
@@ -1278,48 +1278,45 @@ namespace PosBranch_Win.Transaction
             List<UltraGridColumn> columns = GetExportColumns();
             List<UltraGridRow> rows = GetVisibleDataRows().ToList();
 
-            using (StreamWriter writer = new StreamWriter(filePath, false, Encoding.UTF8))
+            // Write CSV with UTF-8 BOM so Excel opens it correctly with proper encoding
+            using (StreamWriter writer = new StreamWriter(filePath, false, new System.Text.UTF8Encoding(true)))
             {
-                writer.WriteLine("<?xml version=\"1.0\"?>");
-                writer.WriteLine("<?mso-application progid=\"Excel.Sheet\"?>");
-                writer.WriteLine("<Workbook xmlns=\"urn:schemas-microsoft-com:office:spreadsheet\" xmlns:ss=\"urn:schemas-microsoft-com:office:spreadsheet\">");
-                writer.WriteLine("<Styles>");
-                writer.WriteLine("<Style ss:ID=\"Title\"><Font ss:Bold=\"1\" ss:Size=\"14\"/></Style>");
-                writer.WriteLine("<Style ss:ID=\"Header\"><Font ss:Bold=\"1\"/><Interior ss:Color=\"#5D97D6\" ss:Pattern=\"Solid\"/><Font ss:Color=\"#FFFFFF\" ss:Bold=\"1\"/></Style>");
-                writer.WriteLine("</Styles>");
-                writer.WriteLine("<Worksheet ss:Name=\"Purchase Order\">");
-                writer.WriteLine("<Table>");
+                // Info header rows
+                writer.WriteLine(CsvQuote("Purchase Order Details"));
+                writer.WriteLine(CsvQuote("Doc No: " + GetControlText(txtDocNo) +
+                    "    Date: " + GetEditorDateText(dtpDate) +
+                    "    Vendor: " + GetControlText(txtNavigator)));
+                writer.WriteLine(CsvQuote("Expected Receive Date: " + GetEditorDateText(dtpExpectedDate) +
+                    "    Reference: " + GetControlText(txtReference)));
+                writer.WriteLine(); // blank line
 
-                WriteExcelTextRow(writer, "Purchase Order Details", "Title", columns.Count);
-                WriteExcelTextRow(writer, "Doc No: " + GetControlText(txtDocNo) + "    Date: " + GetEditorDateText(dtpDate) + "    Vendor: " + GetControlText(txtNavigator), null, columns.Count);
-                WriteExcelTextRow(writer, "Expected Receive Date: " + GetEditorDateText(dtpExpectedDate) + "    Reference: " + GetControlText(txtReference), null, columns.Count);
-                writer.WriteLine("<Row/>");
+                // Column header row
+                writer.WriteLine(string.Join(",", columns.Select(c => CsvQuote(c.Header.Caption))));
 
-                writer.WriteLine("<Row>");
-                foreach (UltraGridColumn column in columns)
-                {
-                    WriteExcelCell(writer, column.Header.Caption, "Header");
-                }
-                writer.WriteLine("</Row>");
-
+                // Data rows
                 foreach (UltraGridRow row in rows)
                 {
-                    writer.WriteLine("<Row>");
-                    foreach (UltraGridColumn column in columns)
+                    var cells = columns.Select(col =>
                     {
-                        object value = row.Cells.Exists(column.Key) ? row.Cells[column.Key].Value : null;
-                        WriteExcelCell(writer, FormatGridExportValue(value, column), null);
-                    }
-                    writer.WriteLine("</Row>");
+                        object val = row.Cells.Exists(col.Key) ? row.Cells[col.Key].Value : null;
+                        return CsvQuote(FormatGridExportValue(val, col));
+                    });
+                    writer.WriteLine(string.Join(",", cells));
                 }
-
-                writer.WriteLine("</Table>");
-                writer.WriteLine("</Worksheet>");
-                writer.WriteLine("</Workbook>");
             }
+
+            // Open the file in Excel automatically
+            try { System.Diagnostics.Process.Start(filePath); } catch { }
 
             MessageBox.Show("Grid exported to Excel successfully.", "Export Grid",
                 MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        private static string CsvQuote(string value)
+        {
+            if (value == null) value = string.Empty;
+            // Wrap in quotes; escape any existing quotes by doubling them
+            return "\"" + value.Replace("\"", "\"\"") + "\"";
         }
 
         private void ExportGridToPdf(string filePath)
@@ -1606,14 +1603,54 @@ namespace PosBranch_Win.Transaction
             if (e == null || e.KeyCode != Keys.Enter)
                 return;
 
-            string value = (txtBarcode.Text ?? string.Empty).Trim();
-            if (!string.Equals(value, "u", StringComparison.OrdinalIgnoreCase))
-                return;
-
             e.Handled = true;
             e.SuppressKeyPress = true;
-            txtBarcode.Clear();
-            OpenUnitDialogForActivePurchaseOrderRow(true);
+
+            string input = (txtBarcode.Text ?? string.Empty).Trim();
+
+            // Handle "u" or "U" to open Unit dialog for active row
+            if (string.Equals(input, "u", StringComparison.OrdinalIgnoreCase))
+            {
+                txtBarcode.Clear();
+                OpenUnitDialogForActivePurchaseOrderRow(true);
+                return;
+            }
+
+            // Handle "*number" to set quantity on the active row
+            if (input.StartsWith("*") && input.Length > 1)
+            {
+                string numberStr = input.Substring(1);
+                decimal newQty;
+                if (decimal.TryParse(numberStr, out newQty) && newQty > 0)
+                {
+                    UltraGridRow activeRow = gridReport.ActiveRow;
+                    if (activeRow == null || !activeRow.IsDataRow)
+                    {
+                        // Try selected rows fallback
+                        foreach (UltraGridRow selectedRow in gridReport.Selected.Rows)
+                        {
+                            if (selectedRow != null && selectedRow.IsDataRow)
+                            {
+                                activeRow = selectedRow;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (activeRow != null && activeRow.IsDataRow)
+                    {
+                        if (activeRow.Cells.Exists("Qty"))
+                            activeRow.Cells["Qty"].Value = newQty;
+
+                        RecalculateRow(activeRow);
+                        RecalculateTotals();
+                    }
+                }
+
+                txtBarcode.Clear();
+                txtBarcode.Focus();
+                return;
+            }
         }
 
         private void gridReport_DoubleClickCell(object sender, DoubleClickCellEventArgs e)

@@ -974,16 +974,18 @@ namespace PosBranch_Win.Reports.InventoryReport
                 col.Hidden = true;
 
             // Columns: Category | Group | Barcode | Description | Cost | Selling Price | UOM | Stock | Hold | Available
-            ConfigureColumn(band, "CategoryName",  "Category",        110, null,       HAlign.Left,  0);
-            ConfigureColumn(band, "GroupName",     "Group",           100, null,       HAlign.Left,  1);
-            ConfigureColumn(band, "Barcode",       "Barcode",         120, null,       HAlign.Left,  2);
-            ConfigureColumn(band, "ItemName",      "Description",     220, null,       HAlign.Left,  3);
-            ConfigureColumn(band, "Cost",          "Cost",             90, "#,##0.00",  HAlign.Right, 4);
-            ConfigureColumn(band, "RetailPrice",   "Selling Price",    90, "#,##0.00",  HAlign.Right, 5);
-            ConfigureColumn(band, "BaseUnitName",  "UOM",              70, null,       HAlign.Center,6);
-            ConfigureColumn(band, "ClosingStock",  "Stock",            80, "#,##0.##",  HAlign.Right, 7);
-            ConfigureColumn(band, "HoldQty",       "Hold",             70, "#,##0.##",  HAlign.Right, 8);
-            ConfigureColumn(band, "AvailableStock","Available",        85, "#,##0.##",  HAlign.Right, 9);
+            ConfigureColumn(band, "CategoryName",  "Category",           110, null,       HAlign.Left,  0);
+            ConfigureColumn(band, "GroupName",     "Group",              100, null,       HAlign.Left,  1);
+            ConfigureColumn(band, "Barcode",       "Barcode",            120, null,       HAlign.Left,  2);
+            ConfigureColumn(band, "ItemName",      "Description",        220, null,       HAlign.Left,  3);
+            ConfigureColumn(band, "Cost",          "Cost",                90, "#,##0.00",  HAlign.Right, 4);
+            ConfigureColumn(band, "RetailPrice",   "Selling Price",       90, "#,##0.00",  HAlign.Right, 5);
+            ConfigureColumn(band, "BaseUnitName",  "UOM",                 70, null,       HAlign.Center,6);
+            ConfigureColumn(band, "ClosingStock",  "Stock",               80, "#,##0.##",  HAlign.Right, 7);
+            ConfigureColumn(band, "HoldQty",       "Hold",                70, "#,##0.##",  HAlign.Right, 8);
+            ConfigureColumn(band, "AvailableStock","Available",           85, "#,##0.##",  HAlign.Right, 9);
+            ConfigureColumn(band, "StockValue",    "Stock Value",        100, "#,##0.00",  HAlign.Right, 10);
+            ConfigureColumn(band, "FutureSalesValue","Future Sales Value",110, "#,##0.00", HAlign.Right, 11);
 
             // Colour coding
             if (band.Columns.Exists("ClosingStock"))
@@ -992,6 +994,10 @@ namespace PosBranch_Win.Reports.InventoryReport
                 band.Columns["HoldQty"].CellAppearance.ForeColor = Color.FromArgb(191, 54, 12);
             if (band.Columns.Exists("AvailableStock"))
                 band.Columns["AvailableStock"].CellAppearance.ForeColor = Color.FromArgb(1, 87, 155);
+            if (band.Columns.Exists("StockValue"))
+                band.Columns["StockValue"].CellAppearance.ForeColor = Color.FromArgb(0, 102, 204);
+            if (band.Columns.Exists("FutureSalesValue"))
+                band.Columns["FutureSalesValue"].CellAppearance.ForeColor = Color.FromArgb(128, 0, 128);
 
             e.Layout.AutoFitStyle = AutoFitStyle.None;
         }
@@ -1587,7 +1593,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                 if (dlg.ShowDialog(this) != DialogResult.OK) return;
 
                 StringBuilder sb = new StringBuilder();
-                sb.AppendLine("Category,Group,Barcode,Description,Cost,Selling Price,UOM,Stock,Hold,Available");
+                sb.AppendLine("Category,Group,Barcode,Description,Cost,Selling Price,UOM,Stock,Hold,Available,Stock Value,Future Sales Value");
                 foreach (StockReportItem row in _reportRows)
                 {
                     sb.AppendLine(string.Join(",",
@@ -1600,7 +1606,9 @@ namespace PosBranch_Win.Reports.InventoryReport
                         Escape(row.BaseUnitName),
                         row.ClosingStock.ToString("F2"),
                         row.HoldQty.ToString("F2"),
-                        row.AvailableStock.ToString("F2")));
+                        row.AvailableStock.ToString("F2"),
+                        row.StockValue.ToString("F2"),
+                        row.FutureSalesValue.ToString("F2")));
                 }
                 File.WriteAllText(dlg.FileName, sb.ToString(), Encoding.UTF8);
                 MessageBox.Show("Report exported successfully.", "Export", MessageBoxButtons.OK, MessageBoxIcon.Information);
