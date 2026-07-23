@@ -43,6 +43,7 @@ namespace ModelClass.Report
         public decimal TotalIn => OpeningStock + Purchase + StockAdjustmentIn + StockTransferIn + SalesReturn;
         public decimal TotalOut => PurchaseReturn + StockAdjustmentOut + StockTransferOut + Sales;
         public decimal StockValue => ClosingStock * Cost;
+        public decimal FutureSalesValue => ClosingStock * RetailPrice;
     }
 
     /// <summary>
