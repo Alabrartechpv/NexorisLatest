@@ -13,6 +13,7 @@ Compression=lzma
 SolidCompression=yes
 SetupIconFile=PosBranch-Win\Resources\app_icon.ico
 PrivilegesRequired=admin
+CloseApplications=yes
 DisableWelcomePage=no
 DisableDirPage=no
 DisableProgramGroupPage=yes
@@ -41,14 +42,22 @@ Name: "{group}\Nexoris POS"; Filename: "{app}\NexorisPOS.exe"; IconFilename: "{a
 Name: "{commondesktop}\Nexoris POS"; Filename: "{app}\NexorisPOS.exe"; IconFilename: "{app}\app_icon.ico"; Tasks: desktopicon
 
 [Run]
-; Install SAP Crystal Reports Runtime silently with basic progress bar (/qb) during installation
-Filename: "msiexec.exe"; Parameters: "/i ""{tmp}\CRRuntime_32bit.msi"" /qb"; StatusMsg: "Installing SAP Crystal Reports engine, please wait..."; Flags: runhidden
+; Install SAP Crystal Reports Runtime silently with basic progress bar (/qb) only if NOT already installed
+Filename: "msiexec.exe"; Parameters: "/i ""{tmp}\CRRuntime_32bit.msi"" /qb"; StatusMsg: "Installing SAP Crystal Reports engine, please wait..."; Flags: runhidden; Check: not IsCRRuntimeInstalled
 ; Run the POS application after setup completes
 Filename: "{app}\NexorisPOS.exe"; Description: "{cm:LaunchProgram,Nexoris POS}"; Flags: nowait postinstall skipifsilent
 
 [Code]
 var
   DbConfigPage: TInputQueryWizardPage;
+
+// Check if SAP Crystal Reports 32-bit runtime is already installed on the computer
+function IsCRRuntimeInstalled: Boolean;
+begin
+  Result := RegKeyExists(HKLM32, 'SOFTWARE\SAP BusinessObjects\Crystal Reports for .NET Framework 4.0\Crystal Reports') or
+            RegKeyExists(HKLM64, 'SOFTWARE\SAP BusinessObjects\Crystal Reports for .NET Framework 4.0\Crystal Reports') or
+            FileExists(ExpandConstant('{commonpf32}\SAP BusinessObjects\Crystal Reports for .NET Framework 4.0\Common\SAP BusinessObjects Enterprise XI 4.0\win32_x86\crpe32.dll'));
+end;
 
 // Helper function to extract only the value from a key=value string.
 // If no '=' is present, returns the trimmed string itself.
