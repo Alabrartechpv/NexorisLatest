@@ -3437,7 +3437,7 @@ namespace PosBranch_Win
                 // 1. Create Wrapper Panel to host Header and ExplorerBar seamlessly
                 panelReportNavigatorWrapper = new Panel();
                 panelReportNavigatorWrapper.Dock = DockStyle.Left;
-                panelReportNavigatorWrapper.Width = 260;
+                panelReportNavigatorWrapper.Width = 285;
                 panelReportNavigatorWrapper.Name = "panelReportNavigatorWrapper";
                 panelReportNavigatorWrapper.Visible = false;
                 panelReportNavigatorWrapper.BackColor = Color.FromArgb(215, 236, 255); // soft office-blue background
@@ -3628,7 +3628,8 @@ namespace PosBranch_Win
             {
                 var item = new Infragistics.Win.UltraWinExplorerBar.UltraExplorerBarItem();
                 item.Key = definition.Key;
-                item.Text = "      " + definition.Text;
+                item.Text = "  •  " + definition.Text;
+                item.ToolTipText = definition.Text;
                 group.Items.Add(item);
             }
         }
