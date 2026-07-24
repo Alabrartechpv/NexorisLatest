@@ -4936,6 +4936,13 @@ namespace PosBranch_Win.Transaction
 
                 if (message.Contains("success"))
                 {
+                    SaveSalesReturnActivityLog("DELETE", new SalesReturn
+                    {
+                        SReturnNo = sReturnNo,
+                        CustomerName = customerTextBox != null && customerTextBox.Value != null ? customerTextBox.Value.ToString() : string.Empty,
+                        GrandTotal = Convert.ToDouble(decimal.TryParse(txtNetTotal != null ? txtNetTotal.Text : "0", out decimal _srNetTotal) ? _srNetTotal : 0m)
+                    }, "Sales Return Deleted");
+
                     MessageBox.Show("Sales return deleted successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
                     // Clear the form

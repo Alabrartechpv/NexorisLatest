@@ -119,9 +119,6 @@ namespace PosBranch_Win.Settings
             cmbActivityType.Items.Clear();
             cmbUser.Items.Add("All Users");
             cmbActivityType.Items.Add("All Actions");
-            cmbActivityType.Items.Add("Login");
-            cmbActivityType.Items.Add("Logout");
-            cmbActivityType.Items.Add("FormEntry");
 
             try
             {
@@ -129,13 +126,36 @@ namespace PosBranch_Win.Settings
                 {
                     foreach (DataRow row in repo.GetUserActivityUsers().Rows)
                     {
-                        cmbUser.Items.Add(Convert.ToString(row["Value"]));
+                        string uVal = Convert.ToString(row["Value"]);
+                        if (!string.IsNullOrWhiteSpace(uVal) && !cmbUser.Items.Contains(uVal))
+                        {
+                            cmbUser.Items.Add(uVal);
+                        }
+                    }
+
+                    foreach (DataRow row in repo.GetUserActivityTypes().Rows)
+                    {
+                        string actVal = Convert.ToString(row["Value"]);
+                        if (!string.IsNullOrWhiteSpace(actVal) && !cmbActivityType.Items.Contains(actVal))
+                        {
+                            cmbActivityType.Items.Add(actVal);
+                        }
                     }
                 }
             }
             catch (Exception ex)
             {
                 MessageBox.Show("Unable to load activity filters: " + ex.Message, "User Activity Log", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+
+            // Ensure standard activity types are present if table was empty
+            string[] standardActions = new[] { "SAVE", "UPDATE", "DELETE", "Login", "Logout", "FormEntry" };
+            foreach (string action in standardActions)
+            {
+                if (!cmbActivityType.Items.Contains(action))
+                {
+                    cmbActivityType.Items.Add(action);
+                }
             }
 
             cmbUser.SelectedIndex = 0;
