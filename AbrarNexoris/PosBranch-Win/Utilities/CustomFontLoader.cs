@@ -1,79 +1,137 @@
-﻿using System;
+using System;
 using System.Drawing;
 using System.Drawing.Text;
 using System.IO;
+using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Windows.Forms;
 
 namespace PosBranch_Win.Utilities
 {
     /// <summary>
-    /// Utility class to load custom embedded fonts for use in the application
-    /// This ensures fonts work on any PC without requiring font installation
+    /// Utility class to load custom embedded fonts for use in the application.
+    /// Ensures fonts work on any PC without requiring font installation in Windows\Fonts.
     /// </summary>
     public static class CustomFontLoader
     {
+        [DllImport("gdi32.dll", ExactSpelling = true, SetLastError = true)]
+        private static extern IntPtr AddFontMemResourceEx(IntPtr pFileView, uint cjSize, IntPtr pReserved, [In] ref uint pNumFonts);
+
+        [DllImport("gdi32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+        private static extern int AddFontResourceEx(string lpszFilename, uint fl, IntPtr pdv);
+
+        private const uint FR_PRIVATE = 0x10;
+
         private static PrivateFontCollection privateFontCollection;
+        private static IntPtr fontBufferPtr = IntPtr.Zero;
         private static bool isInitialized = false;
+        private static readonly object lockObj = new object();
 
         /// <summary>
-        /// Initializes and loads the DS-Digital font from embedded resources
-        /// Call this once during application startup or form initialization
+        /// Initializes and registers the DS-Digital font globally for the process.
+        /// Call this once in Program.Main() before any forms are instantiated.
         /// </summary>
         public static void Initialize()
         {
             if (isInitialized)
                 return;
 
-            try
+            lock (lockObj)
             {
-                privateFontCollection = new PrivateFontCollection();
+                if (isInitialized)
+                    return;
 
-                // Load DS-DIGI.TTF from embedded resources
-                // Resource name format: PosBranch_Win.Font.DS-DIGI.TTF
-                string resourceName = "PosBranch_Win.Font.DS-DIGI.TTF";
-
-                // Get the embedded resource stream
-                var assembly = System.Reflection.Assembly.GetExecutingAssembly();
-                using (Stream fontStream = assembly.GetManifestResourceStream(resourceName))
+                try
                 {
-                    if (fontStream == null)
+                    byte[] fontData = null;
+
+                    // 1. Try reading from embedded resource "PosBranch_Win.Font.DS-DIGI.TTF"
+                    Assembly assembly = Assembly.GetExecutingAssembly();
+                    string resourceName = "PosBranch_Win.Font.DS-DIGI.TTF";
+
+                    using (Stream fontStream = assembly.GetManifestResourceStream(resourceName))
                     {
-                        // Try to list all available resources for debugging
-                        string[] resources = assembly.GetManifestResourceNames();
-                        string availableResources = string.Join(", ", resources);
-                        throw new Exception($"Font resource '{resourceName}' not found. Available resources: {availableResources}");
+                        if (fontStream != null)
+                        {
+                            fontData = new byte[fontStream.Length];
+                            fontStream.Read(fontData, 0, (int)fontStream.Length);
+                        }
                     }
 
-                    // Read the font data into a byte array
-                    byte[] fontData = new byte[fontStream.Length];
-                    fontStream.Read(fontData, 0, (int)fontStream.Length);
+                    // Fallback: Try reading from disk ("Font\DS-DIGI.TTF" or "DS-DIGI.TTF" in startup folder)
+                    string fontDiskPath = Path.Combine(Application.StartupPath, "Font", "DS-DIGI.TTF");
+                    if (!File.Exists(fontDiskPath))
+                    {
+                        fontDiskPath = Path.Combine(Application.StartupPath, "DS-DIGI.TTF");
+                    }
 
-                    // Allocate memory for the font data
-                    IntPtr fontPtr = Marshal.AllocCoTaskMem(fontData.Length);
-                    Marshal.Copy(fontData, 0, fontPtr, fontData.Length);
+                    if (fontData == null && File.Exists(fontDiskPath))
+                    {
+                        fontData = File.ReadAllBytes(fontDiskPath);
+                    }
 
-                    // Add the font to the private font collection
-                    privateFontCollection.AddMemoryFont(fontPtr, fontData.Length);
+                    // 2. Register with Windows GDI via AddFontResourceEx
+                    if (File.Exists(fontDiskPath))
+                    {
+                        try
+                        {
+                            AddFontResourceEx(fontDiskPath, FR_PRIVATE, IntPtr.Zero);
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"AddFontResourceEx warning: {ex.Message}");
+                        }
+                    }
+                    else if (fontData != null)
+                    {
+                        // Save embedded font bytes to a temp font file and register with GDI
+                        try
+                        {
+                            string tempDir = Path.Combine(Path.GetTempPath(), "NexorisFonts");
+                            Directory.CreateDirectory(tempDir);
+                            string tempFontPath = Path.Combine(tempDir, "DS-DIGI.TTF");
+                            if (!File.Exists(tempFontPath) || new FileInfo(tempFontPath).Length != fontData.Length)
+                            {
+                                File.WriteAllBytes(tempFontPath, fontData);
+                            }
+                            AddFontResourceEx(tempFontPath, FR_PRIVATE, IntPtr.Zero);
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Temp font save warning: {ex.Message}");
+                        }
+                    }
 
-                    // Free the allocated memory
-                    Marshal.FreeCoTaskMem(fontPtr);
+                    // 3. Register font bytes into process GDI via AddFontMemResourceEx and GDI+ via PrivateFontCollection
+                    if (fontData != null && fontData.Length > 0)
+                    {
+                        privateFontCollection = new PrivateFontCollection();
+
+                        // Allocate persistent memory (DO NOT free immediately as GDI+ needs it active)
+                        fontBufferPtr = Marshal.AllocCoTaskMem(fontData.Length);
+                        Marshal.Copy(fontData, 0, fontBufferPtr, fontData.Length);
+
+                        // Register with GDI+
+                        privateFontCollection.AddMemoryFont(fontBufferPtr, fontData.Length);
+
+                        // Register with GDI system table for WinForms controls
+                        uint dummy = 0;
+                        AddFontMemResourceEx(fontBufferPtr, (uint)fontData.Length, IntPtr.Zero, ref dummy);
+                    }
+
+                    isInitialized = true;
                 }
-
-                isInitialized = true;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error loading custom font: {ex.Message}");
-                throw new Exception($"Failed to load DS-Digital font: {ex.Message}", ex);
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error in CustomFontLoader.Initialize: {ex.Message}");
+                    isInitialized = true;
+                }
             }
         }
 
         /// <summary>
-        /// Gets the DS-Digital font with the specified size and style
+        /// Gets the DS-Digital font with the specified size and style.
         /// </summary>
-        /// <param name="size">Font size in points</param>
-        /// <param name="style">Font style (Bold, Regular, etc.)</param>
-        /// <returns>Font object using the embedded DS-Digital font</returns>
         public static Font GetDSDigitalFont(float size, FontStyle style = FontStyle.Bold)
         {
             if (!isInitialized)
@@ -81,20 +139,37 @@ namespace PosBranch_Win.Utilities
                 Initialize();
             }
 
-            if (privateFontCollection == null || privateFontCollection.Families.Length == 0)
+            // 1. Try using PrivateFontCollection
+            try
             {
-                throw new Exception("DS-Digital font not loaded. Call Initialize() first.");
+                if (privateFontCollection != null && privateFontCollection.Families.Length > 0)
+                {
+                    return new Font(privateFontCollection.Families[0], size, style);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"GetDSDigitalFont PrivateFontCollection exception: {ex.Message}");
             }
 
-            // Create and return the font using the first family in the collection
-            // DO NOT use "DS-Digital" string - use the FontFamily from the collection
-            return new Font(privateFontCollection.Families[0], size, style);
+            // 2. Try creating font by family name "DS-Digital" (registered by AddFontMemResourceEx / AddFontResourceEx)
+            try
+            {
+                Font fontByName = new Font("DS-Digital", size, style);
+                if (string.Equals(fontByName.FontFamily.Name, "DS-Digital", StringComparison.OrdinalIgnoreCase))
+                {
+                    return fontByName;
+                }
+            }
+            catch { }
+
+            // 3. Final fallback to default system font
+            return new Font(FontFamily.GenericSansSerif, size, style);
         }
 
         /// <summary>
-        /// Gets the DS-Digital font family
+        /// Gets the DS-Digital font family if available.
         /// </summary>
-        /// <returns>FontFamily object for DS-Digital</returns>
         public static FontFamily GetDSDigitalFontFamily()
         {
             if (!isInitialized)
@@ -102,17 +177,23 @@ namespace PosBranch_Win.Utilities
                 Initialize();
             }
 
-            if (privateFontCollection == null || privateFontCollection.Families.Length == 0)
+            if (privateFontCollection != null && privateFontCollection.Families.Length > 0)
             {
-                throw new Exception("DS-Digital font not loaded. Call Initialize() first.");
+                return privateFontCollection.Families[0];
             }
 
-            return privateFontCollection.Families[0];
+            try
+            {
+                return new FontFamily("DS-Digital");
+            }
+            catch
+            {
+                return FontFamily.GenericSansSerif;
+            }
         }
 
         /// <summary>
-        /// Disposes of the font collection resources
-        /// Call this when the application is closing
+        /// Disposes font resources when application exits.
         /// </summary>
         public static void Dispose()
         {
@@ -120,8 +201,15 @@ namespace PosBranch_Win.Utilities
             {
                 privateFontCollection.Dispose();
                 privateFontCollection = null;
-                isInitialized = false;
             }
+
+            if (fontBufferPtr != IntPtr.Zero)
+            {
+                Marshal.FreeCoTaskMem(fontBufferPtr);
+                fontBufferPtr = IntPtr.Zero;
+            }
+
+            isInitialized = false;
         }
     }
 }

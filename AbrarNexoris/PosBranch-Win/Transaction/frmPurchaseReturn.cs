@@ -3499,6 +3499,13 @@ namespace PosBranch_Win.Transaction
                         }
                         else
                         {
+                            SavePurchaseReturnActivityLog("DELETE", new PReturnMaster
+                            {
+                                PReturnNo = prNo,
+                                VendorName = VendorName != null ? VendorName.Text : string.Empty,
+                                GrandTotal = Convert.ToDouble(decimal.TryParse(lblNetAmount != null ? lblNetAmount.Text : "0", out decimal _prNetTotal) ? _prNetTotal : 0m)
+                            });
+
                             MessageBox.Show("Purchase Return deleted successfully.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
                             // If this PR was loaded from PurchaseReturnUpdate form, clear the Tag flag

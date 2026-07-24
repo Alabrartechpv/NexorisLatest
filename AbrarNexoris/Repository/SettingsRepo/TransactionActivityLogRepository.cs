@@ -329,6 +329,52 @@ WHERE CreatedOn >= @FromDate
                     cmd.Parameters.AddWithValue("@CounterSessionId", SessionContext.CounterSessionId);
                     cmd.ExecuteNonQuery();
                 }
+
+                // Also write mirror record into UserActivityLog for central auditing
+                try
+                {
+                    string formName = "Transaction";
+                    string formattedDetails = activityDetails;
+
+                    if (string.Equals(logType, "Purchase", StringComparison.OrdinalIgnoreCase))
+                    {
+                        formName = "FrmPurchase";
+                        formattedDetails = $"Purchase GRN-{transactionNo}" + (!string.IsNullOrWhiteSpace(invoiceNo) ? $" (Inv: {invoiceNo})" : "") + $", Amount: {netAmount:N2}" + (!string.IsNullOrWhiteSpace(partyName) ? $", Vendor: {partyName}" : "");
+                    }
+                    else if (string.Equals(logType, "Sales", StringComparison.OrdinalIgnoreCase))
+                    {
+                        formName = "frmSalesInvoice";
+                        formattedDetails = $"Sales Invoice Bill #{transactionNo}, Amount: {netAmount:N2}" + (!string.IsNullOrWhiteSpace(partyName) ? $", Customer: {partyName}" : "");
+                    }
+                    else if (string.Equals(logType, "Purchase Return", StringComparison.OrdinalIgnoreCase))
+                    {
+                        formName = "frmPurchaseReturn";
+                        formattedDetails = $"Purchase Return GRN-{transactionNo}, Amount: {netAmount:N2}" + (!string.IsNullOrWhiteSpace(partyName) ? $", Vendor: {partyName}" : "");
+                    }
+                    else if (string.Equals(logType, "Sales Return", StringComparison.OrdinalIgnoreCase))
+                    {
+                        formName = "frmSalesReturn";
+                        formattedDetails = $"Sales Return Bill #{transactionNo}, Amount: {netAmount:N2}" + (!string.IsNullOrWhiteSpace(partyName) ? $", Customer: {partyName}" : "");
+                    }
+
+                    using (var userRepo = new UserActivityLogRepository())
+                    {
+                        userRepo.SaveUserActivity(
+                            GetUserId(),
+                            GetUserName(),
+                            SessionContext.UserLevel,
+                            SessionContext.CounterId,
+                            SessionContext.CounterName,
+                            activityType,
+                            formattedDetails,
+                            formName,
+                            SessionContext.CounterSessionId);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error mirroring to UserActivityLog: {ex.Message}");
+                }
             }
             finally
             {
