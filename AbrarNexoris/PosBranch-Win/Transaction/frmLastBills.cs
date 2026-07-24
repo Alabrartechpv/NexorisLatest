@@ -6,6 +6,7 @@ using ModelClass;
 using ModelClass.TransactionModels;
 using PosBranch_Win.DialogBox;
 using Repository;
+using Repository.SettingsRepo;
 using Repository.TransactionRepository;
 using System;
 using System.Collections.Generic;
@@ -14,6 +15,7 @@ using System.Data.SqlClient;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -1705,6 +1707,10 @@ ORDER BY sm.BillNo DESC";
             try
             {
                 long billNoToPrint = currentBillNo;
+
+                // Build item summary for audit log BEFORE going async
+                string printActivityDetails = BuildPrintActivityDetails(billNoToPrint);
+
                 Task.Run(() =>
                 {
                     try
@@ -1718,10 +1724,70 @@ ORDER BY sm.BillNo DESC";
                             MessageBox.Show("Printing failed: " + ex.Message, "Print Failed", MessageBoxButtons.OK, MessageBoxIcon.Error)));
                     }
                 });
+
+                // Log the print action to UserActivityLog
+                try
+                {
+                    using (var userRepo = new UserActivityLogRepository())
+                    {
+                        userRepo.SaveUserActivity(
+                            SessionContext.UserId,
+                            SessionContext.UserName,
+                            SessionContext.UserLevel,
+                            SessionContext.CounterId,
+                            SessionContext.CounterName,
+                            "PRINT",
+                            printActivityDetails,
+                            "frmLastBills",
+                            SessionContext.CounterSessionId);
+                    }
+                }
+                catch (Exception logEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Print activity log failed: {logEx.Message}");
+                }
             }
             catch (Exception ex)
             {
                 MessageBox.Show("Printing failed: " + ex.Message, "Print Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private string BuildPrintActivityDetails(long billNo)
+        {
+            try
+            {
+                var sb = new StringBuilder();
+                sb.Append($"Printed Bill #{billNo}");
+
+                if (itemsGrid?.DataSource is DataTable dt && dt.Rows.Count > 0)
+                {
+                    sb.Append(" | Items: ");
+                    var itemParts = new List<string>();
+                    foreach (DataRow row in dt.Rows)
+                    {
+                        string name   = row["Description"] != DBNull.Value ? row["Description"].ToString().Trim() : string.Empty;
+                        double qty    = row["Qty"]    != DBNull.Value ? Convert.ToDouble(row["Qty"])    : 0;
+                        double amount = row["Amount"] != DBNull.Value ? Convert.ToDouble(row["Amount"]) : 0;
+                        if (!string.IsNullOrWhiteSpace(name))
+                        {
+                            itemParts.Add($"{name} x{qty:N4} = {amount:N2}");
+                        }
+                    }
+                    sb.Append(string.Join("; ", itemParts));
+
+                    // Append grand total from label if available
+                    if (lblTotalValue != null && !string.IsNullOrWhiteSpace(lblTotalValue.Text))
+                    {
+                        sb.Append($" | Total: {lblTotalValue.Text}");
+                    }
+                }
+
+                return sb.ToString();
+            }
+            catch
+            {
+                return $"Printed Bill #{billNo}";
             }
         }
 

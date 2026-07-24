@@ -73,6 +73,49 @@ namespace Repository.SettingsRepo
                     cmd.Parameters.AddWithValue("@CounterSessionId", SessionContext.CounterSessionId);
                     cmd.ExecuteNonQuery();
                 }
+
+                // Mirror to central UserActivityLog for audit trail
+                try
+                {
+                    string mirrorDetails;
+                    if (string.Equals(activityType, "SAVE", StringComparison.OrdinalIgnoreCase))
+                    {
+                        mirrorDetails = $"New Item Added: '{itemName}'" +
+                            (unitCost.HasValue   ? $", Unit Cost: {unitCost.Value:N4}"    : "") +
+                            (retailPrice.HasValue ? $", Retail Price: {retailPrice.Value:N4}" : "") +
+                            (walkinPrice.HasValue ? $", Walkin Price: {walkinPrice.Value:N4}" : "") +
+                            (!string.IsNullOrWhiteSpace(barcode) ? $", Barcode: {barcode}" : "");
+                    }
+                    else if (string.Equals(activityType, "UPDATE", StringComparison.OrdinalIgnoreCase))
+                    {
+                        mirrorDetails = $"Item Updated: '{itemName}'" +
+                            (unitCost.HasValue   ? $", Unit Cost: {unitCost.Value:N4}"    : "") +
+                            (retailPrice.HasValue ? $", Retail Price: {retailPrice.Value:N4}" : "") +
+                            (!string.IsNullOrWhiteSpace(barcode) ? $", Barcode: {barcode}" : "");
+                    }
+                    else
+                    {
+                        mirrorDetails = $"Item '{itemName}' — {activityType}";
+                    }
+
+                    using (var userRepo = new UserActivityLogRepository())
+                    {
+                        userRepo.SaveUserActivity(
+                            GetUserId(),
+                            GetUserName(),
+                            SessionContext.UserLevel,
+                            SessionContext.CounterId,
+                            SessionContext.CounterName,
+                            activityType,
+                            mirrorDetails,
+                            "frmItemMasterNew",
+                            SessionContext.CounterSessionId);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error mirroring item activity to UserActivityLog: {ex.Message}");
+                }
             }
             finally
             {
