@@ -93,18 +93,14 @@ namespace Repository.Accounts
             DataConnection.Open();
             try
             {
-                string query = "SELECT BillNo, BillDate, DueDate, NetAmount AS InvoiceAmount, ISNULL(ReceivedAmount, 0) AS ReceivedAmount, " +
-                               "ISNULL((SELECT SUM(GrandTotal) FROM SReturnMaster WHERE InvoiceNo = CAST(SMaster.BillNo AS varchar(50)) AND BranchId = @BranchId AND CompanyId = SMaster.CompanyId AND FinYearId = SMaster.FinYearId AND CancelFlag = 0), 0) AS ReturnedAmount, " +
-                               "CASE WHEN (NetAmount - ISNULL(ReceivedAmount, 0)) < 0 THEN 0 " +
-                               "ELSE (NetAmount - ISNULL(ReceivedAmount, 0)) END AS Balance " +
-                               "FROM SMaster WHERE BillNo = @BillNo AND BranchId = @BranchId AND CancelFlag = 0" +
-                               (customerId > 0 ? " AND LedgerID = @LedgerID" : "");
-                using (SqlCommand cmd = new SqlCommand(query, (SqlConnection)DataConnection))
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._CreditNoteMaster, (SqlConnection)DataConnection))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@BillNo", billNo);
                     if (customerId > 0)
-                        cmd.Parameters.AddWithValue("@LedgerID", customerId);
+                        cmd.Parameters.AddWithValue("@CustomerLedgerId", customerId);
                     cmd.Parameters.AddWithValue("@BranchId", branchId);
+                    cmd.Parameters.AddWithValue("@_Operation", "GETBYBILLNO");
 
                     DataTable dt = new DataTable();
                     using (SqlDataAdapter da = new SqlDataAdapter(cmd))
@@ -134,11 +130,12 @@ namespace Repository.Accounts
             DataConnection.Open();
             try
             {
-                string query = "SELECT TOP 1 LedgerID FROM SMaster WHERE BillNo = @BillNo AND BranchId = @BranchId AND CancelFlag = 0";
-                using (SqlCommand cmd = new SqlCommand(query, (SqlConnection)DataConnection))
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._CreditNoteMaster, (SqlConnection)DataConnection))
                 {
-                    cmd.Parameters.AddWithValue("@BillNo", billNo);
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@InvoiceNo", billNo);
                     cmd.Parameters.AddWithValue("@BranchId", branchId);
+                    cmd.Parameters.AddWithValue("@_Operation", "GETCUSTOMERLEDGERBYBILLNO");
                     object res = cmd.ExecuteScalar();
                     if (res != null && res != DBNull.Value)
                     {
@@ -166,10 +163,11 @@ namespace Repository.Accounts
             DataConnection.Open();
             try
             {
-                string query = "SELECT TOP 1 LedgerName FROM LedgerMaster WHERE LedgerID = @LedgerID";
-                using (SqlCommand cmd = new SqlCommand(query, (SqlConnection)DataConnection))
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._CreditNoteMaster, (SqlConnection)DataConnection))
                 {
-                    cmd.Parameters.AddWithValue("@LedgerID", ledgerId);
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@CustomerLedgerId", ledgerId);
+                    cmd.Parameters.AddWithValue("@_Operation", "GETCUSTOMERNAME");
                     object res = cmd.ExecuteScalar();
                     if (res != null && res != DBNull.Value)
                     {
@@ -444,7 +442,61 @@ namespace Repository.Accounts
                             // master.RemainingAmount → CreditAmount - AppliedAmount (computed property)
 
                             // 4. Create Voucher Entries - Double entry system
-                            // Skip voucher creation if coming from Sales Return (vouchers already created)
+                            // CRITICAL: If this Credit Note is linked to a Sales Return (SReturnNo > 0),
+                            // or if the invoice being credited was already returned via Sales Return (SReturnMaster),
+                            // the Sales Return already created the voucher entries (Dr Sales, Cr Customer Ledger).
+                            // Creating vouchers here again would DOUBLE-CREDIT the customer's ledger,
+                            // causing their Trial Balance entry to net to zero or double-count.
+                            // Always skip voucher creation when a Sales Return is linked.
+                            if (master.SReturnNo > 0)
+                            {
+                                skipVoucherCreation = true;
+                            }
+
+                            if (!skipVoucherCreation && !string.IsNullOrWhiteSpace(master.InvoiceNo))
+                            {
+                                try
+                                {
+                                    using (SqlCommand checkSRCmd = new SqlCommand(STOREDPROCEDURE._CreditNoteMaster, conn, transaction))
+                                    {
+                                        checkSRCmd.CommandType = CommandType.StoredProcedure;
+                                        checkSRCmd.Parameters.AddWithValue("@InvoiceNo", master.InvoiceNo);
+                                        checkSRCmd.Parameters.AddWithValue("@BranchId", master.BranchId);
+                                        checkSRCmd.Parameters.AddWithValue("@_Operation", "CHECKRETURN");
+                                        object srCount = checkSRCmd.ExecuteScalar();
+                                        if (srCount != null && srCount != DBNull.Value && Convert.ToInt32(srCount) > 0)
+                                        {
+                                            skipVoucherCreation = true;
+                                        }
+                                    }
+                                }
+                                catch { }
+                            }
+
+                            if (!skipVoucherCreation && details != null && details.Count > 0)
+                            {
+                                try
+                                {
+                                    foreach (var d in details)
+                                    {
+                                        using (SqlCommand checkSRCmd = new SqlCommand(STOREDPROCEDURE._CreditNoteMaster, conn, transaction))
+                                        {
+                                            checkSRCmd.CommandType = CommandType.StoredProcedure;
+                                            checkSRCmd.Parameters.AddWithValue("@BillNo", d.BillNo);
+                                            checkSRCmd.Parameters.AddWithValue("@BranchId", master.BranchId);
+                                            checkSRCmd.Parameters.AddWithValue("@_Operation", "CHECKRETURN");
+                                            object srCount = checkSRCmd.ExecuteScalar();
+                                            if (srCount != null && srCount != DBNull.Value && Convert.ToInt32(srCount) > 0)
+                                            {
+                                                skipVoucherCreation = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                                catch { }
+                            }
+
                             if (!skipVoucherCreation)
                             {
                                 // Credit entry (Customer account - reduce receivable)

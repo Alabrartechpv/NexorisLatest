@@ -890,8 +890,10 @@ namespace Repository.TransactionRepository
                         double totalGST = gstTaxAmounts.Values.Sum();
                         double returnAmountWithoutGST = sr.GrandTotal - totalGST;
 
-                        // Create voucher entries based on payment mode (reverse of Sales)
-                        if (sr.PaymodeID == 2) // CASH
+                        // Create voucher entries based on customer context (reverse of Sales)
+                        // If the customer has a Ledger account, always credit the Customer Ledger (SUNDRY DEBTORS).
+                        // Only use Cash account for anonymous/walk-in customers (LedgerID <= 0).
+                        if (sr.LedgerID <= 0) // ANONYMOUS / WALK-IN CUSTOMER — Cash refund
                         {
                             // First voucher entry - Credit Cash (cash goes out on return)
                             objVoucher = new Voucher();
@@ -919,7 +921,7 @@ namespace Repository.TransactionRepository
                             // Create GST voucher entries (CGST and SGST) - DEBITED for return
                             CreateGSTReturnVoucherEntries(sr, objVoucher, trans, gstTaxAmounts, voucherDate, ref slNo);
                         }
-                        else // CREDIT
+                        else // IDENTIFIED CUSTOMER — Credit Customer Ledger (SUNDRY DEBTORS)
                         {
                             // First voucher entry - Credit Customer Account (customer gets credit for return)
                             objVoucher = new Voucher();
@@ -1529,10 +1531,12 @@ namespace Repository.TransactionRepository
                         System.Diagnostics.Debug.WriteLine($"Deleted existing voucher entries for VoucherID: {sr.VoucherID}");
                     }
 
-                    // Now create new voucher entries based on payment mode (reverse of Sales)
-                    if (sr.PaymodeID == 2) // CASH
+                    // Now create new voucher entries based on customer context (reverse of Sales)
+                    // If the customer has a Ledger account, always credit the Customer Ledger (SUNDRY DEBTORS).
+                    // Only use Cash account for anonymous/walk-in customers (LedgerID <= 0).
+                    if (sr.LedgerID <= 0) // ANONYMOUS / WALK-IN CUSTOMER — Cash refund
                     {
-                        // First voucher entry - Debit Cash (reverse of Sales)
+                        // First voucher entry - Credit Cash (cash goes out on return)
                         Voucher objVoucher = new Voucher();
                         objVoucher.CompanyID = DataBase.CompanyId != null ? Convert.ToInt32(DataBase.CompanyId) : 0;
                         objVoucher.BranchID = DataBase.BranchId != null ? Convert.ToInt32(DataBase.BranchId) : 0;
@@ -1581,9 +1585,9 @@ namespace Repository.TransactionRepository
                         // Create GST voucher entries (CGST and SGST) - DEBITED for return
                         CreateGSTReturnVoucherEntries(sr, objVoucher, (SqlTransaction)trans, gstTaxAmounts, sr.SReturnDate, ref slNo);
                     }
-                    else // CREDIT
+                    else // IDENTIFIED CUSTOMER — Credit Customer Ledger (SUNDRY DEBTORS)
                     {
-                        // First voucher entry - Debit Customer Account (reverse of Sales)
+                        // First voucher entry - Credit Customer Account (customer gets credit for return)
                         Voucher objVoucher = new Voucher();
                         objVoucher.CompanyID = DataBase.CompanyId != null ? Convert.ToInt32(DataBase.CompanyId) : 0;
                         objVoucher.BranchID = DataBase.BranchId != null ? Convert.ToInt32(DataBase.BranchId) : 0;
