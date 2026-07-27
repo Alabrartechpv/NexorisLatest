@@ -1,5 +1,6 @@
 using Infragistics.Win;
 using Infragistics.Win.UltraWinEditors;
+using PosBranch_Win.DialogBox;
 using Repository.SettingsRepo;
 using System;
 using System.Data;
@@ -28,6 +29,7 @@ namespace PosBranch_Win.Settings
         private UltraComboEditor cmbUser;
         private UltraComboEditor cmbActivityType;
         private UltraTextEditor txtItemSearch;
+        private Button btnItemSearchBrowse;
         private UltraComboEditor cmbAction;
         private Button btnApply;
         private Button btnReset;
@@ -112,6 +114,31 @@ namespace PosBranch_Win.Settings
             cmbUser = new UltraComboEditor();
             cmbActivityType = new UltraComboEditor();
             txtItemSearch = new UltraTextEditor();
+
+            var itemSearchContainer = new TableLayoutPanel { Dock = DockStyle.Top, Height = 30, ColumnCount = 2, RowCount = 1, BackColor = Color.Transparent };
+            itemSearchContainer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
+            itemSearchContainer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 38F));
+
+            txtItemSearch.Dock = DockStyle.Fill;
+            txtItemSearch.Margin = new Padding(0, 0, 4, 0);
+
+            btnItemSearchBrowse = new Button
+            {
+                Text = "...",
+                Dock = DockStyle.Fill,
+                Margin = new Padding(0),
+                Cursor = Cursors.Hand,
+                FlatStyle = FlatStyle.Flat,
+                BackColor = Color.White,
+                ForeColor = navy,
+                Font = new Font("Segoe UI Semibold", 9.5F, FontStyle.Bold)
+            };
+            btnItemSearchBrowse.FlatAppearance.BorderColor = skyBlueOutline;
+            btnItemSearchBrowse.Click += btnItemSearchBrowse_Click;
+
+            itemSearchContainer.Controls.Add(txtItemSearch, 0, 0);
+            itemSearchContainer.Controls.Add(btnItemSearchBrowse, 1, 0);
+
             cmbAction = new UltraComboEditor();
             btnApply = new Button { Text = "Apply Filters", Height = 32, Dock = DockStyle.Top };
             btnReset = new Button { Text = "Reset", Height = 32, Dock = DockStyle.Top };
@@ -119,7 +146,7 @@ namespace PosBranch_Win.Settings
             AddDateRangeFilter(filters);
             AddFilter(filters, "User", cmbUser);
             AddFilter(filters, "Activity Type", cmbActivityType);
-            AddFilter(filters, "Item", txtItemSearch);
+            AddFilter(filters, "Item", itemSearchContainer);
             AddFilter(filters, "Action", cmbAction);
             filters.Controls.Add(new Panel { Height = 12, Dock = DockStyle.Top });
             filters.Controls.Add(btnApply);
@@ -326,10 +353,10 @@ namespace PosBranch_Win.Settings
         {
             if (gridActivity.Columns.Count == 0) return;
 
+            SetColumn("Action", "Action", 220);
             SetColumn("DisplayLogNo", "#", 55);
             SetColumn("CreatedOn", "Date & Time", 155);
             SetColumn("UserName", "User", 115);
-            SetColumn("Action", "Action", 220);
             SetColumn("ItemName", "Item Name", 240);
             SetColumn("Barcode", "Barcode", 150);
             SetColumn("UOM", "UOM", 80);
@@ -349,6 +376,12 @@ namespace PosBranch_Win.Settings
             SetColumn("ActivityDetails", "Details", 360);
             SetColumn("CounterName", "Counter", 130);
             SetColumn("CounterSessionId", "Session", 90);
+
+            if (gridActivity.Columns.Contains("Action"))
+            {
+                gridActivity.Columns["Action"].DisplayIndex = 0;
+                gridActivity.Columns["Action"].Frozen = true;
+            }
 
             foreach (string name in new[] { "CompanyId", "BranchId", "FinYearId", "UserId", "CounterId", "Available", "Hold", "Cycle", "BoxQty", "ActivityLogId", "ActionSort", "SlNo", "ItemId", "UnitId", "Stock In", "Stock Out", "Adjustment Qty", "New Balance", "Qty Difference", "PhysicalStock", "Comments", "Remarks" })
             {
@@ -405,12 +438,16 @@ namespace PosBranch_Win.Settings
                 {
                     qtyDifference = FirstDecimal(row, "AdjustmentQty", "Adjustment Qty");
                 }
-                if (qtyDifference == 0m && string.Equals(action, "Purchase Return", StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(action, "Purchase Return", StringComparison.OrdinalIgnoreCase))
                 {
                     decimal returnedQty = FirstDecimal(row, "Returned", "ReturnedQty", "ReturnQty", "Returnqty", "Returned qty");
                     if (returnedQty != 0m)
                     {
-                        qtyDifference = 0m - Math.Abs(returnedQty);
+                        if (qtyDifference == 0m)
+                        {
+                            qtyDifference = 0m - Math.Abs(returnedQty);
+                        }
+                        row["Qty"] = Math.Abs(returnedQty);
                     }
                 }
                 if (qtyDifference == 0m)
@@ -797,6 +834,39 @@ namespace PosBranch_Win.Settings
                         popup.ShowDialog(this);
                     }
                 }
+            }
+        }
+
+        private void btnItemSearchBrowse_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                using (var dialog = new frmdialForItemMaster("ItemStockActivity"))
+                {
+                    Form topLevelParent = this.FindForm();
+                    DialogResult result = (topLevelParent != null && topLevelParent != this)
+                        ? dialog.ShowDialog(topLevelParent)
+                        : dialog.ShowDialog();
+
+                    if (result == DialogResult.OK)
+                    {
+                        string selected = !string.IsNullOrWhiteSpace(dialog.SelectedItemName)
+                            ? dialog.SelectedItemName
+                            : (!string.IsNullOrWhiteSpace(dialog.SelectedBarcode)
+                                ? dialog.SelectedBarcode
+                                : Convert.ToString(dialog.Tag));
+
+                        if (!string.IsNullOrWhiteSpace(selected))
+                        {
+                            txtItemSearch.Text = selected;
+                            LoadActivityLog();
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Unable to open Item Master lookup: " + ex.Message, Text, MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 

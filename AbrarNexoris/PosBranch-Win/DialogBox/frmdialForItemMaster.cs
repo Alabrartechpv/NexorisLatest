@@ -48,6 +48,31 @@ namespace PosBranch_Win.DialogBox
         // Add this property to allow the parent form to specify the TaxType filter
         public string TaxTypeFilter { get; set; } = "ALL";
 
+        // Properties to expose selected item details to parent dialogs
+        public string SelectedItemName { get; private set; }
+        public string SelectedBarcode { get; private set; }
+        public string SelectedItemNo { get; private set; }
+        public long SelectedItemId { get; private set; }
+
+        public void CaptureSelectedItemData()
+        {
+            try
+            {
+                if (ultraGrid1 != null && ultraGrid1.ActiveRow != null)
+                {
+                    SelectedItemName = ultraGrid1.ActiveRow.Cells.Exists("Description") ? Convert.ToString(ultraGrid1.ActiveRow.Cells["Description"].Value) : string.Empty;
+                    SelectedBarcode = ultraGrid1.ActiveRow.Cells.Exists("BarCode") ? Convert.ToString(ultraGrid1.ActiveRow.Cells["BarCode"].Value) : string.Empty;
+                    SelectedItemNo = ultraGrid1.ActiveRow.Cells.Exists("ItemNo") ? Convert.ToString(ultraGrid1.ActiveRow.Cells["ItemNo"].Value) : string.Empty;
+                    SelectedItemId = ultraGrid1.ActiveRow.Cells.Exists("ItemId") ? Convert.ToInt64(ultraGrid1.ActiveRow.Cells["ItemId"].Value ?? 0) : 0;
+                    this.Tag = !string.IsNullOrWhiteSpace(SelectedItemName) ? SelectedItemName : SelectedBarcode;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("CaptureSelectedItemData error: " + ex.Message);
+            }
+        }
+
         private void InitializeStatusLabel()
         {
             // Create a status label at the bottom of the form
@@ -2561,6 +2586,8 @@ namespace PosBranch_Win.DialogBox
         {
             try
             {
+                CaptureSelectedItemData();
+
                 // Process based on form type
                 if (FormName == "frmSalesReturn" || FormName == "frmSalesInvoice")
                 {
@@ -2593,7 +2620,7 @@ namespace PosBranch_Win.DialogBox
                     System.Diagnostics.Debug.WriteLine("Double-click detected, sending item to Stock Transfer");
                     SendItemToStockTransfer();
                 }
-                else if (FormName == "FrmBarcode" || FormName == "frmChangeItemNo" || FormName == "frmvendorpurchasereport")
+                else if (FormName == "FrmBarcode" || FormName == "frmChangeItemNo" || FormName == "frmvendorpurchasereport" || FormName == "ItemStockActivity")
                 {
                     // Handle simple selection dialogs
                     System.Diagnostics.Debug.WriteLine($"Double-click detected, selecting item for {FormName}");
@@ -4368,6 +4395,8 @@ namespace PosBranch_Win.DialogBox
                     // Log to debug
                     System.Diagnostics.Debug.WriteLine($"OK button clicked in frmdialForItemMaster. FormName: {FormName}");
 
+                    CaptureSelectedItemData();
+
                     if (FormName == "FrmStockAdjustment")
                     {
                         SendItemToStockAdjustment();
@@ -4392,10 +4421,10 @@ namespace PosBranch_Win.DialogBox
                     {
                         SendItemToPurchaseReturn();
                     }
-                    else if (FormName == "FrmBarcode")
+                    else if (FormName == "FrmBarcode" || FormName == "ItemStockActivity")
                     {
-                        // Handle barcode form selection
-                        System.Diagnostics.Debug.WriteLine("OK button clicked, selecting item for barcode printing");
+                        // Handle barcode form / item stock activity selection
+                        System.Diagnostics.Debug.WriteLine($"OK button clicked, selecting item for {FormName}");
                         this.DialogResult = DialogResult.OK;
                         this.Close();
                     }
