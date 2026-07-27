@@ -5471,14 +5471,20 @@ namespace PosBranch_Win.Transaction
         {
             try
             {
-                // Get the customer's LedgerID from the current sales return
-                int customerLedgerId = Convert.ToInt32(SReturn.LedgerID);
+                // Get the customer's LedgerID from the current sales return or customer control
+                int customerLedgerId = SReturn != null && SReturn.LedgerID > 0 ? Convert.ToInt32(SReturn.LedgerID) : 0;
+                if (customerLedgerId <= 0 && customerTextBox != null && customerTextBox.Tag != null)
+                {
+                    int.TryParse(customerTextBox.Tag.ToString(), out customerLedgerId);
+                }
+
                 string customerName = creditNote.CustomerName;
                 decimal returnedAmount = (decimal)creditNote.TotalAmount;
+                int sReturnNo = SReturn != null && SReturn.SReturnNo > 0 ? SReturn.SReturnNo : creditNote.CreditNoteNo;
 
                 // Create and configure the Credit Note form instead of Receipt form
                 var creditNoteFormInstance = new PosBranch_Win.Accounts.FrmCreditNote(
-                    creditNote.CreditNoteNo,
+                    sReturnNo,
                     customerLedgerId,
                     customerName,
                     creditNote.InvoiceNo,

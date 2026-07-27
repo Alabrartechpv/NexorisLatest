@@ -1559,34 +1559,7 @@ namespace Repository.TransactionRepository
                         objVoucher.IsSyncd = false;
                         objVoucher._Operation = "CREATE";
 
-                        using (SqlCommand voucherEntryCmd = new SqlCommand(STOREDPROCEDURE.POS_Vouchers, (SqlConnection)DataConnection, (SqlTransaction)trans))
-                        {
-                            voucherEntryCmd.CommandType = CommandType.StoredProcedure;
-                            voucherEntryCmd.Parameters.AddWithValue("@CompanyID", objVoucher.CompanyID);
-                            voucherEntryCmd.Parameters.AddWithValue("@BranchID", objVoucher.BranchID);
-                            voucherEntryCmd.Parameters.AddWithValue("@VoucherID", objVoucher.VoucherID);
-                            voucherEntryCmd.Parameters.AddWithValue("@VoucherSeriesID", objVoucher.VoucherSeriesID);
-                            voucherEntryCmd.Parameters.AddWithValue("@VoucherDate", objVoucher.VoucherDate);
-                            voucherEntryCmd.Parameters.AddWithValue("@VoucherNumber", objVoucher.VoucherNumber);
-                            voucherEntryCmd.Parameters.AddWithValue("GroupID", objVoucher.GroupID);
-                            voucherEntryCmd.Parameters.AddWithValue("LedgerID", objVoucher.LedgerID);
-                            voucherEntryCmd.Parameters.AddWithValue("LedgerName", objVoucher.LedgerName);
-                            voucherEntryCmd.Parameters.AddWithValue("VoucherType", objVoucher.VoucherType);
-                            voucherEntryCmd.Parameters.AddWithValue("Credit", objVoucher.Credit);
-                            voucherEntryCmd.Parameters.AddWithValue("Debit", objVoucher.Debit);
-                            voucherEntryCmd.Parameters.AddWithValue("Narration", objVoucher.Narration);
-                            voucherEntryCmd.Parameters.AddWithValue("SlNo", objVoucher.SlNo);
-                            voucherEntryCmd.Parameters.AddWithValue("Mode", objVoucher.Mode);
-                            voucherEntryCmd.Parameters.AddWithValue("ModeID", objVoucher.ModeID);
-                            voucherEntryCmd.Parameters.AddWithValue("UserID", objVoucher.UserID);
-                            voucherEntryCmd.Parameters.AddWithValue("UserName", objVoucher.UserName);
-                            voucherEntryCmd.Parameters.AddWithValue("FinYearID", objVoucher.FinYearID);
-                            voucherEntryCmd.Parameters.AddWithValue("_Operation", objVoucher._Operation);
-                            voucherEntryCmd.Parameters.AddWithValue("UserDate", objVoucher.UserDate);
-
-                            voucherEntryCmd.ExecuteNonQuery();
-                            System.Diagnostics.Debug.WriteLine($"Created cash credit voucher entry for VoucherID: {sr.VoucherID}");
-                        }
+                            CreateVoucherEntry(objVoucher, (SqlTransaction)trans, $"VoucherID={objVoucher.VoucherID}, Type=CREDIT, Account=Cash, Amount={sr.GrandTotal}");
 
                         // Second voucher entry - Debit Sales (reverse of Sales)
                         // Calculate GST amounts for proper voucher split
@@ -1603,37 +1576,10 @@ namespace Repository.TransactionRepository
                         objVoucher.Debit = returnAmountWithoutGST;
                         objVoucher.SlNo = slNo++;
 
-                        using (SqlCommand voucherEntryCmd = new SqlCommand(STOREDPROCEDURE.POS_Vouchers, (SqlConnection)DataConnection, (SqlTransaction)trans))
-                        {
-                            voucherEntryCmd.CommandType = CommandType.StoredProcedure;
-                            voucherEntryCmd.Parameters.AddWithValue("@CompanyID", objVoucher.CompanyID);
-                            voucherEntryCmd.Parameters.AddWithValue("@BranchID", objVoucher.BranchID);
-                            voucherEntryCmd.Parameters.AddWithValue("@VoucherID", objVoucher.VoucherID);
-                            voucherEntryCmd.Parameters.AddWithValue("@VoucherSeriesID", objVoucher.VoucherSeriesID);
-                            voucherEntryCmd.Parameters.AddWithValue("@VoucherDate", objVoucher.VoucherDate);
-                            voucherEntryCmd.Parameters.AddWithValue("@VoucherNumber", objVoucher.VoucherNumber);
-                            voucherEntryCmd.Parameters.AddWithValue("GroupID", objVoucher.GroupID);
-                            voucherEntryCmd.Parameters.AddWithValue("LedgerID", objVoucher.LedgerID);
-                            voucherEntryCmd.Parameters.AddWithValue("LedgerName", objVoucher.LedgerName);
-                            voucherEntryCmd.Parameters.AddWithValue("VoucherType", objVoucher.VoucherType);
-                            voucherEntryCmd.Parameters.AddWithValue("Credit", objVoucher.Credit);
-                            voucherEntryCmd.Parameters.AddWithValue("Debit", objVoucher.Debit);
-                            voucherEntryCmd.Parameters.AddWithValue("Narration", objVoucher.Narration);
-                            voucherEntryCmd.Parameters.AddWithValue("SlNo", objVoucher.SlNo);
-                            voucherEntryCmd.Parameters.AddWithValue("Mode", objVoucher.Mode);
-                            voucherEntryCmd.Parameters.AddWithValue("ModeID", objVoucher.ModeID);
-                            voucherEntryCmd.Parameters.AddWithValue("UserID", objVoucher.UserID);
-                            voucherEntryCmd.Parameters.AddWithValue("UserName", objVoucher.UserName);
-                            voucherEntryCmd.Parameters.AddWithValue("FinYearID", objVoucher.FinYearID);
-                            voucherEntryCmd.Parameters.AddWithValue("_Operation", objVoucher._Operation);
-                            voucherEntryCmd.Parameters.AddWithValue("UserDate", objVoucher.UserDate);
-
-                            voucherEntryCmd.ExecuteNonQuery();
-                            System.Diagnostics.Debug.WriteLine($"Created sales debit voucher entry for VoucherID: {sr.VoucherID}");
-                        }
+                        CreateVoucherEntry(objVoucher, (SqlTransaction)trans, $"VoucherID={objVoucher.VoucherID}, Type=DEBIT, Account=Sales, Amount={returnAmountWithoutGST}");
 
                         // Create GST voucher entries (CGST and SGST) - DEBITED for return
-                        CreateGSTReturnVoucherEntries(sr, objVoucher, trans, gstTaxAmounts, sr.SReturnDate, ref slNo);
+                        CreateGSTReturnVoucherEntries(sr, objVoucher, (SqlTransaction)trans, gstTaxAmounts, sr.SReturnDate, ref slNo);
                     }
                     else // CREDIT
                     {
@@ -1664,34 +1610,7 @@ namespace Repository.TransactionRepository
                         objVoucher.IsSyncd = false;
                         objVoucher._Operation = "CREATE";
 
-                        using (SqlCommand voucherEntryCmd = new SqlCommand(STOREDPROCEDURE.POS_Vouchers, (SqlConnection)DataConnection, (SqlTransaction)trans))
-                        {
-                            voucherEntryCmd.CommandType = CommandType.StoredProcedure;
-                            voucherEntryCmd.Parameters.AddWithValue("@CompanyID", objVoucher.CompanyID);
-                            voucherEntryCmd.Parameters.AddWithValue("@BranchID", objVoucher.BranchID);
-                            voucherEntryCmd.Parameters.AddWithValue("@VoucherID", objVoucher.VoucherID);
-                            voucherEntryCmd.Parameters.AddWithValue("@VoucherSeriesID", objVoucher.VoucherSeriesID);
-                            voucherEntryCmd.Parameters.AddWithValue("@VoucherDate", objVoucher.VoucherDate);
-                            voucherEntryCmd.Parameters.AddWithValue("@VoucherNumber", objVoucher.VoucherNumber);
-                            voucherEntryCmd.Parameters.AddWithValue("GroupID", objVoucher.GroupID);
-                            voucherEntryCmd.Parameters.AddWithValue("LedgerID", objVoucher.LedgerID);
-                            voucherEntryCmd.Parameters.AddWithValue("LedgerName", objVoucher.LedgerName);
-                            voucherEntryCmd.Parameters.AddWithValue("VoucherType", objVoucher.VoucherType);
-                            voucherEntryCmd.Parameters.AddWithValue("Credit", objVoucher.Credit);
-                            voucherEntryCmd.Parameters.AddWithValue("Debit", objVoucher.Debit);
-                            voucherEntryCmd.Parameters.AddWithValue("Narration", objVoucher.Narration);
-                            voucherEntryCmd.Parameters.AddWithValue("SlNo", objVoucher.SlNo);
-                            voucherEntryCmd.Parameters.AddWithValue("Mode", objVoucher.Mode);
-                            voucherEntryCmd.Parameters.AddWithValue("ModeID", objVoucher.ModeID);
-                            voucherEntryCmd.Parameters.AddWithValue("UserID", objVoucher.UserID);
-                            voucherEntryCmd.Parameters.AddWithValue("UserName", objVoucher.UserName);
-                            voucherEntryCmd.Parameters.AddWithValue("FinYearID", objVoucher.FinYearID);
-                            voucherEntryCmd.Parameters.AddWithValue("_Operation", objVoucher._Operation);
-                            voucherEntryCmd.Parameters.AddWithValue("UserDate", objVoucher.UserDate);
-
-                            voucherEntryCmd.ExecuteNonQuery();
-                            System.Diagnostics.Debug.WriteLine($"Created customer credit voucher entry for VoucherID: {sr.VoucherID}");
-                        }
+                        CreateVoucherEntry(objVoucher, (SqlTransaction)trans, $"VoucherID={objVoucher.VoucherID}, Type=CREDIT, Customer={objVoucher.LedgerName}, Amount={sr.GrandTotal}");
 
                         // Second voucher entry - Debit Sales (reverse of Sales)
                         // Calculate GST amounts for proper voucher split
@@ -1708,34 +1627,7 @@ namespace Repository.TransactionRepository
                         objVoucher.Debit = returnAmountWithoutGSTCredit;
                         objVoucher.SlNo = slNoCredit++;
 
-                        using (SqlCommand voucherEntryCmd = new SqlCommand(STOREDPROCEDURE.POS_Vouchers, (SqlConnection)DataConnection, (SqlTransaction)trans))
-                        {
-                            voucherEntryCmd.CommandType = CommandType.StoredProcedure;
-                            voucherEntryCmd.Parameters.AddWithValue("@CompanyID", objVoucher.CompanyID);
-                            voucherEntryCmd.Parameters.AddWithValue("@BranchID", objVoucher.BranchID);
-                            voucherEntryCmd.Parameters.AddWithValue("@VoucherID", objVoucher.VoucherID);
-                            voucherEntryCmd.Parameters.AddWithValue("@VoucherSeriesID", objVoucher.VoucherSeriesID);
-                            voucherEntryCmd.Parameters.AddWithValue("@VoucherDate", objVoucher.VoucherDate);
-                            voucherEntryCmd.Parameters.AddWithValue("@VoucherNumber", objVoucher.VoucherNumber);
-                            voucherEntryCmd.Parameters.AddWithValue("GroupID", objVoucher.GroupID);
-                            voucherEntryCmd.Parameters.AddWithValue("LedgerID", objVoucher.LedgerID);
-                            voucherEntryCmd.Parameters.AddWithValue("LedgerName", objVoucher.LedgerName);
-                            voucherEntryCmd.Parameters.AddWithValue("VoucherType", objVoucher.VoucherType);
-                            voucherEntryCmd.Parameters.AddWithValue("Credit", objVoucher.Credit);
-                            voucherEntryCmd.Parameters.AddWithValue("Debit", objVoucher.Debit);
-                            voucherEntryCmd.Parameters.AddWithValue("Narration", objVoucher.Narration);
-                            voucherEntryCmd.Parameters.AddWithValue("SlNo", objVoucher.SlNo);
-                            voucherEntryCmd.Parameters.AddWithValue("Mode", objVoucher.Mode);
-                            voucherEntryCmd.Parameters.AddWithValue("ModeID", objVoucher.ModeID);
-                            voucherEntryCmd.Parameters.AddWithValue("UserID", objVoucher.UserID);
-                            voucherEntryCmd.Parameters.AddWithValue("UserName", objVoucher.UserName);
-                            voucherEntryCmd.Parameters.AddWithValue("FinYearID", objVoucher.FinYearID);
-                            voucherEntryCmd.Parameters.AddWithValue("_Operation", objVoucher._Operation);
-                            voucherEntryCmd.Parameters.AddWithValue("UserDate", objVoucher.UserDate);
-
-                            voucherEntryCmd.ExecuteNonQuery();
-                            System.Diagnostics.Debug.WriteLine($"Created sales debit voucher entry for VoucherID: {sr.VoucherID}");
-                        }
+                        CreateVoucherEntry(objVoucher, (SqlTransaction)trans, $"VoucherID={objVoucher.VoucherID}, Type=DEBIT, Account=Sales, Amount={returnAmountWithoutGSTCredit}");
 
                         // Create GST voucher entries (CGST and SGST) - DEBITED for return
                         CreateGSTReturnVoucherEntries(sr, objVoucher, trans, gstTaxAmountsCredit, sr.SReturnDate, ref slNoCredit);
@@ -2886,21 +2778,21 @@ namespace Repository.TransactionRepository
                 voucherEntryCmd.Parameters.AddWithValue("@VoucherSeriesID", voucher.VoucherSeriesID);
                 voucherEntryCmd.Parameters.AddWithValue("@VoucherDate", voucher.VoucherDate);
                 voucherEntryCmd.Parameters.AddWithValue("@VoucherNumber", voucher.VoucherNumber);
-                voucherEntryCmd.Parameters.AddWithValue("GroupID", voucher.GroupID);
-                voucherEntryCmd.Parameters.AddWithValue("LedgerID", voucher.LedgerID);
-                voucherEntryCmd.Parameters.AddWithValue("LedgerName", voucher.LedgerName);
-                voucherEntryCmd.Parameters.AddWithValue("VoucherType", voucher.VoucherType);
-                voucherEntryCmd.Parameters.AddWithValue("Credit", voucher.Credit);
-                voucherEntryCmd.Parameters.AddWithValue("Debit", voucher.Debit);
-                voucherEntryCmd.Parameters.AddWithValue("Narration", voucher.Narration);
-                voucherEntryCmd.Parameters.AddWithValue("SlNo", voucher.SlNo);
-                voucherEntryCmd.Parameters.AddWithValue("Mode", voucher.Mode);
-                voucherEntryCmd.Parameters.AddWithValue("ModeID", voucher.ModeID);
-                voucherEntryCmd.Parameters.AddWithValue("UserID", voucher.UserID);
-                voucherEntryCmd.Parameters.AddWithValue("UserName", voucher.UserName);
-                voucherEntryCmd.Parameters.AddWithValue("FinYearID", voucher.FinYearID);
+                voucherEntryCmd.Parameters.AddWithValue("@GroupID", voucher.GroupID);
+                voucherEntryCmd.Parameters.AddWithValue("@LedgerID", voucher.LedgerID);
+                voucherEntryCmd.Parameters.AddWithValue("@LedgerName", voucher.LedgerName);
+                voucherEntryCmd.Parameters.AddWithValue("@VoucherType", voucher.VoucherType);
+                voucherEntryCmd.Parameters.AddWithValue("@Credit", voucher.Credit);
+                voucherEntryCmd.Parameters.AddWithValue("@Debit", voucher.Debit);
+                voucherEntryCmd.Parameters.AddWithValue("@Narration", voucher.Narration);
+                voucherEntryCmd.Parameters.AddWithValue("@SlNo", voucher.SlNo);
+                voucherEntryCmd.Parameters.AddWithValue("@Mode", voucher.Mode);
+                voucherEntryCmd.Parameters.AddWithValue("@ModeID", voucher.ModeID);
+                voucherEntryCmd.Parameters.AddWithValue("@UserID", voucher.UserID);
+                voucherEntryCmd.Parameters.AddWithValue("@UserName", voucher.UserName);
+                voucherEntryCmd.Parameters.AddWithValue("@FinYearID", voucher.FinYearID);
                 voucherEntryCmd.Parameters.AddWithValue("@_Operation", voucher._Operation);
-                voucherEntryCmd.Parameters.AddWithValue("UserDate", voucher.UserDate);
+                voucherEntryCmd.Parameters.AddWithValue("@UserDate", voucher.UserDate);
 
                 voucherEntryCmd.ExecuteNonQuery();
             }

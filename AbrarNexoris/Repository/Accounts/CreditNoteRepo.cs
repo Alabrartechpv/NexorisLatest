@@ -97,11 +97,13 @@ namespace Repository.Accounts
                                "ISNULL((SELECT SUM(GrandTotal) FROM SReturnMaster WHERE InvoiceNo = CAST(SMaster.BillNo AS varchar(50)) AND BranchId = @BranchId AND CompanyId = SMaster.CompanyId AND FinYearId = SMaster.FinYearId AND CancelFlag = 0), 0) AS ReturnedAmount, " +
                                "CASE WHEN (NetAmount - ISNULL(ReceivedAmount, 0)) < 0 THEN 0 " +
                                "ELSE (NetAmount - ISNULL(ReceivedAmount, 0)) END AS Balance " +
-                               "FROM SMaster WHERE BillNo = @BillNo AND LedgerID = @LedgerID AND BranchId = @BranchId AND CancelFlag = 0";
+                               "FROM SMaster WHERE BillNo = @BillNo AND BranchId = @BranchId AND CancelFlag = 0" +
+                               (customerId > 0 ? " AND LedgerID = @LedgerID" : "");
                 using (SqlCommand cmd = new SqlCommand(query, (SqlConnection)DataConnection))
                 {
                     cmd.Parameters.AddWithValue("@BillNo", billNo);
-                    cmd.Parameters.AddWithValue("@LedgerID", customerId);
+                    if (customerId > 0)
+                        cmd.Parameters.AddWithValue("@LedgerID", customerId);
                     cmd.Parameters.AddWithValue("@BranchId", branchId);
 
                     DataTable dt = new DataTable();
@@ -119,6 +121,69 @@ namespace Repository.Accounts
                     DataConnection.Close();
             }
             return null;
+        }
+
+        public int GetCustomerLedgerIdByInvoiceNo(string billNo, int branchId)
+        {
+            if (string.IsNullOrWhiteSpace(billNo))
+                return 0;
+
+            if (DataConnection.State == ConnectionState.Open)
+                DataConnection.Close();
+
+            DataConnection.Open();
+            try
+            {
+                string query = "SELECT TOP 1 LedgerID FROM SMaster WHERE BillNo = @BillNo AND BranchId = @BranchId AND CancelFlag = 0";
+                using (SqlCommand cmd = new SqlCommand(query, (SqlConnection)DataConnection))
+                {
+                    cmd.Parameters.AddWithValue("@BillNo", billNo);
+                    cmd.Parameters.AddWithValue("@BranchId", branchId);
+                    object res = cmd.ExecuteScalar();
+                    if (res != null && res != DBNull.Value)
+                    {
+                        return Convert.ToInt32(res);
+                    }
+                }
+            }
+            catch { }
+            finally
+            {
+                if (DataConnection.State == ConnectionState.Open)
+                    DataConnection.Close();
+            }
+            return 0;
+        }
+
+        public string GetCustomerNameByLedgerId(int ledgerId)
+        {
+            if (ledgerId <= 0)
+                return string.Empty;
+
+            if (DataConnection.State == ConnectionState.Open)
+                DataConnection.Close();
+
+            DataConnection.Open();
+            try
+            {
+                string query = "SELECT TOP 1 LedgerName FROM LedgerMaster WHERE LedgerID = @LedgerID";
+                using (SqlCommand cmd = new SqlCommand(query, (SqlConnection)DataConnection))
+                {
+                    cmd.Parameters.AddWithValue("@LedgerID", ledgerId);
+                    object res = cmd.ExecuteScalar();
+                    if (res != null && res != DBNull.Value)
+                    {
+                        return res.ToString();
+                    }
+                }
+            }
+            catch { }
+            finally
+            {
+                if (DataConnection.State == ConnectionState.Open)
+                    DataConnection.Close();
+            }
+            return string.Empty;
         }
 
         /// <summary>
@@ -391,7 +456,7 @@ namespace Repository.Accounts
                                     cmd.Parameters.AddWithValue("@VoucherID", master.VoucherId);
                                     cmd.Parameters.AddWithValue("@VoucherSeriesID", 0);
                                     cmd.Parameters.AddWithValue("@VoucherDate", master.VoucherDate);
-                                    cmd.Parameters.AddWithValue("@VoucherNumber", "");
+                                    cmd.Parameters.AddWithValue("@VoucherNumber", "CN" + master.VoucherId);
                                     cmd.Parameters.AddWithValue("@LedgerID", master.CustomerLedgerId);
                                     cmd.Parameters.AddWithValue("@VoucherType", "Credit Note");
                                     cmd.Parameters.AddWithValue("@Debit", 0);
@@ -424,7 +489,7 @@ namespace Repository.Accounts
                                     cmd.Parameters.AddWithValue("@VoucherID", master.VoucherId);
                                     cmd.Parameters.AddWithValue("@VoucherSeriesID", 0);
                                     cmd.Parameters.AddWithValue("@VoucherDate", master.VoucherDate);
-                                    cmd.Parameters.AddWithValue("@VoucherNumber", "");
+                                    cmd.Parameters.AddWithValue("@VoucherNumber", "CN" + master.VoucherId);
                                     cmd.Parameters.AddWithValue("@LedgerID", master.PaymentMethodLedgerId);
                                     cmd.Parameters.AddWithValue("@VoucherType", "Credit Note");
                                     cmd.Parameters.AddWithValue("@Debit", (float)master.CreditAmount);

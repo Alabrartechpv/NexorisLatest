@@ -52,6 +52,7 @@ namespace PosBranch_Win.Accounts
             ultraTextEditor1.ReadOnly = true;
             creditNoteRepo = new CreditNoteRepository();
             rdbtnoutstanding.Checked = true;
+            dtpPurchaseDate.Value = DateTime.Now;
 
             // Ensure form captures key events
             this.KeyPreview = true;
@@ -662,6 +663,20 @@ namespace PosBranch_Win.Accounts
             {
                 selectionOrderCounter = 0;
 
+                if (currentCustomerLedgerId <= 0 && !string.IsNullOrEmpty(_invoiceNo))
+                {
+                    currentCustomerLedgerId = creditNoteRepo.GetCustomerLedgerIdByInvoiceNo(_invoiceNo, currentBranchId);
+                    if (currentCustomerLedgerId > 0)
+                    {
+                        textBox4.Text = currentCustomerLedgerId.ToString();
+                        string custName = creditNoteRepo.GetCustomerNameByLedgerId(currentCustomerLedgerId);
+                        if (!string.IsNullOrEmpty(custName) && string.IsNullOrEmpty(txtCustomer.Text))
+                        {
+                            txtCustomer.Text = custName;
+                        }
+                    }
+                }
+
                 if (currentCustomerLedgerId <= 0)
                 {
                     ultraGrid1.DataSource = CreateEmptyInvoiceTable();
@@ -672,6 +687,14 @@ namespace PosBranch_Win.Accounts
                 if (rdbtnoutstanding.Checked)
                 {
                     invoices = creditNoteRepo.GetOutstandingInvoices(currentCustomerLedgerId, currentBranchId);
+                    if (invoices == null || invoices.Rows.Count == 0)
+                    {
+                        invoices = creditNoteRepo.GetAllInvoices(currentCustomerLedgerId, currentBranchId);
+                        if (invoices != null && invoices.Rows.Count > 0)
+                        {
+                            radioBtnAllDocument.Checked = true;
+                        }
+                    }
                 }
                 else
                 {
@@ -1317,7 +1340,14 @@ namespace PosBranch_Win.Accounts
 
             txtPurchaseNo.Text = masterRow["VoucherId"].ToString();
             textBox4.Text = currentCustomerLedgerId.ToString();
-            dtpPurchaseDate.Value = Convert.ToDateTime(masterRow["VoucherDate"]);
+            if (masterRow["VoucherDate"] != null && masterRow["VoucherDate"] != DBNull.Value)
+            {
+                dtpPurchaseDate.Value = Convert.ToDateTime(masterRow["VoucherDate"]);
+            }
+            else
+            {
+                dtpPurchaseDate.Value = DateTime.Now;
+            }
             txtReceivedAmount.Text = Convert.ToDouble(masterRow["CreditAmount"]).ToString("N2");
             richTextBox2.Text = masterRow["Narration"]?.ToString() ?? "";
 

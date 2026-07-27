@@ -121,6 +121,69 @@ namespace Repository.Accounts
             return null;
         }
 
+        public int GetVendorLedgerIdByInvoiceNo(string purchaseNo, int branchId)
+        {
+            if (string.IsNullOrWhiteSpace(purchaseNo))
+                return 0;
+
+            if (DataConnection.State == ConnectionState.Open)
+                DataConnection.Close();
+
+            DataConnection.Open();
+            try
+            {
+                string query = "SELECT TOP 1 LedgerID FROM PMaster WHERE InvoiceNo = @PurchaseNo AND BranchId = @BranchId AND CancelFlag = 0";
+                using (SqlCommand cmd = new SqlCommand(query, (SqlConnection)DataConnection))
+                {
+                    cmd.Parameters.AddWithValue("@PurchaseNo", purchaseNo);
+                    cmd.Parameters.AddWithValue("@BranchId", branchId);
+                    object res = cmd.ExecuteScalar();
+                    if (res != null && res != DBNull.Value)
+                    {
+                        return Convert.ToInt32(res);
+                    }
+                }
+            }
+            catch { }
+            finally
+            {
+                if (DataConnection.State == ConnectionState.Open)
+                    DataConnection.Close();
+            }
+            return 0;
+        }
+
+        public string GetVendorNameByLedgerId(int ledgerId)
+        {
+            if (ledgerId <= 0)
+                return string.Empty;
+
+            if (DataConnection.State == ConnectionState.Open)
+                DataConnection.Close();
+
+            DataConnection.Open();
+            try
+            {
+                string query = "SELECT TOP 1 LedgerName FROM LedgerMaster WHERE LedgerID = @LedgerID";
+                using (SqlCommand cmd = new SqlCommand(query, (SqlConnection)DataConnection))
+                {
+                    cmd.Parameters.AddWithValue("@LedgerID", ledgerId);
+                    object res = cmd.ExecuteScalar();
+                    if (res != null && res != DBNull.Value)
+                    {
+                        return res.ToString();
+                    }
+                }
+            }
+            catch { }
+            finally
+            {
+                if (DataConnection.State == ConnectionState.Open)
+                    DataConnection.Close();
+            }
+            return string.Empty;
+        }
+
         /// <summary>
         /// Get all invoices for vendor
         /// </summary>
@@ -339,7 +402,7 @@ namespace Repository.Accounts
                                     cmd.Parameters.AddWithValue("@VoucherID", master.VoucherId);
                                     cmd.Parameters.AddWithValue("@VoucherSeriesID", 0);
                                     cmd.Parameters.AddWithValue("@VoucherDate", master.VoucherDate);
-                                    cmd.Parameters.AddWithValue("@VoucherNumber", "");
+                                    cmd.Parameters.AddWithValue("@VoucherNumber", "DN" + master.VoucherId);
                                     cmd.Parameters.AddWithValue("@LedgerID", master.VendorLedgerId);
                                     cmd.Parameters.AddWithValue("@VoucherType", "Debit Note");
                                     cmd.Parameters.AddWithValue("@Debit", (float)master.DebitAmount);
@@ -372,7 +435,7 @@ namespace Repository.Accounts
                                     cmd.Parameters.AddWithValue("@VoucherID", master.VoucherId);
                                     cmd.Parameters.AddWithValue("@VoucherSeriesID", 0);
                                     cmd.Parameters.AddWithValue("@VoucherDate", master.VoucherDate);
-                                    cmd.Parameters.AddWithValue("@VoucherNumber", "");
+                                    cmd.Parameters.AddWithValue("@VoucherNumber", "DN" + master.VoucherId);
                                     cmd.Parameters.AddWithValue("@LedgerID", master.PaymentMethodLedgerId);
                                     cmd.Parameters.AddWithValue("@VoucherType", "Debit Note");
                                     cmd.Parameters.AddWithValue("@Debit", 0);

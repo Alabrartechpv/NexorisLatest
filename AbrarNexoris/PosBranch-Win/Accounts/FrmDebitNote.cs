@@ -153,6 +153,20 @@ namespace PosBranch_Win.Accounts
         {
             try
             {
+                if (currentVendorLedgerId <= 0 && !string.IsNullOrEmpty(_invoiceNo))
+                {
+                    currentVendorLedgerId = debitNoteRepo.GetVendorLedgerIdByInvoiceNo(_invoiceNo, currentBranchId);
+                    if (currentVendorLedgerId > 0)
+                    {
+                        textBox4.Text = currentVendorLedgerId.ToString();
+                        string vendorName = debitNoteRepo.GetVendorNameByLedgerId(currentVendorLedgerId);
+                        if (!string.IsNullOrEmpty(vendorName) && string.IsNullOrEmpty(txtVendorName.Text))
+                        {
+                            txtVendorName.Text = vendorName;
+                        }
+                    }
+                }
+
                 if (currentVendorLedgerId <= 0)
                 {
                     ultraGrid1.DataSource = CreateEmptyInvoiceTable();
@@ -163,6 +177,14 @@ namespace PosBranch_Win.Accounts
                 if (rdbtnoutstanding.Checked)
                 {
                     dt = debitNoteRepo.GetOutstandingInvoices(currentVendorLedgerId, currentBranchId);
+                    if (dt == null || dt.Rows.Count == 0)
+                    {
+                        dt = debitNoteRepo.GetAllInvoices(currentVendorLedgerId, currentBranchId);
+                        if (dt != null && dt.Rows.Count > 0)
+                        {
+                            radioBtnAllDocument.Checked = true;
+                        }
+                    }
                 }
                 else
                 {
