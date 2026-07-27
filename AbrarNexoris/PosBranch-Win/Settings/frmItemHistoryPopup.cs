@@ -74,6 +74,7 @@ namespace PosBranch_Win.Settings
             gridHistory.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(248, 252, 255);
 
             gridHistory.CellContentClick += GridHistory_CellContentClick;
+            gridHistory.DataBindingComplete += (s, e) => ApplyActionColors();
 
             var panelBottom = new Panel
             {
@@ -111,6 +112,7 @@ namespace PosBranch_Win.Settings
 
                     gridHistory.DataSource = data;
                     ConfigureGrid();
+                    ApplyActionColors();
                 }
             }
             catch (Exception ex)
@@ -222,6 +224,73 @@ namespace PosBranch_Win.Settings
                 filtered.AppendLine(line);
             }
             return filtered.ToString().TrimEnd();
+        }
+
+        private void ApplyActionColors()
+        {
+            if (gridHistory == null || !gridHistory.Columns.Contains("ActivityType")) return;
+
+            foreach (DataGridViewRow row in gridHistory.Rows)
+            {
+                string action = Convert.ToString(row.Cells["ActivityType"].Value);
+                Color color = GetActionColor(action);
+                if (color == Color.Empty) continue;
+
+                row.DefaultCellStyle.ForeColor = color;
+                row.Cells["ActivityType"].Style.ForeColor = color;
+                row.Cells["ActivityType"].Style.Font = new Font(gridHistory.Font, FontStyle.Bold);
+            }
+        }
+
+        private static Color GetActionColor(string action)
+        {
+            if (action == null) return Color.Empty;
+
+            if (action.IndexOf("(Purchase)", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                action.IndexOf("(Stock IN)", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return Color.FromArgb(24, 128, 70);
+            }
+
+            if (action.IndexOf("(Sales)", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                action.IndexOf("(Stock OUT)", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return Color.FromArgb(190, 35, 35);
+            }
+
+            if (string.Equals(action, "Sales", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(action, "Stock OUT", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(action, "Stock Out", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(action, "DELETE", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(action, "REMOVE", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(action, "CANCEL", StringComparison.OrdinalIgnoreCase))
+            {
+                return Color.FromArgb(190, 35, 35);
+            }
+
+            if (string.Equals(action, "Purchase", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(action, "Stock IN", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(action, "Stock In", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(action, "SAVE", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(action, "ADD", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(action, "CREATE", StringComparison.OrdinalIgnoreCase))
+            {
+                return Color.FromArgb(24, 128, 70);
+            }
+
+            if (string.Equals(action, "Sales Return", StringComparison.OrdinalIgnoreCase))
+            {
+                return Color.FromArgb(204, 112, 0);
+            }
+
+            if (string.Equals(action, "Purchase Return", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(action, "UPDATE", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(action, "EDIT", StringComparison.OrdinalIgnoreCase))
+            {
+                return Color.FromArgb(35, 95, 190);
+            }
+
+            return Color.Empty;
         }
     }
 }

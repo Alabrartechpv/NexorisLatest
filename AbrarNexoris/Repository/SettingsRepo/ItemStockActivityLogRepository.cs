@@ -522,6 +522,10 @@ WHERE ISNULL(pm.UserName, N'') <> N''
                     continue;
                 }
 
+                if (rows.Columns.Contains("Qty"))
+                {
+                    row["Qty"] = returnQty;
+                }
                 row["StockIn"] = 0m;
                 row["StockOut"] = returnQty;
                 row["MovementQty"] = 0m - returnQty;

@@ -63,6 +63,7 @@ namespace PosBranch_Win.Settings
             gridHistory.DefaultCellStyle.SelectionBackColor = Color.FromArgb(215, 238, 255);
             gridHistory.DefaultCellStyle.SelectionForeColor = navy;
             gridHistory.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(248, 252, 255);
+            gridHistory.DataBindingComplete += (s, e) => ApplyActionColors();
 
             var bottomPanel = new Panel { Dock = DockStyle.Bottom, Height = 50, BackColor = Color.FromArgb(245, 250, 255) };
             var btnClose = new Button
@@ -108,9 +109,9 @@ namespace PosBranch_Win.Settings
         {
             if (gridHistory.Columns.Count == 0) return;
 
-            SetColumn("DisplayLogNo", "#", 55, 0);
-            SetColumn("CreatedOn", "Date & Time", 155, 1);
-            SetColumn("Action", "Action", 220, 2);
+            SetColumn("Action", "Action", 220, 0);
+            SetColumn("DisplayLogNo", "#", 55, 1);
+            SetColumn("CreatedOn", "Date & Time", 155, 2);
             SetColumn("DocNo", "Doc No", 95, 3);
             SetColumn("StockIn", "Stock In", 90, 4);
             SetColumn("StockOut", "Stock Out", 90, 5);
@@ -126,6 +127,12 @@ namespace PosBranch_Win.Settings
             SetColumn("PurchaseNo", "Purchase No", 110, 15);
             SetColumn("Counter", "Counter", 160, 16);
             SetColumn("Session", "Session", 90, 17);
+
+            if (gridHistory.Columns.Contains("Action"))
+            {
+                gridHistory.Columns["Action"].DisplayIndex = 0;
+                gridHistory.Columns["Action"].Frozen = true;
+            }
 
             if (gridHistory.Columns.Contains("CreatedOn"))
             {
@@ -208,6 +215,16 @@ namespace PosBranch_Win.Settings
                     adjustmentQty = qtyDifference;
                 }
 
+                decimal itemQty = ToDecimal(row, "Qty");
+                if (string.Equals(action, "Purchase Return", StringComparison.OrdinalIgnoreCase))
+                {
+                    decimal returnedQty = ToDecimalAny(row, "Returned", "ReturnedQty", "ReturnQty", "Returnqty", "Returned qty");
+                    if (returnedQty > 0m)
+                    {
+                        itemQty = returnedQty;
+                    }
+                }
+
                 display.Rows.Add(
                     ToInt(row, "DisplayLogNo"),
                     ToDateTime(row, "CreatedOn"),
@@ -222,7 +239,7 @@ namespace PosBranch_Win.Settings
                     ToDecimal(row, "Stock"),
                     ToDecimal(row, "Available"),
                     ToDecimal(row, "Hold"),
-                    ToDecimal(row, "Qty"),
+                    itemQty,
                     ToText(row, "SalesBillNo"),
                     FormatPurchaseNo(ToText(row, "PurchaseNo")),
                     FirstText(row, "CounterName", "Counter"),
@@ -372,7 +389,7 @@ namespace PosBranch_Win.Settings
 
         private void ApplyActionColors()
         {
-            if (!gridHistory.Columns.Contains("Action") || !gridHistory.Columns.Contains("Stock")) return;
+            if (gridHistory == null || !gridHistory.Columns.Contains("Action")) return;
 
             foreach (DataGridViewRow row in gridHistory.Rows)
             {
@@ -380,11 +397,12 @@ namespace PosBranch_Win.Settings
                 Color color = GetActionColor(action);
                 if (color == Color.Empty) continue;
 
-                row.Cells["Stock"].Style.ForeColor = color;
-                row.Cells["Stock"].Style.SelectionForeColor = color;
-                row.Cells["Stock"].Style.BackColor = GetActionBackColor(action);
-                row.Cells["Stock"].Style.SelectionBackColor = GetActionBackColor(action);
-                row.Cells["Action"].Style.Font = new Font(gridHistory.Font, FontStyle.Bold);
+                row.DefaultCellStyle.ForeColor = color;
+                if (gridHistory.Columns.Contains("Action"))
+                {
+                    row.Cells["Action"].Style.ForeColor = color;
+                    row.Cells["Action"].Style.Font = new Font(gridHistory.Font, FontStyle.Bold);
+                }
             }
         }
 
