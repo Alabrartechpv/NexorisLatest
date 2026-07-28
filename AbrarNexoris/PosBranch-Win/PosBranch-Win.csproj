@@ -1048,6 +1048,7 @@
     <Compile Include="Settings\TransactionActivityLogForm.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="Settings\GridPinningHelper.cs" />
     <Compile Include="Settings\PurchaseLog.cs">
       <SubType>Form</SubType>
     </Compile>
