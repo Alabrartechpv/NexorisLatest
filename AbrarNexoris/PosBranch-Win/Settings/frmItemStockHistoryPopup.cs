@@ -63,6 +63,7 @@ namespace PosBranch_Win.Settings
             gridHistory.DefaultCellStyle.SelectionBackColor = Color.FromArgb(215, 238, 255);
             gridHistory.DefaultCellStyle.SelectionForeColor = navy;
             gridHistory.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(248, 252, 255);
+            GridPinningHelper.Attach(gridHistory);
             gridHistory.DataBindingComplete += (s, e) => ApplyActionColors();
 
             var bottomPanel = new Panel { Dock = DockStyle.Bottom, Height = 50, BackColor = Color.FromArgb(245, 250, 255) };
@@ -108,6 +109,7 @@ namespace PosBranch_Win.Settings
         private void ConfigureGrid()
         {
             if (gridHistory.Columns.Count == 0) return;
+            GridPinningHelper.Attach(gridHistory);
 
             SetColumn("Action", "Action", 220, 0);
             SetColumn("DisplayLogNo", "#", 55, 1);

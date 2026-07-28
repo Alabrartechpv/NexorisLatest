@@ -57,10 +57,22 @@ namespace PosBranch_Win.Reports.PurchaseReports
             Both
         }
 
+        private Form columnChooserForm;
+        private ListBox columnChooserListBox;
+        private bool isDraggingHeaderToHide;
+        private UltraGridColumn columnBeingDragged;
+        private Point headerDragStartPoint;
+        private readonly System.Windows.Forms.ToolTip headerToolTip = new System.Windows.Forms.ToolTip();
+
         public frmvendorpurchasereport()
         {
             InitializeComponent();
             gridReport.Resize += gridReport_Resize;
+            gridReport.AfterColPosChanged += (s, e) => UpdateFooterCellPositions();
+            gridReport.AfterColRegionScroll += (s, e) => UpdateFooterCellPositions();
+            gridReport.AfterRowRegionScroll += (s, e) => UpdateFooterCellPositions();
+            gridReport.Paint += (s, e) => UpdateFooterCellPositions();
+            SetupHeaderDragToHideAndColumnChooser();
             ApplyRuntimeStyles();
         }
 
@@ -85,6 +97,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
             StyleFilterText(txtItem);
 
             cmbQuickDate.Items.Clear();
+            cmbQuickDate.Items.Add("All");
             cmbQuickDate.Items.Add("Today");
             cmbQuickDate.Items.Add("Yesterday");
             cmbQuickDate.Items.Add("Last 7 Days");
@@ -305,13 +318,16 @@ namespace PosBranch_Win.Reports.PurchaseReports
             layout.Override.MinRowHeight = 19;
             layout.Override.DefaultRowHeight = 19;
             layout.RowConnectorStyle = RowConnectorStyle.None;
-            layout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
+            layout.AutoFitStyle = AutoFitStyle.None;
         }
 
         private void cmbQuickDate_ValueChanged(object sender, EventArgs e)
         {
             if (GetQuickDateText() != "Custom")
+            {
                 ApplyQuickDate();
+                LoadReport();
+            }
         }
 
         private void DatePicker_ValueChanged(object sender, EventArgs e)
@@ -462,6 +478,16 @@ namespace PosBranch_Win.Reports.PurchaseReports
                             0, GetCompanyId(), GetBranchId(), GetFinYearId());
                 }
 
+                if ((activeMode == ReportMode.Overview || activeMode == ReportMode.Vendor) && currentData != null)
+                {
+                    currentData = GroupVendorDataByBill(currentData);
+                }
+
+                if (currentData != null && (activeMode == ReportMode.Overview || activeMode == ReportMode.Vendor || activeMode == ReportMode.Both))
+                {
+                    PopulateVendorBillOutstanding();
+                }
+
                 gridReport.DataSource = currentData;
                 ConfigureGridColumns();
                 CreateFooterCells();
@@ -474,6 +500,127 @@ namespace PosBranch_Win.Reports.PurchaseReports
             {
                 MessageBox.Show("Unable to load vendor purchase report: " + ex.Message,
                     "Vendor Purchase Report", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private DataTable GroupVendorDataByBill(DataTable inputTable)
+        {
+            if (inputTable == null || inputTable.Rows.Count == 0)
+                return inputTable;
+
+            DataTable billTable = new DataTable();
+            foreach (DataColumn col in inputTable.Columns)
+            {
+                billTable.Columns.Add(col.ColumnName, col.DataType);
+            }
+
+            var groupedRows = inputTable.AsEnumerable()
+                .GroupBy(r => {
+                    string pNo = inputTable.Columns.Contains("PurchaseNo") && r["PurchaseNo"] != DBNull.Value ? Convert.ToString(r["PurchaseNo"]).Trim() : "";
+                    string gNo = inputTable.Columns.Contains("GRNNumber") && r["GRNNumber"] != DBNull.Value ? Convert.ToString(r["GRNNumber"]).Trim() : "";
+                    string iNo = inputTable.Columns.Contains("InvoiceNo") && r["InvoiceNo"] != DBNull.Value ? Convert.ToString(r["InvoiceNo"]).Trim() : "";
+                    return !string.IsNullOrEmpty(pNo) ? pNo : (!string.IsNullOrEmpty(gNo) ? gNo : iNo);
+                });
+
+            int rRank = 1;
+            foreach (var group in groupedRows)
+            {
+                DataRow firstRow = group.First();
+                DataRow newRow = billTable.NewRow();
+
+                foreach (DataColumn col in inputTable.Columns)
+                {
+                    newRow[col.ColumnName] = firstRow[col.ColumnName];
+                }
+
+                if (billTable.Columns.Contains("Rank"))
+                {
+                    newRow["Rank"] = rRank++;
+                }
+
+                if (inputTable.Columns.Contains("TotalAmount"))
+                {
+                    decimal totalAmt = group.Sum(r => r["TotalAmount"] != DBNull.Value ? Convert.ToDecimal(r["TotalAmount"]) : 0m);
+                    newRow["TotalAmount"] = totalAmt;
+                }
+                else if (inputTable.Columns.Contains("Amount"))
+                {
+                    decimal totalAmt = group.Sum(r => r["Amount"] != DBNull.Value ? Convert.ToDecimal(r["Amount"]) : 0m);
+                    newRow["Amount"] = totalAmt;
+                }
+
+                if (inputTable.Columns.Contains("Qty"))
+                {
+                    decimal totalQty = group.Sum(r => r["Qty"] != DBNull.Value ? Convert.ToDecimal(r["Qty"]) : 0m);
+                    newRow["Qty"] = totalQty;
+                }
+
+                billTable.Rows.Add(newRow);
+            }
+
+            return billTable;
+        }
+
+        private void PopulateVendorBillOutstanding()
+        {
+            if (currentData == null) return;
+
+            var grnOutstandingMap = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                using (var paymentRepo = new Repository.Accounts.VendorPaymentRepository())
+                {
+                    DataTable invoices = paymentRepo.GetAllInvoices(selectedVendorId);
+                    if (invoices != null)
+                    {
+                        foreach (DataRow invRow in invoices.Rows)
+                        {
+                            string billNo = Convert.ToString(invRow["BillNo"]).Trim();
+                            decimal balance = invRow.Table.Columns.Contains("Balance") && invRow["Balance"] != DBNull.Value
+                                ? Convert.ToDecimal(invRow["Balance"])
+                                : 0m;
+                            if (!string.IsNullOrEmpty(billNo))
+                            {
+                                grnOutstandingMap[billNo] = balance;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Error getting vendor invoices for outstanding calculation: " + ex.Message);
+            }
+
+            if (!currentData.Columns.Contains("Outstanding"))
+            {
+                currentData.Columns.Add("Outstanding", typeof(decimal));
+            }
+
+            foreach (DataRow row in currentData.Rows)
+            {
+                string purchaseNo = string.Empty;
+                if (currentData.Columns.Contains("PurchaseNo") && row["PurchaseNo"] != DBNull.Value)
+                {
+                    purchaseNo = Convert.ToString(row["PurchaseNo"]).Trim();
+                }
+                else if (currentData.Columns.Contains("GRNNumber") && row["GRNNumber"] != DBNull.Value)
+                {
+                    purchaseNo = Convert.ToString(row["GRNNumber"]).Trim();
+                }
+
+                if (!string.IsNullOrEmpty(purchaseNo) && grnOutstandingMap.TryGetValue(purchaseNo, out decimal balVal))
+                {
+                    row["Outstanding"] = balVal;
+                }
+                else if (currentData.Columns.Contains("Balance") && row["Balance"] != DBNull.Value)
+                {
+                    row["Outstanding"] = Convert.ToDecimal(row["Balance"]);
+                }
+                else
+                {
+                    row["Outstanding"] = 0m;
+                }
             }
         }
 
@@ -495,20 +642,32 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 return;
             }
 
-            SetColumn("Rank", "#", 55);
-            SetColumn("Vendor", "Vendor", 190);
-            SetColumn("PurchaseDate", "Purchase Date", 115, "dd-MMM-yyyy");
-            SetColumn("InvoiceDate", "Invoice Date", 115, "dd-MMM-yyyy");
-            SetColumn("PurchaseNo", "Purchase No", 90);
-            SetColumn("GRNNumber", "GRN No", 90);
-            SetColumn("InvoiceNo", "Invoice No", 105);
-            SetColumn("ItemName", "Item Name", 230);
-            SetColumn("Qty", "Qty", 80, "N2", true);
-            SetColumn("Price", "Price", 95, "N2", true);
-            SetColumn("Amount", "Amount", 110, "N2", true);
-            SetColumn("TotalAmount", "Total Amount", 120, "N2", true);
-
             UltraGridBand band = gridReport.DisplayLayout.Bands[0];
+            foreach (UltraGridColumn column in band.Columns)
+            {
+                column.Hidden = true;
+            }
+
+            int displayIndex = 0;
+            ShowColumn("Rank", "#", 45, displayIndex++);
+            ShowColumn("PurchaseDate", "Purchase Date", 115, displayIndex++, "dd-MMM-yyyy");
+            ShowColumn("InvoiceDate", "Invoice Date", 115, displayIndex++, "dd-MMM-yyyy");
+            ShowColumn("PurchaseNo", "Purchase No", 100, displayIndex++);
+            ShowColumn("GRNNumber", "GRN No", 105, displayIndex++);
+
+            if (ColumnExists("InvoiceNo"))
+                ShowColumn("InvoiceNo", "Invoice No", 105, displayIndex++);
+
+            ShowColumn("Vendor", "Vendor", 200, displayIndex++);
+
+            if (ColumnExists("TotalAmount"))
+                ShowColumn("TotalAmount", "Total Amount", 130, displayIndex++, "N2", true);
+            else if (ColumnExists("Amount"))
+                ShowColumn("Amount", "Total Amount", 130, displayIndex++, "N2", true);
+
+            if (ColumnExists("Outstanding"))
+                ShowColumn("Outstanding", "Outstanding", 130, displayIndex++, "N2", true);
+
             foreach (UltraGridColumn column in band.Columns)
             {
                 if (column.Key.EndsWith("Id", StringComparison.OrdinalIgnoreCase))
@@ -526,20 +685,30 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
             int displayIndex = 0;
             if (showVendor)
-                ShowColumn("Vendor", "Vendor", 220, displayIndex++);
+                ShowColumn("Vendor", "Vendor", 200, displayIndex++);
 
-            ShowColumn("PurchaseDate", "Purchase Date", 140, displayIndex++, "dd-MMM-yyyy");
-            ShowColumn("InvoiceDate", "Invoice Date", 140, displayIndex++, "dd-MMM-yyyy");
-            ShowColumn("PurchaseNo", "Purchase No", 120, displayIndex++);
-            ShowColumn("GRNNumber", "GRN No", 120, displayIndex++);
-            ShowColumn("ItemName", "Item Name", 320, displayIndex++);
-            ShowColumn("Qty", "Qty", 90, displayIndex++, "N2", true);
-            ShowColumn("Price", "Price", 110, displayIndex++, "N2", true);
+            ShowColumn("PurchaseDate", "Purchase Date", 115, displayIndex++, "dd-MMM-yyyy");
+            ShowColumn("InvoiceDate", "Invoice Date", 115, displayIndex++, "dd-MMM-yyyy");
+            ShowColumn("PurchaseNo", "Purchase No", 100, displayIndex++);
+            ShowColumn("GRNNumber", "GRN No", 105, displayIndex++);
+
+            if (ColumnExists("InvoiceNo"))
+                ShowColumn("InvoiceNo", "Invoice No", 105, displayIndex++);
+
+            if (activeMode != ReportMode.Vendor)
+            {
+                ShowColumn("ItemName", "Item Name", 240, displayIndex++);
+                ShowColumn("Qty", "Qty", 85, displayIndex++, "N2", true);
+                ShowColumn("Price", "Price", 95, displayIndex++, "N2", true);
+            }
 
             if (ColumnExists("TotalAmount"))
-                ShowColumn("TotalAmount", "Total Amount", 150, displayIndex++, "N2", true);
-            else
-                ShowColumn("Amount", "Total Amount", 150, displayIndex++, "N2", true);
+                ShowColumn("TotalAmount", "Total Amount", 130, displayIndex++, "N2", true);
+            else if (ColumnExists("Amount"))
+                ShowColumn("Amount", "Total Amount", 130, displayIndex++, "N2", true);
+
+            if (ColumnExists("Outstanding"))
+                ShowColumn("Outstanding", "Outstanding", 130, displayIndex++, "N2", true);
         }
 
         private void ConfigureItemVendorGridColumns()
@@ -551,16 +720,24 @@ namespace PosBranch_Win.Reports.PurchaseReports
             }
 
             int displayIndex = 0;
-            ShowColumn("Vendor", "Vendor", 260, displayIndex++);
-            ShowColumn("PurchaseDate", "Purchase Date", 140, displayIndex++, "dd-MMM-yyyy");
-            ShowColumn("InvoiceDate", "Invoice Date", 140, displayIndex++, "dd-MMM-yyyy");
-            ShowColumn("Qty", "Qty", 90, displayIndex++, "N2", true);
-            ShowColumn("Price", "Price", 110, displayIndex++, "N2", true);
+            ShowColumn("Vendor", "Vendor", 200, displayIndex++);
+            ShowColumn("PurchaseDate", "Purchase Date", 115, displayIndex++, "dd-MMM-yyyy");
+            ShowColumn("InvoiceDate", "Invoice Date", 115, displayIndex++, "dd-MMM-yyyy");
+            ShowColumn("PurchaseNo", "Purchase No", 100, displayIndex++);
+            ShowColumn("GRNNumber", "GRN No", 105, displayIndex++);
+
+            if (ColumnExists("InvoiceNo"))
+                ShowColumn("InvoiceNo", "Invoice No", 105, displayIndex++);
+
+            ShowColumn("Qty", "Qty", 85, displayIndex++, "N2", true);
+            ShowColumn("Price", "Price", 95, displayIndex++, "N2", true);
 
             if (ColumnExists("Amount"))
-                ShowColumn("Amount", "Amount", 140, displayIndex++, "N2", true);
-            else
-                ShowColumn("TotalAmount", "Amount", 140, displayIndex++, "N2", true);
+                ShowColumn("Amount", "Amount", 130, displayIndex++, "N2", true);
+            else if (ColumnExists("TotalAmount"))
+                ShowColumn("TotalAmount", "Amount", 130, displayIndex++, "N2", true);
+
+            // Outstanding column is explicitly hidden in Item mode
         }
 
         private void SetColumn(string name, string caption, int width, string format = null, bool alignRight = false)
@@ -672,18 +849,31 @@ namespace PosBranch_Win.Reports.PurchaseReports
             DateTime from = today;
             DateTime to = today;
 
-            if (selected == "Yesterday")
+            if (selected == "All")
             {
-                from = today.AddDays(-1);
-                to = from;
+                from = new DateTime(2000, 1, 1);
+                to = new DateTime(2099, 12, 31);
+                if (panelFrom != null) panelFrom.Visible = false;
+                if (panelTo != null) panelTo.Visible = false;
             }
-            else if (selected == "Last 7 Days")
+            else
             {
-                from = today.AddDays(-6);
-            }
-            else if (selected == "This Month")
-            {
-                from = new DateTime(today.Year, today.Month, 1);
+                if (panelFrom != null) panelFrom.Visible = true;
+                if (panelTo != null) panelTo.Visible = true;
+
+                if (selected == "Yesterday")
+                {
+                    from = today.AddDays(-1);
+                    to = from;
+                }
+                else if (selected == "Last 7 Days")
+                {
+                    from = today.AddDays(-6);
+                }
+                else if (selected == "This Month")
+                {
+                    from = new DateTime(today.Year, today.Month, 1);
+                }
             }
 
             dtpFrom.Value = from;
@@ -829,7 +1019,19 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 footerLabels[column.Key] = footerLabel;
 
                 if (!columnAggregations.ContainsKey(column.Key))
-                    columnAggregations[column.Key] = "None";
+                {
+                    if (column.Key.Equals("TotalAmount", StringComparison.OrdinalIgnoreCase) ||
+                        column.Key.Equals("Amount", StringComparison.OrdinalIgnoreCase) ||
+                        column.Key.Equals("Qty", StringComparison.OrdinalIgnoreCase) ||
+                        column.Key.Equals("Outstanding", StringComparison.OrdinalIgnoreCase))
+                    {
+                        columnAggregations[column.Key] = "Sum";
+                    }
+                    else
+                    {
+                        columnAggregations[column.Key] = "None";
+                    }
+                }
 
                 xOffset += column.Width;
             }
@@ -1019,17 +1221,44 @@ namespace PosBranch_Win.Reports.PurchaseReports
             if (gridReport.DisplayLayout == null || gridReport.DisplayLayout.Bands.Count == 0 || footerLabels.Count == 0)
                 return;
 
-            int xOffset = gridReport.DisplayLayout.Override.RowSelectorWidth;
-            foreach (UltraGridColumn column in gridReport.DisplayLayout.Bands[0].Columns.Cast<UltraGridColumn>().OrderBy(c => c.Header.VisiblePosition))
+            UltraGridBand band = gridReport.DisplayLayout.Bands[0];
+            int rowSelectorWidth = gridReport.DisplayLayout.Override.RowSelectorWidth;
+            int scrollOffset = 0;
+            if (gridReport.ActiveColScrollRegion != null)
+            {
+                scrollOffset = gridReport.ActiveColScrollRegion.Position;
+            }
+
+            int calculatedX = rowSelectorWidth - scrollOffset;
+
+            foreach (UltraGridColumn column in band.Columns.Cast<UltraGridColumn>().OrderBy(c => c.Header.VisiblePosition))
             {
                 if (column.Hidden || !footerLabels.ContainsKey(column.Key))
                     continue;
 
                 Label footerLabel = footerLabels[column.Key];
-                footerLabel.Left = xOffset;
-                footerLabel.Width = column.Width;
-                footerLabel.Height = Math.Max(ultraPanelGridFooter.Height - 2, 20);
-                xOffset += column.Width;
+                var headerUI = column.Header.GetUIElement();
+                int left, width;
+
+                if (headerUI != null)
+                {
+                    left = headerUI.Rect.Left;
+                    width = headerUI.Rect.Width;
+                }
+                else
+                {
+                    left = calculatedX;
+                    width = column.Width;
+                }
+
+                calculatedX += column.Width;
+
+                footerLabel.Left = left;
+                footerLabel.Width = width;
+                footerLabel.Top = 0;
+                footerLabel.Height = ultraPanelGridFooter.Height;
+                footerLabel.Visible = (left + width > 0 && left < ultraPanelGridFooter.Width);
+                footerLabel.Invalidate();
             }
         }
 
@@ -1083,39 +1312,54 @@ namespace PosBranch_Win.Reports.PurchaseReports
             string columnKey = tagData != null ? tagData.Item1 : string.Empty;
             string displayText = tagData != null ? tagData.Item2 : footerLabel.Text;
 
+            Graphics g = e.Graphics;
+            g.SmoothingMode = SmoothingMode.AntiAlias;
+
+            // Fill background matching header blue
+            Rectangle rect = new Rectangle(0, 0, footerLabel.Width, footerLabel.Height);
+            using (SolidBrush bgBrush = new SolidBrush(gridHeaderBlue))
+            {
+                g.FillRectangle(bgBrush, rect);
+            }
+
+            // Draw right and top border grid lines
+            using (Pen borderPen = new Pen(Color.FromArgb(118, 154, 198), 1))
+            {
+                g.DrawLine(borderPen, footerLabel.Width - 1, 0, footerLabel.Width - 1, footerLabel.Height);
+                g.DrawLine(borderPen, 0, 0, footerLabel.Width, 0);
+            }
+
             if (string.IsNullOrWhiteSpace(displayText))
+            {
+                footerLabel.Text = string.Empty;
                 return;
+            }
 
             if (columnAggregations.ContainsKey(columnKey) &&
                 string.Equals(columnAggregations[columnKey], "None", StringComparison.OrdinalIgnoreCase))
-                return;
-
-            Graphics graphics = e.Graphics;
-            graphics.SmoothingMode = SmoothingMode.AntiAlias;
-
-            SizeF textSize = graphics.MeasureString(displayText, footerLabel.Font);
-            int padding = 6;
-            int cornerRadius = 6;
-            int margin = 1;
-            int boxWidth = footerLabel.Width - (margin * 2);
-            int boxHeight = (int)textSize.Height + padding;
-            int x = margin;
-            int y = (footerLabel.Height - boxHeight) / 2;
-
-            Rectangle rect = new Rectangle(x, y, boxWidth, boxHeight);
-            Color boxColor = Color.FromArgb(0, 80, 160);
-
-            using (GraphicsPath path = RoundedRect(rect, cornerRadius))
-            using (SolidBrush brush = new SolidBrush(boxColor))
             {
-                graphics.FillPath(brush, path);
+                footerLabel.Text = string.Empty;
+                return;
             }
 
-            using (SolidBrush textBrush = new SolidBrush(Color.White))
+            bool isNumeric = gridReport.DisplayLayout.Bands.Count > 0 &&
+                             gridReport.DisplayLayout.Bands[0].Columns.Exists(columnKey) &&
+                             IsSummableColumn(gridReport.DisplayLayout.Bands[0].Columns[columnKey]);
+
+            TextFormatFlags flags = TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.SingleLine;
+            if (isNumeric)
             {
-                float textX = x + (boxWidth - textSize.Width) / 2;
-                float textY = y + (boxHeight - textSize.Height) / 2 - 1;
-                graphics.DrawString(displayText, footerLabel.Font, textBrush, textX, textY);
+                flags |= TextFormatFlags.Right;
+            }
+            else
+            {
+                flags |= TextFormatFlags.Left;
+            }
+
+            Rectangle textRect = new Rectangle(4, 0, Math.Max(0, footerLabel.Width - 8), footerLabel.Height);
+            using (Font textFont = new Font("Segoe UI", 9F, FontStyle.Bold))
+            {
+                TextRenderer.DrawText(g, displayText, textFont, textRect, Color.White, flags);
             }
 
             footerLabel.Text = string.Empty;
@@ -1367,5 +1611,290 @@ namespace PosBranch_Win.Reports.PurchaseReports
             path.CloseFigure();
             return path;
         }
+
+        #region Column Chooser & Drag-Down to Hide
+
+        private void SetupHeaderDragToHideAndColumnChooser()
+        {
+            gridReport.MouseDown += GridReport_MouseDown;
+            gridReport.MouseMove += GridReport_MouseMove;
+            gridReport.MouseUp += GridReport_MouseUp;
+
+            ContextMenuStrip headerMenu = new ContextMenuStrip { Font = new Font("Segoe UI", 9F) };
+            ToolStripMenuItem chooserItem = new ToolStripMenuItem("📋 Field / Column Chooser...", null, (s, e) => ShowColumnChooserForm());
+            chooserItem.Font = new Font("Segoe UI Semibold", 9.5F, FontStyle.Bold);
+            headerMenu.Items.Add(chooserItem);
+
+            ToolStripMenuItem showAllItem = new ToolStripMenuItem("🔓 Show / Unhide All Columns", null, (s, e) => UnhideAllColumns());
+            headerMenu.Items.Add(showAllItem);
+
+            gridReport.ContextMenuStrip = headerMenu;
+        }
+
+        private void GridReport_MouseDown(object sender, MouseEventArgs e)
+        {
+            if (gridReport.DisplayLayout == null || gridReport.DisplayLayout.Bands.Count == 0)
+                return;
+
+            UIElement element = gridReport.DisplayLayout.UIElement?.ElementFromPoint(new Point(e.X, e.Y));
+            HeaderUIElement headerUI = element as HeaderUIElement ?? element?.GetAncestor(typeof(HeaderUIElement)) as HeaderUIElement;
+
+            UltraGridColumn col = headerUI?.Header?.Column;
+            if (headerUI != null && col != null)
+            {
+                if (e.Button == MouseButtons.Right)
+                {
+                    ShowHeaderContextMenu(col, e.Location);
+                    return;
+                }
+
+                if (e.Button == MouseButtons.Left)
+                {
+                    isDraggingHeaderToHide = true;
+                    columnBeingDragged = col;
+                    headerDragStartPoint = new Point(e.X, e.Y);
+                }
+            }
+        }
+
+        private void GridReport_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (!isDraggingHeaderToHide || columnBeingDragged == null || e.Button != MouseButtons.Left)
+                return;
+
+            int deltaX = Math.Abs(e.X - headerDragStartPoint.X);
+            int deltaY = e.Y - headerDragStartPoint.Y;
+
+            if (deltaY > 30 && deltaY > deltaX)
+            {
+                gridReport.Cursor = Cursors.No;
+                string colName = !string.IsNullOrEmpty(columnBeingDragged.Header.Caption) ? columnBeingDragged.Header.Caption : columnBeingDragged.Key;
+                headerToolTip.SetToolTip(gridReport, $"Drag down to hide '{colName}' column");
+
+                if (deltaY > 50)
+                {
+                    HideColumn(columnBeingDragged);
+                    isDraggingHeaderToHide = false;
+                    columnBeingDragged = null;
+                    gridReport.Cursor = Cursors.Default;
+                    headerToolTip.SetToolTip(gridReport, string.Empty);
+                }
+            }
+        }
+
+        private void GridReport_MouseUp(object sender, MouseEventArgs e)
+        {
+            if (isDraggingHeaderToHide)
+            {
+                if (columnBeingDragged != null && (e.Y - headerDragStartPoint.Y) > 40)
+                {
+                    HideColumn(columnBeingDragged);
+                }
+                isDraggingHeaderToHide = false;
+                columnBeingDragged = null;
+                gridReport.Cursor = Cursors.Default;
+                headerToolTip.SetToolTip(gridReport, string.Empty);
+            }
+        }
+
+        private void HideColumn(UltraGridColumn col)
+        {
+            if (col == null) return;
+            col.Hidden = true;
+            UpdateFooterCellPositions();
+            UpdateFooterValues();
+            if (columnChooserForm != null && columnChooserForm.Visible)
+            {
+                PopulateColumnChooserListBox();
+            }
+        }
+
+        private void ShowHeaderContextMenu(UltraGridColumn col, Point location)
+        {
+            if (col == null) return;
+            ContextMenuStrip menu = new ContextMenuStrip { Font = new Font("Segoe UI", 9F) };
+            string colName = !string.IsNullOrEmpty(col.Header.Caption) ? col.Header.Caption : col.Key;
+
+            ToolStripMenuItem hideItem = new ToolStripMenuItem($"🙈 Hide Column '{colName}'", null, (s, e) => HideColumn(col));
+            hideItem.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
+            menu.Items.Add(hideItem);
+
+            menu.Items.Add(new ToolStripSeparator());
+
+            ToolStripMenuItem chooserItem = new ToolStripMenuItem("📋 Field / Column Chooser...", null, (s, e) => ShowColumnChooserForm());
+            menu.Items.Add(chooserItem);
+
+            ToolStripMenuItem showAllItem = new ToolStripMenuItem("🔓 Show / Unhide All Columns", null, (s, e) => UnhideAllColumns());
+            menu.Items.Add(showAllItem);
+
+            menu.Show(gridReport, location);
+        }
+
+        private void ShowColumnChooserForm()
+        {
+            if (columnChooserForm == null || columnChooserForm.IsDisposed)
+            {
+                CreateColumnChooserForm();
+            }
+
+            PopulateColumnChooserListBox();
+            columnChooserForm.Show(this);
+            PositionColumnChooser();
+        }
+
+        private void CreateColumnChooserForm()
+        {
+            columnChooserForm = new Form
+            {
+                Text = "Customization (Field Chooser)",
+                Size = new Size(240, 300),
+                FormBorderStyle = FormBorderStyle.FixedSingle,
+                StartPosition = FormStartPosition.Manual,
+                TopMost = true,
+                MaximizeBox = false,
+                MinimizeBox = false,
+                BackColor = Color.FromArgb(240, 244, 248),
+                ShowIcon = false,
+                ShowInTaskbar = false
+            };
+
+            columnChooserForm.FormClosing += (s, e) =>
+            {
+                e.Cancel = true;
+                columnChooserForm.Hide();
+            };
+
+            columnChooserListBox = new ListBox
+            {
+                Dock = DockStyle.Fill,
+                AllowDrop = true,
+                DrawMode = DrawMode.OwnerDrawFixed,
+                BorderStyle = BorderStyle.None,
+                BackColor = Color.FromArgb(240, 244, 248),
+                ItemHeight = 34,
+                IntegralHeight = false
+            };
+
+            columnChooserListBox.DrawItem += ColumnChooserListBox_DrawItem;
+            columnChooserListBox.DoubleClick += ColumnChooserListBox_DoubleClick;
+
+            columnChooserForm.Controls.Add(columnChooserListBox);
+        }
+
+        private void PopulateColumnChooserListBox()
+        {
+            if (columnChooserListBox == null || gridReport.DisplayLayout.Bands.Count == 0)
+                return;
+
+            columnChooserListBox.Items.Clear();
+            UltraGridBand band = gridReport.DisplayLayout.Bands[0];
+
+            foreach (UltraGridColumn col in band.Columns)
+            {
+                if (col.Hidden && !col.Key.EndsWith("Id", StringComparison.OrdinalIgnoreCase))
+                {
+                    string caption = !string.IsNullOrEmpty(col.Header.Caption) ? col.Header.Caption : col.Key;
+                    columnChooserListBox.Items.Add(new ColumnChooserItem(col.Key, caption));
+                }
+            }
+        }
+
+        private void ColumnChooserListBox_DoubleClick(object sender, EventArgs e)
+        {
+            if (columnChooserListBox.SelectedItem is ColumnChooserItem item)
+            {
+                UnhideColumn(item.ColumnKey);
+            }
+        }
+
+        private void UnhideColumn(string columnKey)
+        {
+            if (gridReport.DisplayLayout.Bands.Count > 0 && gridReport.DisplayLayout.Bands[0].Columns.Exists(columnKey))
+            {
+                gridReport.DisplayLayout.Bands[0].Columns[columnKey].Hidden = false;
+                UpdateFooterCellPositions();
+                UpdateFooterValues();
+                PopulateColumnChooserListBox();
+            }
+        }
+
+        private void UnhideAllColumns()
+        {
+            if (gridReport.DisplayLayout.Bands.Count == 0) return;
+            UltraGridBand band = gridReport.DisplayLayout.Bands[0];
+            foreach (UltraGridColumn col in band.Columns)
+            {
+                if (!col.Key.EndsWith("Id", StringComparison.OrdinalIgnoreCase))
+                {
+                    col.Hidden = false;
+                }
+            }
+            UpdateFooterCellPositions();
+            UpdateFooterValues();
+            PopulateColumnChooserListBox();
+        }
+
+        private void PositionColumnChooser()
+        {
+            if (columnChooserForm != null && !columnChooserForm.IsDisposed && columnChooserForm.Visible)
+            {
+                columnChooserForm.Location = new Point(
+                    Right - columnChooserForm.Width - 30,
+                    Bottom - columnChooserForm.Height - 30);
+                columnChooserForm.BringToFront();
+            }
+        }
+
+        private void ColumnChooserListBox_DrawItem(object sender, DrawItemEventArgs e)
+        {
+            if (e.Index < 0 || columnChooserListBox == null || e.Index >= columnChooserListBox.Items.Count)
+                return;
+
+            if (!(columnChooserListBox.Items[e.Index] is ColumnChooserItem item))
+                return;
+
+            Rectangle rect = e.Bounds;
+            rect.Inflate(-4, -3);
+
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+
+            using (SolidBrush bgBrush = new SolidBrush(Color.FromArgb(0, 121, 211)))
+            using (GraphicsPath path = RoundedRect(rect, 4))
+            {
+                e.Graphics.FillPath(bgBrush, path);
+            }
+
+            using (SolidBrush textBrush = new SolidBrush(Color.White))
+            {
+                StringFormat sf = new StringFormat
+                {
+                    LineAlignment = StringAlignment.Center,
+                    Alignment = StringAlignment.Center
+                };
+                using (Font textFont = new Font("Segoe UI", 9F, FontStyle.Bold))
+                {
+                    e.Graphics.DrawString(item.DisplayText, textFont, textBrush, rect, sf);
+                }
+            }
+        }
+
+        private sealed class ColumnChooserItem
+        {
+            public string ColumnKey { get; }
+            public string DisplayText { get; }
+
+            public ColumnChooserItem(string key, string text)
+            {
+                ColumnKey = key;
+                DisplayText = text;
+            }
+
+            public override string ToString()
+            {
+                return DisplayText;
+            }
+        }
+
+        #endregion
     }
 }

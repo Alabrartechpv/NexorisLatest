@@ -185,6 +185,7 @@ namespace PosBranch_Win.Settings
 
             var gridFrame = new RoundedPanel { Dock = DockStyle.Fill, BackColor = Color.FromArgb(247, 252, 255), Padding = new Padding(2), BorderColor = Color.FromArgb(176, 224, 255), BorderRadius = 8 };
             gridActivity = new DataGridView();
+            GridPinningHelper.Attach(gridActivity);
             gridFrame.Controls.Add(gridActivity);
 
             var footer = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 1, BackColor = Color.Transparent };
@@ -352,6 +353,7 @@ namespace PosBranch_Win.Settings
         private void ConfigureGridColumns()
         {
             if (gridActivity.Columns.Count == 0) return;
+            GridPinningHelper.Attach(gridActivity);
 
             SetColumn("Action", "Action", 220);
             SetColumn("DisplayLogNo", "#", 55);
