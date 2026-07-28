@@ -56,6 +56,9 @@ namespace Repository.Accounts
         /// </summary>
         public DataTable GetOutstandingInvoices(int customerId, int branchId)
         {
+            if (DataConnection.State == ConnectionState.Open)
+                DataConnection.Close();
+
             DataConnection.Open();
             try
             {
@@ -219,11 +222,14 @@ namespace Repository.Accounts
         }
 
         /// <summary>
-        /// Get customer outstanding total
+        /// Get customer outstanding total via stored procedure
         /// </summary>
         public decimal GetCustomerOutstandingTotal(int customerLedgerId, int branchId)
         {
             decimal outstandingTotal = 0;
+            if (DataConnection.State == ConnectionState.Open)
+                DataConnection.Close();
+
             DataConnection.Open();
             try
             {
@@ -249,7 +255,7 @@ namespace Repository.Accounts
             }
             catch (Exception ex)
             {
-                throw ex;
+                System.Diagnostics.Debug.WriteLine($"Error getting customer outstanding: {ex.Message}");
             }
             finally
             {
@@ -442,63 +448,20 @@ namespace Repository.Accounts
                             // master.RemainingAmount → CreditAmount - AppliedAmount (computed property)
 
                             // 4. Create Voucher Entries - Double entry system
-                            // CRITICAL: If this Credit Note is linked to a Sales Return (SReturnNo > 0),
-                            // or if the invoice being credited was already returned via Sales Return (SReturnMaster),
-                            // the Sales Return already created the voucher entries (Dr Sales, Cr Customer Ledger).
-                            // Creating vouchers here again would DOUBLE-CREDIT the customer's ledger,
-                            // causing their Trial Balance entry to net to zero or double-count.
-                            // Always skip voucher creation when a Sales Return is linked.
-                            if (master.SReturnNo > 0)
-                            {
-                                skipVoucherCreation = true;
-                            }
-
-                            if (!skipVoucherCreation && !string.IsNullOrWhiteSpace(master.InvoiceNo))
-                            {
-                                try
-                                {
-                                    using (SqlCommand checkSRCmd = new SqlCommand(STOREDPROCEDURE._CreditNoteMaster, conn, transaction))
-                                    {
-                                        checkSRCmd.CommandType = CommandType.StoredProcedure;
-                                        checkSRCmd.Parameters.AddWithValue("@InvoiceNo", master.InvoiceNo);
-                                        checkSRCmd.Parameters.AddWithValue("@BranchId", master.BranchId);
-                                        checkSRCmd.Parameters.AddWithValue("@_Operation", "CHECKRETURN");
-                                        object srCount = checkSRCmd.ExecuteScalar();
-                                        if (srCount != null && srCount != DBNull.Value && Convert.ToInt32(srCount) > 0)
-                                        {
-                                            skipVoucherCreation = true;
-                                        }
-                                    }
-                                }
-                                catch { }
-                            }
-
-                            if (!skipVoucherCreation && details != null && details.Count > 0)
-                            {
-                                try
-                                {
-                                    foreach (var d in details)
-                                    {
-                                        using (SqlCommand checkSRCmd = new SqlCommand(STOREDPROCEDURE._CreditNoteMaster, conn, transaction))
-                                        {
-                                            checkSRCmd.CommandType = CommandType.StoredProcedure;
-                                            checkSRCmd.Parameters.AddWithValue("@BillNo", d.BillNo);
-                                            checkSRCmd.Parameters.AddWithValue("@BranchId", master.BranchId);
-                                            checkSRCmd.Parameters.AddWithValue("@_Operation", "CHECKRETURN");
-                                            object srCount = checkSRCmd.ExecuteScalar();
-                                            if (srCount != null && srCount != DBNull.Value && Convert.ToInt32(srCount) > 0)
-                                            {
-                                                skipVoucherCreation = true;
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-                                catch { }
-                            }
+                            // GL voucher creation is executed here when Credit Note is saved (matching Purchase Return & Debit Note behavior).
 
                             if (!skipVoucherCreation)
                             {
+                                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_Vouchers, conn, transaction))
+                                {
+                                    cmd.CommandType = CommandType.StoredProcedure;
+                                    cmd.Parameters.AddWithValue("@VoucherID", master.VoucherId);
+                                    cmd.Parameters.AddWithValue("@BranchID", master.BranchId);
+                                    cmd.Parameters.AddWithValue("@VoucherType", "Credit Note");
+                                    cmd.Parameters.AddWithValue("@_Operation", "UPDATE");
+                                    cmd.ExecuteNonQuery();
+                                }
+
                                 // Credit entry (Customer account - reduce receivable)
                                 using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_Vouchers, conn, transaction))
                                 {

@@ -38,11 +38,13 @@ namespace ModelClass
         public static string DISCOUNTRECEIVED = "DISCOUNT RECEIVED";
         public static string DISCOUNTALLOWED = "DISCOUNT ALLOWED";
         public static string SALE = "SALES";
+        public static string SALESRETURN = "SALES RETURN";
         public static string DEFAULTCUSTOMER = "DEFAULT CUSTOMER";
         public static string DEFAULTTRANSPORTER = "DEFAULT TRANSPORTER";
         public static string DELIVERYCHARGE = "DELIVERY CHARGE";
         public static string LOCALPURCHASE = "LOCAL PURCHASE";
         public static string LOCALSALE = "LOCAL SALES";
+        public static string PURCHASERETURN = "PURCHASE RETURN";
         public static string OFFICESUPPLIES = "OFFICE SUPPLIES";
         public static string CASHEXCESSORSHORT = "CASH EXCESS OR SHORT";
 

@@ -23,22 +23,22 @@ namespace Repository.TransactionRepository
         LedgerRepository objLedgerRepository = new LedgerRepository();
 
         /// <summary>
-        /// Helper method to get purchase ledger ID
+        /// Helper method to get purchase return ledger ID
         /// </summary>
-        private int GetPurchaseLedgerId(int branchId)
+        private int GetPurchaseReturnLedgerId(int branchId)
         {
             try
             {
                 LedgerRepository ledgerRepo = new LedgerRepository();
-                int purchaseLedgerId = ledgerRepo.GetLedgerId(DefaultLedgers.PURCHASE, (int)AccountGroup.PURCHASE_ACCOUNT, branchId > 0 ? branchId : Convert.ToInt32(DataBase.BranchId));
-                if (purchaseLedgerId > 0)
+                int purchaseReturnLedgerId = ledgerRepo.GetLedgerId(DefaultLedgers.PURCHASERETURN, (int)AccountGroup.PURCHASE_ACCOUNT, branchId > 0 ? branchId : Convert.ToInt32(DataBase.BranchId));
+                if (purchaseReturnLedgerId > 0)
                 {
-                    return purchaseLedgerId;
+                    return purchaseReturnLedgerId;
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error getting purchase ledger ID: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Error getting purchase return ledger ID: {ex.Message}");
             }
             return 0; // Return 0 if not found, let the calling code handle it
         }
@@ -1000,7 +1000,7 @@ namespace Repository.TransactionRepository
                             System.Diagnostics.Debug.WriteLine($"Using Vendor ledger (ID: {creditLedgerId}) as fallback");
                         }
 
-                        // Calculate amount without tax for Purchase ledger (SubTotal - TaxAmt)
+                        // Calculate amount without tax for Purchase Return ledger (SubTotal - TaxAmt)
                         double purchaseAmountWithoutTax = pr.SubTotal - pr.TaxAmt;
 
                         System.Diagnostics.Debug.WriteLine($"Voucher Calculation: SubTotal={pr.SubTotal}, TaxAmt={pr.TaxAmt}, PurchaseAmtWithoutTax={purchaseAmountWithoutTax}, GrandTotal={pr.GrandTotal}");
@@ -1026,10 +1026,10 @@ namespace Repository.TransactionRepository
 
                         // Create purchase return account voucher (CREDIT for return - reducing purchase account)
                         // Amount = SubTotal - TaxAmt (purchase amount without tax)
-                        int purchaseLedgerId = GetPurchaseLedgerId(pr.BranchId);
-                        if (purchaseLedgerId <= 0)
+                        int purchaseReturnLedgerId = GetPurchaseReturnLedgerId(pr.BranchId);
+                        if (purchaseReturnLedgerId <= 0)
                         {
-                            throw new Exception("Purchase ledger not found. Please configure Purchase ledger in the system.");
+                            throw new Exception("Purchase Return ledger not found. Please configure Purchase Return ledger in the system.");
                         }
 
                         PReturnVoucher prVoucher = new PReturnVoucher
@@ -1041,7 +1041,7 @@ namespace Repository.TransactionRepository
                             VoucherType = ModelClass.VoucherType.DebitNote,
                             VoucherDate = pr.PReturnDate,
                             ReferenceNo = pr.PReturnNo.ToString(),
-                            LedgerID = purchaseLedgerId, // Always use Purchase ledger
+                            LedgerID = purchaseReturnLedgerId, // Always use Purchase Return ledger
                             Debit = 0,
                             Credit = purchaseAmountWithoutTax,
                             Narration = $"Purchase Return - PR#{pr.PReturnNo}",
@@ -1737,11 +1737,11 @@ namespace Repository.TransactionRepository
 
                 CreateVoucher(vendorVoucher, trans);
 
-                // Create purchase return account voucher (debit) - Always use Purchase ledger
-                int purchaseLedgerId = GetPurchaseLedgerId(prMaster.BranchId);
-                if (purchaseLedgerId <= 0)
+                // Create purchase return account voucher (debit) - Always use Purchase Return ledger
+                int purchaseReturnLedgerId = GetPurchaseReturnLedgerId(prMaster.BranchId);
+                if (purchaseReturnLedgerId <= 0)
                 {
-                    throw new Exception("Purchase ledger not found. Please configure Purchase ledger in the system.");
+                    throw new Exception("Purchase Return ledger not found. Please configure Purchase Return ledger in the system.");
                 }
 
                 PReturnVoucher prVoucher = new PReturnVoucher
@@ -1753,7 +1753,7 @@ namespace Repository.TransactionRepository
                     VoucherType = ModelClass.VoucherType.DebitNote,
                     VoucherDate = prMaster.PReturnDate,
                     ReferenceNo = prMaster.PReturnNo.ToString(),
-                    LedgerID = purchaseLedgerId, // Always use Purchase ledger
+                    LedgerID = purchaseReturnLedgerId, // Always use Purchase Return ledger
                     Debit = prMaster.GrandTotal,
                     Credit = 0,
                     Narration = $"Purchase Return - PR#{prMaster.PReturnNo}",
@@ -2396,7 +2396,7 @@ namespace Repository.TransactionRepository
                     }
                 }
 
-                // Calculate amount without tax for Purchase ledger (SubTotal - TaxAmt)
+                // Calculate amount without tax for Purchase Return ledger (SubTotal - TaxAmt)
                 double purchaseAmountWithoutTax = subTotal - taxAmt;
 
                 System.Diagnostics.Debug.WriteLine($"Voucher Calculation: SubTotal={subTotal}, TaxAmt={taxAmt}, PurchaseAmtWithoutTax={purchaseAmountWithoutTax}, GrandTotal={existingPR.GrandTotal}");
@@ -2423,10 +2423,10 @@ namespace Repository.TransactionRepository
 
                 // Create purchase return account voucher (CREDIT for return - reducing purchase account)
                 // Amount = SubTotal - TaxAmt (purchase amount without tax)
-                int purchaseLedgerId = GetPurchaseLedgerId(branchId);
-                if (purchaseLedgerId <= 0)
+                int purchaseReturnLedgerId = GetPurchaseReturnLedgerId(branchId);
+                if (purchaseReturnLedgerId <= 0)
                 {
-                    throw new Exception("Purchase ledger not found. Please configure Purchase ledger in the system.");
+                    throw new Exception("Purchase Return ledger not found. Please configure Purchase Return ledger in the system.");
                 }
 
                 PReturnVoucher prVoucher = new PReturnVoucher
@@ -2438,7 +2438,7 @@ namespace Repository.TransactionRepository
                     VoucherType = ModelClass.VoucherType.DebitNote,
                     VoucherDate = existingPR.PReturnDate,
                     ReferenceNo = prNo.ToString(),
-                    LedgerID = purchaseLedgerId,
+                    LedgerID = purchaseReturnLedgerId,
                     Debit = 0,
                     Credit = purchaseAmountWithoutTax,
                     Narration = $"Purchase Return - PR#{prNo}",

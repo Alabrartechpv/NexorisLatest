@@ -479,6 +479,14 @@ namespace PosBranch_Win.Accounts
                 }
 
                 // Create master record
+                int purchaseReturnLedgerId = GetPurchaseReturnLedgerId();
+                if (purchaseReturnLedgerId <= 0)
+                {
+                    MessageBox.Show("Purchase Return ledger not found. Please configure Purchase Return ledger in the system.",
+                        "Ledger Missing", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
                 DebitNoteMaster master = new DebitNoteMaster
                 {
                     CompanyId = Convert.ToInt32(DataBase.CompanyId),
@@ -489,7 +497,7 @@ namespace PosBranch_Win.Accounts
                     PReturnNo = _pReturnNo,
                     InvoiceNo = _invoiceNo,
                     DebitAmount = (double)totalDebitAmount,
-                    PaymentMethodLedgerId = 1, // Default to Cash - payment selection removed from Debit Notes
+                    PaymentMethodLedgerId = purchaseReturnLedgerId,
                     Narration = richTextBox2.Text,
                     UserId = Convert.ToInt32(DataBase.UserId)
                 };
@@ -544,6 +552,20 @@ namespace PosBranch_Win.Accounts
             {
                 MessageBox.Show($"Error saving debit note: {ex.Message}\n\nStack trace: {ex.StackTrace}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private int GetPurchaseReturnLedgerId()
+        {
+            try
+            {
+                var ledgerRepo = new Repository.MasterRepositry.LedgerRepository();
+                return ledgerRepo.GetLedgerId(DefaultLedgers.PURCHASERETURN, (int)AccountGroup.PURCHASE_ACCOUNT, currentBranchId);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error getting Purchase Return ledger ID: {ex.Message}");
+                return 0;
             }
         }
 

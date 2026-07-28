@@ -21,6 +21,11 @@ namespace Repository.MasterRepositry
             {
                 List<Branch> listbranch = DataConnection.Query<Branch>(STOREDPROCEDURE.POS_Branch, branch, trans,
                     commandType: CommandType.StoredProcedure).ToList<Branch>();
+                if (string.Equals(branch._Operation, "CREATE", StringComparison.OrdinalIgnoreCase))
+                {
+                    int branchId = ResolveCreatedBranchId(branch, listbranch);
+                    EnsureReturnLedgers(branch.CompanyId, branchId, trans);
+                }
                 if (listbranch.Count > 0)
                 {
 
@@ -38,6 +43,85 @@ namespace Repository.MasterRepositry
                     DataConnection.Close();
             }
             return "Success";
+        }
+
+        private int ResolveCreatedBranchId(Branch branch, List<Branch> createdBranches)
+        {
+            if (branch.Id > 0)
+                return branch.Id;
+
+            if (createdBranches != null && createdBranches.Count > 0)
+                return createdBranches[0].Id;
+
+            return 0;
+        }
+
+        private void EnsureReturnLedgers(int companyId, int branchId, IDbTransaction trans)
+        {
+            if (branchId <= 0)
+                return;
+
+            EnsureReturnLedger(companyId, branchId, DefaultLedgers.SALESRETURN, (int)AccountGroup.SALES_ACCOUNT, trans);
+            EnsureReturnLedger(companyId, branchId, DefaultLedgers.PURCHASERETURN, (int)AccountGroup.PURCHASE_ACCOUNT, trans);
+        }
+
+        private void EnsureReturnLedger(int companyId, int branchId, string ledgerName, int groupId, IDbTransaction trans)
+        {
+            if (GetLedgerId(ledgerName, groupId, branchId, trans) > 0)
+                return;
+
+            int ledgerId = GetNextLedgerId(trans);
+            if (ledgerId <= 0)
+                return;
+
+            using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_Ledger, (SqlConnection)DataConnection, (SqlTransaction)trans))
+            {
+                cmd.CommandType = CommandType.StoredProcedure;
+                cmd.Parameters.AddWithValue("@_Operation", "CREATE");
+                cmd.Parameters.AddWithValue("@CompanyID", companyId);
+                cmd.Parameters.AddWithValue("@BranchID", branchId);
+                cmd.Parameters.AddWithValue("@LedgerID", ledgerId);
+                cmd.Parameters.AddWithValue("@LedgerName", ledgerName);
+                cmd.Parameters.AddWithValue("@Alias", DBNull.Value);
+                cmd.Parameters.AddWithValue("@Description", DBNull.Value);
+                cmd.Parameters.AddWithValue("@Notes", DBNull.Value);
+                cmd.Parameters.AddWithValue("@GroupID", groupId);
+                cmd.Parameters.AddWithValue("@OpnDebit", 0);
+                cmd.Parameters.AddWithValue("@OpnCredit", 0);
+                cmd.Parameters.AddWithValue("@ProvideBankDetails", false);
+                cmd.Parameters.AddWithValue("@GstApplicable", false);
+                cmd.Parameters.AddWithValue("@VatApplicable", false);
+                cmd.Parameters.AddWithValue("@InventoryValuesAffected", false);
+                cmd.Parameters.AddWithValue("@MaintainBillWiseDetails", false);
+                cmd.Parameters.AddWithValue("@PriceLevelApplicable", false);
+                cmd.ExecuteScalar();
+            }
+        }
+
+        private int GetLedgerId(string ledgerName, int groupId, int branchId, IDbTransaction trans)
+        {
+            using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._4GetLedgerIdByLedgerNameAndGroupId, (SqlConnection)DataConnection, (SqlTransaction)trans))
+            {
+                cmd.CommandType = CommandType.StoredProcedure;
+                cmd.Parameters.AddWithValue("@LedgerName", ledgerName);
+                cmd.Parameters.AddWithValue("@GroupId", groupId);
+                cmd.Parameters.AddWithValue("@BranchId", branchId);
+
+                object result = cmd.ExecuteScalar();
+                return result == null || result == DBNull.Value ? 0 : Convert.ToInt32(result);
+            }
+        }
+
+        private int GetNextLedgerId(IDbTransaction trans)
+        {
+            using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_Ledger, (SqlConnection)DataConnection, (SqlTransaction)trans))
+            {
+                cmd.CommandType = CommandType.StoredProcedure;
+                cmd.Parameters.AddWithValue("@_Operation", "GETNEXTID");
+
+                object result = cmd.ExecuteScalar();
+                return result == null || result == DBNull.Value ? 0 : Convert.ToInt32(result);
+            }
         }
         public Branch UpdateBranch(Branch br)
         {

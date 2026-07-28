@@ -56,6 +56,9 @@ namespace Repository.Accounts
         /// </summary>
         public DataTable GetOutstandingInvoices(int vendorId, int branchId)
         {
+            if (DataConnection.State == ConnectionState.Open)
+                DataConnection.Close();
+
             DataConnection.Open();
             try
             {
@@ -191,6 +194,9 @@ namespace Repository.Accounts
         /// </summary>
         public DataTable GetAllInvoices(int vendorId, int branchId)
         {
+            if (DataConnection.State == ConnectionState.Open)
+                DataConnection.Close();
+
             DataConnection.Open();
             try
             {
@@ -221,11 +227,14 @@ namespace Repository.Accounts
         }
 
         /// <summary>
-        /// Get vendor outstanding total
+        /// Get vendor outstanding total via stored procedure
         /// </summary>
         public decimal GetVendorOutstandingTotal(int vendorLedgerId, int branchId)
         {
             decimal outstandingTotal = 0;
+            if (DataConnection.State == ConnectionState.Open)
+                DataConnection.Close();
+
             DataConnection.Open();
             try
             {
@@ -251,7 +260,7 @@ namespace Repository.Accounts
             }
             catch (Exception ex)
             {
-                throw ex;
+                System.Diagnostics.Debug.WriteLine($"Error getting vendor outstanding: {ex.Message}");
             }
             finally
             {

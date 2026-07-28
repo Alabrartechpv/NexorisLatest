@@ -455,6 +455,14 @@ namespace PosBranch_Win.Accounts
                     return;
                 }
 
+                int salesReturnLedgerId = GetSalesReturnLedgerId();
+                if (salesReturnLedgerId <= 0)
+                {
+                    MessageBox.Show("Sales Return ledger not found. Please configure Sales Return ledger in the system.",
+                        "Ledger Missing", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
                 // Create master record with all required properties
                 var master = new CreditNoteMaster
                 {
@@ -467,7 +475,7 @@ namespace PosBranch_Win.Accounts
                     SReturnNo = _sReturnNo,
                     InvoiceNo = _invoiceNo ?? "",
                     CreditAmount = (double)totalCreditAmount,
-                    PaymentMethodLedgerId = 1, // Default adjustment ledger
+                    PaymentMethodLedgerId = salesReturnLedgerId,
                     Narration = richTextBox2.Text ?? "",
                     UserId = currentUserId
                 };
@@ -509,8 +517,8 @@ namespace PosBranch_Win.Accounts
                 // Save all data
                 try
                 {
-                    // Skip voucher creation if coming from Sales Return (vouchers already created there)
-                    bool skipVoucherCreation = _sReturnNo > 0;
+                    // GL voucher creation for credit customers is executed here when Credit Note is saved
+                    bool skipVoucherCreation = false;
                     if (creditNoteRepo.SaveCreditNote(master, details, skipVoucherCreation))
                     {
                         // Phase 2: use the lifecycle fields stamped by SaveCreditNote.
@@ -548,6 +556,20 @@ namespace PosBranch_Win.Accounts
             {
                 MessageBox.Show($"Error saving credit note: {ex.Message}\n\nStack trace: {ex.StackTrace}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private int GetSalesReturnLedgerId()
+        {
+            try
+            {
+                var ledgerRepo = new Repository.MasterRepositry.LedgerRepository();
+                return ledgerRepo.GetLedgerId(DefaultLedgers.SALESRETURN, (int)AccountGroup.SALES_ACCOUNT, currentBranchId);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error getting Sales Return ledger ID: {ex.Message}");
+                return 0;
             }
         }
 

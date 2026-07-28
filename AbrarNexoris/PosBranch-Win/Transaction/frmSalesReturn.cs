@@ -5414,50 +5414,10 @@ namespace PosBranch_Win.Transaction
 
         private void EnsureCreditNoteMasterExists(CreditNote creditNote)
         {
-            try
-            {
-                if (creditNote == null || SReturn == null || SReturn.SReturnNo <= 0)
-                {
-                    return;
-                }
-
-                var creditNoteRepo = new Repository.Accounts.CreditNoteRepository();
-                DataTable existingCreditNote = creditNoteRepo.GetCreditNoteBySReturnNo(
-                    SReturn.SReturnNo,
-                    SessionContext.BranchId,
-                    SessionContext.FinYearId);
-
-                if (existingCreditNote != null && existingCreditNote.Rows.Count > 0)
-                {
-                    return;
-                }
-
-                var master = new ModelClass.Accounts.CreditNoteMaster
-                {
-                    CompanyId = SessionContext.CompanyId,
-                    BranchId = SessionContext.BranchId,
-                    FinYearId = SessionContext.FinYearId,
-                    VoucherId = Convert.ToInt32(SReturn.VoucherID),
-                    VoucherDate = DateTime.Now,
-                    CustomerLedgerId = Convert.ToInt32(SReturn.LedgerID),
-                    CustomerName = SReturn.CustomerName,
-                    SReturnNo = SReturn.SReturnNo,
-                    InvoiceNo = SReturn.InvoiceNo ?? string.Empty,
-                    CreditAmount = Convert.ToDouble(creditNote.TotalAmount),
-                    PaymentMethodLedgerId = 1,
-                    Narration = "Auto-generated store credit from Sales Return",
-                    UserId = SessionContext.UserId
-                };
-
-                creditNoteRepo.SaveCreditNote(
-                    master,
-                    new List<ModelClass.Accounts.CreditNoteDetails>(),
-                    skipVoucherCreation: true);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error ensuring credit note master exists: {ex.Message}");
-            }
+            // Do not auto-create CreditNoteMaster during Sales Return saving.
+            // Credit Note master and GL voucher creation are handled when the user opens FrmCreditNote
+            // and applies the pending Sales Return, matching Purchase Return & FrmDebitNote behavior.
+            return;
         }
 
         private void PrintCreditNote(CreditNote creditNote)
