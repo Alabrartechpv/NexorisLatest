@@ -890,8 +890,10 @@ namespace Repository.TransactionRepository
                         double totalGST = gstTaxAmounts.Values.Sum();
                         double returnAmountWithoutGST = sr.GrandTotal - totalGST;
 
-                        // Create voucher entries based on payment mode (reverse of Sales)
-                        if (sr.PaymodeID == 2) // CASH
+                        // Create voucher entries based on customer context (reverse of Sales)
+                        // If the customer has a Ledger account, always credit the Customer Ledger (SUNDRY DEBTORS).
+                        // Only use Cash account for anonymous/walk-in customers (LedgerID <= 0).
+                        if (sr.LedgerID <= 0) // ANONYMOUS / WALK-IN CUSTOMER — Cash refund
                         {
                             // First voucher entry - Credit Cash (cash goes out on return)
                             objVoucher = new Voucher();
@@ -905,47 +907,27 @@ namespace Repository.TransactionRepository
 
                             CreateVoucherEntry(objVoucher, trans, $"VoucherID={objVoucher.VoucherID}, Type=CREDIT, Account=Cash, Amount={sr.GrandTotal}");
 
-                            // Second voucher entry - Debit Sales (without GST)
+                            // Second voucher entry - Debit Sales Return (without GST)
                             PopulateBaseVoucherProperties(objVoucher, sr, voucherDate);
                             objVoucher.GroupID = Convert.ToInt32(AccountGroup.SALES_ACCOUNT);
-                            objVoucher.LedgerID = ledgerRepository.GetLedgerId(DefaultLedgers.SALE, (int)AccountGroup.SALES_ACCOUNT, DataBase.BranchId != null ? Convert.ToInt32(DataBase.BranchId) : 0);
-                            objVoucher.LedgerName = DefaultLedgers.SALE;
+                            objVoucher.LedgerID = ledgerRepository.GetLedgerId(DefaultLedgers.SALESRETURN, (int)AccountGroup.SALES_ACCOUNT, DataBase.BranchId != null ? Convert.ToInt32(DataBase.BranchId) : 0);
+                            if (objVoucher.LedgerID <= 0)
+                                throw new Exception("Sales Return ledger not found. Please configure Sales Return ledger in the system.");
+                            objVoucher.LedgerName = DefaultLedgers.SALESRETURN;
                             objVoucher.Credit = 0;
                             objVoucher.Debit = returnAmountWithoutGST;
                             objVoucher.SlNo = slNo++;
 
-                            CreateVoucherEntry(objVoucher, trans, $"VoucherID={objVoucher.VoucherID}, Type=DEBIT, Account=Sales, Amount={returnAmountWithoutGST}");
+                            CreateVoucherEntry(objVoucher, trans, $"VoucherID={objVoucher.VoucherID}, Type=DEBIT, Account=Sales Return, Amount={returnAmountWithoutGST}");
 
                             // Create GST voucher entries (CGST and SGST) - DEBITED for return
                             CreateGSTReturnVoucherEntries(sr, objVoucher, trans, gstTaxAmounts, voucherDate, ref slNo);
                         }
-                        else // CREDIT
+                        else // IDENTIFIED CUSTOMER — Credit Customer Ledger (SUNDRY DEBTORS)
                         {
-                            // First voucher entry - Credit Customer Account (customer gets credit for return)
-                            objVoucher = new Voucher();
-                            PopulateBaseVoucherProperties(objVoucher, sr, voucherDate);
-                            objVoucher.GroupID = Convert.ToInt32(AccountGroup.SUNDRY_DEBTORS);
-                            objVoucher.LedgerID = sr.LedgerID;
-                            objVoucher.LedgerName = sr.CustomerName;
-                            objVoucher.Debit = 0;
-                            objVoucher.Credit = sr.GrandTotal;
-                            objVoucher.SlNo = slNo++;
-
-                            CreateVoucherEntry(objVoucher, trans, $"VoucherID={objVoucher.VoucherID}, Type=CREDIT, Customer={objVoucher.LedgerName}, Amount={sr.GrandTotal}");
-
-                            // Second voucher entry - Debit Sales (without GST)
-                            PopulateBaseVoucherProperties(objVoucher, sr, voucherDate);
-                            objVoucher.GroupID = Convert.ToInt32(AccountGroup.SALES_ACCOUNT);
-                            objVoucher.LedgerID = ledgerRepository.GetLedgerId(DefaultLedgers.SALE, (int)AccountGroup.SALES_ACCOUNT, DataBase.BranchId != null ? Convert.ToInt32(DataBase.BranchId) : 0);
-                            objVoucher.LedgerName = DefaultLedgers.SALE;
-                            objVoucher.Credit = 0;
-                            objVoucher.Debit = returnAmountWithoutGST;
-                            objVoucher.SlNo = slNo++;
-
-                            CreateVoucherEntry(objVoucher, trans, $"VoucherID={objVoucher.VoucherID}, Type=DEBIT, Account=Sales, Amount={returnAmountWithoutGST}");
-
-                            // Create GST voucher entries (CGST and SGST) - DEBITED for return
-                            CreateGSTReturnVoucherEntries(sr, objVoucher, trans, gstTaxAmounts, voucherDate, ref slNo);
+                            // GL voucher creation for credit customers is handled when Credit Note is saved (in FrmCreditNote),
+                            // matching Purchase Return & Debit Note behavior.
+                            System.Diagnostics.Debug.WriteLine($"Credit customer (LedgerID={sr.LedgerID}): GL voucher creation deferred to Credit Note screen.");
                         }
                     }
                     catch (Exception ex)
@@ -1529,10 +1511,12 @@ namespace Repository.TransactionRepository
                         System.Diagnostics.Debug.WriteLine($"Deleted existing voucher entries for VoucherID: {sr.VoucherID}");
                     }
 
-                    // Now create new voucher entries based on payment mode (reverse of Sales)
-                    if (sr.PaymodeID == 2) // CASH
+                    // Now create new voucher entries based on customer context (reverse of Sales)
+                    // If the customer has a Ledger account, always credit the Customer Ledger (SUNDRY DEBTORS).
+                    // Only use Cash account for anonymous/walk-in customers (LedgerID <= 0).
+                    if (sr.LedgerID <= 0) // ANONYMOUS / WALK-IN CUSTOMER — Cash refund
                     {
-                        // First voucher entry - Debit Cash (reverse of Sales)
+                        // First voucher entry - Credit Cash (cash goes out on return)
                         Voucher objVoucher = new Voucher();
                         objVoucher.CompanyID = DataBase.CompanyId != null ? Convert.ToInt32(DataBase.CompanyId) : 0;
                         objVoucher.BranchID = DataBase.BranchId != null ? Convert.ToInt32(DataBase.BranchId) : 0;
@@ -1561,7 +1545,7 @@ namespace Repository.TransactionRepository
 
                             CreateVoucherEntry(objVoucher, (SqlTransaction)trans, $"VoucherID={objVoucher.VoucherID}, Type=CREDIT, Account=Cash, Amount={sr.GrandTotal}");
 
-                        // Second voucher entry - Debit Sales (reverse of Sales)
+                        // Second voucher entry - Debit Sales Return (reverse of Sales)
                         // Calculate GST amounts for proper voucher split
                         Dictionary<double, double> gstTaxAmounts = CalculateGSTAmounts(dgvInvoice);
                         double totalGST = gstTaxAmounts.Values.Sum();
@@ -1569,21 +1553,23 @@ namespace Repository.TransactionRepository
                         int slNo = 2;
 
                         objVoucher.GroupID = Convert.ToInt32(AccountGroup.SALES_ACCOUNT);
-                        objVoucher.LedgerID = ledgerRepository.GetLedgerId(DefaultLedgers.SALE, (int)AccountGroup.SALES_ACCOUNT, Convert.ToInt32(DataBase.BranchId));
-                        objVoucher.LedgerName = DefaultLedgers.SALE;
+                        objVoucher.LedgerID = ledgerRepository.GetLedgerId(DefaultLedgers.SALESRETURN, (int)AccountGroup.SALES_ACCOUNT, Convert.ToInt32(DataBase.BranchId));
+                        if (objVoucher.LedgerID <= 0)
+                            throw new Exception("Sales Return ledger not found. Please configure Sales Return ledger in the system.");
+                        objVoucher.LedgerName = DefaultLedgers.SALESRETURN;
                         // Reverse of sales: Debit Sales (Sales Return) - without GST
                         objVoucher.Credit = 0;
                         objVoucher.Debit = returnAmountWithoutGST;
                         objVoucher.SlNo = slNo++;
 
-                        CreateVoucherEntry(objVoucher, (SqlTransaction)trans, $"VoucherID={objVoucher.VoucherID}, Type=DEBIT, Account=Sales, Amount={returnAmountWithoutGST}");
+                        CreateVoucherEntry(objVoucher, (SqlTransaction)trans, $"VoucherID={objVoucher.VoucherID}, Type=DEBIT, Account=Sales Return, Amount={returnAmountWithoutGST}");
 
                         // Create GST voucher entries (CGST and SGST) - DEBITED for return
                         CreateGSTReturnVoucherEntries(sr, objVoucher, (SqlTransaction)trans, gstTaxAmounts, sr.SReturnDate, ref slNo);
                     }
-                    else // CREDIT
+                    else // IDENTIFIED CUSTOMER — Credit Customer Ledger (SUNDRY DEBTORS)
                     {
-                        // First voucher entry - Debit Customer Account (reverse of Sales)
+                        // First voucher entry - Credit Customer Account (customer gets credit for return)
                         Voucher objVoucher = new Voucher();
                         objVoucher.CompanyID = DataBase.CompanyId != null ? Convert.ToInt32(DataBase.CompanyId) : 0;
                         objVoucher.BranchID = DataBase.BranchId != null ? Convert.ToInt32(DataBase.BranchId) : 0;
@@ -1612,7 +1598,7 @@ namespace Repository.TransactionRepository
 
                         CreateVoucherEntry(objVoucher, (SqlTransaction)trans, $"VoucherID={objVoucher.VoucherID}, Type=CREDIT, Customer={objVoucher.LedgerName}, Amount={sr.GrandTotal}");
 
-                        // Second voucher entry - Debit Sales (reverse of Sales)
+                        // Second voucher entry - Debit Sales Return (reverse of Sales)
                         // Calculate GST amounts for proper voucher split
                         Dictionary<double, double> gstTaxAmountsCredit = CalculateGSTAmounts(dgvInvoice);
                         double totalGSTCredit = gstTaxAmountsCredit.Values.Sum();
@@ -1620,14 +1606,16 @@ namespace Repository.TransactionRepository
                         int slNoCredit = 2;
 
                         objVoucher.GroupID = Convert.ToInt32(AccountGroup.SALES_ACCOUNT);
-                        objVoucher.LedgerID = ledgerRepository.GetLedgerId(DefaultLedgers.SALE, (int)AccountGroup.SALES_ACCOUNT, Convert.ToInt32(DataBase.BranchId));
-                        objVoucher.LedgerName = DefaultLedgers.SALE;
+                        objVoucher.LedgerID = ledgerRepository.GetLedgerId(DefaultLedgers.SALESRETURN, (int)AccountGroup.SALES_ACCOUNT, Convert.ToInt32(DataBase.BranchId));
+                        if (objVoucher.LedgerID <= 0)
+                            throw new Exception("Sales Return ledger not found. Please configure Sales Return ledger in the system.");
+                        objVoucher.LedgerName = DefaultLedgers.SALESRETURN;
                         // Debit Sales (Sales Return) - without GST
                         objVoucher.Credit = 0;
                         objVoucher.Debit = returnAmountWithoutGSTCredit;
                         objVoucher.SlNo = slNoCredit++;
 
-                        CreateVoucherEntry(objVoucher, (SqlTransaction)trans, $"VoucherID={objVoucher.VoucherID}, Type=DEBIT, Account=Sales, Amount={returnAmountWithoutGSTCredit}");
+                        CreateVoucherEntry(objVoucher, (SqlTransaction)trans, $"VoucherID={objVoucher.VoucherID}, Type=DEBIT, Account=Sales Return, Amount={returnAmountWithoutGSTCredit}");
 
                         // Create GST voucher entries (CGST and SGST) - DEBITED for return
                         CreateGSTReturnVoucherEntries(sr, objVoucher, trans, gstTaxAmountsCredit, sr.SReturnDate, ref slNoCredit);
@@ -1873,7 +1861,6 @@ namespace Repository.TransactionRepository
             return srList;
         }
 
-        /// <summary>
         public bool HasCreditNote(int sReturnNo)
         {
             try
@@ -1894,8 +1881,24 @@ namespace Repository.TransactionRepository
                         DataSet ds = new DataSet();
                         adp.Fill(ds);
 
-                        // If we got any rows, a Credit Note exists for this return
-                        return ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0;
+                        if (ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                        {
+                            DataRow row = ds.Tables[0].Rows[0];
+
+                            // Check if credit note is fully applied (Closed)
+                            double creditAmount = row.Table.Columns.Contains("CreditAmount") && row["CreditAmount"] != DBNull.Value ? Convert.ToDouble(row["CreditAmount"]) : 0;
+                            double appliedAmount = row.Table.Columns.Contains("AppliedAmount") && row["AppliedAmount"] != DBNull.Value ? Convert.ToDouble(row["AppliedAmount"]) : 0;
+                            string status = row.Table.Columns.Contains("Status") && row["Status"] != DBNull.Value ? row["Status"].ToString() : "";
+
+                            // If fully applied / closed, return true (fully processed)
+                            if (status.Equals("Closed", StringComparison.OrdinalIgnoreCase) || (creditAmount > 0 && appliedAmount >= creditAmount))
+                            {
+                                return true;
+                            }
+
+                            // If status is Open or unapplied, it is still pending allocation in FrmCreditNote
+                            return false;
+                        }
                     }
                 }
             }
@@ -1904,6 +1907,7 @@ namespace Repository.TransactionRepository
                 System.Diagnostics.Debug.WriteLine($"Error checking for Credit Note: {ex.Message}");
                 return false; // Assume no credit note if error
             }
+            return false;
         }
 
         // Get invoice number and payment method information

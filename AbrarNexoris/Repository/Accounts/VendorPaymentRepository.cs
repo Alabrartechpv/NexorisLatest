@@ -497,6 +497,9 @@ namespace Repository.Accounts
         public decimal GetVendorOutstandingTotal(int vendorLedgerId)
         {
             decimal outstandingTotal = 0;
+            if (DataConnection.State == ConnectionState.Open)
+                DataConnection.Close();
+
             DataConnection.Open();
             try
             {
@@ -522,7 +525,7 @@ namespace Repository.Accounts
             }
             catch (Exception ex)
             {
-                throw ex;
+                System.Diagnostics.Debug.WriteLine($"Error getting vendor outstanding total: {ex.Message}");
             }
             finally
             {

@@ -1,6 +1,7 @@
 using System;
 using System.Data;
 using System.Data.SqlClient;
+using ModelClass;
 using Repository;
 
 namespace PosBranch_Win.Utilities
@@ -220,7 +221,8 @@ namespace PosBranch_Win.Utilities
                 transaction.Commit();
 
                 // 5. Call POS_Branch CREATE SP (creates branch, 29 groups, default ledgers, and TrackTrans record)
-                using (SqlCommand cmdBranch = new SqlCommand("POS_Branch", conn))
+                object spResult;
+                using (SqlCommand cmdBranch = new SqlCommand(STOREDPROCEDURE.POS_Branch, conn))
                 {
                     cmdBranch.CommandType = CommandType.StoredProcedure;
                     cmdBranch.Parameters.AddWithValue("@BranchName", branchName.Trim());
@@ -232,9 +234,14 @@ namespace PosBranch_Win.Utilities
                     cmdBranch.Parameters.AddWithValue("@IsECommerceAvailable", 0);
                     cmdBranch.Parameters.AddWithValue("@_Operation", "CREATE");
 
-                    object spResult = cmdBranch.ExecuteScalar();
+                    spResult = cmdBranch.ExecuteScalar();
                     System.Diagnostics.Debug.WriteLine($"POS_Branch CREATE result: {spResult}");
                 }
+
+                int branchId = ToInt(spResult);
+                if (branchId <= 0)
+                    branchId = ResolveCreatedBranchId(conn, branchName.Trim());
+                EnsureReturnLedgers(conn, companyId, branchId);
 
                 return true;
             }
@@ -258,6 +265,97 @@ namespace PosBranch_Win.Utilities
                     repo.Dispose();
                 }
             }
+        }
+
+        private static int ResolveCreatedBranchId(SqlConnection conn, string branchName)
+        {
+            using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_Branch, conn))
+            {
+                cmd.CommandType = CommandType.StoredProcedure;
+                cmd.Parameters.AddWithValue("@BranchName", branchName);
+                cmd.Parameters.AddWithValue("@_Operation", "Search");
+
+                using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
+                {
+                    DataSet ds = new DataSet();
+                    adapt.Fill(ds);
+                    if (ds.Tables.Count == 0 || ds.Tables[0].Rows.Count == 0 || !ds.Tables[0].Columns.Contains("Id"))
+                        return 0;
+
+                    return ToInt(ds.Tables[0].Rows[0]["Id"]);
+                }
+            }
+        }
+
+        private static void EnsureReturnLedgers(SqlConnection conn, int companyId, int branchId)
+        {
+            if (branchId <= 0)
+                return;
+
+            EnsureReturnLedger(conn, companyId, branchId, DefaultLedgers.SALESRETURN, (int)AccountGroup.SALES_ACCOUNT);
+            EnsureReturnLedger(conn, companyId, branchId, DefaultLedgers.PURCHASERETURN, (int)AccountGroup.PURCHASE_ACCOUNT);
+        }
+
+        private static void EnsureReturnLedger(SqlConnection conn, int companyId, int branchId, string ledgerName, int groupId)
+        {
+            if (GetLedgerId(conn, ledgerName, groupId, branchId) > 0)
+                return;
+
+            int ledgerId = GetNextLedgerId(conn);
+            if (ledgerId <= 0)
+                return;
+
+            using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_Ledger, conn))
+            {
+                cmd.CommandType = CommandType.StoredProcedure;
+                cmd.Parameters.AddWithValue("@_Operation", "CREATE");
+                cmd.Parameters.AddWithValue("@CompanyID", companyId);
+                cmd.Parameters.AddWithValue("@BranchID", branchId);
+                cmd.Parameters.AddWithValue("@LedgerID", ledgerId);
+                cmd.Parameters.AddWithValue("@LedgerName", ledgerName);
+                cmd.Parameters.AddWithValue("@Alias", DBNull.Value);
+                cmd.Parameters.AddWithValue("@Description", DBNull.Value);
+                cmd.Parameters.AddWithValue("@Notes", DBNull.Value);
+                cmd.Parameters.AddWithValue("@GroupID", groupId);
+                cmd.Parameters.AddWithValue("@OpnDebit", 0);
+                cmd.Parameters.AddWithValue("@OpnCredit", 0);
+                cmd.Parameters.AddWithValue("@ProvideBankDetails", false);
+                cmd.Parameters.AddWithValue("@GstApplicable", false);
+                cmd.Parameters.AddWithValue("@VatApplicable", false);
+                cmd.Parameters.AddWithValue("@InventoryValuesAffected", false);
+                cmd.Parameters.AddWithValue("@MaintainBillWiseDetails", false);
+                cmd.Parameters.AddWithValue("@PriceLevelApplicable", false);
+                cmd.ExecuteScalar();
+            }
+        }
+
+        private static int GetLedgerId(SqlConnection conn, string ledgerName, int groupId, int branchId)
+        {
+            using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._4GetLedgerIdByLedgerNameAndGroupId, conn))
+            {
+                cmd.CommandType = CommandType.StoredProcedure;
+                cmd.Parameters.AddWithValue("@LedgerName", ledgerName);
+                cmd.Parameters.AddWithValue("@GroupId", groupId);
+                cmd.Parameters.AddWithValue("@BranchId", branchId);
+
+                return ToInt(cmd.ExecuteScalar());
+            }
+        }
+
+        private static int GetNextLedgerId(SqlConnection conn)
+        {
+            using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_Ledger, conn))
+            {
+                cmd.CommandType = CommandType.StoredProcedure;
+                cmd.Parameters.AddWithValue("@_Operation", "GETNEXTID");
+
+                return ToInt(cmd.ExecuteScalar());
+            }
+        }
+
+        private static int ToInt(object value)
+        {
+            return value == null || value == DBNull.Value ? 0 : Convert.ToInt32(value);
         }
     }
 }

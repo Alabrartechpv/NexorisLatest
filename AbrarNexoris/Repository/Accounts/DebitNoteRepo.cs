@@ -56,6 +56,9 @@ namespace Repository.Accounts
         /// </summary>
         public DataTable GetOutstandingInvoices(int vendorId, int branchId)
         {
+            if (DataConnection.State == ConnectionState.Open)
+                DataConnection.Close();
+
             DataConnection.Open();
             try
             {
@@ -132,11 +135,12 @@ namespace Repository.Accounts
             DataConnection.Open();
             try
             {
-                string query = "SELECT TOP 1 LedgerID FROM PMaster WHERE InvoiceNo = @PurchaseNo AND BranchId = @BranchId AND CancelFlag = 0";
-                using (SqlCommand cmd = new SqlCommand(query, (SqlConnection)DataConnection))
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._DebitNoteMaster, (SqlConnection)DataConnection))
                 {
-                    cmd.Parameters.AddWithValue("@PurchaseNo", purchaseNo);
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@InvoiceNo", purchaseNo);
                     cmd.Parameters.AddWithValue("@BranchId", branchId);
+                    cmd.Parameters.AddWithValue("@_Operation", "GETVENDORLEDGERBYINVOICE");
                     object res = cmd.ExecuteScalar();
                     if (res != null && res != DBNull.Value)
                     {
@@ -164,10 +168,11 @@ namespace Repository.Accounts
             DataConnection.Open();
             try
             {
-                string query = "SELECT TOP 1 LedgerName FROM LedgerMaster WHERE LedgerID = @LedgerID";
-                using (SqlCommand cmd = new SqlCommand(query, (SqlConnection)DataConnection))
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._DebitNoteMaster, (SqlConnection)DataConnection))
                 {
-                    cmd.Parameters.AddWithValue("@LedgerID", ledgerId);
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@VendorLedgerId", ledgerId);
+                    cmd.Parameters.AddWithValue("@_Operation", "GETVENDORNAME");
                     object res = cmd.ExecuteScalar();
                     if (res != null && res != DBNull.Value)
                     {
@@ -189,6 +194,9 @@ namespace Repository.Accounts
         /// </summary>
         public DataTable GetAllInvoices(int vendorId, int branchId)
         {
+            if (DataConnection.State == ConnectionState.Open)
+                DataConnection.Close();
+
             DataConnection.Open();
             try
             {
@@ -219,11 +227,14 @@ namespace Repository.Accounts
         }
 
         /// <summary>
-        /// Get vendor outstanding total
+        /// Get vendor outstanding total via stored procedure
         /// </summary>
         public decimal GetVendorOutstandingTotal(int vendorLedgerId, int branchId)
         {
             decimal outstandingTotal = 0;
+            if (DataConnection.State == ConnectionState.Open)
+                DataConnection.Close();
+
             DataConnection.Open();
             try
             {
@@ -249,7 +260,7 @@ namespace Repository.Accounts
             }
             catch (Exception ex)
             {
-                throw ex;
+                System.Diagnostics.Debug.WriteLine($"Error getting vendor outstanding: {ex.Message}");
             }
             finally
             {
@@ -390,7 +401,61 @@ namespace Repository.Accounts
                             }
 
                             // 4. Create Voucher Entries - Double entry system
-                            // Skip voucher creation if coming from Purchase Return (vouchers already created)
+                            // CRITICAL: If this Debit Note is linked to a Purchase Return (PReturnNo > 0),
+                            // or if the invoice being debited was already returned via Purchase Return (PReturnMaster),
+                            // the Purchase Return already created the voucher entries (Dr Vendor Ledger, Cr Purchase).
+                            // Creating vouchers here again would DOUBLE-DEBIT the vendor's ledger,
+                            // causing their Trial Balance entry to net to zero or double-count.
+                            // Always skip voucher creation when a Purchase Return is linked.
+                            if (master.PReturnNo > 0)
+                            {
+                                skipVoucherCreation = true;
+                            }
+
+                            if (!skipVoucherCreation && !string.IsNullOrWhiteSpace(master.InvoiceNo))
+                            {
+                                try
+                                {
+                                    using (SqlCommand checkPRCmd = new SqlCommand(STOREDPROCEDURE._DebitNoteMaster, conn, transaction))
+                                    {
+                                        checkPRCmd.CommandType = CommandType.StoredProcedure;
+                                        checkPRCmd.Parameters.AddWithValue("@InvoiceNo", master.InvoiceNo);
+                                        checkPRCmd.Parameters.AddWithValue("@BranchId", master.BranchId);
+                                        checkPRCmd.Parameters.AddWithValue("@_Operation", "CHECKRETURN");
+                                        object prCount = checkPRCmd.ExecuteScalar();
+                                        if (prCount != null && prCount != DBNull.Value && Convert.ToInt32(prCount) > 0)
+                                        {
+                                            skipVoucherCreation = true;
+                                        }
+                                    }
+                                }
+                                catch { }
+                            }
+
+                            if (!skipVoucherCreation && details != null && details.Count > 0)
+                            {
+                                try
+                                {
+                                    foreach (var d in details)
+                                    {
+                                        using (SqlCommand checkPRCmd = new SqlCommand(STOREDPROCEDURE._DebitNoteMaster, conn, transaction))
+                                        {
+                                            checkPRCmd.CommandType = CommandType.StoredProcedure;
+                                            checkPRCmd.Parameters.AddWithValue("@BillNo", d.BillNo);
+                                            checkPRCmd.Parameters.AddWithValue("@BranchId", master.BranchId);
+                                            checkPRCmd.Parameters.AddWithValue("@_Operation", "CHECKRETURN");
+                                            object prCount = checkPRCmd.ExecuteScalar();
+                                            if (prCount != null && prCount != DBNull.Value && Convert.ToInt32(prCount) > 0)
+                                            {
+                                                skipVoucherCreation = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                                catch { }
+                            }
+
                             if (!skipVoucherCreation)
                             {
                                 // Debit entry (Vendor account - reduce payable)

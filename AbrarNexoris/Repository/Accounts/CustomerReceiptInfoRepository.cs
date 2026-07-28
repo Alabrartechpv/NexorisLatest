@@ -543,6 +543,9 @@ namespace Repository.Accounts
         public decimal GetCustomerOutstandingTotal(int customerLedgerId)
         {
             decimal outstandingTotal = 0;
+            if (DataConnection.State == ConnectionState.Open)
+                DataConnection.Close();
+
             DataConnection.Open();
             try
             {
@@ -566,9 +569,9 @@ namespace Repository.Accounts
                     }
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                throw;
+                System.Diagnostics.Debug.WriteLine($"Error getting customer outstanding total: {ex.Message}");
             }
             finally
             {

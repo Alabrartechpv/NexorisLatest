@@ -793,22 +793,34 @@ namespace PosBranch_Win.Transaction
                     SReturn.LedgerID = 0;
                 }
 
-                // Validate payment method selection
-                if (!ValidatePaymentMethod())
+                // Automatically determine payment mode from customer context:
+                // - If a known customer with a Ledger account is selected -> Credit (customer account gets credited in Trial Balance)
+                // - If no customer / anonymous walk-in -> Cash (cash account gets credited)
+                if (SReturn.LedgerID > 0)
                 {
-                    return;
+                    // Known customer - look up the Credit paymode from the dropdown for reference
+                    SReturn.Paymode = "Credit";
+                    // Find the Credit paymode ID from the dropdown
+                    int creditPaymodeId = 1;
+                    if (cmbPaymntMethod.DataSource is DataTable dtPm)
+                    {
+                        foreach (DataRow pmRow in dtPm.Rows)
+                        {
+                            if (pmRow["PayModeName"].ToString().Equals("Credit", StringComparison.OrdinalIgnoreCase))
+                            {
+                                creditPaymodeId = Convert.ToInt32(pmRow["PayModeID"]);
+                                break;
+                            }
+                        }
+                    }
+                    SReturn.PaymodeID = creditPaymodeId;
                 }
-
-                // Log selected payment method
-                Infragistics.Win.ValueListItem selectedPaymentItem = cmbPaymntMethod.SelectedItem as Infragistics.Win.ValueListItem;
-                if (selectedPaymentItem != null && selectedPaymentItem.DataValue is DataRowView)
+                else
                 {
-                    DataRowView selectedPaymentRow = selectedPaymentItem.DataValue as DataRowView;
+                    // Anonymous / walk-in customer - default to Cash
+                    SReturn.Paymode = cmbPaymntMethod.Items.Count > 0 ? cmbPaymntMethod.Text : "Cash";
+                    SReturn.PaymodeID = Convert.ToInt32(cmbPaymntMethod.Value ?? 2);
                 }
-
-                // Set payment method information
-                SReturn.Paymode = cmbPaymntMethod.Text;
-                SReturn.PaymodeID = Convert.ToInt32(cmbPaymntMethod.Value ?? 0);
 
                 // Set SReturnNo - 0 for new records, existing id for updates
                 SReturn.SReturnNo = isUpdate ? existingSReturnNo : 0;
@@ -5402,50 +5414,10 @@ namespace PosBranch_Win.Transaction
 
         private void EnsureCreditNoteMasterExists(CreditNote creditNote)
         {
-            try
-            {
-                if (creditNote == null || SReturn == null || SReturn.SReturnNo <= 0)
-                {
-                    return;
-                }
-
-                var creditNoteRepo = new Repository.Accounts.CreditNoteRepository();
-                DataTable existingCreditNote = creditNoteRepo.GetCreditNoteBySReturnNo(
-                    SReturn.SReturnNo,
-                    SessionContext.BranchId,
-                    SessionContext.FinYearId);
-
-                if (existingCreditNote != null && existingCreditNote.Rows.Count > 0)
-                {
-                    return;
-                }
-
-                var master = new ModelClass.Accounts.CreditNoteMaster
-                {
-                    CompanyId = SessionContext.CompanyId,
-                    BranchId = SessionContext.BranchId,
-                    FinYearId = SessionContext.FinYearId,
-                    VoucherId = Convert.ToInt32(SReturn.VoucherID),
-                    VoucherDate = DateTime.Now,
-                    CustomerLedgerId = Convert.ToInt32(SReturn.LedgerID),
-                    CustomerName = SReturn.CustomerName,
-                    SReturnNo = SReturn.SReturnNo,
-                    InvoiceNo = SReturn.InvoiceNo ?? string.Empty,
-                    CreditAmount = Convert.ToDouble(creditNote.TotalAmount),
-                    PaymentMethodLedgerId = 1,
-                    Narration = "Auto-generated store credit from Sales Return",
-                    UserId = SessionContext.UserId
-                };
-
-                creditNoteRepo.SaveCreditNote(
-                    master,
-                    new List<ModelClass.Accounts.CreditNoteDetails>(),
-                    skipVoucherCreation: true);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error ensuring credit note master exists: {ex.Message}");
-            }
+            // Do not auto-create CreditNoteMaster during Sales Return saving.
+            // Credit Note master and GL voucher creation are handled when the user opens FrmCreditNote
+            // and applies the pending Sales Return, matching Purchase Return & FrmDebitNote behavior.
+            return;
         }
 
         private void PrintCreditNote(CreditNote creditNote)
