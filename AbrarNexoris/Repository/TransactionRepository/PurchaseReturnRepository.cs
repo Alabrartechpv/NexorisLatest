@@ -976,96 +976,7 @@ namespace Repository.TransactionRepository
                         System.Diagnostics.Debug.WriteLine($"Skipping detail insertion in savePR for update - UpdatePurchaseReturnDetails will handle it");
                     }
 
-                    // Create accounting vouchers for the purchase return (only for new PRs, not updates)
-                    // For updates, vouchers will be regenerated in UpdatePurchaseReturnDetails
-                    if (!isUpdate)
-                    {
-                        // Determine which ledger to credit based on payment method's PaymodeLedgerID
-                        int creditLedgerId;
-                        string creditLedgerName;
-
-                        // Use PaymodeLedgerID if available, otherwise fall back to vendor ledger
-                        if (pr.PaymodeLedgerID > 0)
-                        {
-                            // Use the ledger from PayMode table
-                            creditLedgerId = pr.PaymodeLedgerID;
-                            creditLedgerName = pr.Paymode;
-                            System.Diagnostics.Debug.WriteLine($"Using PaymodeLedgerID: {creditLedgerId} for payment method: {pr.Paymode}");
-                        }
-                        else
-                        {
-                            // Fallback to vendor ledger if PaymodeLedgerID is not set
-                            creditLedgerId = (int)pr.LedgerID;
-                            creditLedgerName = pr.VendorName;
-                            System.Diagnostics.Debug.WriteLine($"Using Vendor ledger (ID: {creditLedgerId}) as fallback");
-                        }
-
-                        // Calculate amount without tax for Purchase Return ledger (SubTotal - TaxAmt)
-                        double purchaseAmountWithoutTax = pr.SubTotal - pr.TaxAmt;
-
-                        System.Diagnostics.Debug.WriteLine($"Voucher Calculation: SubTotal={pr.SubTotal}, TaxAmt={pr.TaxAmt}, PurchaseAmtWithoutTax={purchaseAmountWithoutTax}, GrandTotal={pr.GrandTotal}");
-
-                        // Create payment method account voucher (DEBIT for return - money received back)
-                        PReturnVoucher vendorVoucher = new PReturnVoucher
-                        {
-                            CompanyId = pr.CompanyId,
-                            FinYearId = pr.FinYearId,
-                            BranchID = pr.BranchId,
-                            VoucherID = voucherId,
-                            VoucherType = ModelClass.VoucherType.DebitNote,
-                            VoucherDate = pr.PReturnDate,
-                            ReferenceNo = pr.PReturnNo.ToString(),
-                            LedgerID = creditLedgerId, // Use payment method's ledger
-                            Debit = pr.GrandTotal,
-                            Credit = 0,
-                            Narration = $"Purchase Return - PR#{pr.PReturnNo}",
-                            CancelFlag = false
-                        };
-
-                        CreateVoucher(vendorVoucher, trans);
-
-                        // Create purchase return account voucher (CREDIT for return - reducing purchase account)
-                        // Amount = SubTotal - TaxAmt (purchase amount without tax)
-                        int purchaseReturnLedgerId = GetPurchaseReturnLedgerId(pr.BranchId);
-                        if (purchaseReturnLedgerId <= 0)
-                        {
-                            throw new Exception("Purchase Return ledger not found. Please configure Purchase Return ledger in the system.");
-                        }
-
-                        PReturnVoucher prVoucher = new PReturnVoucher
-                        {
-                            CompanyId = pr.CompanyId,
-                            FinYearId = pr.FinYearId,
-                            BranchID = pr.BranchId,
-                            VoucherID = voucherId,
-                            VoucherType = ModelClass.VoucherType.DebitNote,
-                            VoucherDate = pr.PReturnDate,
-                            ReferenceNo = pr.PReturnNo.ToString(),
-                            LedgerID = purchaseReturnLedgerId, // Always use Purchase Return ledger
-                            Debit = 0,
-                            Credit = purchaseAmountWithoutTax,
-                            Narration = $"Purchase Return - PR#{pr.PReturnNo}",
-                            CancelFlag = false
-                        };
-
-                        CreateVoucher(prVoucher, trans);
-
-                        // Create tax voucher entries for CGST and SGST
-                        Dictionary<double, double> taxAmountsByPercentage = AggregateTaxAmountsByPercentage(dgvInvoice);
-                        if (taxAmountsByPercentage.Count > 0)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"Creating tax vouchers for {taxAmountsByPercentage.Count} tax percentage(s)");
-                            CreateTaxVoucherEntries(voucherId, taxAmountsByPercentage, pr.PReturnNo, pr.Remarks ?? "", trans);
-                        }
-                        else
-                        {
-                            System.Diagnostics.Debug.WriteLine("No tax amounts found, skipping tax voucher creation");
-                        }
-                    }
-                    else
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Skipping voucher creation for update - vouchers will be regenerated in UpdatePurchaseReturnDetails");
-                    }
+                    System.Diagnostics.Debug.WriteLine($"Purchase Return PR#{pr.PReturnNo} saved as pending stock return. Accounting voucher will be posted from Debit Note.");
 
                     trans.Commit();
 
@@ -1673,6 +1584,9 @@ namespace Repository.TransactionRepository
         {
             try
             {
+                System.Diagnostics.Debug.WriteLine($"Skipping purchase return voucher creation for PR#{prMaster?.PReturnNo}. Debit Note is the accounting posting point.");
+                return "success";
+
                 // Generate voucher number directly using the stored procedure
                 int voucherNo = 0;
                 using (SqlCommand voucherCmd = new SqlCommand("POS_Vouchers", (SqlConnection)DataConnection, trans))
@@ -2149,12 +2063,8 @@ namespace Repository.TransactionRepository
                 {
                     try
                     {
-                        // Before committing, regenerate vouchers for the updated purchase return
-                        System.Diagnostics.Debug.WriteLine($"Regenerating vouchers for PR#{pr.PReturnNo}");
-                        RegenerateVouchersForUpdate(pr.PReturnNo, pr.CompanyId, pr.FinYearId, pr.BranchId, transaction);
-
                         transaction.Commit();
-                        System.Diagnostics.Debug.WriteLine("Transaction committed successfully with regenerated vouchers");
+                        System.Diagnostics.Debug.WriteLine("Transaction committed successfully. Purchase Return accounting remains pending until Debit Note.");
                     }
                     catch (Exception commitEx)
                     {
@@ -2276,6 +2186,9 @@ namespace Repository.TransactionRepository
         {
             try
             {
+                System.Diagnostics.Debug.WriteLine($"Skipping purchase return voucher regeneration for PR#{prNo}. Debit Note is the accounting posting point.");
+                return;
+
                 System.Diagnostics.Debug.WriteLine($"Starting voucher regeneration for PR#{prNo}");
 
                 // First, get the existing master record to get VoucherID and other details

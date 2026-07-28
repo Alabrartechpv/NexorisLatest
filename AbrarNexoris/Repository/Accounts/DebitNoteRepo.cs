@@ -275,7 +275,7 @@ namespace Repository.Accounts
         /// </summary>
         /// <param name="master">Debit Note master record</param>
         /// <param name="details">Debit Note detail records</param>
-        /// <param name="skipVoucherCreation">If true, skip voucher creation (used when coming from Purchase Return which already created vouchers)</param>
+        /// <param name="skipVoucherCreation">If true, skip voucher creation for non-accounting saves</param>
         public bool SaveDebitNote(DebitNoteMaster master, List<DebitNoteDetails> details, bool skipVoucherCreation = false)
         {
             if (master == null)
@@ -400,61 +400,8 @@ namespace Repository.Accounts
                                 }
                             }
 
-                            // 4. Create Voucher Entries - Double entry system
-                            // CRITICAL: If this Debit Note is linked to a Purchase Return (PReturnNo > 0),
-                            // or if the invoice being debited was already returned via Purchase Return (PReturnMaster),
-                            // the Purchase Return already created the voucher entries (Dr Vendor Ledger, Cr Purchase).
-                            // Creating vouchers here again would DOUBLE-DEBIT the vendor's ledger,
-                            // causing their Trial Balance entry to net to zero or double-count.
-                            // Always skip voucher creation when a Purchase Return is linked.
-                            if (master.PReturnNo > 0)
-                            {
-                                skipVoucherCreation = true;
-                            }
-
-                            if (!skipVoucherCreation && !string.IsNullOrWhiteSpace(master.InvoiceNo))
-                            {
-                                try
-                                {
-                                    using (SqlCommand checkPRCmd = new SqlCommand(STOREDPROCEDURE._DebitNoteMaster, conn, transaction))
-                                    {
-                                        checkPRCmd.CommandType = CommandType.StoredProcedure;
-                                        checkPRCmd.Parameters.AddWithValue("@InvoiceNo", master.InvoiceNo);
-                                        checkPRCmd.Parameters.AddWithValue("@BranchId", master.BranchId);
-                                        checkPRCmd.Parameters.AddWithValue("@_Operation", "CHECKRETURN");
-                                        object prCount = checkPRCmd.ExecuteScalar();
-                                        if (prCount != null && prCount != DBNull.Value && Convert.ToInt32(prCount) > 0)
-                                        {
-                                            skipVoucherCreation = true;
-                                        }
-                                    }
-                                }
-                                catch { }
-                            }
-
-                            if (!skipVoucherCreation && details != null && details.Count > 0)
-                            {
-                                try
-                                {
-                                    foreach (var d in details)
-                                    {
-                                        using (SqlCommand checkPRCmd = new SqlCommand(STOREDPROCEDURE._DebitNoteMaster, conn, transaction))
-                                        {
-                                            checkPRCmd.CommandType = CommandType.StoredProcedure;
-                                            checkPRCmd.Parameters.AddWithValue("@BillNo", d.BillNo);
-                                            checkPRCmd.Parameters.AddWithValue("@BranchId", master.BranchId);
-                                            checkPRCmd.Parameters.AddWithValue("@_Operation", "CHECKRETURN");
-                                            object prCount = checkPRCmd.ExecuteScalar();
-                                            if (prCount != null && prCount != DBNull.Value && Convert.ToInt32(prCount) > 0)
-                                            {
-                                                skipVoucherCreation = true;
-                                                break;
-                                            }
-                                        }
-                                    }
-                                }
-                                catch { }
-                            }
+                            // 4. Create Voucher Entries - Double entry system.
+                            // Purchase Return is stock/pending only; linked Debit Note is the accounting posting point.
 
                             if (!skipVoucherCreation)
                             {

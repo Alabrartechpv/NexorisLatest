@@ -1,4 +1,4 @@
-﻿namespace PosBranch_Win.Transaction
+namespace PosBranch_Win.Transaction
 {
     partial class frmSalesReturn
     {

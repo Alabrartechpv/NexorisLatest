@@ -274,8 +274,8 @@ namespace PosBranch_Win.Accounts
 
                     row["ReturnedAmount"] = returnedAmount;
 
-                    // Clamp and calculate actual balance
-                    decimal balance = invoiceAmount - paidAmount - returnedAmount;
+                    // Clamp and calculate actual balance (PaidAmount already includes settled amounts)
+                    decimal balance = invoiceAmount - paidAmount;
                     if (balance < 0) balance = 0;
 
                     row["Balance"] = balance;
@@ -532,8 +532,8 @@ namespace PosBranch_Win.Accounts
                     return;
                 }
 
-                // Save debit note - skip voucher creation if coming from Purchase Return (already has vouchers)
-                bool skipVoucher = _pReturnNo > 0;
+                // Purchase Return is pending stock movement only; Debit Note is the accounting posting point.
+                bool skipVoucher = false;
                 bool success = debitNoteRepo.SaveDebitNote(master, details, skipVoucher);
 
                 if (success)
