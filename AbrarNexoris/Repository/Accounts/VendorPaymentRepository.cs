@@ -69,6 +69,8 @@ namespace Repository.Accounts
                 throw new ArgumentException("Double-entry voucher rows are required.", nameof(vouchers));
             }
 
+            ValidatePaymentAmounts(master, details, vouchers);
+
             DataConnection.Open();
             SqlTransaction transaction = null;
 
@@ -286,6 +288,56 @@ namespace Repository.Accounts
             }
 
             return 1;
+        }
+
+        private void ValidatePaymentAmounts(VendorPaymentMaster master, List<VendorPaymentDetails> details, List<VoucherEntry> vouchers)
+        {
+            if (master.TotalPaymentAmount <= 0)
+            {
+                throw new InvalidOperationException("Payment amount must be greater than zero.");
+            }
+
+            decimal detailTotal = Math.Round(details.Where(d => d != null).Sum(d => d.AdjustedAmount), 2);
+            decimal paymentTotal = Math.Round(master.TotalPaymentAmount, 2);
+            if (detailTotal != paymentTotal)
+            {
+                throw new InvalidOperationException("Payment detail total must equal payment amount.");
+            }
+
+            List<VoucherEntry> postingRows = vouchers
+                .Where(v => v != null && (v.DebitAmount > 0 || v.CreditAmount > 0))
+                .ToList();
+
+            if (postingRows.Count < 2)
+            {
+                throw new InvalidOperationException("Payment voucher must contain at least two posting rows.");
+            }
+
+            foreach (VoucherEntry row in postingRows)
+            {
+                if (row.DebitAmount < 0 || row.CreditAmount < 0)
+                {
+                    throw new InvalidOperationException("Payment voucher debit and credit cannot be negative.");
+                }
+
+                if (row.DebitAmount > 0 && row.CreditAmount > 0)
+                {
+                    throw new InvalidOperationException("A payment voucher row cannot contain both debit and credit.");
+                }
+            }
+
+            decimal totalDebit = Math.Round(postingRows.Sum(v => v.DebitAmount), 2);
+            decimal totalCredit = Math.Round(postingRows.Sum(v => v.CreditAmount), 2);
+
+            if (totalDebit != totalCredit)
+            {
+                throw new InvalidOperationException("Payment voucher is not balanced. Total debit must equal total credit.");
+            }
+
+            if (totalDebit != paymentTotal)
+            {
+                throw new InvalidOperationException("Payment voucher total must equal payment amount.");
+            }
         }
 
         private int ResolveVoucherLedgerId(VendorPaymentMaster master, VoucherEntry voucher, int paymentMethodId, int paymentAccountLedgerId)

@@ -166,6 +166,8 @@ namespace Repository.Accounts
                 return false; // Validate input parameters
             }
 
+            ValidateReceiptAmounts(master, details, voucherEntries);
+
             SqlConnection conn = DataConnection as SqlConnection;
             if (conn == null)
             {
@@ -913,6 +915,56 @@ namespace Repository.Accounts
             {
                 System.Diagnostics.Debug.WriteLine($"Error getting cash ledger ID: {ex.Message}");
                 return GetCashLedgerIdFromDatabase(branchId);
+            }
+        }
+
+        private void ValidateReceiptAmounts(CustomerReceiptMaster master, List<CustomerReceiptDetails> details, List<VoucherEntry> voucherEntries)
+        {
+            if (master.TotalReceiptAmount <= 0)
+            {
+                throw new InvalidOperationException("Receipt amount must be greater than zero.");
+            }
+
+            decimal detailTotal = Math.Round(details.Where(d => d != null).Sum(d => d.AdjustedAmount), 2);
+            decimal receiptTotal = Math.Round(master.TotalReceiptAmount, 2);
+            if (detailTotal != receiptTotal)
+            {
+                throw new InvalidOperationException("Receipt detail total must equal receipt amount.");
+            }
+
+            List<VoucherEntry> postingRows = voucherEntries
+                .Where(v => v != null && (v.DebitAmount > 0 || v.CreditAmount > 0))
+                .ToList();
+
+            if (postingRows.Count < 2)
+            {
+                throw new InvalidOperationException("Receipt voucher must contain at least two posting rows.");
+            }
+
+            foreach (VoucherEntry row in postingRows)
+            {
+                if (row.DebitAmount < 0 || row.CreditAmount < 0)
+                {
+                    throw new InvalidOperationException("Receipt voucher debit and credit cannot be negative.");
+                }
+
+                if (row.DebitAmount > 0 && row.CreditAmount > 0)
+                {
+                    throw new InvalidOperationException("A receipt voucher row cannot contain both debit and credit.");
+                }
+            }
+
+            decimal totalDebit = Math.Round(postingRows.Sum(v => v.DebitAmount), 2);
+            decimal totalCredit = Math.Round(postingRows.Sum(v => v.CreditAmount), 2);
+
+            if (totalDebit != totalCredit)
+            {
+                throw new InvalidOperationException("Receipt voucher is not balanced. Total debit must equal total credit.");
+            }
+
+            if (totalDebit != receiptTotal)
+            {
+                throw new InvalidOperationException("Receipt voucher total must equal receipt amount.");
             }
         }
 
