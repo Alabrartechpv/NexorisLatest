@@ -72,6 +72,11 @@ namespace PosBranch_Win.Transaction
         public frmSalesReturn()
         {
             InitializeComponent();
+
+            // Hide payment method combo and label as requested
+            if (cmbPaymntMethod != null) cmbPaymntMethod.Visible = false;
+            if (labelPaymentMethod != null) labelPaymentMethod.Visible = false;
+
             InitializeUltraGrid();
 
             // Add additional grid events for automatic editing
