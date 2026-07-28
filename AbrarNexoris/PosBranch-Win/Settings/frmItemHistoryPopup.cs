@@ -73,6 +73,7 @@ namespace PosBranch_Win.Settings
             gridHistory.DefaultCellStyle.SelectionForeColor = navy;
             gridHistory.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(248, 252, 255);
 
+            GridPinningHelper.Attach(gridHistory);
             gridHistory.CellContentClick += GridHistory_CellContentClick;
             gridHistory.DataBindingComplete += (s, e) => ApplyActionColors();
 
@@ -124,6 +125,7 @@ namespace PosBranch_Win.Settings
         private void ConfigureGrid()
         {
             if (gridHistory.Columns.Count == 0) return;
+            GridPinningHelper.Attach(gridHistory);
 
             // Hide unneeded database IDs
             HideColumn("ItemActivityLogId");
