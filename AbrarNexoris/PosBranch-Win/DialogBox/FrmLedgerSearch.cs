@@ -83,8 +83,11 @@ namespace PosBranch_Win.DialogBox
         {
             try
             {
-                // Pass 0 to fetch ledgers across all branches to ensure visibility
-                int branchId = 0; 
+                // Filter to the current branch — shows only ledgers belonging to the logged-in user's branch
+                int branchId = SessionContext.BranchId > 0
+                    ? SessionContext.BranchId
+                    : (int.TryParse(DataBase.BranchId, out int bid) ? bid : 0);
+
                 if (ledgerRepo == null)
                 {
                     ledgerRepo = new Repository.Accounts.LedgerRepository();

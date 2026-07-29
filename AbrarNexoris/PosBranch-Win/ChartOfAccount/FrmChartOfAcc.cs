@@ -1374,8 +1374,9 @@ namespace PosBranch_Win.ChartOfAccount
         {
             try
             {
-                // Load the ledger details
-                DataTable ledgers = ledgerRepo.GetAllLedgers();
+                // Load ledger details filtered to current branch
+                int branchId = GetContextValue(SessionContext.BranchId, DataBase.BranchId);
+                DataTable ledgers = ledgerRepo.GetAllLedgers(branchId);
                 DataRow[] matchingLedgers = ledgers.Select($"LedgerID = {ledgerId}");
 
                 if (matchingLedgers.Length > 0)

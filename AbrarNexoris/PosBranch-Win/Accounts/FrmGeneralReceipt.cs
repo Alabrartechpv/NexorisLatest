@@ -59,6 +59,9 @@ namespace PosBranch_Win.Accounts
             {
                 CmboBranch.Value = branchId;
             }
+
+            CmboBranch.ReadOnly = true;
+            CmboBranch.TabStop = false;
         }
 
         private void BindLedgers()
@@ -88,7 +91,54 @@ namespace PosBranch_Win.Accounts
             gridReceipt.AfterCellUpdate += gridReceipt_AfterCellUpdate;
             gridReceipt.KeyDown += gridReceipt_KeyDown;
             txtVoucherNo.KeyDown += txtVoucherNo_KeyDown;
+            dtpVoucherDate.KeyDown += dtpVoucherDate_KeyDown;
+            CmboBranch.KeyDown += CmboBranch_KeyDown;
+            txtNarration.KeyDown += txtNarration_KeyDown;
             this.Load += FrmGeneralReceipt_Load;
+        }
+
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            // Ribbon Save hotkey: F8 (also supports Ctrl+S, F12)
+            if (keyData == Keys.F8 || keyData == (Keys.Control | Keys.S) || keyData == Keys.F12)
+            {
+                Save();
+                return true;
+            }
+            // Ribbon Clear hotkey: F1 (also supports Ctrl+N, F2)
+            if (keyData == Keys.F1 || keyData == (Keys.Control | Keys.N) || keyData == Keys.F2)
+            {
+                ClearForm();
+                return true;
+            }
+            // Ribbon Exit hotkey: F4
+            if (keyData == Keys.F4)
+            {
+                this.Close();
+                return true;
+            }
+            // Ribbon Delete hotkey: Ctrl+B (also supports Ctrl+D, Ctrl+Delete)
+            if (keyData == (Keys.Control | Keys.B) || keyData == (Keys.Control | Keys.D) || keyData == (Keys.Control | Keys.Delete))
+            {
+                DeleteActiveGridRow();
+                return true;
+            }
+            // History hotkey: F5 / Ctrl+H
+            if (keyData == Keys.F5 || keyData == (Keys.Control | Keys.H))
+            {
+                btnHistory_Click(this, EventArgs.Empty);
+                return true;
+            }
+            // Ledger Search hotkey: F3 / Ctrl+L
+            if (keyData == Keys.F3 || keyData == (Keys.Control | Keys.L))
+            {
+                if (gridReceipt.Focused || gridReceipt.ContainsFocus)
+                {
+                    OpenLedgerSearchForActiveRow();
+                    return true;
+                }
+            }
+            return base.ProcessCmdKey(ref msg, keyData);
         }
 
         private void ApplyModernTheme()
@@ -278,7 +328,7 @@ namespace PosBranch_Win.Accounts
             gridReceipt.DisplayLayout.Override.RowSelectorWidth = 34;
             gridReceipt.DisplayLayout.Override.RowSelectorHeaderStyle = RowSelectorHeaderStyle.ColumnChooserButton;
             gridReceipt.DisplayLayout.Override.CellClickAction = CellClickAction.EditAndSelectText;
-            gridReceipt.DisplayLayout.Override.AllowAddNew = AllowAddNew.TemplateOnBottom;
+            gridReceipt.DisplayLayout.Override.AllowAddNew = AllowAddNew.No;
             gridReceipt.DisplayLayout.Override.AllowDelete = DefaultableBoolean.True;
             gridReceipt.DisplayLayout.Override.SelectTypeRow = SelectType.Single;
             gridReceipt.DisplayLayout.Override.RowSelectors = DefaultableBoolean.True;
@@ -291,7 +341,8 @@ namespace PosBranch_Win.Accounts
         {
             btnHistory = new UltraButton
             {
-                Text = "History"
+                Text = "History (F5)",
+                TabIndex = 4
             };
             btnHistory.Click += btnHistory_Click;
             headerPanel.ClientArea.Controls.Add(btnHistory);
@@ -302,6 +353,11 @@ namespace PosBranch_Win.Accounts
             e.Layout.CaptionVisible = DefaultableBoolean.False;
             e.Layout.GroupByBox.Hidden = true;
             e.Layout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
+
+            e.Layout.Override.AllowAddNew = AllowAddNew.No;
+            e.Layout.Override.AllowDelete = DefaultableBoolean.True;
+            e.Layout.Override.AllowUpdate = DefaultableBoolean.True;
+            e.Layout.Override.CellClickAction = CellClickAction.EditAndSelectText;
 
             UltraGridBand band = e.Layout.Bands[0];
             band.HeaderVisible = false;
@@ -320,6 +376,12 @@ namespace PosBranch_Win.Accounts
             band.Columns["Debit"].CellAppearance.TextHAlign = HAlign.Right;
             band.Columns["Credit"].CellAppearance.TextHAlign = HAlign.Right;
             band.Columns["Narration"].CellMultiLine = DefaultableBoolean.True;
+
+            if (band.Columns.Exists("LedgerID"))
+            {
+                band.Columns["LedgerID"].AutoCompleteMode = Infragistics.Win.AutoCompleteMode.SuggestAppend;
+            }
+
             ApplyLedgerValueList();
         }
 
@@ -389,7 +451,7 @@ namespace PosBranch_Win.Accounts
             LoadReceipt();
         }
 
-        private void ClearForm()
+        public void ClearForm()
         {
             isBinding = true;
             currentVoucherId = 0;
@@ -400,6 +462,11 @@ namespace PosBranch_Win.Accounts
             journalLineTable.Rows.Add(journalLineTable.NewRow());
             isBinding = false;
             UpdateTotals();
+
+            this.BeginInvoke(new Action(() =>
+            {
+                dtpVoucherDate.Focus();
+            }));
         }
 
         private JournalVoucher BuildReceiptFromGrid()
@@ -804,23 +871,207 @@ namespace PosBranch_Win.Accounts
             UpdateTotals();
         }
 
+        // ── Keyboard Navigation & Helper Methods ─────────────────────────────────
+
+        private void ActivateGridCell(int rowIndex, string columnName)
+        {
+            if (gridReceipt.Rows.Count > rowIndex && rowIndex >= 0)
+            {
+                gridReceipt.Focus();
+                var row = gridReceipt.Rows[rowIndex];
+                gridReceipt.ActiveRow = row;
+                gridReceipt.Selected.Rows.Clear();
+                gridReceipt.Selected.Rows.Add(row);
+                if (row.Cells.Exists(columnName))
+                {
+                    gridReceipt.ActiveCell = row.Cells[columnName];
+                    gridReceipt.PerformAction(UltraGridAction.EnterEditMode);
+                }
+            }
+        }
+
+        private void OpenLedgerSearchForActiveRow()
+        {
+            if (gridReceipt.ActiveRow == null) return;
+            using (var searchForm = new PosBranch_Win.DialogBox.FrmLedgerSearch())
+            {
+                if (searchForm.ShowDialog(this) == DialogResult.OK && searchForm.SelectedLedgerId > 0)
+                {
+                    if (gridReceipt.ActiveRow.ListObject is DataRowView rowView)
+                    {
+                        rowView["LedgerID"] = searchForm.SelectedLedgerId;
+                        gridReceipt.UpdateData();
+                        int idx = gridReceipt.ActiveRow.Index;
+                        this.BeginInvoke(new Action(() =>
+                        {
+                            ActivateGridCell(idx, "Debit");
+                        }));
+                    }
+                }
+            }
+        }
+
+        private void DeleteActiveGridRow()
+        {
+            if (gridReceipt.ActiveRow != null && gridReceipt.ActiveRow.ListObject is DataRowView rowView)
+            {
+                if (journalLineTable.Rows.Count > 1)
+                {
+                    rowView.Row.Delete();
+                    UpdateTotals();
+                }
+                else
+                {
+                    rowView["LedgerID"] = DBNull.Value;
+                    rowView["Debit"] = 0;
+                    rowView["Credit"] = 0;
+                    rowView["Narration"] = string.Empty;
+                    UpdateTotals();
+                }
+            }
+        }
+
         private void gridReceipt_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.KeyCode == Keys.Enter)
             {
-                gridReceipt.PerformAction(UltraGridAction.NextCellByTab);
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+
+                if (gridReceipt.ActiveCell == null && gridReceipt.ActiveRow != null)
+                {
+                    gridReceipt.ActiveCell = gridReceipt.ActiveRow.Cells["LedgerID"];
+                }
+
+                if (gridReceipt.ActiveCell == null) return;
+
+                string colKey = gridReceipt.ActiveCell.Column.Key;
+                int rowIndex = gridReceipt.ActiveRow.Index;
+
+                gridReceipt.PerformAction(UltraGridAction.ExitEditMode);
+
+                if (colKey == "LedgerID")
+                {
+                    long ledgerId = GetLongValue(gridReceipt.ActiveCell.Value);
+                    if (ledgerId <= 0)
+                    {
+                        if (rowIndex == gridReceipt.Rows.Count - 1 && journalLineTable.Rows.Count > 1)
+                        {
+                            decimal totalDebit = 0, totalCredit = 0;
+                            foreach (DataRow r in journalLineTable.Rows)
+                            {
+                                if (r.RowState != DataRowState.Deleted)
+                                {
+                                    totalDebit += GetDecimalValue(r["Debit"]);
+                                    totalCredit += GetDecimalValue(r["Credit"]);
+                                }
+                            }
+                            if (totalDebit > 0 && Math.Round(totalDebit, 2) == Math.Round(totalCredit, 2))
+                            {
+                                txtNarration.Focus();
+                                return;
+                            }
+                        }
+                        OpenLedgerSearchForActiveRow();
+                        return;
+                    }
+                    ActivateGridCell(rowIndex, "Debit");
+                }
+                else if (colKey == "Debit")
+                {
+                    decimal debit = GetDecimalValue(gridReceipt.ActiveCell.Value);
+                    if (debit > 0)
+                    {
+                        if (gridReceipt.ActiveRow.Cells.Exists("Credit"))
+                            gridReceipt.ActiveRow.Cells["Credit"].Value = 0;
+                    }
+                    ActivateGridCell(rowIndex, "Credit");
+                }
+                else if (colKey == "Credit")
+                {
+                    decimal credit = GetDecimalValue(gridReceipt.ActiveCell.Value);
+                    if (credit > 0)
+                    {
+                        if (gridReceipt.ActiveRow.Cells.Exists("Debit"))
+                            gridReceipt.ActiveRow.Cells["Debit"].Value = 0;
+                    }
+                    ActivateGridCell(rowIndex, "Narration");
+                }
+                else if (colKey == "Narration")
+                {
+                    long ledgerId = GetLongValue(gridReceipt.ActiveRow.Cells["LedgerID"].Value);
+                    if (rowIndex == gridReceipt.Rows.Count - 1)
+                    {
+                        if (ledgerId > 0)
+                        {
+                            DataRow newRow = journalLineTable.NewRow();
+                            journalLineTable.Rows.Add(newRow);
+                            ActivateGridCell(rowIndex + 1, "LedgerID");
+                        }
+                        else
+                        {
+                            txtNarration.Focus();
+                        }
+                    }
+                    else
+                    {
+                        ActivateGridCell(rowIndex + 1, "LedgerID");
+                    }
+                }
+            }
+            else if (e.KeyCode == Keys.Delete && (gridReceipt.ActiveCell == null || !gridReceipt.ActiveCell.IsInEditMode))
+            {
+                DeleteActiveGridRow();
+                e.Handled = true;
+            }
+            else if (e.KeyCode == Keys.F3)
+            {
+                OpenLedgerSearchForActiveRow();
                 e.Handled = true;
             }
         }
 
         private void txtVoucherNo_KeyDown(object sender, KeyEventArgs e)
         {
-            if (e.KeyCode == Keys.Enter && !string.IsNullOrWhiteSpace(txtVoucherNo.Text))
+            if (e.KeyCode == Keys.Enter)
             {
-                LoadReceipt();
                 e.Handled = true;
+                if (!string.IsNullOrWhiteSpace(txtVoucherNo.Text))
+                {
+                    LoadReceipt();
+                }
+                else
+                {
+                    dtpVoucherDate.Focus();
+                }
+            }
+        }
+
+        private void dtpVoucherDate_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                e.Handled = true;
+                ActivateGridCell(0, "LedgerID");
+            }
+        }
+
+        private void CmboBranch_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                e.Handled = true;
+                ActivateGridCell(0, "LedgerID");
+            }
+        }
+
+        private void txtNarration_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter && (e.Control || !txtNarration.Text.Contains("\n")))
+            {
+                e.Handled = true;
+                Save();
             }
         }
     }
 }
-

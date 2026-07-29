@@ -4,6 +4,7 @@ using System.Drawing;
 using System.Windows.Forms;
 using Infragistics.Win;
 using Infragistics.Win.Misc;
+using Infragistics.Win.UltraWinEditors;
 using Infragistics.Win.UltraWinGrid;
 using Repository.Accounts;
 using ModelClass;
@@ -12,6 +13,7 @@ namespace PosBranch_Win.Accounts
 {
     public partial class FrmGeneralVoucherHistory : Form
     {
+        private const string SearchPlaceholder = "Search vouchers...";
         private readonly GeneralVoucherRepository _repository = new GeneralVoucherRepository();
         private readonly string _voucherType;
         private DataTable _historyTable;
@@ -33,18 +35,39 @@ namespace PosBranch_Win.Accounts
             btnCancel.Click += (s, e) => { this.DialogResult = DialogResult.Cancel; this.Close(); };
             
             txtSearch.TextChanged += (s, e) => ApplyFilter();
+            txtSearch.GotFocus += (s, e) =>
+            {
+                if (txtSearch.Text == SearchPlaceholder)
+                {
+                    txtSearch.Text = "";
+                    txtSearch.Appearance.ForeColor = Color.FromArgb(31, 42, 55);
+                }
+            };
+            txtSearch.LostFocus += (s, e) =>
+            {
+                if (string.IsNullOrWhiteSpace(txtSearch.Text))
+                {
+                    txtSearch.Text = SearchPlaceholder;
+                    txtSearch.Appearance.ForeColor = Color.Gray;
+                }
+            };
+            txtSearch.KeyDown += TxtSearch_KeyDown;
+
             cmbSearchBy.ValueChanged += (s, e) => ApplyFilter();
             cmbSortBy.ValueChanged += (s, e) => ApplySort();
             
             gridHistory.InitializeLayout += gridHistory_InitializeLayout;
             gridHistory.DoubleClickRow += (s, e) => SelectVoucher();
             gridHistory.KeyDown += gridHistory_KeyDown;
+
+            this.KeyDown += FrmGeneralVoucherHistory_KeyDown;
         }
 
         private void FrmGeneralVoucherHistory_Load(object sender, EventArgs e)
         {
-            // Populate drop downs
+            // Populate dropdowns
             cmbSearchBy.Items.Clear();
+            cmbSearchBy.Items.Add("All", "All");
             cmbSearchBy.Items.Add("Voucher No", "Voucher No");
             cmbSearchBy.Items.Add("Narration", "Narration");
             cmbSearchBy.SelectedIndex = 0;
@@ -55,6 +78,12 @@ namespace PosBranch_Win.Accounts
             cmbSortBy.SelectedIndex = 0;
 
             LoadHistory();
+
+            this.BeginInvoke(new Action(() =>
+            {
+                txtSearch.Focus();
+                txtSearch.SelectAll();
+            }));
         }
 
         private void LoadHistory()
@@ -67,6 +96,13 @@ namespace PosBranch_Win.Accounts
                 
                 ApplySort();
                 UpdateCountLabel();
+
+                if (gridHistory.Rows.Count > 0)
+                {
+                    gridHistory.ActiveRow = gridHistory.Rows[0];
+                    gridHistory.Selected.Rows.Clear();
+                    gridHistory.Selected.Rows.Add(gridHistory.Rows[0]);
+                }
             }
             catch (Exception ex)
             {
@@ -78,7 +114,10 @@ namespace PosBranch_Win.Accounts
         {
             if (_historyTable == null) return;
 
-            string filter = txtSearch.Text.Trim().Replace("'", "''");
+            string searchText = txtSearch.Text.Trim();
+            if (searchText == SearchPlaceholder) searchText = "";
+
+            string filter = searchText.Replace("'", "''");
             if (string.IsNullOrWhiteSpace(filter))
             {
                 _historyTable.DefaultView.RowFilter = string.Empty;
@@ -86,14 +125,25 @@ namespace PosBranch_Win.Accounts
                 return;
             }
 
-            string searchCol = cmbSearchBy.Value?.ToString();
+            string searchCol = cmbSearchBy.Value?.ToString() ?? "All";
             if (searchCol == "Narration")
             {
                 _historyTable.DefaultView.RowFilter = $"Narration LIKE '%{filter}%'";
             }
-            else
+            else if (searchCol == "Voucher No")
             {
                 _historyTable.DefaultView.RowFilter = $"VoucherNumber LIKE '%{filter}%' OR CONVERT(VoucherID, 'System.String') LIKE '%{filter}%'";
+            }
+            else
+            {
+                _historyTable.DefaultView.RowFilter = $"VoucherNumber LIKE '%{filter}%' OR CONVERT(VoucherID, 'System.String') LIKE '%{filter}%' OR Narration LIKE '%{filter}%'";
+            }
+
+            if (gridHistory.Rows.Count > 0)
+            {
+                gridHistory.ActiveRow = gridHistory.Rows[0];
+                gridHistory.Selected.Rows.Clear();
+                gridHistory.Selected.Rows.Add(gridHistory.Rows[0]);
             }
 
             UpdateCountLabel();
@@ -137,6 +187,42 @@ namespace PosBranch_Win.Accounts
                 SelectVoucher();
                 e.Handled = true;
             }
+            else if (e.KeyCode == Keys.Escape)
+            {
+                this.DialogResult = DialogResult.Cancel;
+                this.Close();
+                e.Handled = true;
+            }
+        }
+
+        private void TxtSearch_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Down || e.KeyCode == Keys.Up)
+            {
+                gridHistory.Focus();
+                e.Handled = true;
+            }
+            else if (e.KeyCode == Keys.Enter)
+            {
+                SelectVoucher();
+                e.Handled = true;
+            }
+            else if (e.KeyCode == Keys.Escape)
+            {
+                this.DialogResult = DialogResult.Cancel;
+                this.Close();
+                e.Handled = true;
+            }
+        }
+
+        private void FrmGeneralVoucherHistory_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Escape)
+            {
+                this.DialogResult = DialogResult.Cancel;
+                this.Close();
+                e.Handled = true;
+            }
         }
 
         private void gridHistory_InitializeLayout(object sender, InitializeLayoutEventArgs e)
@@ -148,14 +234,41 @@ namespace PosBranch_Win.Accounts
             e.Layout.Override.SelectTypeRow = SelectType.Single;
 
             // Grid header style
+            Color headerBlue = Color.FromArgb(0, 123, 255);
+            Color lightBlue = Color.FromArgb(173, 216, 230);
+
             e.Layout.Override.HeaderStyle = HeaderStyle.WindowsXPCommand;
-            e.Layout.Override.HeaderAppearance.BackColor = Color.FromArgb(18, 65, 89);
-            e.Layout.Override.HeaderAppearance.BackColor2 = Color.FromArgb(28, 85, 110);
+            e.Layout.Override.HeaderAppearance.BackColor = headerBlue;
+            e.Layout.Override.HeaderAppearance.BackColor2 = headerBlue;
+            e.Layout.Override.HeaderAppearance.BackGradientStyle = GradientStyle.None;
             e.Layout.Override.HeaderAppearance.ForeColor = Color.White;
             e.Layout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.True;
+            e.Layout.Override.HeaderAppearance.TextHAlign = HAlign.Center;
+
+            // Borders
+            e.Layout.BorderStyle = UIElementBorderStyle.Solid;
+            e.Layout.Override.BorderStyleRow = UIElementBorderStyle.Solid;
+            e.Layout.Override.BorderStyleCell = UIElementBorderStyle.Solid;
+            e.Layout.Override.BorderStyleHeader = UIElementBorderStyle.Solid;
+            e.Layout.Override.CellAppearance.BorderColor = lightBlue;
+            e.Layout.Override.RowAppearance.BorderColor = lightBlue;
+            e.Layout.Override.HeaderAppearance.BorderColor = headerBlue;
+
+            // Row heights & fonts
+            e.Layout.Override.MinRowHeight = 30;
+            e.Layout.Override.DefaultRowHeight = 30;
+            e.Layout.Override.CellAppearance.FontData.SizeInPoints = 9.5F;
+            e.Layout.Override.CellAppearance.TextVAlign = VAlign.Middle;
 
             // Row alternate appearance
-            e.Layout.Override.RowAlternateAppearance.BackColor = Color.FromArgb(245, 247, 250);
+            e.Layout.Override.RowAppearance.BackColor = Color.White;
+            e.Layout.Override.RowAlternateAppearance.BackColor = Color.FromArgb(245, 250, 255);
+
+            // Active / selected row
+            e.Layout.Override.ActiveRowAppearance.BackColor = Color.FromArgb(0, 120, 215);
+            e.Layout.Override.ActiveRowAppearance.ForeColor = Color.White;
+            e.Layout.Override.SelectedRowAppearance.BackColor = Color.FromArgb(0, 120, 215);
+            e.Layout.Override.SelectedRowAppearance.ForeColor = Color.White;
 
             UltraGridBand band = e.Layout.Bands[0];
             if (band.Columns.Exists("VoucherID")) band.Columns["VoucherID"].Hidden = true;
@@ -170,6 +283,7 @@ namespace PosBranch_Win.Accounts
             {
                 band.Columns["VoucherDate"].Header.Caption = "Voucher Date";
                 band.Columns["VoucherDate"].Format = "dd-MMM-yyyy";
+                band.Columns["VoucherDate"].CellAppearance.TextHAlign = HAlign.Center;
                 band.Columns["VoucherDate"].Width = 120;
             }
 
@@ -193,6 +307,8 @@ namespace PosBranch_Win.Accounts
             this.BackColor = Color.FromArgb(243, 244, 246);
             this.DoubleBuffered = true;
             this.Font = new Font("Segoe UI", 9.5F);
+            this.MinimumSize = new Size(800, 560);
+            this.KeyPreview = true;
 
             // Title styling
             lblTitle.Appearance.ForeColor = Color.FromArgb(18, 65, 89);
@@ -220,12 +336,18 @@ namespace PosBranch_Win.Accounts
 
             // Flatten Inputs
             txtSearch.DisplayStyle = EmbeddableElementDisplayStyle.Office2013;
+            txtSearch.Text = SearchPlaceholder;
+            txtSearch.Appearance.ForeColor = Color.Gray;
+
             cmbSearchBy.DisplayStyle = EmbeddableElementDisplayStyle.Office2013;
             cmbSortBy.DisplayStyle = EmbeddableElementDisplayStyle.Office2013;
 
-            // Buttons
-            StyleGradientButton(btnSelect, Color.FromArgb(25, 118, 210), Color.FromArgb(33, 150, 243), Color.FromArgb(21, 101, 192), Color.FromArgb(66, 165, 245), 90);
-            StyleGradientButton(btnCancel, Color.FromArgb(84, 110, 122), Color.FromArgb(96, 125, 139), Color.FromArgb(69, 90, 100), Color.FromArgb(120, 144, 156), 90);
+            // Button Text & Styling
+            btnSelect.Text = "Select (OK)";
+            btnCancel.Text = "Close (Esc)";
+
+            StyleGradientButton(btnSelect, Color.FromArgb(0, 123, 255), Color.FromArgb(0, 105, 217), Color.FromArgb(0, 90, 190), Color.FromArgb(30, 144, 255), 120);
+            StyleGradientButton(btnCancel, Color.FromArgb(108, 117, 125), Color.FromArgb(90, 98, 104), Color.FromArgb(75, 82, 88), Color.FromArgb(130, 140, 150), 120);
 
             LayoutControls();
             this.SizeChanged += (s, e) => LayoutControls();
@@ -236,13 +358,13 @@ namespace PosBranch_Win.Accounts
             button.UseOsThemes = DefaultableBoolean.False;
             button.UseAppStyling = false;
             button.ButtonStyle = UIElementButtonStyle.Flat;
-            button.Size = new Size(width, 32);
+            button.Size = new Size(width, 34);
             button.Appearance.BackColor = backColor;
             button.Appearance.BackColor2 = backColor2;
             button.Appearance.BackGradientStyle = GradientStyle.Vertical;
             button.Appearance.ForeColor = Color.White;
             button.Appearance.FontData.Bold = DefaultableBoolean.True;
-            button.Appearance.FontData.SizeInPoints = 9F;
+            button.Appearance.FontData.SizeInPoints = 9.5F;
             button.Appearance.BorderColor = borderColor;
             button.HotTrackAppearance.BackColor = hoverColor;
             button.HotTrackAppearance.ForeColor = Color.White;
@@ -256,23 +378,23 @@ namespace PosBranch_Win.Accounts
             int filterTop = 50;
             lblSearchBy.Location = new Point(20, filterTop);
             cmbSearchBy.Location = new Point(20, filterTop + 22);
-            cmbSearchBy.Size = new Size(130, 26);
+            cmbSearchBy.Size = new Size(130, 28);
 
             lblSearch.Location = new Point(cmbSearchBy.Right + 15, filterTop);
             txtSearch.Location = new Point(cmbSearchBy.Right + 15, filterTop + 22);
-            txtSearch.Size = new Size(260, 26);
+            txtSearch.Size = new Size(280, 28);
 
             lblSortBy.Location = new Point(txtSearch.Right + 15, filterTop);
             cmbSortBy.Location = new Point(txtSearch.Right + 15, filterTop + 22);
-            cmbSortBy.Size = new Size(130, 26);
+            cmbSortBy.Size = new Size(140, 28);
 
             gridHistory.Location = new Point(20, cmbSearchBy.Bottom + 15);
             gridHistory.Size = new Size(this.ClientSize.Width - 40, this.ClientSize.Height - gridHistory.Top - 70);
 
-            lblCount.Location = new Point(20, gridHistory.Bottom + 15);
+            lblCount.Location = new Point(20, gridHistory.Bottom + 18);
 
             btnCancel.Location = new Point(this.ClientSize.Width - 20 - btnCancel.Width, gridHistory.Bottom + 12);
-            btnSelect.Location = new Point(btnCancel.Left - 10 - btnSelect.Width, gridHistory.Bottom + 12);
+            btnSelect.Location = new Point(btnCancel.Left - 12 - btnSelect.Width, gridHistory.Bottom + 12);
         }
     }
 }

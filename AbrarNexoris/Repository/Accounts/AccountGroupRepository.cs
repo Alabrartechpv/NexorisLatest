@@ -273,21 +273,13 @@ namespace Repository.Accounts
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@_Operation", "GETALL");
-                    if (branchId > 0)
-                    {
-                        cmd.Parameters.AddWithValue("@_BranchID", branchId);
-                    }
+                    // Always pass branch ID — SP filters when value > 0, returns all when NULL/0
+                    cmd.Parameters.AddWithValue("@_BranchID", branchId > 0 ? (object)branchId : DBNull.Value);
 
                     using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
                     {
                         adapt.Fill(dtResult);
                     }
-                }
-
-                if (branchId > 0 && dtResult.Columns.Contains("BranchID"))
-                {
-                    DataRow[] branchRows = dtResult.Select($"BranchID = {branchId}");
-                    dtResult = branchRows.Length > 0 ? branchRows.CopyToDataTable() : dtResult.Clone();
                 }
             }
             catch (Exception Ex)
