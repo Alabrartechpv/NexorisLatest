@@ -89,7 +89,7 @@ namespace PosBranch_Win.Master
 
                 try
                 {
-                    var txtBarcodeCtrl = this.Controls.Find("txt_barcode", true).FirstOrDefault() as TextBox;
+                    var txtBarcodeCtrl = GetMainBarcodeEditor();
                     barcode = txtBarcodeCtrl != null ? (txtBarcodeCtrl.Text ?? string.Empty).Trim() : (ItemMaster != null ? ItemMaster.Barcode : string.Empty);
                 }
                 catch
@@ -217,7 +217,7 @@ namespace PosBranch_Win.Master
             string barcode = string.Empty;
             try
             {
-                var txtBarcodeCtrl = this.Controls.Find("txt_barcode", true).FirstOrDefault() as TextBox;
+                var txtBarcodeCtrl = GetMainBarcodeEditor();
                 barcode = txtBarcodeCtrl != null ? (txtBarcodeCtrl.Text ?? string.Empty).Trim() : string.Empty;
             }
             catch { }
@@ -419,7 +419,7 @@ namespace PosBranch_Win.Master
             string barcodeHeader = string.Empty;
             try
             {
-                var txtBarcodeCtrl = this.Controls.Find("txt_barcode", true).FirstOrDefault() as TextBox;
+                var txtBarcodeCtrl = GetMainBarcodeEditor();
                 barcodeHeader = txtBarcodeCtrl != null ? (txtBarcodeCtrl.Text ?? string.Empty).Trim() : string.Empty;
             }
             catch { }
@@ -1863,7 +1863,7 @@ namespace PosBranch_Win.Master
             catch { }
 
             // Connect txt_barcode TextChanged event for auto-generating item number
-            var txtBarcodeForNewItem = this.Controls.Find("txt_barcode", true).FirstOrDefault() as TextBox;
+            var txtBarcodeForNewItem = GetMainBarcodeEditor();
             if (txtBarcodeForNewItem != null)
             {
                 txtBarcodeForNewItem.TextChanged += txt_barcode_TextChanged;
@@ -1950,7 +1950,7 @@ namespace PosBranch_Win.Master
             // Sync txt_barcode changes to ultraGrid1 barcode cell for new items
             try
             {
-                var txtBarcodeCtrl = this.Controls.Find("txt_barcode", true).FirstOrDefault() as TextBox;
+                var txtBarcodeCtrl = GetMainBarcodeEditor();
                 if (txtBarcodeCtrl != null)
                 {
                     txtBarcodeCtrl.TextChanged += txt_barcode_TextChanged;
@@ -3759,14 +3759,16 @@ namespace PosBranch_Win.Master
             ClearAllFields();
         }
 
-        private TextBox GetMainBarcodeTextBox()
+        private Infragistics.Win.UltraWinEditors.UltraTextEditor GetMainBarcodeEditor()
         {
-            return this.Controls.Find("txt_barcode", true).FirstOrDefault() as TextBox;
+            return txt_barcode ?? this.Controls.Find("txt_barcode", true)
+                .OfType<Infragistics.Win.UltraWinEditors.UltraTextEditor>()
+                .FirstOrDefault();
         }
 
         private void SetMainBarcodeEditability(bool allowEdit, string barcode = null)
         {
-            var txtBarcodeCtrl = GetMainBarcodeTextBox();
+            var txtBarcodeCtrl = GetMainBarcodeEditor();
             if (txtBarcodeCtrl != null)
             {
                 if (barcode != null)
@@ -3776,6 +3778,7 @@ namespace PosBranch_Win.Master
 
                 txtBarcodeCtrl.ReadOnly = !allowEdit;
                 txtBarcodeCtrl.BackColor = Color.FromArgb(255, 224, 192);
+                txtBarcodeCtrl.Appearance.BackColor = Color.FromArgb(255, 224, 192);
             }
 
             loadedItemMainBarcode = allowEdit ? string.Empty : ((barcode ?? txtBarcodeCtrl?.Text) ?? string.Empty).Trim();
@@ -3811,7 +3814,7 @@ namespace PosBranch_Win.Master
 
             MessageBox.Show("Main barcode cannot be changed for an existing item.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             SetLoadedItemBarcode(originalBarcode);
-            GetMainBarcodeTextBox()?.Focus();
+            GetMainBarcodeEditor()?.Focus();
             return false;
         }
 
@@ -3882,7 +3885,7 @@ namespace PosBranch_Win.Master
                             string currentBarcode = string.Empty;
                             try
                             {
-                                var txtBarcodeCtrl = this.Controls.Find("txt_barcode", true).FirstOrDefault() as TextBox;
+                                var txtBarcodeCtrl = GetMainBarcodeEditor();
                                 if (txtBarcodeCtrl != null) currentBarcode = txtBarcodeCtrl.Text ?? string.Empty;
                             }
                             catch { }
@@ -4847,7 +4850,7 @@ namespace PosBranch_Win.Master
                 string stockQty = "0";
 
                 // Get barcode from txt_barcode field
-                var txtBarcodeCtrl = this.Controls.Find("txt_barcode", true).FirstOrDefault() as TextBox;
+                var txtBarcodeCtrl = GetMainBarcodeEditor();
                 if (txtBarcodeCtrl != null)
                 {
                     barcode = txtBarcodeCtrl.Text?.Trim() ?? "";
@@ -5007,7 +5010,7 @@ namespace PosBranch_Win.Master
                 if (isItemLoaded)
                 {
                     // Get barcode from txt_barcode field
-                    var txtBarcodeCtrl = this.Controls.Find("txt_barcode", true).FirstOrDefault() as TextBox;
+                    var txtBarcodeCtrl = GetMainBarcodeEditor();
                     if (txtBarcodeCtrl != null)
                     {
                         barcode = txtBarcodeCtrl.Text?.Trim() ?? "";
@@ -5299,7 +5302,7 @@ namespace PosBranch_Win.Master
                     // so we try to get it from the first price setting row if available.
                     try
                     {
-                        var txtBarcodeCtrl = this.Controls.Find("txt_barcode", true).FirstOrDefault() as TextBox;
+                        var txtBarcodeCtrl = GetMainBarcodeEditor();
                         if (txtBarcodeCtrl != null)
                         {
                             string barcode = getItem.Barcode;
@@ -7215,9 +7218,18 @@ namespace PosBranch_Win.Master
                 if (!string.IsNullOrWhiteSpace(txt_ItemNo.Text))
                     return;
 
-                // Get barcode text
-                var txtBarcodeField = sender as TextBox;
-                if (txtBarcodeField == null || string.IsNullOrWhiteSpace(txtBarcodeField.Text))
+                string barcodeText = string.Empty;
+                Control txtBarcodeField = sender as Control;
+                if (txtBarcodeField != null)
+                {
+                    barcodeText = txtBarcodeField.Text;
+                }
+                else if (txt_barcode != null)
+                {
+                    barcodeText = txt_barcode.Text;
+                }
+
+                if (string.IsNullOrWhiteSpace(barcodeText))
                     return;
 
                 // Generate new item number (same logic as btnIemLoad_ById_Click but without message box)
@@ -7676,7 +7688,7 @@ namespace PosBranch_Win.Master
                 string barcode = string.Empty;
                 try
                 {
-                    var txtBarcodeCtrl = this.Controls.Find("txt_barcode", true).FirstOrDefault() as TextBox;
+                    var txtBarcodeCtrl = GetMainBarcodeEditor();
                     barcode = txtBarcodeCtrl != null ? (txtBarcodeCtrl.Text ?? string.Empty).Trim() : string.Empty;
                 }
                 catch { barcode = string.Empty; }
@@ -7684,7 +7696,7 @@ namespace PosBranch_Win.Master
                 if (string.IsNullOrWhiteSpace(barcode))
                 {
                     MessageBox.Show("Please enter Barcode.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    var txtBarcodeCtrl = this.Controls.Find("txt_barcode", true).FirstOrDefault() as TextBox;
+                    var txtBarcodeCtrl = GetMainBarcodeEditor();
                     txtBarcodeCtrl?.Focus();
                     return false;
                 }
@@ -7753,7 +7765,7 @@ namespace PosBranch_Win.Master
                     if (string.IsNullOrWhiteSpace(barcode))
                     {
                         MessageBox.Show("Barcode is required for WEIGHT ITEM.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        var txtBarcodeCtrl = this.Controls.Find("txt_barcode", true).FirstOrDefault() as TextBox;
+                        var txtBarcodeCtrl = GetMainBarcodeEditor();
                         txtBarcodeCtrl?.Focus();
                         return false;
                     }
@@ -7762,7 +7774,7 @@ namespace PosBranch_Win.Master
                     if (barcodeLength < 7 || barcodeLength > 9)
                     {
                         MessageBox.Show("Barcode must be 7-9 characters for WEIGHT ITEM.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        var txtBarcodeCtrl = this.Controls.Find("txt_barcode", true).FirstOrDefault() as TextBox;
+                        var txtBarcodeCtrl = GetMainBarcodeEditor();
                         txtBarcodeCtrl?.Focus();
                         return false;
                     }
@@ -7994,7 +8006,7 @@ namespace PosBranch_Win.Master
                 string stockQty = "0";
 
                 // Get barcode from txt_barcode field
-                var txtBarcodeCtrl = this.Controls.Find("txt_barcode", true).FirstOrDefault() as TextBox;
+                var txtBarcodeCtrl = GetMainBarcodeEditor();
                 if (txtBarcodeCtrl != null)
                 {
                     barcode = txtBarcodeCtrl.Text?.Trim() ?? "";
@@ -8174,7 +8186,7 @@ namespace PosBranch_Win.Master
                 string barcode = string.Empty;
                 try
                 {
-                    var txtBarcodeCtrl = this.Controls.Find("txt_barcode", true).FirstOrDefault() as TextBox;
+                    var txtBarcodeCtrl = GetMainBarcodeEditor();
                     barcode = txtBarcodeCtrl != null ? (txtBarcodeCtrl.Text ?? string.Empty).Trim() : string.Empty;
                 }
                 catch { barcode = string.Empty; }
@@ -8182,7 +8194,7 @@ namespace PosBranch_Win.Master
                 if (string.IsNullOrWhiteSpace(barcode))
                 {
                     MessageBox.Show("Please enter Barcode.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    var txtBarcodeCtrl = this.Controls.Find("txt_barcode", true).FirstOrDefault() as TextBox;
+                    var txtBarcodeCtrl = GetMainBarcodeEditor();
                     txtBarcodeCtrl?.Focus();
                     return;
                 }
@@ -8259,7 +8271,7 @@ namespace PosBranch_Win.Master
                     if (string.IsNullOrWhiteSpace(barcode))
                     {
                         MessageBox.Show("Barcode is required for WEIGHT ITEM.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        var txtBarcodeCtrl = this.Controls.Find("txt_barcode", true).FirstOrDefault() as TextBox;
+                        var txtBarcodeCtrl = GetMainBarcodeEditor();
                         txtBarcodeCtrl?.Focus();
                         return;
                     }
@@ -8268,7 +8280,7 @@ namespace PosBranch_Win.Master
                     if (barcodeLength < 7 || barcodeLength > 9)
                     {
                         MessageBox.Show("Barcode must be 7-9 characters for WEIGHT ITEM.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        var txtBarcodeCtrl = this.Controls.Find("txt_barcode", true).FirstOrDefault() as TextBox;
+                        var txtBarcodeCtrl = GetMainBarcodeEditor();
                         txtBarcodeCtrl?.Focus();
                         return;
                     }
@@ -8516,7 +8528,7 @@ namespace PosBranch_Win.Master
                     this.clear();
                     TryRefreshItemDialog();
 
-                    var txtBarcodeCtrl = this.Controls.Find("txt_barcode", true).FirstOrDefault() as TextBox;
+                    var txtBarcodeCtrl = GetMainBarcodeEditor();
                     txtBarcodeCtrl?.Focus();
                 }
                 else
@@ -8574,7 +8586,7 @@ namespace PosBranch_Win.Master
             string barcode = string.Empty;
             try
             {
-                var txtBarcodeCtrl = this.Controls.Find("txt_barcode", true).FirstOrDefault() as TextBox;
+                var txtBarcodeCtrl = GetMainBarcodeEditor();
                 barcode = txtBarcodeCtrl != null ? (txtBarcodeCtrl.Text ?? string.Empty).Trim() : string.Empty;
             }
             catch { barcode = string.Empty; }
@@ -8582,7 +8594,7 @@ namespace PosBranch_Win.Master
             if (string.IsNullOrWhiteSpace(barcode))
             {
                 MessageBox.Show("Please enter Barcode.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                var txtBarcodeCtrl = this.Controls.Find("txt_barcode", true).FirstOrDefault() as TextBox;
+                var txtBarcodeCtrl = GetMainBarcodeEditor();
                 txtBarcodeCtrl?.Focus();
                 return;
             }
@@ -8644,7 +8656,7 @@ namespace PosBranch_Win.Master
                 if (string.IsNullOrWhiteSpace(barcode))
                 {
                     MessageBox.Show("Barcode is required for WEIGHT ITEM.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    var txtBarcodeCtrl = this.Controls.Find("txt_barcode", true).FirstOrDefault() as TextBox;
+                    var txtBarcodeCtrl = GetMainBarcodeEditor();
                     txtBarcodeCtrl?.Focus();
                     return;
                 }
@@ -8653,7 +8665,7 @@ namespace PosBranch_Win.Master
                 if (barcodeLength < 7 || barcodeLength > 9)
                 {
                     MessageBox.Show("Barcode must be 7-9 characters for WEIGHT ITEM.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    var txtBarcodeCtrl = this.Controls.Find("txt_barcode", true).FirstOrDefault() as TextBox;
+                    var txtBarcodeCtrl = GetMainBarcodeEditor();
                     txtBarcodeCtrl?.Focus();
                     return;
                 }
@@ -8898,7 +8910,7 @@ namespace PosBranch_Win.Master
                 this.clear();
                 TryRefreshItemDialog();
 
-                var txtBarcodeCtrl = this.Controls.Find("txt_barcode", true).FirstOrDefault() as TextBox;
+                var txtBarcodeCtrl = GetMainBarcodeEditor();
                 txtBarcodeCtrl?.Focus();
             }
             else
@@ -9146,7 +9158,7 @@ namespace PosBranch_Win.Master
         private void button7_Click(object sender, EventArgs e)
         {
             this.clear();
-            var txtBarcodeCtrl = this.Controls.Find("txt_barcode", true).FirstOrDefault() as TextBox;
+            var txtBarcodeCtrl = GetMainBarcodeEditor();
             txtBarcodeCtrl?.Focus();
         }
 
@@ -9697,7 +9709,7 @@ namespace PosBranch_Win.Master
             {
                 // Clear everything when F1 is pressed
                 this.clear();
-                var txtBarcodeCtrl = this.Controls.Find("txt_barcode", true).FirstOrDefault() as TextBox;
+                var txtBarcodeCtrl = GetMainBarcodeEditor();
                 txtBarcodeCtrl?.Focus();
             }
             else if (e.KeyCode == Keys.F7)
@@ -10040,7 +10052,7 @@ namespace PosBranch_Win.Master
                             string currentBarcode = string.Empty;
                             try
                             {
-                                var txtBarcodeCtrl = this.Controls.Find("txt_barcode", true).FirstOrDefault() as TextBox;
+                                var txtBarcodeCtrl = GetMainBarcodeEditor();
                                 if (txtBarcodeCtrl != null) currentBarcode = txtBarcodeCtrl.Text ?? string.Empty;
                             }
                             catch { }
@@ -10116,7 +10128,7 @@ namespace PosBranch_Win.Master
                                     string currentBarcode = string.Empty;
                                     try
                                     {
-                                        var txtBarcodeCtrl = this.Controls.Find("txt_barcode", true).FirstOrDefault() as TextBox;
+                                        var txtBarcodeCtrl = GetMainBarcodeEditor();
                                         if (txtBarcodeCtrl != null) currentBarcode = txtBarcodeCtrl.Text ?? string.Empty;
                                     }
                                     catch { }
@@ -10391,7 +10403,7 @@ namespace PosBranch_Win.Master
             /* try
             {
                 // Get the barcode from the text field
-                var txtBarcodeCtrl = this.Controls.Find("txt_barcode", true).FirstOrDefault() as TextBox;
+                var txtBarcodeCtrl = GetMainBarcodeEditor();
                 string barcodeFromField = txtBarcodeCtrl != null ? (txtBarcodeCtrl.Text ?? string.Empty) : string.Empty;
 
                 // If the text field has a barcode, ensure base unit row has same barcode
@@ -13186,7 +13198,7 @@ namespace PosBranch_Win.Master
                     if (ItemRepository.CheckBarcodeExists(normalizedMainBarcode, excludeItemId))
                     {
                         MessageBox.Show($"Main barcode '{normalizedMainBarcode}' already exists.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        var txtBarcodeCtrl = this.Controls.Find("txt_barcode", true).FirstOrDefault() as TextBox;
+                        var txtBarcodeCtrl = GetMainBarcodeEditor();
                         txtBarcodeCtrl?.Focus();
                         return false;
                     }
@@ -13195,7 +13207,7 @@ namespace PosBranch_Win.Master
                     if (mainBarcodeAlternativeOwner > 0 && mainBarcodeAlternativeOwner != excludeItemId)
                     {
                         MessageBox.Show($"Main barcode '{normalizedMainBarcode}' already exists as an alternative barcode.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                        var txtBarcodeCtrl = this.Controls.Find("txt_barcode", true).FirstOrDefault() as TextBox;
+                        var txtBarcodeCtrl = GetMainBarcodeEditor();
                         txtBarcodeCtrl?.Focus();
                         return false;
                     }
@@ -14965,3 +14977,4 @@ namespace PosBranch_Win.Master
 
     }
 }
+
