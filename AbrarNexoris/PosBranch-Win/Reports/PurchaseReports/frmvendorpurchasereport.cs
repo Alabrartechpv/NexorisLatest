@@ -63,6 +63,8 @@ namespace PosBranch_Win.Reports.PurchaseReports
         private UltraGridColumn columnBeingDragged;
         private Point headerDragStartPoint;
         private readonly System.Windows.Forms.ToolTip headerToolTip = new System.Windows.Forms.ToolTip();
+        private readonly HashSet<string> userHiddenColumnKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Cursor blackXCursor = CreateBlackXCursor();
 
         public frmvendorpurchasereport()
         {
@@ -81,6 +83,26 @@ namespace PosBranch_Win.Reports.PurchaseReports
             cmbQuickDate.Value = "Today";
             ApplyQuickDate();
             LoadReport();
+        }
+
+        /// <summary>
+        /// Pre-selects a vendor by ID/name and loads the Vendor-mode report with ALL dates.
+        /// Call this after the form is shown/loaded.
+        /// </summary>
+        public void OpenWithVendor(int vendorId, string vendorName)
+        {
+            if (vendorId <= 0) return;
+            selectedVendorId = vendorId;
+            selectedVendorName = string.IsNullOrWhiteSpace(vendorName) ? "Vendor " + vendorId : vendorName;
+            txtVendor.Text = selectedVendorName;
+
+            // Always show ALL dates when opening from Item Master so full purchase history is visible
+            suppressQuickDateChange = true;
+            cmbQuickDate.Value = "All";
+            suppressQuickDateChange = false;
+            ApplyQuickDate();
+
+            SetActiveMode(ReportMode.Vendor, true);
         }
 
         private void ApplyRuntimeStyles()
@@ -490,6 +512,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
                 gridReport.DataSource = currentData;
                 ConfigureGridColumns();
+                ApplyUserHiddenColumns();
                 CreateFooterCells();
                 UpdateFooterCellPositions();
                 UpdateFooterValues();
@@ -563,25 +586,52 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
         private void PopulateVendorBillOutstanding()
         {
-            if (currentData == null) return;
+            if (currentData == null || currentData.Rows.Count == 0) return;
 
             var grnOutstandingMap = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
             try
             {
                 using (var paymentRepo = new Repository.Accounts.VendorPaymentRepository())
                 {
-                    DataTable invoices = paymentRepo.GetAllInvoices(selectedVendorId);
-                    if (invoices != null)
+                    List<int> vendorIdsToFetch = new List<int>();
+                    if (selectedVendorId > 0)
                     {
-                        foreach (DataRow invRow in invoices.Rows)
+                        vendorIdsToFetch.Add(selectedVendorId);
+                    }
+                    else
+                    {
+                        foreach (DataRow row in currentData.Rows)
                         {
-                            string billNo = Convert.ToString(invRow["BillNo"]).Trim();
-                            decimal balance = invRow.Table.Columns.Contains("Balance") && invRow["Balance"] != DBNull.Value
-                                ? Convert.ToDecimal(invRow["Balance"])
-                                : 0m;
-                            if (!string.IsNullOrEmpty(billNo))
+                            int vId = 0;
+                            if (currentData.Columns.Contains("VendorLedgerId") && row["VendorLedgerId"] != DBNull.Value)
+                                int.TryParse(row["VendorLedgerId"].ToString(), out vId);
+                            else if (currentData.Columns.Contains("LedgerID") && row["LedgerID"] != DBNull.Value)
+                                int.TryParse(row["LedgerID"].ToString(), out vId);
+                            else if (currentData.Columns.Contains("LedgerId") && row["LedgerId"] != DBNull.Value)
+                                int.TryParse(row["LedgerId"].ToString(), out vId);
+                            else if (currentData.Columns.Contains("VendorId") && row["VendorId"] != DBNull.Value)
+                                int.TryParse(row["VendorId"].ToString(), out vId);
+
+                            if (vId > 0 && !vendorIdsToFetch.Contains(vId))
+                                vendorIdsToFetch.Add(vId);
+                        }
+                    }
+
+                    foreach (int vId in vendorIdsToFetch)
+                    {
+                        DataTable invoices = paymentRepo.GetAllInvoices(vId);
+                        if (invoices != null)
+                        {
+                            foreach (DataRow invRow in invoices.Rows)
                             {
-                                grnOutstandingMap[billNo] = balance;
+                                string billNo = Convert.ToString(invRow["BillNo"]).Trim();
+                                decimal balance = invRow.Table.Columns.Contains("Balance") && invRow["Balance"] != DBNull.Value
+                                    ? Convert.ToDecimal(invRow["Balance"])
+                                    : 0m;
+                                if (!string.IsNullOrEmpty(billNo))
+                                {
+                                    grnOutstandingMap[billNo] = balance;
+                                }
                             }
                         }
                     }
@@ -1614,11 +1664,62 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
         #region Column Chooser & Drag-Down to Hide
 
+        private static Cursor CreateBlackXCursor()
+        {
+            try
+            {
+                using (Bitmap bmp = new Bitmap(32, 32))
+                using (Graphics g = Graphics.FromImage(bmp))
+                {
+                    g.SmoothingMode = SmoothingMode.AntiAlias;
+                    g.Clear(Color.Transparent);
+
+                    using (SolidBrush bgBrush = new SolidBrush(Color.Black))
+                    {
+                        g.FillEllipse(bgBrush, 4, 4, 24, 24);
+                    }
+
+                    using (Pen whitePen = new Pen(Color.White, 3.5f))
+                    {
+                        whitePen.StartCap = System.Drawing.Drawing2D.LineCap.Round;
+                        whitePen.EndCap = System.Drawing.Drawing2D.LineCap.Round;
+                        g.DrawLine(whitePen, 11, 11, 21, 21);
+                        g.DrawLine(whitePen, 21, 11, 11, 21);
+                    }
+
+                    IntPtr hIcon = bmp.GetHicon();
+                    return new Cursor(hIcon);
+                }
+            }
+            catch
+            {
+                return Cursors.No;
+            }
+        }
+
+        private void ApplyUserHiddenColumns()
+        {
+            if (gridReport.DisplayLayout == null || gridReport.DisplayLayout.Bands.Count == 0)
+                return;
+
+            UltraGridBand band = gridReport.DisplayLayout.Bands[0];
+            foreach (UltraGridColumn col in band.Columns)
+            {
+                if (userHiddenColumnKeys.Contains(col.Key))
+                {
+                    col.Hidden = true;
+                }
+            }
+        }
+
         private void SetupHeaderDragToHideAndColumnChooser()
         {
+            gridReport.AllowDrop = true;
             gridReport.MouseDown += GridReport_MouseDown;
             gridReport.MouseMove += GridReport_MouseMove;
             gridReport.MouseUp += GridReport_MouseUp;
+            gridReport.DragOver += GridReport_DragOver;
+            gridReport.DragDrop += GridReport_DragDrop;
 
             ContextMenuStrip headerMenu = new ContextMenuStrip { Font = new Font("Segoe UI", 9F) };
             ToolStripMenuItem chooserItem = new ToolStripMenuItem("📋 Field / Column Chooser...", null, (s, e) => ShowColumnChooserForm());
@@ -1665,11 +1766,11 @@ namespace PosBranch_Win.Reports.PurchaseReports
             int deltaX = Math.Abs(e.X - headerDragStartPoint.X);
             int deltaY = e.Y - headerDragStartPoint.Y;
 
-            if (deltaY > 30 && deltaY > deltaX)
+            if (deltaY > 25 && deltaY > deltaX)
             {
-                gridReport.Cursor = Cursors.No;
+                gridReport.Cursor = blackXCursor;
                 string colName = !string.IsNullOrEmpty(columnBeingDragged.Header.Caption) ? columnBeingDragged.Header.Caption : columnBeingDragged.Key;
-                headerToolTip.SetToolTip(gridReport, $"Drag down to hide '{colName}' column");
+                headerToolTip.SetToolTip(gridReport, $"✖ Drag down to hide '{colName}' column");
 
                 if (deltaY > 50)
                 {
@@ -1697,9 +1798,57 @@ namespace PosBranch_Win.Reports.PurchaseReports
             }
         }
 
+        private void GridReport_DragOver(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(typeof(ColumnChooserItem)))
+            {
+                e.Effect = DragDropEffects.Move;
+            }
+        }
+
+        private void GridReport_DragDrop(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetData(typeof(ColumnChooserItem)) is ColumnChooserItem item)
+            {
+                Point clientPt = gridReport.PointToClient(new Point(e.X, e.Y));
+                int dropPosition = GetTargetColumnPositionFromPoint(clientPt);
+                UnhideColumn(item.ColumnKey, dropPosition);
+            }
+        }
+
+        private int GetTargetColumnPositionFromPoint(Point pt)
+        {
+            if (gridReport.DisplayLayout == null || gridReport.DisplayLayout.Bands.Count == 0)
+                return 0;
+
+            UIElement element = gridReport.DisplayLayout.UIElement?.ElementFromPoint(pt);
+            HeaderUIElement headerUI = element as HeaderUIElement ?? element?.GetAncestor(typeof(HeaderUIElement)) as HeaderUIElement;
+
+            if (headerUI != null && headerUI.Header?.Column != null)
+            {
+                return headerUI.Header.Column.Header.VisiblePosition;
+            }
+
+            UltraGridBand band = gridReport.DisplayLayout.Bands[0];
+            foreach (UltraGridColumn col in band.Columns.Cast<UltraGridColumn>().OrderBy(c => c.Header.VisiblePosition))
+            {
+                if (!col.Hidden)
+                {
+                    UIElement hUI = col.Header.GetUIElement();
+                    if (hUI != null && pt.X >= hUI.Rect.Left && pt.X <= hUI.Rect.Right)
+                    {
+                        return col.Header.VisiblePosition;
+                    }
+                }
+            }
+
+            return band.Columns.Count;
+        }
+
         private void HideColumn(UltraGridColumn col)
         {
             if (col == null) return;
+            userHiddenColumnKeys.Add(col.Key);
             col.Hidden = true;
             UpdateFooterCellPositions();
             UpdateFooterValues();
@@ -1777,8 +1926,24 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
             columnChooserListBox.DrawItem += ColumnChooserListBox_DrawItem;
             columnChooserListBox.DoubleClick += ColumnChooserListBox_DoubleClick;
+            columnChooserListBox.MouseDown += ColumnChooserListBox_MouseDown;
 
             columnChooserForm.Controls.Add(columnChooserListBox);
+        }
+
+        private void ColumnChooserListBox_MouseDown(object sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Left && columnChooserListBox != null)
+            {
+                int index = columnChooserListBox.IndexFromPoint(e.Location);
+                if (index >= 0 && index < columnChooserListBox.Items.Count)
+                {
+                    if (columnChooserListBox.Items[index] is ColumnChooserItem item)
+                    {
+                        columnChooserListBox.DoDragDrop(item, DragDropEffects.Move);
+                    }
+                }
+            }
         }
 
         private void PopulateColumnChooserListBox()
@@ -1807,11 +1972,17 @@ namespace PosBranch_Win.Reports.PurchaseReports
             }
         }
 
-        private void UnhideColumn(string columnKey)
+        private void UnhideColumn(string columnKey, int? targetVisiblePosition = null)
         {
+            userHiddenColumnKeys.Remove(columnKey);
             if (gridReport.DisplayLayout.Bands.Count > 0 && gridReport.DisplayLayout.Bands[0].Columns.Exists(columnKey))
             {
-                gridReport.DisplayLayout.Bands[0].Columns[columnKey].Hidden = false;
+                UltraGridColumn col = gridReport.DisplayLayout.Bands[0].Columns[columnKey];
+                col.Hidden = false;
+                if (targetVisiblePosition.HasValue)
+                {
+                    col.Header.VisiblePosition = targetVisiblePosition.Value;
+                }
                 UpdateFooterCellPositions();
                 UpdateFooterValues();
                 PopulateColumnChooserListBox();
@@ -1820,6 +1991,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
         private void UnhideAllColumns()
         {
+            userHiddenColumnKeys.Clear();
             if (gridReport.DisplayLayout.Bands.Count == 0) return;
             UltraGridBand band = gridReport.DisplayLayout.Bands[0];
             foreach (UltraGridColumn col in band.Columns)

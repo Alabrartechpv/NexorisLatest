@@ -6731,6 +6731,14 @@ namespace PosBranch_Win.Transaction
             }
         }
 
+        public void LoadPurchaseDataReadOnly(int purchaseId)
+        {
+            LoadPurchaseData(purchaseId);
+            SetFormReadOnly(true);
+            pbxSave.Visible = false;
+            ultraPictureBox4.Visible = false;
+        }
+
         // Add UpdatePurchase method to handle update operation
         public void UpdatePurchase()
         {

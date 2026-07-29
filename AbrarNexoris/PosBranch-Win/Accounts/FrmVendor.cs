@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -66,6 +66,16 @@ namespace PosBranch_Win.Accounts
         {
             InitializeComponent();
             InitializeForm();
+        }
+
+        /// <summary>
+        /// Loads a vendor record by its LedgerId so the form opens pre-populated.
+        /// Call this after the form is shown/loaded.
+        /// </summary>
+        public void LoadVendorById(int vendorId)
+        {
+            if (vendorId > 0)
+                LoadVendorData(vendorId);
         }
 
         private void InitializeForm()
