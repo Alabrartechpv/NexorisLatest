@@ -72,10 +72,14 @@ namespace PosBranch_Win.Transaction
         public frmSalesReturn()
         {
             InitializeComponent();
+            this.KeyPreview = true;
+            this.Shown += new EventHandler(frmSalesReturn_Shown);
+            this.Enter += new EventHandler(frmSalesReturn_Enter);
 
-            // Hide payment method combo and label as requested
+            // Hide payment method combo, label, and overlapping C ID label
             if (cmbPaymntMethod != null) cmbPaymntMethod.Visible = false;
             if (labelPaymentMethod != null) labelPaymentMethod.Visible = false;
+            if (label1 != null) label1.Visible = false;
 
             InitializeUltraGrid();
 
@@ -118,7 +122,11 @@ namespace PosBranch_Win.Transaction
             {
                 // Get references to existing controls
                 customerTextBox = (Infragistics.Win.UltraWinEditors.UltraTextEditor)Controls.Find("textBox2", true)[0];
-                customerButton = (System.Windows.Forms.Button)Controls.Find("button2", true)[0];
+                var foundBtn = Controls.Find("button3", true);
+                if (foundBtn.Length > 0)
+                    customerButton = (System.Windows.Forms.Button)foundBtn[0];
+                else if (Controls.Find("button2", true).Length > 0)
+                    customerButton = (System.Windows.Forms.Button)Controls.Find("button2", true)[0];
 
                 // Set initial state
                 customerTextBox.ReadOnly = true;
@@ -281,8 +289,8 @@ namespace PosBranch_Win.Transaction
                             column.CellAppearance.BackColor = lightGreen; // Light green for user-entered values
                             break;
                         case "ReturnedQty":
-                            column.Header.Caption = "Returned Qty";
-                            column.Width = 100;
+                            column.Header.Caption = "Prev Returned";
+                            column.Width = 110;
                             column.CellAppearance.TextHAlign = HAlign.Right;
                             column.Format = "N2";
                             column.CellActivation = Activation.NoEdit; // Read-only - previously returned quantity
@@ -422,8 +430,8 @@ namespace PosBranch_Win.Transaction
                 // Set tab order
                 SetTabOrder();
 
-                // Set initial focus to button2
-                this.ActiveControl = button2;
+                // Set initial focus to button3
+                this.ActiveControl = button3;
 
                 // Set default payment method to Cash
                 SetupDefaultPaymentMode();
@@ -452,8 +460,7 @@ namespace PosBranch_Win.Transaction
         private void SetTabOrder()
         {
             // Set tab indexes for controls in the specified order
-            button2.TabIndex = 1;
-            cmbPaymntMethod.TabIndex = 2;
+            button3.TabIndex = 1;
             dtSReturnDate.TabIndex = 3;
             TxtBarcode.TabIndex = 4;
             btn_Add_Custm.TabIndex = 5;
@@ -468,12 +475,7 @@ namespace PosBranch_Win.Transaction
 
             if (forward)
             {
-                if (currentControl == button2)
-                {
-                    cmbPaymntMethod.Focus();
-                    return true;
-                }
-                else if (currentControl == cmbPaymntMethod)
+                if (currentControl == button3)
                 {
                     dtSReturnDate.Focus();
                     return true;
@@ -495,8 +497,8 @@ namespace PosBranch_Win.Transaction
                 }
                 else if (currentControl == button1)
                 {
-                    // Loop back to button2 instead of going to dtInvoiceDate
-                    button2.Focus();
+                    // Loop back to button3 instead of going to dtInvoiceDate
+                    button3.Focus();
                     return true;
                 }
             }
@@ -807,7 +809,7 @@ namespace PosBranch_Win.Transaction
                     SReturn.Paymode = "Credit";
                     // Find the Credit paymode ID from the dropdown
                     int creditPaymodeId = 1;
-                    if (cmbPaymntMethod.DataSource is DataTable dtPm)
+                    if (cmbPaymntMethod != null && cmbPaymntMethod.DataSource is DataTable dtPm)
                     {
                         foreach (DataRow pmRow in dtPm.Rows)
                         {
@@ -823,8 +825,8 @@ namespace PosBranch_Win.Transaction
                 else
                 {
                     // Anonymous / walk-in customer - default to Cash
-                    SReturn.Paymode = cmbPaymntMethod.Items.Count > 0 ? cmbPaymntMethod.Text : "Cash";
-                    SReturn.PaymodeID = Convert.ToInt32(cmbPaymntMethod.Value ?? 2);
+                    SReturn.Paymode = (cmbPaymntMethod != null && cmbPaymntMethod.Items.Count > 0 && cmbPaymntMethod.SelectedIndex > 0) ? cmbPaymntMethod.Text : "Cash";
+                    SReturn.PaymodeID = (cmbPaymntMethod != null && cmbPaymntMethod.Value != null) ? Convert.ToInt32(cmbPaymntMethod.Value) : 2;
                 }
 
                 // Set SReturnNo - 0 for new records, existing id for updates
@@ -1004,8 +1006,66 @@ namespace PosBranch_Win.Transaction
             {
                 try
                 {
+                    string rawInput = TxtBarcode.Text.Trim();
+
+                    // Case A: Direct ReturnQty change on active row using *10 (e.g. *10 sets ReturnQty to 10)
+                    if (rawInput.StartsWith("*") && rawInput.Length > 1 && !rawInput.Substring(1).Contains('*') && ultraGrid1.Rows.Count > 0 && ultraGrid1.ActiveRow != null)
+                    {
+                        string qtyStr = rawInput.Substring(1);
+                        if (decimal.TryParse(qtyStr, out decimal newReturnQty) && newReturnQty > 0)
+                        {
+                            UltraGridRow activeRow = ultraGrid1.ActiveRow;
+                            if (activeRow != null && activeRow.Cells.Exists("ReturnQty"))
+                            {
+                                decimal origQty = 0;
+                                decimal.TryParse(activeRow.Cells["Qty"].Value?.ToString(), out origQty);
+                                decimal returnedQty = 0;
+                                decimal.TryParse(activeRow.Cells["ReturnedQty"].Value?.ToString(), out returnedQty);
+                                
+                                bool isWithoutBillCheck = textBox1.Value?.ToString() == "without bill" || string.IsNullOrEmpty(textBox1.Value?.ToString());
+                                decimal availableQty = isWithoutBillCheck || origQty <= 0 ? decimal.MaxValue : (origQty - returnedQty);
+
+                                if (newReturnQty <= availableQty)
+                                {
+                                    activeRow.Cells["ReturnQty"].Value = newReturnQty;
+                                    decimal unitPrice = 0;
+                                    decimal.TryParse(activeRow.Cells["UnitPrice"].Value?.ToString(), out unitPrice);
+                                    activeRow.Cells["Amount"].Value = newReturnQty * unitPrice;
+                                    UpdateTotalAmount();
+                                }
+                                else
+                                {
+                                    MessageBox.Show($"Return quantity cannot exceed available quantity ({availableQty})", "Quantity Limit", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                }
+                            }
+                        }
+                        TxtBarcode.Clear();
+                        return;
+                    }
+
+                    // Case B: Parse quantity multiplier prefix/suffix (e.g., 10*BARCODE or BARCODE*10)
+                    string barcodeText = rawInput;
+                    decimal quantityToAdd = 1;
+
+                    if (rawInput.Contains("*"))
+                    {
+                        string[] parts = rawInput.Split('*');
+                        if (parts.Length == 2)
+                        {
+                            if (decimal.TryParse(parts[0], out decimal q1) && q1 > 0 && !string.IsNullOrEmpty(parts[1]))
+                            {
+                                quantityToAdd = q1;
+                                barcodeText = parts[1];
+                            }
+                            else if (decimal.TryParse(parts[1], out decimal q2) && q2 > 0 && !string.IsNullOrEmpty(parts[0]))
+                            {
+                                quantityToAdd = q2;
+                                barcodeText = parts[0];
+                            }
+                        }
+                    }
+
                     // Check if a customer is selected - only required for bill-based returns
-                    // For "without bill" scenario, customer selection is optional
                     int customerId = customerTextBox.Tag != null ? Convert.ToInt32(customerTextBox.Tag) : 0;
                     bool isWithoutBill = textBox1.Value?.ToString() == "without bill" || string.IsNullOrEmpty(textBox1.Value?.ToString());
 
@@ -1039,19 +1099,25 @@ namespace PosBranch_Win.Transaction
                             return;
                         }
 
-                        // Clear the grid but preserve customer selection
                         ClearGridOnly();
                     }
 
-                    // Set textBox1 to indicate items are being added without a bill
-                    textBox1.Value = "without bill";
-                    currentDataSource = DataSource.Barcode;
+                    // Set Without Bill radio mode
+                    if (rbWithoutBill != null && !rbWithoutBill.Checked)
+                    {
+                        rbWithoutBill.Checked = true;
+                    }
+                    else
+                    {
+                        textBox1.Value = "without bill";
+                        currentDataSource = DataSource.Barcode;
+                    }
 
                     DataBase.Operations = "GETITEMBYBARCODE";
-                    ItemDDlGrid item = dp.itemDDlGrid(TxtBarcode.Text, "");
+                    ItemDDlGrid item = dp.itemDDlGrid(barcodeText, "");
                     if (item.List != null && item.List.Count() == 1)
                     {
-                        CheckData(TxtBarcode.Text);
+                        CheckData(barcodeText, quantityToAdd);
                         if (!CheckExists)
                         {
                             var itemData = item.List.First();
@@ -1064,42 +1130,34 @@ namespace PosBranch_Win.Transaction
                             newRow["Barcode"] = itemData.BarCode;
                             newRow["Unit"] = itemData.Unit;
                             newRow["UnitPrice"] = itemData.RetailPrice;
-                            newRow["Qty"] = 1;
-                            newRow["ReturnQty"] = 1; // Default return quantity
-                            newRow["ReturnedQty"] = 0; // Previously returned quantity (starts at 0)
-                            newRow["Packing"] = itemData.Packing; // Use actual packing from item master
-                            newRow["Cost"] = itemData.Cost; // Add cost from item data
+                            newRow["Qty"] = quantityToAdd; // Invoice quantity reference
+                            newRow["ReturnQty"] = quantityToAdd; // Return quantity
+                            newRow["ReturnedQty"] = 0;
+                            newRow["Packing"] = itemData.Packing;
+                            newRow["Cost"] = itemData.Cost;
                             newRow["Reason"] = "Select Reason";
-                            newRow["Amount"] = itemData.RetailPrice;
 
-                            // Calculate tax values for this item
                             double sellingPrice = (double)itemData.RetailPrice;
                             double taxPercentage = itemData.TaxPer;
                             string taxType = itemData.TaxType ?? "excl";
 
-                            // Calculate tax amount and total with tax
-                            double taxAmount = CalculateTaxAmount(sellingPrice, taxPercentage, taxType);
-                            double totalWithTax = CalculateTotalWithTax(sellingPrice, taxPercentage, taxType);
+                            double taxAmount = CalculateTaxAmount(sellingPrice, taxPercentage, taxType) * (double)quantityToAdd;
+                            double totalWithTax = CalculateTotalWithTax(sellingPrice, taxPercentage, taxType) * (double)quantityToAdd;
 
                             newRow["TaxPer"] = taxPercentage;
                             newRow["TaxAmt"] = taxAmount;
                             newRow["TaxType"] = taxType;
-
-                            // Update amount to include tax if needed
                             newRow["Amount"] = totalWithTax;
-                            newRow["Select"] = true; // Default to selected for sales return items
+                            newRow["Select"] = true;
 
                             dt.Rows.Add(newRow);
                             ultraGrid1.DataSource = dt;
 
-                            // Focus the Unit cell in the newly added row with enhanced method
                             System.Threading.Thread.Sleep(50);
                             ForceUnitCellEditMode();
                         }
                         CheckExists = false;
                         TxtBarcode.Clear();
-
-                        // Update totals after adding item
                         UpdateTotalAmount();
                     }
                     else
@@ -1115,7 +1173,7 @@ namespace PosBranch_Win.Transaction
             }
         }
 
-        public void CheckData(string Barcode)
+        public void CheckData(string Barcode, decimal addQty = 1)
         {
             try
             {
@@ -1124,67 +1182,54 @@ namespace PosBranch_Win.Transaction
                     if (row.Cells["Barcode"].Value?.ToString() == Barcode)
                     {
                         CheckExists = true;
-                        // Parse existing quantity safely
-                        decimal existingQty = 0;
-                        decimal.TryParse(row.Cells["Qty"].Value?.ToString(), out existingQty);
-
-                        // Add 1 to existing quantity
-                        decimal newQty = existingQty + 1;
-                        row.Cells["Qty"].Value = newQty;
+                        
+                        // Parse original invoice Qty safely (do NOT overwrite Qty)
+                        decimal originalInvoiceQty = 0;
+                        decimal.TryParse(row.Cells["Qty"].Value?.ToString(), out originalInvoiceQty);
 
                         // Update ReturnQty if the column exists and validate against available quantity
                         if (row.Cells.Exists("ReturnQty"))
                         {
                             decimal existingReturnQty = 0;
                             decimal.TryParse(row.Cells["ReturnQty"].Value?.ToString(), out existingReturnQty);
-                            decimal newReturnQty = existingReturnQty + 1;
+                            decimal newReturnQty = existingReturnQty + addQty;
 
                             // Validate against available quantity
                             decimal returnedQty = 0;
                             decimal.TryParse(row.Cells["ReturnedQty"].Value?.ToString(), out returnedQty);
-                            decimal availableQty = newQty - returnedQty;
+                            
+                            bool isWithoutBill = textBox1.Value?.ToString() == "without bill" || string.IsNullOrEmpty(textBox1.Value?.ToString());
+                            decimal availableQty = isWithoutBill || originalInvoiceQty <= 0 ? decimal.MaxValue : (originalInvoiceQty - returnedQty);
 
                             if (newReturnQty <= availableQty)
                             {
                                 row.Cells["ReturnQty"].Value = newReturnQty;
 
-                                // Calculate amount based on ReturnQty (FIXED: was using newQty)
                                 decimal unitPrice = 0;
                                 decimal.TryParse(row.Cells["UnitPrice"].Value?.ToString(), out unitPrice);
                                 row.Cells["Amount"].Value = newReturnQty * unitPrice;
                             }
                             else
                             {
-                                // Keep the previous value and show warning
                                 row.Cells["ReturnQty"].Value = existingReturnQty;
-                                MessageBox.Show($"Cannot add more items. Available quantity: {availableQty}",
+                                MessageBox.Show($"Cannot add more items. Available quantity for return: {availableQty}",
                                     "Quantity Limit", MessageBoxButtons.OK, MessageBoxIcon.Warning);
 
-                                // Recalculate amount with existing ReturnQty
                                 decimal unitPrice = 0;
                                 decimal.TryParse(row.Cells["UnitPrice"].Value?.ToString(), out unitPrice);
                                 row.Cells["Amount"].Value = existingReturnQty * unitPrice;
                             }
                         }
-                        else
-                        {
-                            // Fallback for backward compatibility - calculate amount based on Qty
-                            decimal unitPrice = 0;
-                            decimal.TryParse(row.Cells["UnitPrice"].Value?.ToString(), out unitPrice);
-                            row.Cells["Amount"].Value = newQty * unitPrice;
-                        }
-
-                        // Update totals
-                        UpdateTotalAmount();
-                        break;
+                        return;
                     }
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Error checking barcode: " + ex.Message);
+                MessageBox.Show("Error checking item: " + ex.Message);
             }
         }
+
         private void UpdateTotalAmount()
         {
             try
@@ -1962,9 +2007,16 @@ namespace PosBranch_Win.Transaction
                 // Make sure editable cells aren't blocked
                 if (e.Cell != null)
                 {
+                    if (e.Cell.Column.Key == "Qty")
+                    {
+                        e.Cell.Activation = Activation.NoEdit;
+                        e.Cell.Column.CellActivation = Activation.NoEdit;
+                        e.Cancel = true;
+                        return;
+                    }
+
                     if (e.Cell.Column.Key == "Unit" ||
                         e.Cell.Column.Key == "UnitPrice" ||
-                        e.Cell.Column.Key == "Qty" ||
                         e.Cell.Column.Key == "ReturnQty" ||
                         e.Cell.Column.Key == "Reason")
                     {
@@ -2034,7 +2086,7 @@ namespace PosBranch_Win.Transaction
                 else if (e.Cell != null)
                 {
                     if (e.Cell.Column.Key == "UnitPrice" ||
-                        e.Cell.Column.Key == "Qty" ||
+                        e.Cell.Column.Key == "ReturnQty" ||
                         e.Cell.Column.Key == "Reason")
                     {
                         e.Cell.Activate();
@@ -2199,43 +2251,113 @@ namespace PosBranch_Win.Transaction
             }
         }
 
+        private void frmSalesReturn_Shown(object sender, EventArgs e)
+        {
+            ActivateFormFocus();
+        }
+
+        private void frmSalesReturn_Enter(object sender, EventArgs e)
+        {
+            ActivateFormFocus();
+        }
+
+        private void ActivateFormFocus()
+        {
+            try
+            {
+                this.Focus();
+                this.Select();
+                if (button3 != null)
+                {
+                    button3.Focus();
+                    button3.Select();
+                }
+            }
+            catch { }
+        }
+
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            Keys key = keyData & Keys.KeyCode;
+            if (key == Keys.F11)
+            {
+                button2_Click_1(this, EventArgs.Empty);
+                return true;
+            }
+            if (key == Keys.F5)
+            {
+                if (btn_Add_Custm != null && btn_Add_Custm.Enabled)
+                {
+                    btn_Add_Custm_Click(this, EventArgs.Empty);
+                }
+                return true;
+            }
+            if (key == Keys.F7)
+            {
+                if (barbtn != null && barbtn.Enabled)
+                {
+                    barbtn_Click(this, EventArgs.Empty);
+                }
+                return true;
+            }
+            if (keyData == Keys.F1)
+            {
+                ClearForm();
+                return true;
+            }
+            if (keyData == Keys.F8)
+            {
+                if (ValidatePaymentMethod())
+                {
+                    DialogResult result = MessageBox.Show("Save goods return?", "Confirm Save", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                    if (result == DialogResult.Yes)
+                    {
+                        SaveSalesReturnWithCreditNote();
+                        if (this.Parent is TabPage tabPage && tabPage.Parent is TabControl tabControl)
+                        {
+                            tabControl.TabPages.Remove(tabPage);
+                        }
+                        this.Close();
+                    }
+                }
+                return true;
+            }
+            if (keyData == Keys.F4)
+            {
+                DialogResult result = MessageBox.Show("Are you sure you want to close?", "Confirm Close", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                if (result == DialogResult.Yes)
+                {
+                    if (this.Parent is TabPage tabPage && tabPage.Parent is TabControl tabControl)
+                    {
+                        tabControl.TabPages.Remove(tabPage);
+                    }
+                    this.Close();
+                }
+                return true;
+            }
+
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
+
         private void frmSalesReturn_KeyDown(object sender, KeyEventArgs e)
         {
-            if (e.KeyCode == Keys.F7)
+            if (e.KeyCode == Keys.F11)
             {
-                // If there are existing items from an invoice, clear them first
-                if (!string.IsNullOrEmpty(textBox1.Value?.ToString()) && textBox1.Value?.ToString() != "without bill")
+                button2_Click_1(sender, e);
+                e.Handled = true;
+            }
+            else if (e.KeyCode == Keys.F5)
+            {
+                if (btn_Add_Custm.Enabled)
                 {
-                    // Clear the form but preserve customer selection
-                    string customerName = customerTextBox.Value?.ToString() ?? "";
-                    object customerTag = customerTextBox.Tag;
-                    ClearForm();
-                    customerTextBox.Value = customerName;
-                    customerTextBox.Tag = customerTag;
+                    btn_Add_Custm_Click(sender, e);
+                    e.Handled = true;
                 }
-
-                // Set textBox1 to indicate items are being added without a bill
-                textBox1.Value = "without bill";
-
-                // Open the item selection dialog with parameter indicating it's from Sales Return
-                frmdialForItemMaster itemDialog = new frmdialForItemMaster("frmSalesReturn");
-                itemDialog.Owner = this;
-
-                // Set KeyPreview to handle ESC key at the form level
-                itemDialog.KeyPreview = true;
-
-                // Add KeyDown handler to catch ESC key
-                itemDialog.KeyDown += (s, args) =>
-                {
-                    if (args.KeyCode == Keys.Escape)
-                    {
-                        // Close the item dialog when ESC is pressed
-                        itemDialog.Close();
-                        args.Handled = true; // Mark as handled to prevent bubbling
-                    }
-                };
-
-                itemDialog.ShowDialog();
+            }
+            else if (e.KeyCode == Keys.F7)
+            {
+                barbtn_Click(sender, e);
+                e.Handled = true;
             }
             else if (e.KeyCode == Keys.Escape)
             {
@@ -2272,6 +2394,11 @@ namespace PosBranch_Win.Transaction
             else if (e.KeyCode == Keys.F1)
             {
                 ClearForm();
+            }
+            else if (e.KeyCode == Keys.F5)
+            {
+                btn_Add_Custm_Click(sender, e);
+                e.Handled = true;
             }
             else if (e.KeyCode == Keys.F8)
             {
@@ -2347,6 +2474,79 @@ namespace PosBranch_Win.Transaction
                     DeleteSalesReturn();
                     e.Handled = true;
                 }
+            }
+        }
+
+        private void rbReturnMode_CheckedChanged(object sender, EventArgs e)
+        {
+            if (rbWithoutBill != null && rbWithoutBill.Checked)
+            {
+                // Switch to Without Bill mode
+                textBox1.ReadOnly = true;
+                textBox1.Value = "without bill";
+                btn_Add_Custm.Enabled = false;
+                btn_Add_Custm.BackColor = System.Drawing.Color.LightGray;
+                btn_Add_Custm.ForeColor = System.Drawing.Color.DimGray;
+
+                dtInvoiceDate.Enabled = false;
+                TxtInvoiceAmnt.Enabled = false;
+
+                // Visual feedback: dim bill fields
+                textBox1.Appearance.BackColor = System.Drawing.Color.LightGray;
+                dtInvoiceDate.Appearance.BackColor = System.Drawing.Color.LightGray;
+                TxtInvoiceAmnt.Appearance.BackColor = System.Drawing.Color.LightGray;
+
+                // Enable Barcode input & F7 button in Without Bill mode
+                if (TxtBarcode != null)
+                {
+                    TxtBarcode.ReadOnly = false;
+                    TxtBarcode.Appearance.BackColor = System.Drawing.Color.White;
+                }
+                if (barbtn != null)
+                {
+                    barbtn.Enabled = true;
+                    barbtn.BackColor = System.Drawing.Color.FromArgb(0, 122, 204);
+                    barbtn.ForeColor = System.Drawing.Color.White;
+                }
+
+                currentDataSource = DataSource.Barcode;
+                if (TxtBarcode != null) TxtBarcode.Focus();
+            }
+            else if (rbWithBill != null && rbWithBill.Checked)
+            {
+                // Switch to With Bill mode
+                textBox1.ReadOnly = false;
+                if (textBox1.Value?.ToString() == "without bill")
+                {
+                    textBox1.Value = "";
+                }
+                btn_Add_Custm.Enabled = true;
+                btn_Add_Custm.BackColor = System.Drawing.Color.FromArgb(0, 122, 204);
+                btn_Add_Custm.ForeColor = System.Drawing.Color.White;
+
+                dtInvoiceDate.Enabled = true;
+                TxtInvoiceAmnt.Enabled = true;
+
+                // Restore white background on bill fields
+                textBox1.Appearance.BackColor = System.Drawing.Color.White;
+                dtInvoiceDate.Appearance.BackColor = System.Drawing.Color.White;
+                TxtInvoiceAmnt.Appearance.BackColor = System.Drawing.Color.White;
+
+                // Dim/Disable Barcode input & F7 button in With Bill mode
+                if (TxtBarcode != null)
+                {
+                    TxtBarcode.ReadOnly = true;
+                    TxtBarcode.Appearance.BackColor = System.Drawing.Color.LightGray;
+                }
+                if (barbtn != null)
+                {
+                    barbtn.Enabled = false;
+                    barbtn.BackColor = System.Drawing.Color.LightGray;
+                    barbtn.ForeColor = System.Drawing.Color.DimGray;
+                }
+
+                currentDataSource = DataSource.None;
+                if (btn_Add_Custm != null) btn_Add_Custm.Focus();
             }
         }
 
@@ -3568,8 +3768,8 @@ namespace PosBranch_Win.Transaction
                                 column.Format = "0.00";
                                 break;
                             case "ReturnedQty":
-                                column.Header.Caption = "Returned Qty";
-                                column.Width = 80;
+                                column.Header.Caption = "Prev Returned";
+                                column.Width = 110;
                                 column.CellActivation = Activation.NoEdit;
                                 column.Format = "0.00";
                                 break;
@@ -3755,7 +3955,7 @@ namespace PosBranch_Win.Transaction
                 // Set focus based on the source of previous items
                 if (wasCustomerBill)
                 {
-                    button2.Focus();
+                    button3.Focus();
                 }
                 else if (wasBarcodeItems)
                 {
@@ -3763,8 +3963,8 @@ namespace PosBranch_Win.Transaction
                 }
                 else
                 {
-                    // Default focus to button2 for new form
-                    button2.Focus();
+                    // Default focus to button3 for new form
+                    button3.Focus();
                 }
             }
             catch (Exception ex)
@@ -3776,15 +3976,15 @@ namespace PosBranch_Win.Transaction
         private void ultraPictureBox1_Click(object sender, EventArgs e)
         {
             ClearForm();
-            // Ensure focus is set to button2
-            button2.Focus();
+            // Ensure focus is set to button3
+            button3.Focus();
         }
 
         private void ultraLabel1_Click(object sender, EventArgs e)
         {
             ClearForm();
-            // Ensure focus is set to button2
-            button2.Focus();
+            // Ensure focus is set to button3
+            button3.Focus();
         }
 
         private void TxtInvoiceAmnt_TextChanged(object sender, EventArgs e)
@@ -3813,9 +4013,15 @@ namespace PosBranch_Win.Transaction
         {
             try
             {
-                // Check if a customer is selected
+                // Check if a customer is selected; if Tag is null, load default customer
                 int customerId = customerTextBox.Tag != null ? Convert.ToInt32(customerTextBox.Tag) : 0;
                 if (customerId <= 0)
+                {
+                    SetupDefaultCustomer();
+                    customerId = customerTextBox.Tag != null ? Convert.ToInt32(customerTextBox.Tag) : 0;
+                }
+
+                if (customerId <= 0 && string.IsNullOrEmpty(customerTextBox.Value?.ToString()))
                 {
                     MessageBox.Show("Please select a customer first", "No Customer Selected", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
@@ -3847,7 +4053,11 @@ namespace PosBranch_Win.Transaction
                     ClearGridOnly();
                 }
 
-                // Set textBox1 to indicate items are being added without a bill
+                // Ensure Without Bill mode is set
+                if (rbWithoutBill != null && !rbWithoutBill.Checked)
+                {
+                    rbWithoutBill.Checked = true;
+                }
                 textBox1.Value = "without bill";
                 currentDataSource = DataSource.Barcode;
 
@@ -3975,7 +4185,7 @@ namespace PosBranch_Win.Transaction
         private void label1_Click(object sender, EventArgs e)
         {
             // Focus the customer selection button when the label is clicked
-            button2.Focus();
+            button3.Focus();
         }
 
         private void ultraLabel4_Click(object sender, EventArgs e)
@@ -4217,10 +4427,17 @@ namespace PosBranch_Win.Transaction
                         ultraGrid1.DisplayLayout.Bands[0].Columns["UnitPrice"].CellActivation = Activation.AllowEdit;
                     }
 
-                    // Qty column
+                    // Qty column (original invoice quantity - historical read only)
                     if (ultraGrid1.DisplayLayout.Bands[0].Columns.Exists("Qty"))
                     {
-                        ultraGrid1.DisplayLayout.Bands[0].Columns["Qty"].CellActivation = Activation.AllowEdit;
+                        ultraGrid1.DisplayLayout.Bands[0].Columns["Qty"].CellActivation = Activation.NoEdit;
+                    }
+
+                    // ReturnQty column (editable return quantity)
+                    if (ultraGrid1.DisplayLayout.Bands[0].Columns.Exists("ReturnQty"))
+                    {
+                        ultraGrid1.DisplayLayout.Bands[0].Columns["ReturnQty"].CellActivation = Activation.AllowEdit;
+                        ultraGrid1.DisplayLayout.Bands[0].Columns["ReturnQty"].CellClickAction = CellClickAction.Edit;
                     }
 
                     // Packing column (hidden - no need to set activation)
@@ -4598,7 +4815,7 @@ namespace PosBranch_Win.Transaction
                 }
 
                 // Validate payment method selection
-                if (cmbPaymntMethod.SelectedIndex <= 0)
+                if (cmbPaymntMethod != null && cmbPaymntMethod.SelectedIndex <= 0)
                 {
                     MessageBox.Show("Please select a valid payment method before updating.",
                                    "Update Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -4786,15 +5003,15 @@ namespace PosBranch_Win.Transaction
                     }
 
                     // Set payment method information
-                    SReturn.Paymode = cmbPaymntMethod.Text;
+                    SReturn.Paymode = (cmbPaymntMethod != null && !string.IsNullOrEmpty(cmbPaymntMethod.Text)) ? cmbPaymntMethod.Text : (existingSR != null ? existingSR.Paymode : "Cash");
 
                     // Safe conversion for PaymodeID
-                    int paymodeId = 0;
-                    if (cmbPaymntMethod.Value != null && cmbPaymntMethod.Value != DBNull.Value)
+                    int paymodeId = existingSR != null ? existingSR.PaymodeID : 2;
+                    if (cmbPaymntMethod != null && cmbPaymntMethod.Value != null && cmbPaymntMethod.Value != DBNull.Value)
                     {
                         int.TryParse(cmbPaymntMethod.Value.ToString(), out paymodeId);
                     }
-                    SReturn.PaymodeID = paymodeId;
+                    SReturn.PaymodeID = paymodeId > 0 ? paymodeId : 2;
 
                     SReturn.PaymodeLedgerID = existingSR.PaymodeLedgerID; // Preserve the existing value
 
@@ -5054,21 +5271,7 @@ namespace PosBranch_Win.Transaction
 
         private bool ValidatePaymentMethod(bool showErrorMessage = true)
         {
-            // Check if payment method is selected and is valid (not the placeholder "Select Payment")
-            if (cmbPaymntMethod.SelectedIndex <= 0)
-            {
-                if (showErrorMessage)
-                {
-                    MessageBox.Show("Please select a payment method before saving.", "Payment Method Required", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                }
-                return false;
-            }
-
-            // Get the selected payment method name
-            string selectedPaymentMethod = cmbPaymntMethod.Text.ToLower();
-
-            // Remove the restriction to only allow credit or debit cards
-            // All payment methods are now valid as long as one is selected
+            // Payment method is not required on form - default to Cash/Credit internally
             return true;
         }
 

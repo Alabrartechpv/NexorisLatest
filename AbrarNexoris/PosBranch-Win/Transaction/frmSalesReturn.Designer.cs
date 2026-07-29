@@ -46,9 +46,9 @@ namespace PosBranch_Win.Transaction
             Infragistics.Win.Appearance appearance16 = new Infragistics.Win.Appearance();
             Infragistics.Win.Appearance appearance17 = new Infragistics.Win.Appearance();
             Infragistics.Win.Appearance appearance18 = new Infragistics.Win.Appearance();
-            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(frmSalesReturn));
             Infragistics.Win.Appearance appearance19 = new Infragistics.Win.Appearance();
             Infragistics.Win.Appearance appearance20 = new Infragistics.Win.Appearance();
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(frmSalesReturn));
             Infragistics.Win.Appearance appearance21 = new Infragistics.Win.Appearance();
             Infragistics.Win.Appearance appearance22 = new Infragistics.Win.Appearance();
             Infragistics.Win.Appearance appearance23 = new Infragistics.Win.Appearance();
@@ -66,6 +66,7 @@ namespace PosBranch_Win.Transaction
             Infragistics.Win.Appearance appearance35 = new Infragistics.Win.Appearance();
             Infragistics.Win.Appearance appearance36 = new Infragistics.Win.Appearance();
             Infragistics.Win.Appearance appearance37 = new Infragistics.Win.Appearance();
+            Infragistics.Win.Appearance appearance38 = new Infragistics.Win.Appearance();
             this.panel1 = new Infragistics.Win.Misc.UltraPanel();
             this.ultraPanel2 = new Infragistics.Win.Misc.UltraPanel();
             this.ultraGrid1 = new Infragistics.Win.UltraWinGrid.UltraGrid();
@@ -77,7 +78,19 @@ namespace PosBranch_Win.Transaction
             this.SubTotal = new Infragistics.Win.Misc.UltraLabel();
             this.TxtSubTotal = new Infragistics.Win.UltraWinEditors.UltraTextEditor();
             this.ultraPanel1 = new Infragistics.Win.Misc.UltraPanel();
+            this.panel2 = new Infragistics.Win.Misc.UltraPanel();
+            this.rbWithBill = new System.Windows.Forms.RadioButton();
+            this.rbWithoutBill = new System.Windows.Forms.RadioButton();
+            this.button3 = new System.Windows.Forms.Button();
             this.barbtn = new System.Windows.Forms.Button();
+            this.label1 = new Infragistics.Win.Misc.UltraLabel();
+            this.textBox2 = new Infragistics.Win.UltraWinEditors.UltraTextEditor();
+            this.button1 = new System.Windows.Forms.Button();
+            this.dtSReturnDate = new Infragistics.Win.UltraWinEditors.UltraDateTimeEditor();
+            this.TxtSRNO = new Infragistics.Win.UltraWinEditors.UltraTextEditor();
+            this.labelSRNO = new Infragistics.Win.Misc.UltraLabel();
+            this.labelDate = new Infragistics.Win.Misc.UltraLabel();
+            this.labelCustomerName = new Infragistics.Win.Misc.UltraLabel();
             this.labelBarcode = new Infragistics.Win.Misc.UltraLabel();
             this.btn_Add_Custm = new System.Windows.Forms.Button();
             this.dtInvoiceDate = new Infragistics.Win.UltraWinEditors.UltraDateTimeEditor();
@@ -87,18 +100,8 @@ namespace PosBranch_Win.Transaction
             this.labelInvoiceDate = new Infragistics.Win.Misc.UltraLabel();
             this.labelInvoiceAmount = new Infragistics.Win.Misc.UltraLabel();
             this.labelInvoiceNo = new Infragistics.Win.Misc.UltraLabel();
-            this.panel2 = new Infragistics.Win.Misc.UltraPanel();
-            this.label1 = new Infragistics.Win.Misc.UltraLabel();
-            this.button2 = new System.Windows.Forms.Button();
-            this.textBox2 = new Infragistics.Win.UltraWinEditors.UltraTextEditor();
-            this.button1 = new System.Windows.Forms.Button();
-            this.dtSReturnDate = new Infragistics.Win.UltraWinEditors.UltraDateTimeEditor();
-            this.TxtSRNO = new Infragistics.Win.UltraWinEditors.UltraTextEditor();
-            this.labelSRNO = new Infragistics.Win.Misc.UltraLabel();
-            this.labelDate = new Infragistics.Win.Misc.UltraLabel();
             this.cmbPaymntMethod = new Infragistics.Win.UltraWinEditors.UltraComboEditor();
             this.labelPaymentMethod = new Infragistics.Win.Misc.UltraLabel();
-            this.labelCustomerName = new Infragistics.Win.Misc.UltraLabel();
             this.panel5 = new Infragistics.Win.Misc.UltraPanel();
             this.ultraLabel4 = new Infragistics.Win.Misc.UltraLabel();
             this.ultraPictureBox3 = new Infragistics.Win.UltraWinEditors.UltraPictureBox();
@@ -124,17 +127,16 @@ namespace PosBranch_Win.Transaction
             this.ultraPanel9.ClientArea.SuspendLayout();
             this.ultraPanel9.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.TxtSubTotal)).BeginInit();
-            this.ultraPanel1.ClientArea.SuspendLayout();
             this.ultraPanel1.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.dtInvoiceDate)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.textBox1)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.TxtBarcode)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.TxtInvoiceAmnt)).BeginInit();
             this.panel2.ClientArea.SuspendLayout();
             this.panel2.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.textBox2)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.dtSReturnDate)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.TxtSRNO)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.dtInvoiceDate)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.textBox1)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.TxtBarcode)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.TxtInvoiceAmnt)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.cmbPaymntMethod)).BeginInit();
             this.panel5.ClientArea.SuspendLayout();
             this.panel5.SuspendLayout();
@@ -169,9 +171,9 @@ namespace PosBranch_Win.Transaction
             this.ultraPanel2.ClientArea.Controls.Add(this.ultraGrid1);
             this.ultraPanel2.ClientArea.Controls.Add(this.gridFooterPanel);
             this.ultraPanel2.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.ultraPanel2.Location = new System.Drawing.Point(0, 165);
+            this.ultraPanel2.Location = new System.Drawing.Point(0, 150);
             this.ultraPanel2.Name = "ultraPanel2";
-            this.ultraPanel2.Size = new System.Drawing.Size(1364, 475);
+            this.ultraPanel2.Size = new System.Drawing.Size(1364, 490);
             this.ultraPanel2.TabIndex = 34;
             // 
             // ultraGrid1
@@ -234,7 +236,7 @@ namespace PosBranch_Win.Transaction
             this.ultraGrid1.Dock = System.Windows.Forms.DockStyle.Fill;
             this.ultraGrid1.Location = new System.Drawing.Point(0, 0);
             this.ultraGrid1.Name = "ultraGrid1";
-            this.ultraGrid1.Size = new System.Drawing.Size(1360, 445);
+            this.ultraGrid1.Size = new System.Drawing.Size(1360, 460);
             this.ultraGrid1.TabIndex = 23;
             this.ultraGrid1.Text = "ultraGrid1";
             this.ultraGrid1.InitializeLayout += new Infragistics.Win.UltraWinGrid.InitializeLayoutEventHandler(this.ultraGrid1_InitializeLayout);
@@ -248,7 +250,7 @@ namespace PosBranch_Win.Transaction
             appearance14.ForeColor = System.Drawing.Color.White;
             this.gridFooterPanel.Appearance = appearance14;
             this.gridFooterPanel.Dock = System.Windows.Forms.DockStyle.Bottom;
-            this.gridFooterPanel.Location = new System.Drawing.Point(0, 445);
+            this.gridFooterPanel.Location = new System.Drawing.Point(0, 460);
             this.gridFooterPanel.Name = "gridFooterPanel";
             this.gridFooterPanel.Size = new System.Drawing.Size(1360, 26);
             this.gridFooterPanel.TabIndex = 24;
@@ -348,141 +350,12 @@ namespace PosBranch_Win.Transaction
             // 
             // ultraPanel1
             // 
-            this.ultraPanel1.BorderStyle = Infragistics.Win.UIElementBorderStyle.InsetSoft;
-            // 
-            // ultraPanel1.ClientArea
-            // 
-            this.ultraPanel1.ClientArea.Controls.Add(this.barbtn);
-            this.ultraPanel1.ClientArea.Controls.Add(this.labelBarcode);
-            this.ultraPanel1.ClientArea.Controls.Add(this.btn_Add_Custm);
-            this.ultraPanel1.ClientArea.Controls.Add(this.dtInvoiceDate);
-            this.ultraPanel1.ClientArea.Controls.Add(this.textBox1);
-            this.ultraPanel1.ClientArea.Controls.Add(this.TxtBarcode);
-            this.ultraPanel1.ClientArea.Controls.Add(this.TxtInvoiceAmnt);
-            this.ultraPanel1.ClientArea.Controls.Add(this.labelInvoiceDate);
-            this.ultraPanel1.ClientArea.Controls.Add(this.labelInvoiceAmount);
-            this.ultraPanel1.ClientArea.Controls.Add(this.labelInvoiceNo);
-            this.ultraPanel1.Dock = System.Windows.Forms.DockStyle.Top;
-            this.ultraPanel1.Location = new System.Drawing.Point(0, 85);
+            this.ultraPanel1.BorderStyle = Infragistics.Win.UIElementBorderStyle.None;
+            this.ultraPanel1.Location = new System.Drawing.Point(0, 190);
             this.ultraPanel1.Name = "ultraPanel1";
-            this.ultraPanel1.Size = new System.Drawing.Size(1364, 80);
+            this.ultraPanel1.Size = new System.Drawing.Size(1364, 0);
             this.ultraPanel1.TabIndex = 33;
-            // 
-            // barbtn
-            // 
-            this.barbtn.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(122)))), ((int)(((byte)(204)))));
-            this.barbtn.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.barbtn.Location = new System.Drawing.Point(213, 31);
-            this.barbtn.Name = "barbtn";
-            this.barbtn.Size = new System.Drawing.Size(38, 33);
-            this.barbtn.TabIndex = 2;
-            this.barbtn.Text = "F7";
-            this.barbtn.UseVisualStyleBackColor = false;
-            this.barbtn.Click += new System.EventHandler(this.barbtn_Click);
-            // 
-            // labelBarcode
-            // 
-            this.labelBarcode.Font = new System.Drawing.Font("Microsoft Sans Serif", 15F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.labelBarcode.Location = new System.Drawing.Point(24, 4);
-            this.labelBarcode.Name = "labelBarcode";
-            this.labelBarcode.Size = new System.Drawing.Size(85, 25);
-            this.labelBarcode.TabIndex = 1;
-            this.labelBarcode.Text = "Barcode";
-            // 
-            // btn_Add_Custm
-            // 
-            this.btn_Add_Custm.BackColor = System.Drawing.Color.Transparent;
-            this.btn_Add_Custm.BackgroundImage = ((System.Drawing.Image)(resources.GetObject("btn_Add_Custm.BackgroundImage")));
-            this.btn_Add_Custm.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Stretch;
-            this.btn_Add_Custm.Location = new System.Drawing.Point(460, 30);
-            this.btn_Add_Custm.Name = "btn_Add_Custm";
-            this.btn_Add_Custm.Size = new System.Drawing.Size(29, 33);
-            this.btn_Add_Custm.TabIndex = 5;
-            this.btn_Add_Custm.UseVisualStyleBackColor = false;
-            this.btn_Add_Custm.Click += new System.EventHandler(this.btn_Add_Custm_Click);
-            // 
-            // dtInvoiceDate
-            // 
-            appearance19.BorderColor = System.Drawing.Color.DeepSkyBlue;
-            this.dtInvoiceDate.Appearance = appearance19;
-            this.dtInvoiceDate.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
-            this.dtInvoiceDate.FormatString = "yy/MM/dd";
-            this.dtInvoiceDate.Location = new System.Drawing.Point(853, 37);
-            this.dtInvoiceDate.Name = "dtInvoiceDate";
-            this.dtInvoiceDate.Size = new System.Drawing.Size(144, 19);
-            this.dtInvoiceDate.TabIndex = 6;
-            this.dtInvoiceDate.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
-            // 
-            // textBox1
-            // 
-            appearance20.BorderColor = System.Drawing.Color.DeepSkyBlue;
-            this.textBox1.Appearance = appearance20;
-            this.textBox1.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
-            this.textBox1.Font = new System.Drawing.Font("Microsoft Sans Serif", 15F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.textBox1.Location = new System.Drawing.Point(296, 31);
-            this.textBox1.Name = "textBox1";
-            this.textBox1.Size = new System.Drawing.Size(165, 31);
-            this.textBox1.TabIndex = 30;
-            this.textBox1.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
-            this.textBox1.ValueChanged += new System.EventHandler(this.textBox1_TextChanged);
-            this.textBox1.KeyDown += new System.Windows.Forms.KeyEventHandler(this.textBox1_KeyDown);
-            // 
-            // TxtBarcode
-            // 
-            appearance21.BorderColor = System.Drawing.Color.DeepSkyBlue;
-            this.TxtBarcode.Appearance = appearance21;
-            this.TxtBarcode.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
-            this.TxtBarcode.Font = new System.Drawing.Font("Microsoft Sans Serif", 15F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.TxtBarcode.Location = new System.Drawing.Point(24, 32);
-            this.TxtBarcode.Name = "TxtBarcode";
-            this.TxtBarcode.Size = new System.Drawing.Size(189, 31);
-            this.TxtBarcode.TabIndex = 7;
-            this.TxtBarcode.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
-            this.TxtBarcode.KeyDown += new System.Windows.Forms.KeyEventHandler(this.TxtBarcode_KeyDown);
-            // 
-            // TxtInvoiceAmnt
-            // 
-            appearance22.BorderColor = System.Drawing.Color.DeepSkyBlue;
-            this.TxtInvoiceAmnt.Appearance = appearance22;
-            this.TxtInvoiceAmnt.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
-            this.TxtInvoiceAmnt.Font = new System.Drawing.Font("Microsoft Sans Serif", 15F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.TxtInvoiceAmnt.Location = new System.Drawing.Point(559, 33);
-            this.TxtInvoiceAmnt.Name = "TxtInvoiceAmnt";
-            this.TxtInvoiceAmnt.Size = new System.Drawing.Size(176, 31);
-            this.TxtInvoiceAmnt.TabIndex = 19;
-            this.TxtInvoiceAmnt.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
-            this.TxtInvoiceAmnt.ValueChanged += new System.EventHandler(this.TxtInvoiceAmnt_TextChanged);
-            // 
-            // labelInvoiceDate
-            // 
-            this.labelInvoiceDate.AutoSize = true;
-            this.labelInvoiceDate.Font = new System.Drawing.Font("Microsoft Sans Serif", 15F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.labelInvoiceDate.Location = new System.Drawing.Point(856, 9);
-            this.labelInvoiceDate.Name = "labelInvoiceDate";
-            this.labelInvoiceDate.Size = new System.Drawing.Size(122, 26);
-            this.labelInvoiceDate.TabIndex = 16;
-            this.labelInvoiceDate.Text = "Invoice Date";
-            // 
-            // labelInvoiceAmount
-            // 
-            this.labelInvoiceAmount.AutoSize = true;
-            this.labelInvoiceAmount.Font = new System.Drawing.Font("Microsoft Sans Serif", 15F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.labelInvoiceAmount.Location = new System.Drawing.Point(560, 6);
-            this.labelInvoiceAmount.Name = "labelInvoiceAmount";
-            this.labelInvoiceAmount.Size = new System.Drawing.Size(149, 26);
-            this.labelInvoiceAmount.TabIndex = 17;
-            this.labelInvoiceAmount.Text = "Invoice Amount";
-            this.labelInvoiceAmount.Click += new System.EventHandler(this.labelInvoiceAmount_Click);
-            // 
-            // labelInvoiceNo
-            // 
-            this.labelInvoiceNo.AutoSize = true;
-            this.labelInvoiceNo.Font = new System.Drawing.Font("Microsoft Sans Serif", 15F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.labelInvoiceNo.Location = new System.Drawing.Point(296, 6);
-            this.labelInvoiceNo.Name = "labelInvoiceNo";
-            this.labelInvoiceNo.Size = new System.Drawing.Size(110, 26);
-            this.labelInvoiceNo.TabIndex = 15;
-            this.labelInvoiceNo.Text = "Invoice No.";
+            this.ultraPanel1.Visible = false;
             // 
             // panel2
             // 
@@ -490,54 +363,114 @@ namespace PosBranch_Win.Transaction
             // 
             // panel2.ClientArea
             // 
+            this.panel2.ClientArea.Controls.Add(this.rbWithBill);
+            this.panel2.ClientArea.Controls.Add(this.rbWithoutBill);
+            this.panel2.ClientArea.Controls.Add(this.button3);
+            this.panel2.ClientArea.Controls.Add(this.barbtn);
             this.panel2.ClientArea.Controls.Add(this.label1);
-            this.panel2.ClientArea.Controls.Add(this.button2);
             this.panel2.ClientArea.Controls.Add(this.textBox2);
             this.panel2.ClientArea.Controls.Add(this.button1);
             this.panel2.ClientArea.Controls.Add(this.dtSReturnDate);
             this.panel2.ClientArea.Controls.Add(this.TxtSRNO);
             this.panel2.ClientArea.Controls.Add(this.labelSRNO);
             this.panel2.ClientArea.Controls.Add(this.labelDate);
-            this.panel2.ClientArea.Controls.Add(this.cmbPaymntMethod);
-            this.panel2.ClientArea.Controls.Add(this.labelPaymentMethod);
             this.panel2.ClientArea.Controls.Add(this.labelCustomerName);
+            this.panel2.ClientArea.Controls.Add(this.labelBarcode);
+            this.panel2.ClientArea.Controls.Add(this.btn_Add_Custm);
+            this.panel2.ClientArea.Controls.Add(this.dtInvoiceDate);
+            this.panel2.ClientArea.Controls.Add(this.textBox1);
+            this.panel2.ClientArea.Controls.Add(this.TxtBarcode);
+            this.panel2.ClientArea.Controls.Add(this.TxtInvoiceAmnt);
+            this.panel2.ClientArea.Controls.Add(this.labelInvoiceDate);
+            this.panel2.ClientArea.Controls.Add(this.labelInvoiceAmount);
+            this.panel2.ClientArea.Controls.Add(this.labelInvoiceNo);
             this.panel2.Dock = System.Windows.Forms.DockStyle.Top;
             this.panel2.Location = new System.Drawing.Point(0, 0);
             this.panel2.Name = "panel2";
-            this.panel2.Size = new System.Drawing.Size(1364, 85);
+            this.panel2.Size = new System.Drawing.Size(1364, 150);
             this.panel2.TabIndex = 10;
+            // 
+            // rbWithBill
+            // 
+            this.rbWithBill.AutoSize = true;
+            this.rbWithBill.Checked = true;
+            this.rbWithBill.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.rbWithBill.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(102)))), ((int)(((byte)(204)))));
+            this.rbWithBill.Location = new System.Drawing.Point(520, 19);
+            this.rbWithBill.Name = "rbWithBill";
+            this.rbWithBill.Size = new System.Drawing.Size(83, 20);
+            this.rbWithBill.TabIndex = 39;
+            this.rbWithBill.TabStop = true;
+            this.rbWithBill.Text = "With Bill";
+            this.rbWithBill.UseVisualStyleBackColor = true;
+            this.rbWithBill.CheckedChanged += new System.EventHandler(this.rbReturnMode_CheckedChanged);
+            // 
+            // rbWithoutBill
+            // 
+            this.rbWithoutBill.AutoSize = true;
+            this.rbWithoutBill.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.rbWithoutBill.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(0)))), ((int)(((byte)(0)))));
+            this.rbWithoutBill.Location = new System.Drawing.Point(615, 19);
+            this.rbWithoutBill.Name = "rbWithoutBill";
+            this.rbWithoutBill.Size = new System.Drawing.Size(105, 20);
+            this.rbWithoutBill.TabIndex = 40;
+            this.rbWithoutBill.Text = "Without Bill";
+            this.rbWithoutBill.UseVisualStyleBackColor = true;
+            this.rbWithoutBill.CheckedChanged += new System.EventHandler(this.rbReturnMode_CheckedChanged);
+            // 
+            // button3
+            // 
+            this.button3.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(122)))), ((int)(((byte)(204)))));
+            this.button3.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(100)))), ((int)(((byte)(182)))));
+            this.button3.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.button3.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.button3.ForeColor = System.Drawing.Color.White;
+            this.button3.Location = new System.Drawing.Point(460, 16);
+            this.button3.Name = "button3";
+            this.button3.Size = new System.Drawing.Size(41, 26);
+            this.button3.TabIndex = 38;
+            this.button3.Text = "F11";
+            this.button3.UseVisualStyleBackColor = false;
+            this.button3.Click += new System.EventHandler(this.button2_Click_1);
+            // 
+            // barbtn
+            // 
+            this.barbtn.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(122)))), ((int)(((byte)(204)))));
+            this.barbtn.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(100)))), ((int)(((byte)(182)))));
+            this.barbtn.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.barbtn.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.barbtn.ForeColor = System.Drawing.Color.White;
+            this.barbtn.Location = new System.Drawing.Point(460, 100);
+            this.barbtn.Name = "barbtn";
+            this.barbtn.Size = new System.Drawing.Size(41, 26);
+            this.barbtn.TabIndex = 37;
+            this.barbtn.Text = "F7";
+            this.barbtn.UseVisualStyleBackColor = false;
+            this.barbtn.Click += new System.EventHandler(this.barbtn_Click);
             // 
             // label1
             // 
-            this.label1.Font = new System.Drawing.Font("Microsoft Sans Serif", 15F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label1.Location = new System.Drawing.Point(183, 7);
+            appearance19.BackColor = System.Drawing.Color.Transparent;
+            this.label1.Appearance = appearance19;
+            this.label1.Font = new System.Drawing.Font("Microsoft Sans Serif", 11F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label1.Location = new System.Drawing.Point(3, -3);
             this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(51, 25);
+            this.label1.Size = new System.Drawing.Size(51, 23);
             this.label1.TabIndex = 35;
             this.label1.Text = "C ID";
+            this.label1.Visible = false;
             this.label1.Click += new System.EventHandler(this.label1_Click);
-            // 
-            // button2
-            // 
-            this.button2.BackColor = System.Drawing.Color.Transparent;
-            this.button2.BackgroundImage = ((System.Drawing.Image)(resources.GetObject("button2.BackgroundImage")));
-            this.button2.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Stretch;
-            this.button2.Location = new System.Drawing.Point(213, 35);
-            this.button2.Name = "button2";
-            this.button2.Size = new System.Drawing.Size(29, 33);
-            this.button2.TabIndex = 1;
-            this.button2.UseVisualStyleBackColor = false;
-            this.button2.Click += new System.EventHandler(this.button2_Click_1);
             // 
             // textBox2
             // 
-            appearance23.BorderColor = System.Drawing.Color.DeepSkyBlue;
-            this.textBox2.Appearance = appearance23;
+            appearance20.BorderColor = System.Drawing.Color.DeepSkyBlue;
+            this.textBox2.Appearance = appearance20;
             this.textBox2.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
-            this.textBox2.Font = new System.Drawing.Font("Microsoft Sans Serif", 15F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.textBox2.Location = new System.Drawing.Point(24, 36);
+            this.textBox2.Font = new System.Drawing.Font("Microsoft Sans Serif", 11F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.textBox2.Location = new System.Drawing.Point(115, 16);
+            this.textBox2.Multiline = true;
             this.textBox2.Name = "textBox2";
-            this.textBox2.Size = new System.Drawing.Size(189, 31);
+            this.textBox2.Size = new System.Drawing.Size(340, 26);
             this.textBox2.TabIndex = 33;
             this.textBox2.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
             // 
@@ -547,9 +480,9 @@ namespace PosBranch_Win.Transaction
             this.button1.BackColor = System.Drawing.Color.Transparent;
             this.button1.BackgroundImage = ((System.Drawing.Image)(resources.GetObject("button1.BackgroundImage")));
             this.button1.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Stretch;
-            this.button1.Location = new System.Drawing.Point(1237, 34);
+            this.button1.Location = new System.Drawing.Point(1293, 58);
             this.button1.Name = "button1";
-            this.button1.Size = new System.Drawing.Size(31, 31);
+            this.button1.Size = new System.Drawing.Size(26, 26);
             this.button1.TabIndex = 4;
             this.button1.UseVisualStyleBackColor = false;
             this.button1.Click += new System.EventHandler(this.button1_Click);
@@ -557,59 +490,176 @@ namespace PosBranch_Win.Transaction
             // dtSReturnDate
             // 
             this.dtSReturnDate.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            appearance24.BorderColor = System.Drawing.Color.DeepSkyBlue;
-            this.dtSReturnDate.Appearance = appearance24;
+            appearance21.BorderColor = System.Drawing.Color.DeepSkyBlue;
+            this.dtSReturnDate.Appearance = appearance21;
             this.dtSReturnDate.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
-            this.dtSReturnDate.Font = new System.Drawing.Font("Microsoft Sans Serif", 15F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.dtSReturnDate.FormatString = "yy/MM/dd";
-            this.dtSReturnDate.Location = new System.Drawing.Point(895, 34);
+            this.dtSReturnDate.Font = new System.Drawing.Font("Microsoft Sans Serif", 11F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.dtSReturnDate.FormatString = "dd-MM-yyyy";
+            this.dtSReturnDate.Location = new System.Drawing.Point(1170, 16);
             this.dtSReturnDate.Name = "dtSReturnDate";
-            this.dtSReturnDate.Size = new System.Drawing.Size(180, 31);
+            this.dtSReturnDate.Size = new System.Drawing.Size(149, 24);
             this.dtSReturnDate.TabIndex = 3;
             this.dtSReturnDate.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
             // 
             // TxtSRNO
             // 
             this.TxtSRNO.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            appearance25.BorderColor = System.Drawing.Color.DeepSkyBlue;
-            this.TxtSRNO.Appearance = appearance25;
+            appearance22.BorderColor = System.Drawing.Color.DeepSkyBlue;
+            this.TxtSRNO.Appearance = appearance22;
             this.TxtSRNO.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
-            this.TxtSRNO.Font = new System.Drawing.Font("Microsoft Sans Serif", 15F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.TxtSRNO.Location = new System.Drawing.Point(1100, 34);
+            this.TxtSRNO.Font = new System.Drawing.Font("Microsoft Sans Serif", 11F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.TxtSRNO.Location = new System.Drawing.Point(1170, 58);
+            this.TxtSRNO.Multiline = true;
             this.TxtSRNO.Name = "TxtSRNO";
-            this.TxtSRNO.Size = new System.Drawing.Size(137, 31);
+            this.TxtSRNO.Size = new System.Drawing.Size(120, 26);
             this.TxtSRNO.TabIndex = 14;
             this.TxtSRNO.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
             // 
             // labelSRNO
             // 
             this.labelSRNO.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.labelSRNO.Font = new System.Drawing.Font("Microsoft Sans Serif", 15F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.labelSRNO.Location = new System.Drawing.Point(1102, 9);
+            this.labelSRNO.Font = new System.Drawing.Font("Microsoft Sans Serif", 11F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.labelSRNO.Location = new System.Drawing.Point(1095, 61);
             this.labelSRNO.Name = "labelSRNO";
-            this.labelSRNO.Size = new System.Drawing.Size(74, 25);
+            this.labelSRNO.Size = new System.Drawing.Size(65, 23);
             this.labelSRNO.TabIndex = 13;
             this.labelSRNO.Text = "SR NO";
             // 
             // labelDate
             // 
             this.labelDate.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.labelDate.Font = new System.Drawing.Font("Microsoft Sans Serif", 15F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.labelDate.Location = new System.Drawing.Point(895, 9);
+            this.labelDate.Font = new System.Drawing.Font("Microsoft Sans Serif", 11F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.labelDate.Location = new System.Drawing.Point(1120, 19);
             this.labelDate.Name = "labelDate";
-            this.labelDate.Size = new System.Drawing.Size(53, 25);
+            this.labelDate.Size = new System.Drawing.Size(45, 23);
             this.labelDate.TabIndex = 11;
             this.labelDate.Text = "Date";
             // 
-            // cmbPaymntMethod
+            // labelCustomerName
+            // 
+            this.labelCustomerName.Font = new System.Drawing.Font("Microsoft Sans Serif", 11F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.labelCustomerName.Location = new System.Drawing.Point(20, 19);
+            this.labelCustomerName.Name = "labelCustomerName";
+            this.labelCustomerName.Size = new System.Drawing.Size(75, 23);
+            this.labelCustomerName.TabIndex = 7;
+            this.labelCustomerName.Text = "Customer";
+            // 
+            // labelBarcode
+            // 
+            this.labelBarcode.Font = new System.Drawing.Font("Microsoft Sans Serif", 11F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.labelBarcode.Location = new System.Drawing.Point(20, 103);
+            this.labelBarcode.Name = "labelBarcode";
+            this.labelBarcode.Size = new System.Drawing.Size(70, 23);
+            this.labelBarcode.TabIndex = 1;
+            this.labelBarcode.Text = "Barcode";
+            // 
+            // btn_Add_Custm
+            // 
+            this.btn_Add_Custm.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(122)))), ((int)(((byte)(204)))));
+            this.btn_Add_Custm.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(100)))), ((int)(((byte)(182)))));
+            this.btn_Add_Custm.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btn_Add_Custm.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.btn_Add_Custm.ForeColor = System.Drawing.Color.White;
+            this.btn_Add_Custm.Location = new System.Drawing.Point(248, 58);
+            this.btn_Add_Custm.Name = "btn_Add_Custm";
+            this.btn_Add_Custm.Size = new System.Drawing.Size(41, 26);
+            this.btn_Add_Custm.TabIndex = 5;
+            this.btn_Add_Custm.Text = "F5";
+            this.btn_Add_Custm.UseVisualStyleBackColor = false;
+            this.btn_Add_Custm.Click += new System.EventHandler(this.btn_Add_Custm_Click);
+            // 
+            // dtInvoiceDate
+            // 
+            appearance23.BorderColor = System.Drawing.Color.DeepSkyBlue;
+            this.dtInvoiceDate.Appearance = appearance23;
+            this.dtInvoiceDate.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
+            this.dtInvoiceDate.Font = new System.Drawing.Font("Microsoft Sans Serif", 11F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.dtInvoiceDate.FormatString = "dd-MM-yyyy";
+            this.dtInvoiceDate.Location = new System.Drawing.Point(385, 58);
+            this.dtInvoiceDate.Name = "dtInvoiceDate";
+            this.dtInvoiceDate.Size = new System.Drawing.Size(150, 24);
+            this.dtInvoiceDate.TabIndex = 6;
+            this.dtInvoiceDate.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
+            // 
+            // textBox1
+            // 
+            appearance24.BorderColor = System.Drawing.Color.DeepSkyBlue;
+            this.textBox1.Appearance = appearance24;
+            this.textBox1.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
+            this.textBox1.Font = new System.Drawing.Font("Microsoft Sans Serif", 11F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.textBox1.Location = new System.Drawing.Point(115, 58);
+            this.textBox1.Multiline = true;
+            this.textBox1.Name = "textBox1";
+            this.textBox1.Size = new System.Drawing.Size(130, 26);
+            this.textBox1.TabIndex = 30;
+            this.textBox1.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
+            this.textBox1.ValueChanged += new System.EventHandler(this.textBox1_TextChanged);
+            this.textBox1.KeyDown += new System.Windows.Forms.KeyEventHandler(this.textBox1_KeyDown);
+            // 
+            // TxtBarcode
+            // 
+            appearance25.BorderColor = System.Drawing.Color.DeepSkyBlue;
+            this.TxtBarcode.Appearance = appearance25;
+            this.TxtBarcode.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
+            this.TxtBarcode.Font = new System.Drawing.Font("Microsoft Sans Serif", 11F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.TxtBarcode.Location = new System.Drawing.Point(115, 100);
+            this.TxtBarcode.Multiline = true;
+            this.TxtBarcode.Name = "TxtBarcode";
+            this.TxtBarcode.Size = new System.Drawing.Size(340, 26);
+            this.TxtBarcode.TabIndex = 7;
+            this.TxtBarcode.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
+            this.TxtBarcode.KeyDown += new System.Windows.Forms.KeyEventHandler(this.TxtBarcode_KeyDown);
+            // 
+            // TxtInvoiceAmnt
             // 
             appearance26.BorderColor = System.Drawing.Color.DeepSkyBlue;
-            this.cmbPaymntMethod.Appearance = appearance26;
+            this.TxtInvoiceAmnt.Appearance = appearance26;
+            this.TxtInvoiceAmnt.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
+            this.TxtInvoiceAmnt.Font = new System.Drawing.Font("Microsoft Sans Serif", 11F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.TxtInvoiceAmnt.Location = new System.Drawing.Point(660, 58);
+            this.TxtInvoiceAmnt.Name = "TxtInvoiceAmnt";
+            this.TxtInvoiceAmnt.Size = new System.Drawing.Size(130, 24);
+            this.TxtInvoiceAmnt.TabIndex = 19;
+            this.TxtInvoiceAmnt.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
+            this.TxtInvoiceAmnt.ValueChanged += new System.EventHandler(this.TxtInvoiceAmnt_TextChanged);
+            // 
+            // labelInvoiceDate
+            // 
+            this.labelInvoiceDate.Font = new System.Drawing.Font("Microsoft Sans Serif", 11F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.labelInvoiceDate.Location = new System.Drawing.Point(295, 61);
+            this.labelInvoiceDate.Name = "labelInvoiceDate";
+            this.labelInvoiceDate.Size = new System.Drawing.Size(90, 23);
+            this.labelInvoiceDate.TabIndex = 16;
+            this.labelInvoiceDate.Text = "Invoice Date";
+            // 
+            // labelInvoiceAmount
+            // 
+            this.labelInvoiceAmount.Font = new System.Drawing.Font("Microsoft Sans Serif", 11F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.labelInvoiceAmount.Location = new System.Drawing.Point(545, 61);
+            this.labelInvoiceAmount.Name = "labelInvoiceAmount";
+            this.labelInvoiceAmount.Size = new System.Drawing.Size(110, 23);
+            this.labelInvoiceAmount.TabIndex = 17;
+            this.labelInvoiceAmount.Text = "Invoice Amount";
+            this.labelInvoiceAmount.Click += new System.EventHandler(this.labelInvoiceAmount_Click);
+            // 
+            // labelInvoiceNo
+            // 
+            this.labelInvoiceNo.Font = new System.Drawing.Font("Microsoft Sans Serif", 11F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.labelInvoiceNo.Location = new System.Drawing.Point(20, 61);
+            this.labelInvoiceNo.Name = "labelInvoiceNo";
+            this.labelInvoiceNo.Size = new System.Drawing.Size(85, 23);
+            this.labelInvoiceNo.TabIndex = 15;
+            this.labelInvoiceNo.Text = "Invoice No.";
+            // 
+            // cmbPaymntMethod
+            // 
+            appearance27.BorderColor = System.Drawing.Color.DeepSkyBlue;
+            this.cmbPaymntMethod.Appearance = appearance27;
             this.cmbPaymntMethod.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
-            this.cmbPaymntMethod.Font = new System.Drawing.Font("Microsoft Sans Serif", 15F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.cmbPaymntMethod.Font = new System.Drawing.Font("Microsoft Sans Serif", 11F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.cmbPaymntMethod.Location = new System.Drawing.Point(296, 34);
             this.cmbPaymntMethod.Name = "cmbPaymntMethod";
-            this.cmbPaymntMethod.Size = new System.Drawing.Size(192, 31);
+            this.cmbPaymntMethod.Size = new System.Drawing.Size(192, 24);
             this.cmbPaymntMethod.TabIndex = 2;
             this.cmbPaymntMethod.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
             this.cmbPaymntMethod.ValueChanged += new System.EventHandler(this.cmbPaymntMethod_SelectedIndexChanged);
@@ -617,22 +667,12 @@ namespace PosBranch_Win.Transaction
             // labelPaymentMethod
             // 
             this.labelPaymentMethod.AutoSize = true;
-            this.labelPaymentMethod.Font = new System.Drawing.Font("Microsoft Sans Serif", 15F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.labelPaymentMethod.Location = new System.Drawing.Point(302, 6);
+            this.labelPaymentMethod.Font = new System.Drawing.Font("Microsoft Sans Serif", 11F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.labelPaymentMethod.Location = new System.Drawing.Point(373, 6);
             this.labelPaymentMethod.Name = "labelPaymentMethod";
-            this.labelPaymentMethod.Size = new System.Drawing.Size(163, 26);
+            this.labelPaymentMethod.Size = new System.Drawing.Size(119, 19);
             this.labelPaymentMethod.TabIndex = 9;
             this.labelPaymentMethod.Text = "Payment Method";
-            // 
-            // labelCustomerName
-            // 
-            this.labelCustomerName.AutoSize = true;
-            this.labelCustomerName.Font = new System.Drawing.Font("Microsoft Sans Serif", 15F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.labelCustomerName.Location = new System.Drawing.Point(25, 6);
-            this.labelCustomerName.Name = "labelCustomerName";
-            this.labelCustomerName.Size = new System.Drawing.Size(157, 26);
-            this.labelCustomerName.TabIndex = 7;
-            this.labelCustomerName.Text = "Customer Name";
             // 
             // panel5
             // 
@@ -659,11 +699,11 @@ namespace PosBranch_Win.Transaction
             // 
             // ultraLabel4
             // 
-            appearance27.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
-            appearance27.BorderColor2 = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
-            appearance27.BorderColor3DBase = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(128)))), ((int)(((byte)(255)))));
-            appearance27.TextHAlignAsString = "Center";
-            this.ultraLabel4.Appearance = appearance27;
+            appearance28.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
+            appearance28.BorderColor2 = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
+            appearance28.BorderColor3DBase = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(128)))), ((int)(((byte)(255)))));
+            appearance28.TextHAlignAsString = "Center";
+            this.ultraLabel4.Appearance = appearance28;
             this.ultraLabel4.BorderStyleInner = Infragistics.Win.UIElementBorderStyle.WindowsVista;
             this.ultraLabel4.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.ultraLabel4.Location = new System.Drawing.Point(91, 187);
@@ -675,10 +715,10 @@ namespace PosBranch_Win.Transaction
             // 
             // ultraPictureBox3
             // 
-            appearance28.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(255)))), ((int)(((byte)(192)))));
-            appearance28.BorderColor2 = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
-            appearance28.BorderColor3DBase = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
-            this.ultraPictureBox3.Appearance = appearance28;
+            appearance29.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(255)))), ((int)(((byte)(192)))));
+            appearance29.BorderColor2 = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
+            appearance29.BorderColor3DBase = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
+            this.ultraPictureBox3.Appearance = appearance29;
             this.ultraPictureBox3.BorderShadowColor = System.Drawing.Color.Empty;
             this.ultraPictureBox3.BorderStyle = Infragistics.Win.UIElementBorderStyle.Rounded1Etched;
             this.ultraPictureBox3.Cursor = System.Windows.Forms.Cursors.Hand;
@@ -690,11 +730,11 @@ namespace PosBranch_Win.Transaction
             // 
             // ultraLabel3
             // 
-            appearance29.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
-            appearance29.BorderColor2 = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
-            appearance29.BorderColor3DBase = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(128)))), ((int)(((byte)(255)))));
-            appearance29.TextHAlignAsString = "Center";
-            this.ultraLabel3.Appearance = appearance29;
+            appearance30.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
+            appearance30.BorderColor2 = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
+            appearance30.BorderColor3DBase = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(128)))), ((int)(((byte)(255)))));
+            appearance30.TextHAlignAsString = "Center";
+            this.ultraLabel3.Appearance = appearance30;
             this.ultraLabel3.BorderStyleInner = Infragistics.Win.UIElementBorderStyle.WindowsVista;
             this.ultraLabel3.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.ultraLabel3.Location = new System.Drawing.Point(17, 187);
@@ -705,10 +745,10 @@ namespace PosBranch_Win.Transaction
             // 
             // pbxExit
             // 
-            appearance30.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(255)))), ((int)(((byte)(192)))));
-            appearance30.BorderColor2 = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
-            appearance30.BorderColor3DBase = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
-            this.pbxExit.Appearance = appearance30;
+            appearance31.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(255)))), ((int)(((byte)(192)))));
+            appearance31.BorderColor2 = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
+            appearance31.BorderColor3DBase = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
+            this.pbxExit.Appearance = appearance31;
             this.pbxExit.BorderShadowColor = System.Drawing.Color.Empty;
             this.pbxExit.BorderStyle = Infragistics.Win.UIElementBorderStyle.Rounded1Etched;
             this.pbxExit.Cursor = System.Windows.Forms.Cursors.Hand;
@@ -721,11 +761,11 @@ namespace PosBranch_Win.Transaction
             // 
             // ultraLabel2
             // 
-            appearance31.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
-            appearance31.BorderColor2 = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
-            appearance31.BorderColor3DBase = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(128)))), ((int)(((byte)(255)))));
-            appearance31.TextHAlignAsString = "Center";
-            this.ultraLabel2.Appearance = appearance31;
+            appearance32.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
+            appearance32.BorderColor2 = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
+            appearance32.BorderColor3DBase = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(128)))), ((int)(((byte)(255)))));
+            appearance32.TextHAlignAsString = "Center";
+            this.ultraLabel2.Appearance = appearance32;
             this.ultraLabel2.BorderStyleInner = Infragistics.Win.UIElementBorderStyle.WindowsVista;
             this.ultraLabel2.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.ultraLabel2.Location = new System.Drawing.Point(159, 85);
@@ -736,10 +776,10 @@ namespace PosBranch_Win.Transaction
             // 
             // ultraPictureBox2
             // 
-            appearance32.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(255)))), ((int)(((byte)(192)))));
-            appearance32.BorderColor2 = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
-            appearance32.BorderColor3DBase = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
-            this.ultraPictureBox2.Appearance = appearance32;
+            appearance33.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(255)))), ((int)(((byte)(192)))));
+            appearance33.BorderColor2 = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
+            appearance33.BorderColor3DBase = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
+            this.ultraPictureBox2.Appearance = appearance33;
             this.ultraPictureBox2.BorderShadowColor = System.Drawing.Color.Empty;
             this.ultraPictureBox2.BorderStyle = Infragistics.Win.UIElementBorderStyle.Rounded1Etched;
             this.ultraPictureBox2.Cursor = System.Windows.Forms.Cursors.Hand;
@@ -751,11 +791,11 @@ namespace PosBranch_Win.Transaction
             // 
             // ultraLabel1
             // 
-            appearance33.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
-            appearance33.BorderColor2 = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
-            appearance33.BorderColor3DBase = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(128)))), ((int)(((byte)(255)))));
-            appearance33.TextHAlignAsString = "Center";
-            this.ultraLabel1.Appearance = appearance33;
+            appearance34.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
+            appearance34.BorderColor2 = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
+            appearance34.BorderColor3DBase = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(128)))), ((int)(((byte)(255)))));
+            appearance34.TextHAlignAsString = "Center";
+            this.ultraLabel1.Appearance = appearance34;
             this.ultraLabel1.BorderStyleInner = Infragistics.Win.UIElementBorderStyle.WindowsVista;
             this.ultraLabel1.Font = new System.Drawing.Font("Microsoft Sans Serif", 8F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.ultraLabel1.Location = new System.Drawing.Point(86, 85);
@@ -766,10 +806,10 @@ namespace PosBranch_Win.Transaction
             // 
             // ultraPictureBox1
             // 
-            appearance34.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(255)))), ((int)(((byte)(192)))));
-            appearance34.BorderColor2 = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
-            appearance34.BorderColor3DBase = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
-            this.ultraPictureBox1.Appearance = appearance34;
+            appearance35.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(255)))), ((int)(((byte)(192)))));
+            appearance35.BorderColor2 = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
+            appearance35.BorderColor3DBase = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
+            this.ultraPictureBox1.Appearance = appearance35;
             this.ultraPictureBox1.BorderShadowColor = System.Drawing.Color.Empty;
             this.ultraPictureBox1.BorderStyle = Infragistics.Win.UIElementBorderStyle.Rounded1Etched;
             this.ultraPictureBox1.Cursor = System.Windows.Forms.Cursors.Hand;
@@ -781,11 +821,11 @@ namespace PosBranch_Win.Transaction
             // 
             // lblSave
             // 
-            appearance35.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
-            appearance35.BorderColor2 = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
-            appearance35.BorderColor3DBase = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(128)))), ((int)(((byte)(255)))));
-            appearance35.TextHAlignAsString = "Center";
-            this.lblSave.Appearance = appearance35;
+            appearance36.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
+            appearance36.BorderColor2 = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
+            appearance36.BorderColor3DBase = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(128)))), ((int)(((byte)(255)))));
+            appearance36.TextHAlignAsString = "Center";
+            this.lblSave.Appearance = appearance36;
             this.lblSave.BorderStyleInner = Infragistics.Win.UIElementBorderStyle.WindowsVista;
             this.lblSave.Font = new System.Drawing.Font("Microsoft Sans Serif", 8F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.lblSave.Location = new System.Drawing.Point(12, 86);
@@ -796,10 +836,10 @@ namespace PosBranch_Win.Transaction
             // 
             // pbxSave
             // 
-            appearance36.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(255)))), ((int)(((byte)(192)))));
-            appearance36.BorderColor2 = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
-            appearance36.BorderColor3DBase = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
-            this.pbxSave.Appearance = appearance36;
+            appearance37.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(255)))), ((int)(((byte)(192)))));
+            appearance37.BorderColor2 = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
+            appearance37.BorderColor3DBase = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
+            this.pbxSave.Appearance = appearance37;
             this.pbxSave.BorderShadowColor = System.Drawing.Color.Empty;
             this.pbxSave.BorderStyle = Infragistics.Win.UIElementBorderStyle.Rounded1Etched;
             this.pbxSave.Cursor = System.Windows.Forms.Cursors.Hand;
@@ -812,10 +852,10 @@ namespace PosBranch_Win.Transaction
             // 
             // updtbtn
             // 
-            appearance37.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(255)))), ((int)(((byte)(192)))));
-            appearance37.BorderColor2 = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
-            appearance37.BorderColor3DBase = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
-            this.updtbtn.Appearance = appearance37;
+            appearance38.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(255)))), ((int)(((byte)(192)))));
+            appearance38.BorderColor2 = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
+            appearance38.BorderColor3DBase = System.Drawing.Color.FromArgb(((int)(((byte)(255)))), ((int)(((byte)(192)))), ((int)(((byte)(255)))));
+            this.updtbtn.Appearance = appearance38;
             this.updtbtn.BorderShadowColor = System.Drawing.Color.Empty;
             this.updtbtn.BorderStyle = Infragistics.Win.UIElementBorderStyle.Rounded1Etched;
             this.updtbtn.Cursor = System.Windows.Forms.Cursors.Hand;
@@ -854,19 +894,17 @@ namespace PosBranch_Win.Transaction
             this.ultraPanel9.ClientArea.ResumeLayout(false);
             this.ultraPanel9.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.TxtSubTotal)).EndInit();
-            this.ultraPanel1.ClientArea.ResumeLayout(false);
-            this.ultraPanel1.ClientArea.PerformLayout();
             this.ultraPanel1.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)(this.dtInvoiceDate)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.textBox1)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.TxtBarcode)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.TxtInvoiceAmnt)).EndInit();
             this.panel2.ClientArea.ResumeLayout(false);
             this.panel2.ClientArea.PerformLayout();
             this.panel2.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.textBox2)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.dtSReturnDate)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.TxtSRNO)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.dtInvoiceDate)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.textBox1)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.TxtBarcode)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.TxtInvoiceAmnt)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.cmbPaymntMethod)).EndInit();
             this.panel5.ClientArea.ResumeLayout(false);
             this.panel5.ResumeLayout(false);
@@ -895,7 +933,6 @@ namespace PosBranch_Win.Transaction
         public Infragistics.Win.UltraWinEditors.UltraDateTimeEditor dtInvoiceDate;
         private Infragistics.Win.Misc.UltraPanel panel2;
         private Infragistics.Win.Misc.UltraLabel label1;
-        private System.Windows.Forms.Button button2;
         public Infragistics.Win.UltraWinEditors.UltraTextEditor textBox2;
         private System.Windows.Forms.Button button1;
         private Infragistics.Win.UltraWinEditors.UltraDateTimeEditor dtSReturnDate;
@@ -907,7 +944,6 @@ namespace PosBranch_Win.Transaction
         private Infragistics.Win.Misc.UltraLabel labelCustomerName;
         private Infragistics.Win.Misc.UltraLabel labelInvoiceNo;
         private Infragistics.Win.Misc.UltraPanel ultraPanel1;
-        private System.Windows.Forms.Button barbtn;
         private Infragistics.Win.Misc.UltraLabel labelBarcode;
         public Infragistics.Win.UltraWinEditors.UltraTextEditor textBox1;
         public Infragistics.Win.UltraWinEditors.UltraTextEditor TxtBarcode;
@@ -921,5 +957,9 @@ namespace PosBranch_Win.Transaction
         private Infragistics.Win.Misc.UltraPanel ultraPanel9;
         public Infragistics.Win.Misc.UltraLabel txtNetTotal;
         private Infragistics.Win.Misc.UltraPanel gridFooterPanel;
+        private System.Windows.Forms.Button barbtn;
+        private System.Windows.Forms.Button button3;
+        public System.Windows.Forms.RadioButton rbWithBill;
+        public System.Windows.Forms.RadioButton rbWithoutBill;
     }
 }

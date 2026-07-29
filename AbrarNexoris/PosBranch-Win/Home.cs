@@ -660,6 +660,18 @@ namespace PosBranch_Win
                 newTab.TabPage.Invalidate();
                 newTab.TabPage.Update();
 
+                // Focus the form and its initial active control immediately
+                try
+                {
+                    formToOpen.Focus();
+                    formToOpen.Select();
+                    if (formToOpen.ActiveControl != null)
+                    {
+                        formToOpen.ActiveControl.Focus();
+                    }
+                }
+                catch { }
+
                 // Wire up the form's FormClosed event to remove the tab
                 formToOpen.FormClosed += (sender, e) =>
                 {
@@ -1354,6 +1366,20 @@ namespace PosBranch_Win
         private void TabControlMain_SelectedTabChanged(object sender, Infragistics.Win.UltraWinTabControl.SelectedTabChangedEventArgs e)
         {
             UpdateHoldToolVisibility();
+            try
+            {
+                var activeForm = GetActiveTabForm();
+                if (activeForm != null)
+                {
+                    activeForm.Focus();
+                    activeForm.Select();
+                    if (activeForm.ActiveControl != null)
+                    {
+                        activeForm.ActiveControl.Focus();
+                    }
+                }
+            }
+            catch { }
         }
 
         private void UpdateHoldToolVisibility()
