@@ -1,4 +1,4 @@
-﻿namespace PosBranch_Win.Reports.InventoryReport
+namespace PosBranch_Win.Reports.InventoryReport
 {
     partial class frmItemReport
     {
@@ -30,7 +30,11 @@
         {
             Infragistics.Win.Appearance appearance1 = new Infragistics.Win.Appearance();
             Infragistics.Win.Appearance appearance2 = new Infragistics.Win.Appearance();
+            Infragistics.Win.Appearance appearanceActionBar = new Infragistics.Win.Appearance();
+            Infragistics.Win.Appearance appearanceSummary = new Infragistics.Win.Appearance();
             this.ultraPanelControls = new Infragistics.Win.Misc.UltraPanel();
+            this.ultraPanelActionBar = new Infragistics.Win.Misc.UltraPanel();
+            this.btnHideSelection = new Infragistics.Win.Misc.UltraButton();
             this.btnClose = new Infragistics.Win.Misc.UltraButton();
             this.btnPrint = new Infragistics.Win.Misc.UltraButton();
             this.btnExport = new Infragistics.Win.Misc.UltraButton();
@@ -75,6 +79,8 @@
             this.ultraLabelTotalInCaption = new Infragistics.Win.Misc.UltraLabel();
             this.ultraPanelControls.ClientArea.SuspendLayout();
             this.ultraPanelControls.SuspendLayout();
+            this.ultraPanelActionBar.ClientArea.SuspendLayout();
+            this.ultraPanelActionBar.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.ultraComboBranch)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.ultraComboItem)).BeginInit();
             this.ultraPanelItemDetails.ClientArea.SuspendLayout();
@@ -97,15 +103,13 @@
             // 
             // ultraPanelControls
             // 
-            appearance1.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(236)))), ((int)(((byte)(240)))), ((int)(((byte)(245)))));
+            appearance1.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(223)))), ((int)(((byte)(235)))), ((int)(((byte)(247)))));
+            appearance1.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(167)))), ((int)(((byte)(188)))), ((int)(((byte)(214)))));
             this.ultraPanelControls.Appearance = appearance1;
+            this.ultraPanelControls.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
             // 
             // ultraPanelControls.ClientArea
             // 
-            this.ultraPanelControls.ClientArea.Controls.Add(this.btnClose);
-            this.ultraPanelControls.ClientArea.Controls.Add(this.btnPrint);
-            this.ultraPanelControls.ClientArea.Controls.Add(this.btnExport);
-            this.ultraPanelControls.ClientArea.Controls.Add(this.btnSearch);
             this.ultraPanelControls.ClientArea.Controls.Add(this.ultraComboBranch);
             this.ultraPanelControls.ClientArea.Controls.Add(this.ultraLabelBranch);
             this.ultraPanelControls.ClientArea.Controls.Add(this.ultraComboItem);
@@ -116,58 +120,87 @@
             this.ultraPanelControls.Size = new System.Drawing.Size(1349, 60);
             this.ultraPanelControls.TabIndex = 0;
             // 
-            // btnClose
+            // ultraPanelActionBar
             // 
-            this.btnClose.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.btnClose.Location = new System.Drawing.Point(1239, 16);
-            this.btnClose.Name = "btnClose";
-            this.btnClose.Size = new System.Drawing.Size(95, 30);
-            this.btnClose.TabIndex = 7;
-            this.btnClose.Text = "Close";
-            this.btnClose.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
-            this.btnClose.Click += new System.EventHandler(this.btnClose_Click);
+            appearanceActionBar.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(214)))), ((int)(((byte)(230)))), ((int)(((byte)(246)))));
+            appearanceActionBar.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(167)))), ((int)(((byte)(188)))), ((int)(((byte)(214)))));
+            this.ultraPanelActionBar.Appearance = appearanceActionBar;
+            this.ultraPanelActionBar.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
             // 
-            // btnPrint
+            // ultraPanelActionBar.ClientArea
             // 
-            this.btnPrint.Location = new System.Drawing.Point(730, 16);
-            this.btnPrint.Name = "btnPrint";
-            this.btnPrint.Size = new System.Drawing.Size(95, 30);
-            this.btnPrint.TabIndex = 6;
-            this.btnPrint.Text = "Print";
-            this.btnPrint.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
-            this.btnPrint.Click += new System.EventHandler(this.btnPrint_Click);
-            // 
-            // btnExport
-            // 
-            this.btnExport.Location = new System.Drawing.Point(625, 16);
-            this.btnExport.Name = "btnExport";
-            this.btnExport.Size = new System.Drawing.Size(95, 30);
-            this.btnExport.TabIndex = 5;
-            this.btnExport.Text = "Export";
-            this.btnExport.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
-            this.btnExport.Click += new System.EventHandler(this.btnExport_Click);
+            this.ultraPanelActionBar.ClientArea.Controls.Add(this.btnSearch);
+            this.ultraPanelActionBar.ClientArea.Controls.Add(this.btnExport);
+            this.ultraPanelActionBar.ClientArea.Controls.Add(this.btnPrint);
+            this.ultraPanelActionBar.ClientArea.Controls.Add(this.btnClose);
+            this.ultraPanelActionBar.ClientArea.Controls.Add(this.btnHideSelection);
+            this.ultraPanelActionBar.Dock = System.Windows.Forms.DockStyle.Top;
+            this.ultraPanelActionBar.Location = new System.Drawing.Point(0, 60);
+            this.ultraPanelActionBar.Name = "ultraPanelActionBar";
+            this.ultraPanelActionBar.Size = new System.Drawing.Size(1349, 42);
+            this.ultraPanelActionBar.TabIndex = 1;
             // 
             // btnSearch
             // 
-            this.btnSearch.Location = new System.Drawing.Point(520, 16);
+            this.btnSearch.Location = new System.Drawing.Point(16, 7);
             this.btnSearch.Name = "btnSearch";
-            this.btnSearch.Size = new System.Drawing.Size(95, 30);
-            this.btnSearch.TabIndex = 4;
+            this.btnSearch.Size = new System.Drawing.Size(110, 28);
+            this.btnSearch.TabIndex = 0;
             this.btnSearch.Text = "Search";
             this.btnSearch.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
             this.btnSearch.Click += new System.EventHandler(this.btnSearch_Click);
             // 
+            // btnExport
+            // 
+            this.btnExport.Location = new System.Drawing.Point(132, 7);
+            this.btnExport.Name = "btnExport";
+            this.btnExport.Size = new System.Drawing.Size(100, 28);
+            this.btnExport.TabIndex = 1;
+            this.btnExport.Text = "Export";
+            this.btnExport.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
+            this.btnExport.Click += new System.EventHandler(this.btnExport_Click);
+            // 
+            // btnPrint
+            // 
+            this.btnPrint.Location = new System.Drawing.Point(238, 7);
+            this.btnPrint.Name = "btnPrint";
+            this.btnPrint.Size = new System.Drawing.Size(100, 28);
+            this.btnPrint.TabIndex = 2;
+            this.btnPrint.Text = "Print";
+            this.btnPrint.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
+            this.btnPrint.Click += new System.EventHandler(this.btnPrint_Click);
+            // 
+            // btnClose
+            // 
+            this.btnClose.Location = new System.Drawing.Point(344, 7);
+            this.btnClose.Name = "btnClose";
+            this.btnClose.Size = new System.Drawing.Size(100, 28);
+            this.btnClose.TabIndex = 3;
+            this.btnClose.Text = "Close";
+            this.btnClose.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
+            this.btnClose.Click += new System.EventHandler(this.btnClose_Click);
+            // 
+            // btnHideSelection
+            // 
+            this.btnHideSelection.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.btnHideSelection.Location = new System.Drawing.Point(1214, 7);
+            this.btnHideSelection.Name = "btnHideSelection";
+            this.btnHideSelection.Size = new System.Drawing.Size(120, 28);
+            this.btnHideSelection.TabIndex = 4;
+            this.btnHideSelection.Text = "Hide Selection";
+            this.btnHideSelection.Click += new System.EventHandler(this.btnHideSelection_Click);
+            // 
             // ultraComboBranch
             // 
             this.ultraComboBranch.DropDownStyle = Infragistics.Win.DropDownStyle.DropDownList;
-            this.ultraComboBranch.Location = new System.Drawing.Point(380, 19);
+            this.ultraComboBranch.Location = new System.Drawing.Point(380, 17);
             this.ultraComboBranch.Name = "ultraComboBranch";
-            this.ultraComboBranch.Size = new System.Drawing.Size(130, 25);
+            this.ultraComboBranch.Size = new System.Drawing.Size(180, 25);
             this.ultraComboBranch.TabIndex = 3;
             // 
             // ultraLabelBranch
             // 
-            this.ultraLabelBranch.Location = new System.Drawing.Point(320, 22);
+            this.ultraLabelBranch.Location = new System.Drawing.Point(320, 20);
             this.ultraLabelBranch.Name = "ultraLabelBranch";
             this.ultraLabelBranch.Size = new System.Drawing.Size(55, 23);
             this.ultraLabelBranch.TabIndex = 2;
@@ -176,14 +209,14 @@
             // ultraComboItem
             // 
             this.ultraComboItem.AutoCompleteMode = Infragistics.Win.AutoCompleteMode.SuggestAppend;
-            this.ultraComboItem.Location = new System.Drawing.Point(60, 19);
+            this.ultraComboItem.Location = new System.Drawing.Point(60, 17);
             this.ultraComboItem.Name = "ultraComboItem";
-            this.ultraComboItem.Size = new System.Drawing.Size(250, 25);
+            this.ultraComboItem.Size = new System.Drawing.Size(240, 25);
             this.ultraComboItem.TabIndex = 1;
             // 
             // ultraLabelItem
             // 
-            this.ultraLabelItem.Location = new System.Drawing.Point(12, 22);
+            this.ultraLabelItem.Location = new System.Drawing.Point(12, 20);
             this.ultraLabelItem.Name = "ultraLabelItem";
             this.ultraLabelItem.Size = new System.Drawing.Size(42, 23);
             this.ultraLabelItem.TabIndex = 0;
@@ -191,13 +224,13 @@
             // 
             // ultraPanelItemDetails
             // 
-            appearance2.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(250)))), ((int)(((byte)(252)))), ((int)(((byte)(255)))));
-            appearance2.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(200)))), ((int)(((byte)(210)))), ((int)(((byte)(220)))));
+            appearance2.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(238)))), ((int)(((byte)(244)))), ((int)(((byte)(252)))));
+            appearance2.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(180)))), ((int)(((byte)(200)))), ((int)(((byte)(225)))));
             this.ultraPanelItemDetails.Appearance = appearance2;
             this.ultraPanelItemDetails.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
             // 
             // ultraPanelItemDetails.ClientArea
-            // 
+            //  
             this.ultraPanelItemDetails.ClientArea.Controls.Add(this.ultraLabelLocation);
             this.ultraPanelItemDetails.ClientArea.Controls.Add(this.ultraLabelLocationValue);
             this.ultraPanelItemDetails.ClientArea.Controls.Add(this.ultraLabelSubCategory);
@@ -312,43 +345,42 @@
             this.ultraLabelItemNameValue.TabIndex = 0;
             this.ultraLabelItemNameValue.Text = "-";
             // 
+            // 
             // ultraTabControlMain
             // 
-            this.ultraTabControlMain.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
             this.ultraTabControlMain.Controls.Add(this.ultraTabSharedControlsPage1);
             this.ultraTabControlMain.Controls.Add(this.ultraTabPageTransactions);
             this.ultraTabControlMain.Controls.Add(this.ultraTabPagePriceSettings);
             this.ultraTabControlMain.Controls.Add(this.ultraTabPageVendors);
             this.ultraTabControlMain.Controls.Add(this.ultraTabPageStock);
             this.ultraTabControlMain.Controls.Add(this.ultraTabPagePendingOrders);
-            this.ultraTabControlMain.Location = new System.Drawing.Point(0, 130);
+            this.ultraTabControlMain.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.ultraTabControlMain.Location = new System.Drawing.Point(0, 172);
             this.ultraTabControlMain.Name = "ultraTabControlMain";
             this.ultraTabControlMain.SharedControlsPage = this.ultraTabSharedControlsPage1;
-            this.ultraTabControlMain.Size = new System.Drawing.Size(1349, 282);
+            this.ultraTabControlMain.Size = new System.Drawing.Size(1349, 324);
+            this.ultraTabControlMain.Style = Infragistics.Win.UltraWinTabControl.UltraTabControlStyle.Wizard;
             this.ultraTabControlMain.TabIndex = 2;
-            this.ultraTabControlMain.TabOrientation = Infragistics.Win.UltraWinTabs.TabOrientation.TopLeft;
             // 
             // ultraTabSharedControlsPage1
             // 
-            this.ultraTabSharedControlsPage1.Location = new System.Drawing.Point(1, 20);
+            this.ultraTabSharedControlsPage1.Location = new System.Drawing.Point(0, 0);
             this.ultraTabSharedControlsPage1.Name = "ultraTabSharedControlsPage1";
-            this.ultraTabSharedControlsPage1.Size = new System.Drawing.Size(1345, 259);
+            this.ultraTabSharedControlsPage1.Size = new System.Drawing.Size(1349, 324);
             // 
             // ultraTabPageTransactions
             // 
             this.ultraTabPageTransactions.Controls.Add(this.ultraGridTransactions);
-            this.ultraTabPageTransactions.Location = new System.Drawing.Point(2, 27);
+            this.ultraTabPageTransactions.Location = new System.Drawing.Point(0, 0);
             this.ultraTabPageTransactions.Name = "ultraTabPageTransactions";
-            this.ultraTabPageTransactions.Size = new System.Drawing.Size(1345, 321);
+            this.ultraTabPageTransactions.Size = new System.Drawing.Size(1349, 324);
             // 
             // ultraGridTransactions
             // 
             this.ultraGridTransactions.Dock = System.Windows.Forms.DockStyle.Fill;
             this.ultraGridTransactions.Location = new System.Drawing.Point(0, 0);
             this.ultraGridTransactions.Name = "ultraGridTransactions";
-            this.ultraGridTransactions.Size = new System.Drawing.Size(1345, 321);
+            this.ultraGridTransactions.Size = new System.Drawing.Size(1349, 324);
             this.ultraGridTransactions.TabIndex = 0;
             this.ultraGridTransactions.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
             // 
@@ -357,14 +389,14 @@
             this.ultraTabPagePriceSettings.Controls.Add(this.ultraGridPriceSettings);
             this.ultraTabPagePriceSettings.Location = new System.Drawing.Point(-10000, -10000);
             this.ultraTabPagePriceSettings.Name = "ultraTabPagePriceSettings";
-            this.ultraTabPagePriceSettings.Size = new System.Drawing.Size(1345, 321);
+            this.ultraTabPagePriceSettings.Size = new System.Drawing.Size(1345, 298);
             // 
             // ultraGridPriceSettings
             // 
             this.ultraGridPriceSettings.Dock = System.Windows.Forms.DockStyle.Fill;
             this.ultraGridPriceSettings.Location = new System.Drawing.Point(0, 0);
             this.ultraGridPriceSettings.Name = "ultraGridPriceSettings";
-            this.ultraGridPriceSettings.Size = new System.Drawing.Size(1345, 321);
+            this.ultraGridPriceSettings.Size = new System.Drawing.Size(1345, 298);
             this.ultraGridPriceSettings.TabIndex = 0;
             this.ultraGridPriceSettings.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
             // 
@@ -373,14 +405,14 @@
             this.ultraTabPageVendors.Controls.Add(this.ultraGridVendors);
             this.ultraTabPageVendors.Location = new System.Drawing.Point(-10000, -10000);
             this.ultraTabPageVendors.Name = "ultraTabPageVendors";
-            this.ultraTabPageVendors.Size = new System.Drawing.Size(1345, 321);
+            this.ultraTabPageVendors.Size = new System.Drawing.Size(1345, 298);
             // 
             // ultraGridVendors
             // 
             this.ultraGridVendors.Dock = System.Windows.Forms.DockStyle.Fill;
             this.ultraGridVendors.Location = new System.Drawing.Point(0, 0);
             this.ultraGridVendors.Name = "ultraGridVendors";
-            this.ultraGridVendors.Size = new System.Drawing.Size(1345, 321);
+            this.ultraGridVendors.Size = new System.Drawing.Size(1345, 298);
             this.ultraGridVendors.TabIndex = 0;
             this.ultraGridVendors.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
             // 
@@ -389,14 +421,14 @@
             this.ultraTabPageStock.Controls.Add(this.ultraGridStock);
             this.ultraTabPageStock.Location = new System.Drawing.Point(-10000, -10000);
             this.ultraTabPageStock.Name = "ultraTabPageStock";
-            this.ultraTabPageStock.Size = new System.Drawing.Size(1345, 321);
+            this.ultraTabPageStock.Size = new System.Drawing.Size(1345, 298);
             // 
             // ultraGridStock
             // 
             this.ultraGridStock.Dock = System.Windows.Forms.DockStyle.Fill;
             this.ultraGridStock.Location = new System.Drawing.Point(0, 0);
             this.ultraGridStock.Name = "ultraGridStock";
-            this.ultraGridStock.Size = new System.Drawing.Size(1345, 321);
+            this.ultraGridStock.Size = new System.Drawing.Size(1345, 298);
             this.ultraGridStock.TabIndex = 0;
             this.ultraGridStock.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
             // 
@@ -405,19 +437,23 @@
             this.ultraTabPagePendingOrders.Controls.Add(this.ultraGridPendingOrders);
             this.ultraTabPagePendingOrders.Location = new System.Drawing.Point(-10000, -10000);
             this.ultraTabPagePendingOrders.Name = "ultraTabPagePendingOrders";
-            this.ultraTabPagePendingOrders.Size = new System.Drawing.Size(1345, 321);
+            this.ultraTabPagePendingOrders.Size = new System.Drawing.Size(1345, 298);
             // 
             // ultraGridPendingOrders
             // 
             this.ultraGridPendingOrders.Dock = System.Windows.Forms.DockStyle.Fill;
             this.ultraGridPendingOrders.Location = new System.Drawing.Point(0, 0);
             this.ultraGridPendingOrders.Name = "ultraGridPendingOrders";
-            this.ultraGridPendingOrders.Size = new System.Drawing.Size(1345, 321);
+            this.ultraGridPendingOrders.Size = new System.Drawing.Size(1345, 298);
             this.ultraGridPendingOrders.TabIndex = 0;
             this.ultraGridPendingOrders.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
             // 
             // ultraPanelSummary
             // 
+            appearanceSummary.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(214)))), ((int)(((byte)(230)))), ((int)(((byte)(246)))));
+            appearanceSummary.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(167)))), ((int)(((byte)(188)))), ((int)(((byte)(214)))));
+            this.ultraPanelSummary.Appearance = appearanceSummary;
+            this.ultraPanelSummary.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
             // 
             // ultraPanelSummary.ClientArea
             // 
@@ -430,72 +466,72 @@
             this.ultraPanelSummary.ClientArea.Controls.Add(this.ultraLabelTotalInValue);
             this.ultraPanelSummary.ClientArea.Controls.Add(this.ultraLabelTotalInCaption);
             this.ultraPanelSummary.Dock = System.Windows.Forms.DockStyle.Bottom;
-            this.ultraPanelSummary.Location = new System.Drawing.Point(0, 418);
+            this.ultraPanelSummary.Location = new System.Drawing.Point(0, 496);
             this.ultraPanelSummary.Name = "ultraPanelSummary";
-            this.ultraPanelSummary.Size = new System.Drawing.Size(1349, 143);
+            this.ultraPanelSummary.Size = new System.Drawing.Size(1349, 65);
             this.ultraPanelSummary.TabIndex = 3;
             // 
             // ultraLabelStockValueValue
             // 
-            this.ultraLabelStockValueValue.Location = new System.Drawing.Point(560, 40);
+            this.ultraLabelStockValueValue.Location = new System.Drawing.Point(560, 30);
             this.ultraLabelStockValueValue.Name = "ultraLabelStockValueValue";
-            this.ultraLabelStockValueValue.Size = new System.Drawing.Size(200, 30);
+            this.ultraLabelStockValueValue.Size = new System.Drawing.Size(200, 25);
             this.ultraLabelStockValueValue.TabIndex = 7;
             this.ultraLabelStockValueValue.Text = "₹ 0.00";
             // 
             // ultraLabelStockValueCaption
             // 
-            this.ultraLabelStockValueCaption.Location = new System.Drawing.Point(536, 15);
+            this.ultraLabelStockValueCaption.Location = new System.Drawing.Point(560, 8);
             this.ultraLabelStockValueCaption.Name = "ultraLabelStockValueCaption";
-            this.ultraLabelStockValueCaption.Size = new System.Drawing.Size(150, 23);
+            this.ultraLabelStockValueCaption.Size = new System.Drawing.Size(150, 20);
             this.ultraLabelStockValueCaption.TabIndex = 6;
-            this.ultraLabelStockValueCaption.Text = "💰 Stock Value:";
+            this.ultraLabelStockValueCaption.Text = "Stock Value:";
             // 
             // ultraLabelCurrentStockValue
             // 
-            this.ultraLabelCurrentStockValue.Location = new System.Drawing.Point(380, 40);
+            this.ultraLabelCurrentStockValue.Location = new System.Drawing.Point(380, 30);
             this.ultraLabelCurrentStockValue.Name = "ultraLabelCurrentStockValue";
-            this.ultraLabelCurrentStockValue.Size = new System.Drawing.Size(150, 30);
+            this.ultraLabelCurrentStockValue.Size = new System.Drawing.Size(150, 25);
             this.ultraLabelCurrentStockValue.TabIndex = 5;
             this.ultraLabelCurrentStockValue.Text = "0";
             // 
             // ultraLabelCurrentStockCaption
             // 
-            this.ultraLabelCurrentStockCaption.Location = new System.Drawing.Point(380, 15);
+            this.ultraLabelCurrentStockCaption.Location = new System.Drawing.Point(380, 8);
             this.ultraLabelCurrentStockCaption.Name = "ultraLabelCurrentStockCaption";
-            this.ultraLabelCurrentStockCaption.Size = new System.Drawing.Size(150, 23);
+            this.ultraLabelCurrentStockCaption.Size = new System.Drawing.Size(150, 20);
             this.ultraLabelCurrentStockCaption.TabIndex = 4;
-            this.ultraLabelCurrentStockCaption.Text = " Current Stock:";
+            this.ultraLabelCurrentStockCaption.Text = "Current Stock:";
             // 
             // ultraLabelTotalOutValue
             // 
-            this.ultraLabelTotalOutValue.Location = new System.Drawing.Point(200, 40);
+            this.ultraLabelTotalOutValue.Location = new System.Drawing.Point(200, 30);
             this.ultraLabelTotalOutValue.Name = "ultraLabelTotalOutValue";
-            this.ultraLabelTotalOutValue.Size = new System.Drawing.Size(150, 30);
+            this.ultraLabelTotalOutValue.Size = new System.Drawing.Size(150, 25);
             this.ultraLabelTotalOutValue.TabIndex = 3;
-            this.ultraLabelTotalOutValue.Text = "0";
+            this.ultraLabelTotalOutValue.Text = "Total OUT:";
             // 
             // ultraLabelTotalOutCaption
             // 
-            this.ultraLabelTotalOutCaption.Location = new System.Drawing.Point(200, 15);
+            this.ultraLabelTotalOutCaption.Location = new System.Drawing.Point(200, 8);
             this.ultraLabelTotalOutCaption.Name = "ultraLabelTotalOutCaption";
-            this.ultraLabelTotalOutCaption.Size = new System.Drawing.Size(150, 23);
+            this.ultraLabelTotalOutCaption.Size = new System.Drawing.Size(150, 20);
             this.ultraLabelTotalOutCaption.TabIndex = 2;
             this.ultraLabelTotalOutCaption.Text = "Total OUT:";
             // 
             // ultraLabelTotalInValue
             // 
-            this.ultraLabelTotalInValue.Location = new System.Drawing.Point(20, 40);
+            this.ultraLabelTotalInValue.Location = new System.Drawing.Point(20, 30);
             this.ultraLabelTotalInValue.Name = "ultraLabelTotalInValue";
-            this.ultraLabelTotalInValue.Size = new System.Drawing.Size(150, 30);
+            this.ultraLabelTotalInValue.Size = new System.Drawing.Size(150, 25);
             this.ultraLabelTotalInValue.TabIndex = 1;
             this.ultraLabelTotalInValue.Text = "0";
             // 
             // ultraLabelTotalInCaption
             // 
-            this.ultraLabelTotalInCaption.Location = new System.Drawing.Point(20, 15);
+            this.ultraLabelTotalInCaption.Location = new System.Drawing.Point(20, 8);
             this.ultraLabelTotalInCaption.Name = "ultraLabelTotalInCaption";
-            this.ultraLabelTotalInCaption.Size = new System.Drawing.Size(150, 23);
+            this.ultraLabelTotalInCaption.Size = new System.Drawing.Size(150, 20);
             this.ultraLabelTotalInCaption.TabIndex = 0;
             this.ultraLabelTotalInCaption.Text = "Total IN:";
             // 
@@ -503,11 +539,12 @@
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(250)))), ((int)(((byte)(251)))), ((int)(((byte)(252)))));
+            this.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(245)))), ((int)(((byte)(249)))), ((int)(((byte)(254)))));
             this.ClientSize = new System.Drawing.Size(1349, 561);
-            this.Controls.Add(this.ultraPanelSummary);
             this.Controls.Add(this.ultraTabControlMain);
+            this.Controls.Add(this.ultraPanelSummary);
             this.Controls.Add(this.ultraPanelItemDetails);
+            this.Controls.Add(this.ultraPanelActionBar);
             this.Controls.Add(this.ultraPanelControls);
             this.Font = new System.Drawing.Font("Segoe UI", 9F);
             this.MinimumSize = new System.Drawing.Size(1024, 600);
@@ -519,6 +556,8 @@
             this.ultraPanelControls.ClientArea.ResumeLayout(false);
             this.ultraPanelControls.ClientArea.PerformLayout();
             this.ultraPanelControls.ResumeLayout(false);
+            this.ultraPanelActionBar.ClientArea.ResumeLayout(false);
+            this.ultraPanelActionBar.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.ultraComboBranch)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.ultraComboItem)).EndInit();
             this.ultraPanelItemDetails.ClientArea.ResumeLayout(false);
@@ -544,6 +583,8 @@
         #endregion
 
         private Infragistics.Win.Misc.UltraPanel ultraPanelControls;
+        private Infragistics.Win.Misc.UltraPanel ultraPanelActionBar;
+        private Infragistics.Win.Misc.UltraButton btnHideSelection;
         private Infragistics.Win.Misc.UltraLabel ultraLabelItem;
         private Infragistics.Win.UltraWinEditors.UltraComboEditor ultraComboItem;
         private Infragistics.Win.Misc.UltraLabel ultraLabelBranch;

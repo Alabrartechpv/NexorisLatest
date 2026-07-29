@@ -2596,10 +2596,12 @@ namespace PosBranch_Win
                         continue;
                     }
 
-                    // Apply theme based on control type (like IRS POS - theme EVERYTHING!)
+                    bool isIrsBlue = (themeColor.R == 0 && themeColor.G == 174 && themeColor.B == 219);
+
+                    // Apply theme based on control type (clean IRS POS palette: 90% light/white, 10% blue accents)
                     if (control is Panel panel && !panel.Name.Contains("color") && !panel.Name.Contains("language"))
                     {
-                        panel.BackColor = themeColor; // Use exact color like IRS POS
+                        panel.BackColor = isIrsBlue ? Color.FromArgb(247, 251, 255) : themeColor;
                     }
                     else if (control is Button button && !button.Name.StartsWith("color") && !button.Name.StartsWith("colorButton"))
                     {
@@ -2613,37 +2615,63 @@ namespace PosBranch_Win
                             continue;
                         }
 
-                        button.BackColor = Color.FromArgb(
-                            Math.Min(255, themeColor.R + 20),
-                            Math.Min(255, themeColor.G + 20),
-                            Math.Min(255, themeColor.B + 20)
-                        );
+                        if (isIrsBlue)
+                        {
+                            button.FlatStyle = FlatStyle.Flat;
+                            button.FlatAppearance.BorderSize = 1;
+                            button.FlatAppearance.BorderColor = Color.FromArgb(0, 140, 186);
+                            button.BackColor = Color.FromArgb(0, 174, 219);
+                            button.ForeColor = Color.White;
+                            button.Font = new Font("Segoe UI", 8.5f, FontStyle.Bold);
+                        }
+                        else
+                        {
+                            button.BackColor = Color.FromArgb(
+                                Math.Min(255, themeColor.R + 20),
+                                Math.Min(255, themeColor.G + 20),
+                                Math.Min(255, themeColor.B + 20)
+                            );
+                        }
                     }
                     else if (control is TextBox || control is ComboBox)
                     {
-                        control.BackColor = Color.FromArgb(
-                            Math.Min(255, themeColor.R + 30),
-                            Math.Min(255, themeColor.G + 30),
-                            Math.Min(255, themeColor.B + 30)
-                        );
+                        control.BackColor = Color.White;
+                        control.ForeColor = Color.FromArgb(45, 55, 72);
+                        control.Font = new Font("Segoe UI", 10f, FontStyle.Regular);
                     }
                     else if (control is DataGridView grid)
                     {
-                        grid.BackgroundColor = themeColor; // Use exact color like IRS POS
-                        grid.DefaultCellStyle.BackColor = Color.FromArgb(
-                            Math.Min(255, themeColor.R + 25),
-                            Math.Min(255, themeColor.G + 25),
-                            Math.Min(255, themeColor.B + 25)
-                        );
+                        grid.BackgroundColor = isIrsBlue ? Color.FromArgb(247, 251, 255) : themeColor;
+                        grid.DefaultCellStyle.BackColor = Color.White;
+                        grid.DefaultCellStyle.ForeColor = Color.FromArgb(45, 55, 72);
                     }
                     else if (control is Label || control is GroupBox)
                     {
-                        // Theme labels and group boxes too (like IRS POS)
-                        control.BackColor = Color.FromArgb(
-                            Math.Min(255, themeColor.R + 5),
-                            Math.Min(255, themeColor.G + 5),
-                            Math.Min(255, themeColor.B + 5)
-                        );
+                        control.BackColor = Color.Transparent;
+                        if (isIrsBlue)
+                        {
+                            if (control.Name.Equals("lblledger", StringComparison.OrdinalIgnoreCase))
+                            {
+                                control.ForeColor = Color.FromArgb(0, 102, 204);
+                                control.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
+                            }
+                            else
+                            {
+                                control.ForeColor = Color.FromArgb(45, 55, 72);
+                                if (!control.Font.Bold)
+                                {
+                                    control.Font = new Font("Segoe UI", control.Font.Size > 12 ? control.Font.Size : 9.5f, control.Font.Style);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            control.BackColor = Color.FromArgb(
+                                Math.Min(255, themeColor.R + 5),
+                                Math.Min(255, themeColor.G + 5),
+                                Math.Min(255, themeColor.B + 5)
+                            );
+                        }
                     }
 
                     // Recursively apply to child controls
@@ -2768,8 +2796,10 @@ namespace PosBranch_Win
             {
                 System.Diagnostics.Debug.WriteLine($"=== THEMING FORM: {form.GetType().Name} ===");
 
-                // Apply theme color to the form background
-                form.BackColor = Color.FromArgb(
+                bool isIrsBlue = (themeColor.R == 0 && themeColor.G == 174 && themeColor.B == 219);
+
+                // Apply theme color to the form background (soft #F4FAFF background like IRS POS)
+                form.BackColor = isIrsBlue ? Color.FromArgb(244, 250, 255) : Color.FromArgb(
                     Math.Min(255, themeColor.R + 5),
                     Math.Min(255, themeColor.G + 5),
                     Math.Min(255, themeColor.B + 5)
@@ -2827,29 +2857,80 @@ namespace PosBranch_Win
         {
             try
             {
+                bool isIrsBlue = (themeColor.R == 0 && themeColor.G == 174 && themeColor.B == 219);
+                Color panelBg = isIrsBlue ? Color.FromArgb(247, 251, 255) : themeColor;
+
                 foreach (Control control in controls)
                 {
                     // Handle UltraPanel controls
                     if (control.GetType().Name == "UltraPanel")
                     {
-                        // Use reflection to set appearance properties
-                        var appearanceProp = control.GetType().GetProperty("Appearance");
-                        if (appearanceProp != null)
+                        string pnlName = control.Name ?? "";
+
+                        if (pnlName.Equals("ultraPanel9", StringComparison.OrdinalIgnoreCase))
                         {
-                            var appearance = appearanceProp.GetValue(control);
-                            if (appearance != null)
+                            if (isIrsBlue)
                             {
-                                var backColorProp = appearance.GetType().GetProperty("BackColor");
-                                if (backColorProp != null)
+                                var appearanceProp = control.GetType().GetProperty("Appearance");
+                                if (appearanceProp != null)
                                 {
-                                    backColorProp.SetValue(appearance, themeColor);
-                                    System.Diagnostics.Debug.WriteLine($"Set UltraPanel appearance BackColor: {control.Name}");
+                                    var appearance = appearanceProp.GetValue(control);
+                                    if (appearance != null)
+                                    {
+                                        appearance.GetType().GetProperty("BackColor")?.SetValue(appearance, Color.FromArgb(170, 50, 0));
+                                        appearance.GetType().GetProperty("BackColor2")?.SetValue(appearance, Color.FromArgb(80, 10, 0));
+                                        appearance.GetType().GetProperty("BackGradientStyle")?.SetValue(appearance, Infragistics.Win.GradientStyle.Vertical);
+                                    }
                                 }
                             }
                         }
+                        else if (pnlName.Equals("ultraPanel7", StringComparison.OrdinalIgnoreCase))
+                        {
+                            // ultraPanel7 is the dark navy info widget (Total/Pymt/Change)
+                            // Keep its original dark appearance for contrast - do not override.
+                        }
+                        else if (pnlName.Equals("gridFooterPanel", StringComparison.OrdinalIgnoreCase))
+                        {
+                            // gridFooterPanel is the thin splitter bar below the grid.
+                            // For IRS Blue: keep it as light sky blue (matches the form background).
+                            // For other themes: use the theme color.
+                            Color footerColor = isIrsBlue ? Color.FromArgb(200, 228, 248) : themeColor;
+                            control.BackColor = footerColor;
+                            var appearanceProp = control.GetType().GetProperty("Appearance");
+                            if (appearanceProp != null)
+                            {
+                                var appearance = appearanceProp.GetValue(control);
+                                if (appearance != null)
+                                {
+                                    appearance.GetType().GetProperty("BackColor")?.SetValue(appearance, footerColor);
+                                    appearance.GetType().GetProperty("BackColor2")?.SetValue(appearance, footerColor);
+                                    appearance.GetType().GetProperty("BackGradientStyle")?.SetValue(appearance, Infragistics.Win.GradientStyle.None);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            // Use reflection to set appearance properties
+                            var appearanceProp = control.GetType().GetProperty("Appearance");
+                            if (appearanceProp != null)
+                            {
+                                var appearance = appearanceProp.GetValue(control);
+                                if (appearance != null)
+                                {
+                                    appearance.GetType().GetProperty("BackColor")?.SetValue(appearance, panelBg);
+                                    // Clear any gradient so solid color shows
+                                    if (isIrsBlue)
+                                    {
+                                        appearance.GetType().GetProperty("BackColor2")?.SetValue(appearance, panelBg);
+                                        appearance.GetType().GetProperty("BackGradientStyle")?.SetValue(appearance, Infragistics.Win.GradientStyle.None);
+                                    }
+                                    System.Diagnostics.Debug.WriteLine($"Set UltraPanel appearance BackColor: {control.Name}");
+                                }
+                            }
 
-                        // Also set regular BackColor as fallback
-                        control.BackColor = themeColor;
+                            // Also set regular BackColor as fallback
+                            control.BackColor = panelBg;
+                        }
                     }
 
                     // Recursively apply to child controls
@@ -2872,13 +2953,17 @@ namespace PosBranch_Win
         {
             try
             {
+                bool isIrsBlue = (themeColor.R == 0 && themeColor.G == 174 && themeColor.B == 219);
+                Color headerTop = isIrsBlue ? Color.FromArgb(0, 174, 219) : themeColor;
+                Color headerBottom = isIrsBlue ? Color.FromArgb(0, 140, 186) : Color.FromArgb(Math.Max(0, themeColor.R - 20), Math.Max(0, themeColor.G - 20), Math.Max(0, themeColor.B - 20));
+
                 foreach (Control control in controls)
                 {
                     // Handle UltraGrid controls
                     if (control.GetType().Name == "UltraGrid")
                     {
                         // Theme the grid background
-                        control.BackColor = Color.FromArgb(
+                        control.BackColor = isIrsBlue ? Color.FromArgb(247, 251, 255) : Color.FromArgb(
                             Math.Min(255, themeColor.R + 20),
                             Math.Min(255, themeColor.G + 20),
                             Math.Min(255, themeColor.B + 20)
@@ -2900,18 +2985,42 @@ namespace PosBranch_Win
                                         var overrideObj = overrideProp.GetValue(displayLayout);
                                         if (overrideObj != null)
                                         {
+                                            var headerStyleProp = overrideObj.GetType().GetProperty("HeaderStyle");
+                                            if (headerStyleProp != null)
+                                            {
+                                                headerStyleProp.SetValue(overrideObj, Infragistics.Win.HeaderStyle.WindowsXPCommand);
+                                            }
+
                                             var headerAppearanceProp = overrideObj.GetType().GetProperty("HeaderAppearance");
                                             if (headerAppearanceProp != null)
                                             {
                                                 var headerAppearance = headerAppearanceProp.GetValue(overrideObj);
                                                 if (headerAppearance != null)
                                                 {
-                                                    var backColorProp = headerAppearance.GetType().GetProperty("BackColor");
-                                                    if (backColorProp != null)
-                                                    {
-                                                        backColorProp.SetValue(headerAppearance, themeColor);
-                                                        System.Diagnostics.Debug.WriteLine($"Set UltraGrid header BackColor: {control.Name}");
-                                                    }
+                                                    headerAppearance.GetType().GetProperty("BackColor")?.SetValue(headerAppearance, headerTop);
+                                                    headerAppearance.GetType().GetProperty("BackColor2")?.SetValue(headerAppearance, headerBottom);
+                                                    headerAppearance.GetType().GetProperty("BackGradientStyle")?.SetValue(headerAppearance, Infragistics.Win.GradientStyle.Vertical);
+                                                    headerAppearance.GetType().GetProperty("ForeColor")?.SetValue(headerAppearance, Color.White);
+                                                    headerAppearance.GetType().GetProperty("ThemedElementAlpha")?.SetValue(headerAppearance, Infragistics.Win.Alpha.Transparent);
+                                                    System.Diagnostics.Debug.WriteLine($"Set UltraGrid header BackColor: {control.Name}");
+                                                }
+                                            }
+
+                                            if (isIrsBlue)
+                                            {
+                                                var rowAltProp = overrideObj.GetType().GetProperty("RowAlternateAppearance");
+                                                if (rowAltProp != null)
+                                                {
+                                                    var rowAlt = rowAltProp.GetValue(overrideObj);
+                                                    rowAlt?.GetType().GetProperty("BackColor")?.SetValue(rowAlt, Color.FromArgb(242, 248, 255));
+                                                }
+
+                                                var activeRowProp = overrideObj.GetType().GetProperty("ActiveRowAppearance");
+                                                if (activeRowProp != null)
+                                                {
+                                                    var activeRow = activeRowProp.GetValue(overrideObj);
+                                                    activeRow?.GetType().GetProperty("BackColor")?.SetValue(activeRow, Color.FromArgb(190, 225, 255));
+                                                    activeRow?.GetType().GetProperty("ForeColor")?.SetValue(activeRow, Color.Black);
                                                 }
                                             }
                                         }
@@ -2947,35 +3056,59 @@ namespace PosBranch_Win
             {
                 foreach (Control control in controls)
                 {
-                    // Handle UltraButton controls - but preserve functional button colors
+                    // Handle UltraButton controls
                     if (control.GetType().Name == "UltraButton")
                     {
-                        // Only theme buttons that don't have special functional colors
-                        // Skip buttons with names containing: print, delete, clear, save, cancel
                         string buttonName = control.Name?.ToLower() ?? "";
-                        if (!buttonName.Contains("print") && !buttonName.Contains("delete") &&
-                            !buttonName.Contains("clear") && !buttonName.Contains("save") &&
-                            !buttonName.Contains("cancel") && !buttonName.Contains("verify") &&
-                            !buttonName.Contains("closing") && !buttonName.Contains("close"))
+                        bool isIrsBlue = (themeColor.R == 0 && themeColor.G == 174 && themeColor.B == 219);
+
+                        // For IRS Blue: theme ALL buttons with cyan-blue except special delete/cancel/verify
+                        // For other themes: only skip destructive-action buttons
+                        bool skipButton = buttonName.Contains("delete") || buttonName.Contains("cancel") ||
+                                          buttonName.Contains("verify") || buttonName.Contains("closing");
+
+                        if (!skipButton)
                         {
-                            // Use reflection to set appearance properties for neutral buttons
                             var appearanceProp = control.GetType().GetProperty("Appearance");
                             if (appearanceProp != null)
                             {
                                 var appearance = appearanceProp.GetValue(control);
                                 if (appearance != null)
                                 {
-                                    var backColorProp = appearance.GetType().GetProperty("BackColor");
-                                    if (backColorProp != null)
+                                    if (isIrsBlue)
                                     {
-                                        backColorProp.SetValue(appearance, Color.FromArgb(
-                                            Math.Min(255, themeColor.R + 30),
-                                            Math.Min(255, themeColor.G + 30),
-                                            Math.Min(255, themeColor.B + 30)
-                                        ));
-                                        System.Diagnostics.Debug.WriteLine($"Set UltraButton appearance BackColor: {control.Name}");
+                                        appearance.GetType().GetProperty("BackColor")?.SetValue(appearance, Color.FromArgb(0, 174, 219));
+                                        appearance.GetType().GetProperty("BackColor2")?.SetValue(appearance, Color.FromArgb(0, 140, 186));
+                                        appearance.GetType().GetProperty("BackGradientStyle")?.SetValue(appearance, Infragistics.Win.GradientStyle.Vertical);
+                                        appearance.GetType().GetProperty("ForeColor")?.SetValue(appearance, Color.White);
+                                        appearance.GetType().GetProperty("FontData")?.GetType()
+                                            .GetProperty("Bold")?.SetValue(appearance.GetType().GetProperty("FontData")?.GetValue(appearance), Infragistics.Win.DefaultableBoolean.True);
+                                        System.Diagnostics.Debug.WriteLine($"Set UltraButton IRS Blue: {control.Name}");
+                                    }
+                                    else
+                                    {
+                                        if (!buttonName.Contains("print") && !buttonName.Contains("save") && !buttonName.Contains("close"))
+                                        {
+                                            var backColorProp = appearance.GetType().GetProperty("BackColor");
+                                            if (backColorProp != null)
+                                            {
+                                                backColorProp.SetValue(appearance, Color.FromArgb(
+                                                    Math.Min(255, themeColor.R + 30),
+                                                    Math.Min(255, themeColor.G + 30),
+                                                    Math.Min(255, themeColor.B + 30)
+                                                ));
+                                                System.Diagnostics.Debug.WriteLine($"Set UltraButton appearance BackColor: {control.Name}");
+                                            }
+                                        }
                                     }
                                 }
+                            }
+
+                            // Also set control.BackColor for buttons that respond to it
+                            if (isIrsBlue)
+                            {
+                                control.BackColor = Color.FromArgb(0, 174, 219);
+                                control.ForeColor = Color.White;
                             }
                         }
                     }
@@ -3005,15 +3138,51 @@ namespace PosBranch_Win
                     // Handle UltraLabel controls
                     if (control.GetType().Name == "UltraLabel")
                     {
-                        // Only theme background labels, not text labels
-                        if (control.BackColor != Color.Transparent)
+                        bool isIrsBlue = (themeColor.R == 0 && themeColor.G == 174 && themeColor.B == 219);
+                        string labelName = control.Name?.ToLower() ?? "";
+
+                        if (isIrsBlue)
                         {
-                            control.BackColor = Color.FromArgb(
-                                Math.Min(255, themeColor.R + 10),
-                                Math.Min(255, themeColor.G + 10),
-                                Math.Min(255, themeColor.B + 10)
-                            );
-                            System.Diagnostics.Debug.WriteLine($"Set UltraLabel BackColor: {control.Name}");
+                            if (labelName.Equals("txtnettotal", StringComparison.OrdinalIgnoreCase))
+                            {
+                                // Net total digital display - white text on dark orange background
+                                var appearanceProp = control.GetType().GetProperty("Appearance");
+                                if (appearanceProp != null)
+                                {
+                                    var appearance = appearanceProp.GetValue(control);
+                                    appearance?.GetType().GetProperty("ForeColor")?.SetValue(appearance, Color.FromArgb(255, 230, 100));
+                                }
+                                control.ForeColor = Color.FromArgb(255, 230, 100);
+                            }
+                            else
+                            {
+                                // Standard labels - transparent background, dark text
+                                var appearanceProp = control.GetType().GetProperty("Appearance");
+                                if (appearanceProp != null)
+                                {
+                                    var appearance = appearanceProp.GetValue(control);
+                                    if (appearance != null)
+                                    {
+                                        appearance.GetType().GetProperty("BackColor")?.SetValue(appearance, Color.Transparent);
+                                        appearance.GetType().GetProperty("ForeColor")?.SetValue(appearance, Color.FromArgb(20, 30, 50));
+                                    }
+                                }
+                                control.BackColor = Color.Transparent;
+                                control.ForeColor = Color.FromArgb(20, 30, 50);
+                            }
+                        }
+                        else
+                        {
+                            // Only theme background labels, not text labels
+                            if (control.BackColor != Color.Transparent)
+                            {
+                                control.BackColor = Color.FromArgb(
+                                    Math.Min(255, themeColor.R + 10),
+                                    Math.Min(255, themeColor.G + 10),
+                                    Math.Min(255, themeColor.B + 10)
+                                );
+                                System.Diagnostics.Debug.WriteLine($"Set UltraLabel BackColor: {control.Name}");
+                            }
                         }
                     }
 
@@ -3237,10 +3406,11 @@ namespace PosBranch_Win
                 var screenGroup = ultraExplorerBarSideMenu.Groups["MyScreenColour"];
                 if (screenGroup == null) return;
 
-                // Define the 5 metallic preset colors
+                // Define the preset colors
                 // Each entry: { baseColor, highlightColor (top), shadowColor (bottom), label }
                 var presets = new[]
                 {
+                    new { Base = Color.FromArgb(0, 174, 219),   Hi = Color.FromArgb(100, 220, 255), Lo = Color.FromArgb(0, 140, 186),   Label = "IRS Blue" },
                     new { Base = Color.FromArgb(0, 200, 220),   Hi = Color.FromArgb(120, 240, 255), Lo = Color.FromArgb(0, 140, 160),   Label = "Cyan" },
                     new { Base = Color.FromArgb(170, 200, 235), Hi = Color.FromArgb(220, 235, 255), Lo = Color.FromArgb(120, 155, 195), Label = "Pearl Blue" },
                     new { Base = Color.FromArgb(240, 230, 210), Hi = Color.FromArgb(255, 250, 240), Lo = Color.FromArgb(200, 185, 160), Label = "Pearl Cream" },

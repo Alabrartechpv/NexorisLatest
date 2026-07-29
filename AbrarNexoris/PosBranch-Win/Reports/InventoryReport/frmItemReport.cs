@@ -1,4 +1,4 @@
-﻿using Infragistics.Win;
+using Infragistics.Win;
 using Infragistics.Win.UltraWinGrid;
 using ModelClass;
 using ModelClass.Report;
@@ -153,117 +153,82 @@ namespace PosBranch_Win.Reports.InventoryReport
         }
 
         /// <summary>
-        /// Apply professional styling to UltraGrid - Material Design inspired
+        /// Apply professional styling to UltraGrid - matching frmAuditReport design
         /// </summary>
-        private void ApplyGridStyling(UltraGrid grid)
+        private void ApplyGridStyling(UltraGrid targetGrid)
         {
-            // Sorting & Filtering
-            grid.DisplayLayout.Override.HeaderClickAction = HeaderClickAction.SortMulti;
-            grid.DisplayLayout.Override.AllowRowFiltering = DefaultableBoolean.True;
-            grid.DisplayLayout.Override.FilterUIType = FilterUIType.FilterRow;
-            grid.DisplayLayout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
-
-            // Row selectors - Modern look
-            grid.DisplayLayout.Override.RowSelectorAppearance.BackColor = Color.FromArgb(69, 90, 100);
-            grid.DisplayLayout.Override.RowSelectorAppearance.ForeColor = Color.White;
-            grid.DisplayLayout.Override.RowSelectorAppearance.FontData.Bold = DefaultableBoolean.True;
-            grid.DisplayLayout.Override.RowSelectorAppearance.TextHAlign = Infragistics.Win.HAlign.Center;
-
-            // Modern header styling - Deep Blue-Grey gradient
-            grid.DisplayLayout.Override.HeaderAppearance.BackColor = Color.FromArgb(55, 71, 79);
-            grid.DisplayLayout.Override.HeaderAppearance.BackColor2 = Color.FromArgb(69, 90, 100);
-            grid.DisplayLayout.Override.HeaderAppearance.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
-            grid.DisplayLayout.Override.HeaderAppearance.ForeColor = Color.White;
-            grid.DisplayLayout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.True;
-            grid.DisplayLayout.Override.HeaderAppearance.FontData.SizeInPoints = 9;
-
-            // Row height
-            grid.DisplayLayout.Override.MinRowHeight = 25;
-            grid.DisplayLayout.Override.DefaultRowHeight = 25;
-
-            // Alternating row colors - Soft gradient
-            grid.DisplayLayout.Override.RowAppearance.BackColor = Color.White;
-            grid.DisplayLayout.Override.RowAlternateAppearance.BackColor = Color.FromArgb(250, 250, 252);
-
-            // Selection colors - Material Design Blue
-            grid.DisplayLayout.Override.SelectedRowAppearance.BackColor = Color.FromArgb(66, 165, 245);
-            grid.DisplayLayout.Override.SelectedRowAppearance.ForeColor = Color.White;
-            grid.DisplayLayout.Override.SelectedRowAppearance.FontData.Bold = DefaultableBoolean.True;
-
-            // Active row - Light blue hover
-            grid.DisplayLayout.Override.ActiveRowAppearance.BackColor = Color.FromArgb(227, 242, 253);
-            grid.DisplayLayout.Override.ActiveRowAppearance.ForeColor = Color.FromArgb(33, 33, 33);
-            grid.DisplayLayout.Override.ActiveRowAppearance.BorderColor = Color.FromArgb(66, 165, 245);
-
-            // Border styles
-            grid.DisplayLayout.CaptionVisible = DefaultableBoolean.False;
-            grid.DisplayLayout.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
-            grid.DisplayLayout.Override.BorderStyleCell = Infragistics.Win.UIElementBorderStyle.Solid;
-            grid.DisplayLayout.Override.BorderStyleRow = Infragistics.Win.UIElementBorderStyle.Solid;
-            grid.DisplayLayout.GroupByBox.Hidden = true;
-
-            // Column interactions
-            grid.DisplayLayout.Override.AllowColMoving = AllowColMoving.WithinBand;
-            grid.DisplayLayout.Override.AllowColSizing = AllowColSizing.Free;
-            grid.DisplayLayout.Override.CellClickAction = CellClickAction.RowSelect;
+            targetGrid.UseAppStyling = false;
+            targetGrid.UseOsThemes = DefaultableBoolean.False;
+            targetGrid.DisplayLayout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
+            targetGrid.DisplayLayout.BorderStyle = UIElementBorderStyle.Solid;
+            targetGrid.DisplayLayout.CaptionVisible = DefaultableBoolean.False;
+            targetGrid.DisplayLayout.GroupByBox.Hidden = true;
+            targetGrid.DisplayLayout.GroupByBox.BorderStyle = UIElementBorderStyle.None;
+            targetGrid.DisplayLayout.Override.AllowAddNew = AllowAddNew.No;
+            targetGrid.DisplayLayout.Override.AllowDelete = DefaultableBoolean.False;
+            targetGrid.DisplayLayout.Override.AllowUpdate = DefaultableBoolean.False;
+            targetGrid.DisplayLayout.Override.AllowColMoving = AllowColMoving.WithinBand;
+            targetGrid.DisplayLayout.Override.AllowColSizing = AllowColSizing.Free;
+            targetGrid.DisplayLayout.Override.AllowRowFiltering = DefaultableBoolean.True;
+            targetGrid.DisplayLayout.Override.FilterUIType = FilterUIType.HeaderIcons;
+            targetGrid.DisplayLayout.Override.FilterOperatorLocation = FilterOperatorLocation.Hidden;
+            targetGrid.DisplayLayout.Override.CellClickAction = CellClickAction.RowSelect;
+            targetGrid.DisplayLayout.Override.HeaderClickAction = HeaderClickAction.SortMulti;
+            targetGrid.DisplayLayout.Override.RowSelectors = DefaultableBoolean.True;
+            targetGrid.DisplayLayout.Override.RowSelectorWidth = 28;
+            targetGrid.DisplayLayout.Override.MinRowHeight = 24;
+            targetGrid.DisplayLayout.Override.DefaultRowHeight = 24;
+            targetGrid.DisplayLayout.Override.RowAppearance.BackColor = Color.White;
+            targetGrid.DisplayLayout.Override.RowAlternateAppearance.BackColor = Color.FromArgb(247, 250, 255);
+            targetGrid.DisplayLayout.Override.ActiveRowAppearance.BackColor = Color.FromArgb(120, 116, 235);
+            targetGrid.DisplayLayout.Override.ActiveRowAppearance.ForeColor = Color.White;
+            targetGrid.DisplayLayout.Override.SelectedRowAppearance.BackColor = Color.FromArgb(120, 116, 235);
+            targetGrid.DisplayLayout.Override.SelectedRowAppearance.ForeColor = Color.White;
+            targetGrid.DisplayLayout.Override.HeaderAppearance.BackColor = Color.FromArgb(145, 179, 222);
+            targetGrid.DisplayLayout.Override.HeaderAppearance.BackColor2 = Color.FromArgb(118, 157, 209);
+            targetGrid.DisplayLayout.Override.HeaderAppearance.BackGradientStyle = GradientStyle.Vertical;
+            targetGrid.DisplayLayout.Override.HeaderAppearance.ForeColor = Color.FromArgb(17, 52, 102);
+            targetGrid.DisplayLayout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.True;
+            targetGrid.DisplayLayout.Override.HeaderAppearance.BorderColor = Color.FromArgb(103, 142, 196);
+            targetGrid.DisplayLayout.Override.FilterCellAppearance.BackColor = Color.White;
+            targetGrid.DisplayLayout.Override.FilterCellAppearance.BorderColor = Color.FromArgb(180, 198, 220);
+            targetGrid.DisplayLayout.Override.BorderStyleCell = UIElementBorderStyle.Solid;
+            targetGrid.DisplayLayout.Override.BorderStyleRow = UIElementBorderStyle.Solid;
+            targetGrid.DisplayLayout.Override.CellAppearance.BorderColor = Color.FromArgb(210, 220, 235);
+            targetGrid.DisplayLayout.Override.RowSizing = RowSizing.AutoFree;
+            targetGrid.DisplayLayout.Override.WrapHeaderText = DefaultableBoolean.True;
         }
 
         private void StyleButtons()
         {
-            // Style search button - Primary Blue with gradient
-            btnSearch.UseAppStyling = false;
-            btnSearch.UseOsThemes = DefaultableBoolean.False;
-            btnSearch.Appearance.BackColor = Color.FromArgb(25, 118, 210);
-            btnSearch.Appearance.BackColor2 = Color.FromArgb(33, 150, 243);
-            btnSearch.Appearance.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
-            btnSearch.Appearance.ForeColor = Color.White;
-            btnSearch.Appearance.FontData.Bold = DefaultableBoolean.True;
-            btnSearch.Appearance.FontData.SizeInPoints = 10;
-            btnSearch.Appearance.BorderColor = Color.FromArgb(21, 101, 192);
-            btnSearch.HotTrackAppearance.BackColor = Color.FromArgb(66, 165, 245);
-            btnSearch.HotTrackAppearance.ForeColor = Color.White;
-
-            // Style export button - Teal with gradient
-            btnExport.UseAppStyling = false;
-            btnExport.UseOsThemes = DefaultableBoolean.False;
-            btnExport.Appearance.BackColor = Color.FromArgb(0, 121, 107);
-            btnExport.Appearance.BackColor2 = Color.FromArgb(0, 150, 136);
-            btnExport.Appearance.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
-            btnExport.Appearance.ForeColor = Color.White;
-            btnExport.Appearance.FontData.Bold = DefaultableBoolean.True;
-            btnExport.Appearance.FontData.SizeInPoints = 10;
-            btnExport.Appearance.BorderColor = Color.FromArgb(0, 105, 92);
-            btnExport.HotTrackAppearance.BackColor = Color.FromArgb(38, 166, 154);
-            btnExport.HotTrackAppearance.ForeColor = Color.White;
-
-            // Style print button - Deep Purple with gradient
-            btnPrint.UseAppStyling = false;
-            btnPrint.UseOsThemes = DefaultableBoolean.False;
-            btnPrint.Appearance.BackColor = Color.FromArgb(81, 45, 168);
-            btnPrint.Appearance.BackColor2 = Color.FromArgb(103, 58, 183);
-            btnPrint.Appearance.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
-            btnPrint.Appearance.ForeColor = Color.White;
-            btnPrint.Appearance.FontData.Bold = DefaultableBoolean.True;
-            btnPrint.Appearance.FontData.SizeInPoints = 10;
-            btnPrint.Appearance.BorderColor = Color.FromArgb(69, 39, 160);
-            btnPrint.HotTrackAppearance.BackColor = Color.FromArgb(126, 87, 194);
-            btnPrint.HotTrackAppearance.ForeColor = Color.White;
-
-            // Style close button - Red with gradient
-            btnClose.UseAppStyling = false;
-            btnClose.UseOsThemes = DefaultableBoolean.False;
-            btnClose.Appearance.BackColor = Color.FromArgb(211, 47, 47);
-            btnClose.Appearance.BackColor2 = Color.FromArgb(244, 67, 54);
-            btnClose.Appearance.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
-            btnClose.Appearance.ForeColor = Color.White;
-            btnClose.Appearance.FontData.Bold = DefaultableBoolean.True;
-            btnClose.Appearance.FontData.SizeInPoints = 10;
-            btnClose.Appearance.BorderColor = Color.FromArgb(183, 28, 28);
-            btnClose.HotTrackAppearance.BackColor = Color.FromArgb(229, 115, 115);
-            btnClose.HotTrackAppearance.ForeColor = Color.White;
+            ConfigureButton(btnSearch, Color.FromArgb(72, 122, 214), Color.FromArgb(95, 145, 230));
+            ConfigureButton(btnExport, Color.FromArgb(0, 121, 107), Color.FromArgb(0, 150, 136));
+            ConfigureButton(btnPrint, Color.FromArgb(74, 130, 176), Color.FromArgb(104, 155, 196));
+            ConfigureButton(btnClose, Color.FromArgb(211, 47, 47), Color.FromArgb(244, 67, 54));
+            ConfigureButton(btnHideSelection, Color.FromArgb(84, 120, 190), Color.FromArgb(112, 148, 214));
 
             // Style summary labels
             StyleSummaryLabels();
+        }
+
+        private void ConfigureButton(Infragistics.Win.Misc.UltraButton button, Color startColor, Color endColor)
+        {
+            button.UseAppStyling = false;
+            button.UseOsThemes = DefaultableBoolean.False;
+            button.Appearance.BackColor = startColor;
+            button.Appearance.BackColor2 = endColor;
+            button.Appearance.BackGradientStyle = GradientStyle.Vertical;
+            button.Appearance.ForeColor = Color.White;
+            button.Appearance.FontData.Bold = DefaultableBoolean.True;
+            button.Appearance.BorderColor = startColor;
+            button.HotTrackAppearance.BackColor = endColor;
+            button.HotTrackAppearance.ForeColor = Color.White;
+        }
+
+        private void btnHideSelection_Click(object sender, EventArgs e)
+        {
+            ultraPanelControls.Visible = !ultraPanelControls.Visible;
+            btnHideSelection.Text = ultraPanelControls.Visible ? "Hide Selection" : "Show Selection";
         }
 
         /// <summary>
