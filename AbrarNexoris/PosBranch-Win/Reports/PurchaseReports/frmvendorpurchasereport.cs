@@ -5,6 +5,7 @@ using Repository.ReportRepository;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlClient;
 using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Globalization;
@@ -47,6 +48,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
         private string selectedItemName = string.Empty;
         private bool suppressQuickDateChange;
         private DataTable currentData = new DataTable();
+        private DataTable rawReportData = null;
         private ReportMode activeMode = ReportMode.Overview;
 
         private enum ReportMode
@@ -74,6 +76,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
             gridReport.AfterColRegionScroll += (s, e) => UpdateFooterCellPositions();
             gridReport.AfterRowRegionScroll += (s, e) => UpdateFooterCellPositions();
             gridReport.Paint += (s, e) => UpdateFooterCellPositions();
+            gridReport.ClickCell += gridReport_ClickCell;
             SetupHeaderDragToHideAndColumnChooser();
             ApplyRuntimeStyles();
         }
@@ -491,18 +494,26 @@ namespace PosBranch_Win.Reports.PurchaseReports
             {
                 using (VendorPurchaseReportRepository repo = new VendorPurchaseReportRepository())
                 {
-                    currentData = activeMode == ReportMode.Both && selectedVendorId > 0 && selectedItemId > 0
+                    DataTable fetched = activeMode == ReportMode.Both && selectedVendorId > 0 && selectedItemId > 0
                         ? repo.GetVendorItemPurchases(GetDateValue(dtpFrom), GetDateValue(dtpTo), selectedVendorId, selectedItemId, GetCompanyId(), GetBranchId(), GetFinYearId())
                         : activeMode == ReportMode.Item && selectedItemId > 0
                             ? repo.GetItemVendorPurchases(GetDateValue(dtpFrom), GetDateValue(dtpTo), selectedItemId, GetCompanyId(), GetBranchId(), GetFinYearId())
                             : repo.GetVendorPurchases(GetDateValue(dtpFrom), GetDateValue(dtpTo),
                             activeMode == ReportMode.Vendor ? selectedVendorId : 0,
                             0, GetCompanyId(), GetBranchId(), GetFinYearId());
+
+                    rawReportData = fetched != null ? fetched.Copy() : null;
+                    currentData = fetched;
                 }
 
                 if ((activeMode == ReportMode.Overview || activeMode == ReportMode.Vendor) && currentData != null)
                 {
                     currentData = GroupVendorDataByBill(currentData);
+                }
+
+                if (currentData != null)
+                {
+                    EnsureShowBillColumn(currentData);
                 }
 
                 if (currentData != null && (activeMode == ReportMode.Overview || activeMode == ReportMode.Vendor || activeMode == ReportMode.Both))
@@ -526,6 +537,21 @@ namespace PosBranch_Win.Reports.PurchaseReports
             }
         }
 
+        private void EnsureShowBillColumn(DataTable dt)
+        {
+            if (dt == null) return;
+            if (!dt.Columns.Contains("ShowBill"))
+            {
+                DataColumn col = new DataColumn("ShowBill", typeof(string));
+                col.DefaultValue = "+";
+                dt.Columns.Add(col);
+            }
+            foreach (DataRow r in dt.Rows)
+            {
+                r["ShowBill"] = "+";
+            }
+        }
+
         private DataTable GroupVendorDataByBill(DataTable inputTable)
         {
             if (inputTable == null || inputTable.Rows.Count == 0)
@@ -535,6 +561,11 @@ namespace PosBranch_Win.Reports.PurchaseReports
             foreach (DataColumn col in inputTable.Columns)
             {
                 billTable.Columns.Add(col.ColumnName, col.DataType);
+            }
+
+            if (!billTable.Columns.Contains("ShowBill"))
+            {
+                billTable.Columns.Add("ShowBill", typeof(string));
             }
 
             var groupedRows = inputTable.AsEnumerable()
@@ -555,6 +586,8 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 {
                     newRow[col.ColumnName] = firstRow[col.ColumnName];
                 }
+
+                newRow["ShowBill"] = "+";
 
                 if (billTable.Columns.Contains("Rank"))
                 {
@@ -718,6 +751,12 @@ namespace PosBranch_Win.Reports.PurchaseReports
             if (ColumnExists("Outstanding"))
                 ShowColumn("Outstanding", "Outstanding", 130, displayIndex++, "N2", true);
 
+            if (activeMode == ReportMode.Vendor && ColumnExists("ShowBill"))
+            {
+                ShowColumn("ShowBill", "Show Bill", 75, displayIndex++);
+                FormatShowBillColumn(band.Columns["ShowBill"]);
+            }
+
             foreach (UltraGridColumn column in band.Columns)
             {
                 if (column.Key.EndsWith("Id", StringComparison.OrdinalIgnoreCase))
@@ -759,6 +798,12 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
             if (ColumnExists("Outstanding"))
                 ShowColumn("Outstanding", "Outstanding", 130, displayIndex++, "N2", true);
+
+            if (activeMode == ReportMode.Vendor && ColumnExists("ShowBill"))
+            {
+                ShowColumn("ShowBill", "Show Bill", 75, displayIndex++);
+                FormatShowBillColumn(band.Columns["ShowBill"]);
+            }
         }
 
         private void ConfigureItemVendorGridColumns()
@@ -787,7 +832,18 @@ namespace PosBranch_Win.Reports.PurchaseReports
             else if (ColumnExists("TotalAmount"))
                 ShowColumn("TotalAmount", "Amount", 130, displayIndex++, "N2", true);
 
-            // Outstanding column is explicitly hidden in Item mode
+            // Outstanding column and ShowBill column are explicitly hidden in Item mode
+        }
+
+        private void FormatShowBillColumn(UltraGridColumn col)
+        {
+            if (col == null) return;
+            col.Header.Caption = "Show Bill";
+            col.Header.Appearance.TextHAlign = HAlign.Center;
+            col.CellAppearance.TextHAlign = HAlign.Center;
+            col.CellAppearance.FontData.Bold = DefaultableBoolean.True;
+            col.CellAppearance.ForeColor = Color.FromArgb(0, 102, 204);
+            col.CellAppearance.Cursor = Cursors.Hand;
         }
 
         private void SetColumn(string name, string caption, int width, string format = null, bool alignRight = false)
@@ -2066,6 +2122,305 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 return DisplayText;
             }
         }
+
+        #region Show Bill Popup Logic
+
+        private void gridReport_ClickCell(object sender, ClickCellEventArgs e)
+        {
+            if (e.Cell != null && e.Cell.Column != null && e.Cell.Column.Key.Equals("ShowBill", StringComparison.OrdinalIgnoreCase))
+            {
+                OpenShowBillPopup(e.Cell);
+            }
+        }
+
+        private void OpenShowBillPopup(UltraGridCell cell)
+        {
+            if (cell == null || cell.Row == null) return;
+
+            UltraGridRow row = cell.Row;
+            string purchaseNo = GetRowCellValue(row, "PurchaseNo");
+            string grnNo = GetRowCellValue(row, "GRNNumber");
+            string invoiceNo = GetRowCellValue(row, "InvoiceNo");
+            string vendorName = GetRowCellValue(row, "Vendor");
+            int pid = 0;
+            if (row.Cells.Exists("Pid") && row.Cells["Pid"].Value != null && row.Cells["Pid"].Value != DBNull.Value)
+            {
+                int.TryParse(row.Cells["Pid"].Value.ToString(), out pid);
+            }
+
+            DataTable itemsTable = FetchBillItems(purchaseNo, grnNo, invoiceNo, pid);
+            if (itemsTable == null || itemsTable.Rows.Count == 0)
+            {
+                MessageBox.Show("No item details found for this bill.", "Bill Items", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            ShowBillItemsPopupWindow(cell, purchaseNo, grnNo, invoiceNo, vendorName, itemsTable);
+        }
+
+        private string GetRowCellValue(UltraGridRow row, string colName)
+        {
+            if (row != null && row.Cells.Exists(colName) && row.Cells[colName].Value != null && row.Cells[colName].Value != DBNull.Value)
+            {
+                return Convert.ToString(row.Cells[colName].Value).Trim();
+            }
+            return string.Empty;
+        }
+
+        private DataTable FetchBillItems(string purchaseNo, string grnNo, string invoiceNo, int pid)
+        {
+            DataTable result = new DataTable();
+            result.Columns.Add("ItemName", typeof(string));
+            result.Columns.Add("Cost", typeof(decimal));
+            result.Columns.Add("Qty", typeof(decimal));
+            result.Columns.Add("Amount", typeof(decimal));
+
+            try
+            {
+                // 1. Try finding in rawReportData
+                if (rawReportData != null && rawReportData.Rows.Count > 0)
+                {
+                    var matchingRows = rawReportData.AsEnumerable().Where(r => {
+                        string pNo = rawReportData.Columns.Contains("PurchaseNo") && r["PurchaseNo"] != DBNull.Value ? Convert.ToString(r["PurchaseNo"]).Trim() : "";
+                        string gNo = rawReportData.Columns.Contains("GRNNumber") && r["GRNNumber"] != DBNull.Value ? Convert.ToString(r["GRNNumber"]).Trim() : "";
+                        string iNo = rawReportData.Columns.Contains("InvoiceNo") && r["InvoiceNo"] != DBNull.Value ? Convert.ToString(r["InvoiceNo"]).Trim() : "";
+
+                        if (!string.IsNullOrEmpty(purchaseNo) && string.Equals(pNo, purchaseNo, StringComparison.OrdinalIgnoreCase)) return true;
+                        if (!string.IsNullOrEmpty(grnNo) && string.Equals(gNo, grnNo, StringComparison.OrdinalIgnoreCase)) return true;
+                        if (!string.IsNullOrEmpty(invoiceNo) && string.Equals(iNo, invoiceNo, StringComparison.OrdinalIgnoreCase)) return true;
+                        return false;
+                    }).ToList();
+
+                    if (matchingRows.Count > 0)
+                    {
+                        foreach (DataRow r in matchingRows)
+                        {
+                            string itemName = "";
+                            if (rawReportData.Columns.Contains("ItemName") && r["ItemName"] != DBNull.Value)
+                                itemName = Convert.ToString(r["ItemName"]);
+                            else if (rawReportData.Columns.Contains("Description") && r["Description"] != DBNull.Value)
+                                itemName = Convert.ToString(r["Description"]);
+
+                            decimal cost = 0m;
+                            if (rawReportData.Columns.Contains("Price") && r["Price"] != DBNull.Value)
+                                cost = Convert.ToDecimal(r["Price"]);
+                            else if (rawReportData.Columns.Contains("Cost") && r["Cost"] != DBNull.Value)
+                                cost = Convert.ToDecimal(r["Cost"]);
+
+                            decimal qty = 0m;
+                            if (rawReportData.Columns.Contains("Qty") && r["Qty"] != DBNull.Value)
+                                qty = Convert.ToDecimal(r["Qty"]);
+
+                            decimal amount = 0m;
+                            if (rawReportData.Columns.Contains("Amount") && r["Amount"] != DBNull.Value)
+                                amount = Convert.ToDecimal(r["Amount"]);
+                            else if (rawReportData.Columns.Contains("TotalAmount") && r["TotalAmount"] != DBNull.Value)
+                                amount = Convert.ToDecimal(r["TotalAmount"]);
+                            else
+                                amount = cost * qty;
+
+                            if (!string.IsNullOrEmpty(itemName))
+                            {
+                                result.Rows.Add(itemName, cost, qty, amount);
+                            }
+                        }
+                    }
+                }
+
+                // 2. Fallback to direct SQL query if rawReportData returned no items
+                if (result.Rows.Count == 0 && (!string.IsNullOrEmpty(purchaseNo) || !string.IsNullOrEmpty(invoiceNo) || !string.IsNullOrEmpty(grnNo)))
+                {
+                    using (Repository.BaseRepostitory baseRepo = new Repository.BaseRepostitory())
+                    using (SqlConnection conn = (SqlConnection)baseRepo.DataConnection)
+                    {
+                        if (conn.State == ConnectionState.Closed)
+                            conn.Open();
+
+                        string sql = @"
+                            SELECT 
+                                ISNULL(NULLIF(pd.ItemName, ''), ISNULL(im.Description, 'Item')) AS ItemName,
+                                ISNULL(pd.Cost, 0) AS Cost,
+                                ISNULL(pd.Qty, 0) AS Qty,
+                                ISNULL(pd.Amount, ISNULL(pd.Cost, 0) * ISNULL(pd.Qty, 0)) AS Amount
+                            FROM PurchaseDetails pd WITH (NOLOCK)
+                            LEFT JOIN ItemMaster im WITH (NOLOCK) ON pd.ItemID = im.ItemId
+                            INNER JOIN PurchaseMaster pm WITH (NOLOCK) ON pd.PurchaseNo = pm.PurchaseNo AND pd.CompanyId = pm.CompanyId AND pd.BranchID = pm.BranchID
+                            WHERE (@PNo <> '' AND CAST(pm.PurchaseNo AS NVARCHAR(50)) = @PNo)
+                               OR (@InvNo <> '' AND pm.InvoiceNo = @InvNo)
+                               OR (@GrnNo <> '' AND pm.GRNNumber = @GrnNo)
+                            ORDER BY pd.SlNo";
+
+                        using (SqlCommand cmd = new SqlCommand(sql, conn))
+                        {
+                            cmd.Parameters.AddWithValue("@PNo", purchaseNo ?? "");
+                            cmd.Parameters.AddWithValue("@InvNo", invoiceNo ?? "");
+                            cmd.Parameters.AddWithValue("@GrnNo", grnNo ?? "");
+
+                            using (SqlDataAdapter adapter = new SqlDataAdapter(cmd))
+                            {
+                                DataTable dt = new DataTable();
+                                adapter.Fill(dt);
+                                foreach (DataRow r in dt.Rows)
+                                {
+                                    string itemName = Convert.ToString(r["ItemName"]);
+                                    decimal cost = Convert.ToDecimal(r["Cost"]);
+                                    decimal qty = Convert.ToDecimal(r["Qty"]);
+                                    decimal amount = Convert.ToDecimal(r["Amount"]);
+                                    result.Rows.Add(itemName, cost, qty, amount);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Error in FetchBillItems: " + ex.Message);
+            }
+
+            return result;
+        }
+
+        private void ShowBillItemsPopupWindow(UltraGridCell cell, string purchaseNo, string grnNo, string invoiceNo, string vendorName, DataTable itemsTable)
+        {
+            using (Form popupForm = new Form())
+            {
+                popupForm.Text = "Bill Items";
+                popupForm.FormBorderStyle = FormBorderStyle.FixedDialog;
+                popupForm.MaximizeBox = false;
+                popupForm.MinimizeBox = false;
+                popupForm.StartPosition = FormStartPosition.CenterParent;
+                popupForm.Size = new Size(580, 360);
+                popupForm.BackColor = Color.FromArgb(232, 246, 255);
+                popupForm.KeyPreview = true;
+                popupForm.KeyDown += (s, e) => { if (e.KeyCode == Keys.Escape) popupForm.Close(); };
+
+                // Header Panel
+                UltraPanel headerPanel = new UltraPanel();
+                headerPanel.Dock = DockStyle.Top;
+                headerPanel.Height = 36;
+                headerPanel.UseAppStyling = false;
+                headerPanel.UseOsThemes = DefaultableBoolean.False;
+                headerPanel.Appearance.BackColor = gridHeaderBlue;
+                headerPanel.Appearance.BackColor2 = gridHeaderBlueDark;
+                headerPanel.Appearance.BackGradientStyle = GradientStyle.Vertical;
+
+                Label lblTitle = new Label();
+                string billIdText = !string.IsNullOrEmpty(purchaseNo) ? purchaseNo : (!string.IsNullOrEmpty(grnNo) ? grnNo : invoiceNo);
+                lblTitle.Text = $"📦 Bill Items — Bill No: {billIdText}" + (string.IsNullOrEmpty(vendorName) ? "" : $"  |  Vendor: {vendorName}");
+                lblTitle.ForeColor = Color.White;
+                lblTitle.Font = new Font("Microsoft Sans Serif", 9.75F, FontStyle.Bold);
+                lblTitle.BackColor = Color.Transparent;
+                lblTitle.AutoSize = false;
+                lblTitle.Dock = DockStyle.Fill;
+                lblTitle.TextAlign = ContentAlignment.MiddleLeft;
+                lblTitle.Padding = new Padding(10, 0, 0, 0);
+
+                headerPanel.ClientArea.Controls.Add(lblTitle);
+                popupForm.Controls.Add(headerPanel);
+
+                // Footer Panel
+                UltraPanel footerPanel = new UltraPanel();
+                footerPanel.Dock = DockStyle.Bottom;
+                footerPanel.Height = 32;
+                footerPanel.UseAppStyling = false;
+                footerPanel.UseOsThemes = DefaultableBoolean.False;
+                footerPanel.Appearance.BackColor = gridHeaderBlue;
+                footerPanel.Appearance.BackColor2 = gridHeaderBlueDark;
+                footerPanel.Appearance.BackGradientStyle = GradientStyle.Vertical;
+
+                decimal totalQty = 0m;
+                decimal totalAmt = 0m;
+                foreach (DataRow r in itemsTable.Rows)
+                {
+                    if (r["Qty"] != DBNull.Value) totalQty += Convert.ToDecimal(r["Qty"]);
+                    if (r["Amount"] != DBNull.Value) totalAmt += Convert.ToDecimal(r["Amount"]);
+                }
+
+                Label lblFooter = new Label();
+                lblFooter.Text = $"Total Items: {itemsTable.Rows.Count}    |    Total Qty: {totalQty:N2}    |    Total Amount: Rs {totalAmt:N2}";
+                lblFooter.ForeColor = Color.White;
+                lblFooter.Font = new Font("Microsoft Sans Serif", 9F, FontStyle.Bold);
+                lblFooter.BackColor = Color.Transparent;
+                lblFooter.AutoSize = false;
+                lblFooter.Dock = DockStyle.Fill;
+                lblFooter.TextAlign = ContentAlignment.MiddleCenter;
+
+                footerPanel.ClientArea.Controls.Add(lblFooter);
+                popupForm.Controls.Add(footerPanel);
+
+                // Grid for items
+                UltraGrid popupGrid = new UltraGrid();
+                popupGrid.Dock = DockStyle.Fill;
+                popupGrid.UseAppStyling = false;
+                popupGrid.UseOsThemes = DefaultableBoolean.False;
+                popupGrid.DataSource = itemsTable;
+
+                popupGrid.InitializeLayout += (s, e) =>
+                {
+                    UltraGridLayout layout = e.Layout;
+                    layout.CaptionVisible = DefaultableBoolean.False;
+                    layout.GroupByBox.Hidden = true;
+                    layout.Override.AllowAddNew = AllowAddNew.No;
+                    layout.Override.AllowDelete = DefaultableBoolean.False;
+                    layout.Override.AllowUpdate = DefaultableBoolean.False;
+                    layout.Override.RowSelectors = DefaultableBoolean.False;
+
+                    layout.Override.HeaderStyle = HeaderStyle.Standard;
+                    layout.Override.HeaderAppearance.BackColor = gridHeaderBlue;
+                    layout.Override.HeaderAppearance.BackColor2 = gridHeaderBlueDark;
+                    layout.Override.HeaderAppearance.BackGradientStyle = GradientStyle.Vertical;
+                    layout.Override.HeaderAppearance.ForeColor = Color.White;
+                    layout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.True;
+                    layout.Override.HeaderAppearance.ThemedElementAlpha = Alpha.Transparent;
+                    layout.Override.HeaderAppearance.BorderColor = Color.FromArgb(118, 154, 198);
+
+                    layout.Override.RowAppearance.BackColor = Color.White;
+                    layout.Override.RowAlternateAppearance.BackColor = Color.FromArgb(246, 250, 255);
+                    layout.Override.RowAppearance.BorderColor = Color.FromArgb(197, 217, 241);
+                    layout.Override.CellAppearance.BorderColor = Color.FromArgb(197, 217, 241);
+
+                    if (layout.Bands.Count > 0)
+                    {
+                        UltraGridBand band = layout.Bands[0];
+                        if (band.Columns.Exists("ItemName"))
+                        {
+                            band.Columns["ItemName"].Header.Caption = "Item Name";
+                            band.Columns["ItemName"].Width = 230;
+                            band.Columns["ItemName"].CellAppearance.TextHAlign = HAlign.Left;
+                        }
+                        if (band.Columns.Exists("Cost"))
+                        {
+                            band.Columns["Cost"].Header.Caption = "Cost";
+                            band.Columns["Cost"].Width = 90;
+                            band.Columns["Cost"].Format = "N2";
+                            band.Columns["Cost"].CellAppearance.TextHAlign = HAlign.Right;
+                        }
+                        if (band.Columns.Exists("Qty"))
+                        {
+                            band.Columns["Qty"].Header.Caption = "Qty";
+                            band.Columns["Qty"].Width = 80;
+                            band.Columns["Qty"].Format = "N2";
+                            band.Columns["Qty"].CellAppearance.TextHAlign = HAlign.Right;
+                        }
+                        if (band.Columns.Exists("Amount"))
+                        {
+                            band.Columns["Amount"].Header.Caption = "Amount";
+                            band.Columns["Amount"].Width = 110;
+                            band.Columns["Amount"].Format = "N2";
+                            band.Columns["Amount"].CellAppearance.TextHAlign = HAlign.Right;
+                        }
+                    }
+                };
+
+                popupForm.Controls.Add(popupGrid);
+                popupGrid.BringToFront();
+
+                popupForm.ShowDialog(this);
+            }
+        }
+
+        #endregion
 
         #endregion
     }
