@@ -992,6 +992,9 @@ namespace PosBranch_Win.Transaction
             layout.Override.RowSelectorAppearance.FontData.Bold = DefaultableBoolean.True;
             layout.Override.RowSelectorAppearance.TextHAlign = HAlign.Center;
 
+            // Use Standard style so custom BackColor/gradient settings are respected (not overridden by OS theme)
+            layout.Override.HeaderStyle = HeaderStyle.Standard;
+
             layout.Override.HeaderAppearance.BackColor = GridHeaderBlue;
             layout.Override.HeaderAppearance.BackColor2 = GridHeaderBlueDark;
             layout.Override.HeaderAppearance.BackGradientStyle = GradientStyle.Vertical;
@@ -1909,7 +1912,7 @@ namespace PosBranch_Win.Transaction
                 ultraGrid1.DisplayLayout.Appearance.BorderColor = lightBlue; // Set the main grid border to light blue
 
                 // Configure header appearance with solid color matching FrmPurchaseDisplayDialog.cs
-                ultraGrid1.DisplayLayout.Override.HeaderStyle = HeaderStyle.WindowsXPCommand;
+                ultraGrid1.DisplayLayout.Override.HeaderStyle = HeaderStyle.Standard;
                 ultraGrid1.DisplayLayout.Override.HeaderAppearance.BackColor = headerBlue;
                 ultraGrid1.DisplayLayout.Override.HeaderAppearance.BackColor2 = GridHeaderBlueDark;
                 ultraGrid1.DisplayLayout.Override.HeaderAppearance.BackGradientStyle = GradientStyle.Vertical;
@@ -2798,7 +2801,7 @@ namespace PosBranch_Win.Transaction
                 e.Layout.Override.RowAppearance.FontData.Name = "Microsoft Sans Serif";
 
                 // Add header styling with solid color matching FrmPurchaseDisplayDialog.cs
-                e.Layout.Override.HeaderStyle = Infragistics.Win.HeaderStyle.WindowsXPCommand;
+                e.Layout.Override.HeaderStyle = Infragistics.Win.HeaderStyle.Standard;
                 e.Layout.Override.HeaderAppearance.BackColor = headerBlue;
                 e.Layout.Override.HeaderAppearance.BackColor2 = GridHeaderBlueDark;
                 e.Layout.Override.HeaderAppearance.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
@@ -6731,6 +6734,14 @@ namespace PosBranch_Win.Transaction
             }
         }
 
+        public void LoadPurchaseDataReadOnly(int purchaseId)
+        {
+            LoadPurchaseData(purchaseId);
+            SetFormReadOnly(true);
+            pbxSave.Visible = false;
+            ultraPictureBox4.Visible = false;
+        }
+
         // Add UpdatePurchase method to handle update operation
         public void UpdatePurchase()
         {
@@ -8470,16 +8481,13 @@ namespace PosBranch_Win.Transaction
                 // Make sure grid doesn't draw over the footer by setting scroll bounds
                 ultraGrid1.DisplayLayout.ScrollBounds = ScrollBounds.ScrollToFill;
 
-                // Style the panel to match the row header appearance
-                Color headerBlue = Color.FromArgb(0, 123, 255); // Solid blue color for headers
+                // Style the panel to match the grid header appearance (same as ultraPanelGridFooter in reports)
+                gridFooterPanel.Appearance.BorderColor = GridFooterBorder;
+                gridFooterPanel.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
 
-                // Set footer panel to match header color
-                gridFooterPanel.Appearance.BorderColor = headerBlue;
-                gridFooterPanel.BorderStyle = Infragistics.Win.UIElementBorderStyle.None; // No border
-
-                // Apply solid blue background to match headers
-                gridFooterPanel.Appearance.BackColor = headerBlue;
-                gridFooterPanel.Appearance.BackColor2 = headerBlue;
+                // Apply solid blue background — same as ultraPanelGridFooter in frmvendorpurchasereport
+                gridFooterPanel.Appearance.BackColor = GridHeaderBlue;
+                gridFooterPanel.Appearance.BackColor2 = GridHeaderBlue;
                 gridFooterPanel.Appearance.BackGradientStyle = Infragistics.Win.GradientStyle.None;
 
                 // Clear any existing controls in the panel to prepare for footer cells
@@ -8545,7 +8553,7 @@ namespace PosBranch_Win.Transaction
                     lblFooter.Name = "footer_" + col.Key;
                     lblFooter.Text = ""; // Empty by default
                     lblFooter.TextAlign = ContentAlignment.MiddleCenter; // Center text horizontally and vertically
-                    lblFooter.BackColor = Color.FromArgb(0, 123, 255); // Match header blue color
+                    lblFooter.BackColor = GridHeaderBlue; // Match column header theme color
                     lblFooter.BorderStyle = BorderStyle.None; // No borders initially
                     lblFooter.AutoSize = false;
                     lblFooter.Width = col.Width;
@@ -9103,9 +9111,9 @@ namespace PosBranch_Win.Transaction
             int x = margin;
             int y = (lbl.Height - boxHeight) / 2;
 
-            // Create rectangle and darker blue color for the box
+            // Create rectangle and use the consistent header dark blue for the pill/box fill
             Rectangle rect = new Rectangle(x, y, boxWidth, boxHeight);
-            Color boxColor = Color.FromArgb(0, 80, 160); // Adjusted blue for better contrast and alignment
+            Color boxColor = GridHeaderBlueDark; // Consistent with column header gradient dark tone
 
             // Draw the rounded rectangle
             using (System.Drawing.Drawing2D.GraphicsPath path = new System.Drawing.Drawing2D.GraphicsPath())
