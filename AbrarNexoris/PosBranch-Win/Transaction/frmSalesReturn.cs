@@ -439,6 +439,9 @@ namespace PosBranch_Win.Transaction
                 // Register all event handlers
                 AddEventHandlers();
 
+                // Apply initial return mode state (Hides barcode controls in default With Bill mode)
+                rbReturnMode_CheckedChanged(rbWithBill, EventArgs.Empty);
+
                 // Load custom DS-Digital font from embedded resources
                 try
                 {
@@ -2479,9 +2482,28 @@ namespace PosBranch_Win.Transaction
 
         private void rbReturnMode_CheckedChanged(object sender, EventArgs e)
         {
+            // Barcode input & F7 button remain visible and active in both modes
+            if (labelBarcode != null)
+            {
+                labelBarcode.Visible = true;
+            }
+            if (TxtBarcode != null)
+            {
+                TxtBarcode.Visible = true;
+                TxtBarcode.ReadOnly = false;
+                TxtBarcode.Appearance.BackColor = System.Drawing.Color.White;
+            }
+            if (barbtn != null)
+            {
+                barbtn.Visible = true;
+                barbtn.Enabled = true;
+                barbtn.BackColor = System.Drawing.Color.FromArgb(0, 122, 204);
+                barbtn.ForeColor = System.Drawing.Color.White;
+            }
+
             if (rbWithoutBill != null && rbWithoutBill.Checked)
             {
-                // Switch to Without Bill mode
+                // Switch to Without Bill mode: dim bill fields
                 textBox1.ReadOnly = true;
                 textBox1.Value = "without bill";
                 btn_Add_Custm.Enabled = false;
@@ -2491,30 +2513,16 @@ namespace PosBranch_Win.Transaction
                 dtInvoiceDate.Enabled = false;
                 TxtInvoiceAmnt.Enabled = false;
 
-                // Visual feedback: dim bill fields
                 textBox1.Appearance.BackColor = System.Drawing.Color.LightGray;
                 dtInvoiceDate.Appearance.BackColor = System.Drawing.Color.LightGray;
                 TxtInvoiceAmnt.Appearance.BackColor = System.Drawing.Color.LightGray;
-
-                // Enable Barcode input & F7 button in Without Bill mode
-                if (TxtBarcode != null)
-                {
-                    TxtBarcode.ReadOnly = false;
-                    TxtBarcode.Appearance.BackColor = System.Drawing.Color.White;
-                }
-                if (barbtn != null)
-                {
-                    barbtn.Enabled = true;
-                    barbtn.BackColor = System.Drawing.Color.FromArgb(0, 122, 204);
-                    barbtn.ForeColor = System.Drawing.Color.White;
-                }
 
                 currentDataSource = DataSource.Barcode;
                 if (TxtBarcode != null) TxtBarcode.Focus();
             }
             else if (rbWithBill != null && rbWithBill.Checked)
             {
-                // Switch to With Bill mode
+                // Switch to With Bill mode: enable bill fields
                 textBox1.ReadOnly = false;
                 if (textBox1.Value?.ToString() == "without bill")
                 {
@@ -2527,26 +2535,12 @@ namespace PosBranch_Win.Transaction
                 dtInvoiceDate.Enabled = true;
                 TxtInvoiceAmnt.Enabled = true;
 
-                // Restore white background on bill fields
                 textBox1.Appearance.BackColor = System.Drawing.Color.White;
                 dtInvoiceDate.Appearance.BackColor = System.Drawing.Color.White;
                 TxtInvoiceAmnt.Appearance.BackColor = System.Drawing.Color.White;
 
-                // Dim/Disable Barcode input & F7 button in With Bill mode
-                if (TxtBarcode != null)
-                {
-                    TxtBarcode.ReadOnly = true;
-                    TxtBarcode.Appearance.BackColor = System.Drawing.Color.LightGray;
-                }
-                if (barbtn != null)
-                {
-                    barbtn.Enabled = false;
-                    barbtn.BackColor = System.Drawing.Color.LightGray;
-                    barbtn.ForeColor = System.Drawing.Color.DimGray;
-                }
-
                 currentDataSource = DataSource.None;
-                if (btn_Add_Custm != null) btn_Add_Custm.Focus();
+                if (textBox1 != null) textBox1.Focus();
             }
         }
 
