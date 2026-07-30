@@ -89,6 +89,7 @@ namespace PosBranch_Win
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonTool80 = new Infragistics.Win.UltraWinToolbars.ButtonTool("UnitMaster");
             Infragistics.Win.UltraWinToolbars.RibbonGroup ribbonGroup15 = new Infragistics.Win.UltraWinToolbars.RibbonGroup("ribbonGroup2");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonTool45 = new Infragistics.Win.UltraWinToolbars.ButtonTool("Users");
+            Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolPaymode = new Infragistics.Win.UltraWinToolbars.ButtonTool("PaymodeMaster");
             Infragistics.Win.UltraWinToolbars.RibbonTab ribbonTab3 = new Infragistics.Win.UltraWinToolbars.RibbonTab("ribbon2");
             Infragistics.Win.UltraWinToolbars.RibbonGroup ribbonGroup16 = new Infragistics.Win.UltraWinToolbars.RibbonGroup("Sales");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonTool3 = new Infragistics.Win.UltraWinToolbars.ButtonTool("Pos");
@@ -632,8 +633,10 @@ namespace PosBranch_Win
             buttonTool80});
             ribbonGroup15.Caption = "Utilities";
             buttonTool45.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
+            buttonToolPaymode.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
             ribbonGroup15.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
-            buttonTool45});
+            buttonTool45,
+            buttonToolPaymode});
             ribbonTab2.Groups.AddRange(new Infragistics.Win.UltraWinToolbars.RibbonGroup[] {
             ribbonGroup13,
             ribbonGroup14,
@@ -948,6 +951,9 @@ namespace PosBranch_Win
             appearance32.Image = ((object)(resources.GetObject("appearance32.Image")));
             buttonTool46.SharedPropsInternal.AppearancesSmall.Appearance = appearance32;
             buttonTool46.SharedPropsInternal.Caption = "Users";
+            buttonToolPaymode.SharedPropsInternal.AppearancesLarge.Appearance = appearance38;
+            buttonToolPaymode.SharedPropsInternal.Caption = "Paymode Setup";
+            buttonToolPaymode.SharedPropsInternal.DisplayStyle = Infragistics.Win.UltraWinToolbars.ToolDisplayStyle.ImageAndText;
             appearance33.Image = ((object)(resources.GetObject("appearance33.Image")));
             buttonTool48.SharedPropsInternal.AppearancesSmall.Appearance = appearance33;
             buttonTool48.SharedPropsInternal.Caption = "Sales Return";

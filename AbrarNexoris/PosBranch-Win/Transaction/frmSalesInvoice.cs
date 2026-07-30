@@ -5130,6 +5130,29 @@ namespace PosBranch_Win.Transaction
             {
                 if (paymentResult.IsSuccess)
                 {
+                    // NOTE: Do NOT overwrite sales.PaymodeId or sales.PaymodeName here.
+                    // The header Cash/Credit selection (set via SetSaleMode / cmbPaymt) is already
+                    // the correct SMaster classification:
+                    //   - Cash  = money received now (UPI, BankTransfer, Card, Cheque all fall under Cash)
+                    //   - Credit = money NOT yet received (customer will pay later)
+                    // The breakdown of HOW cash was received (UPI, BankTransfer etc.) lives in SPaymentDetails only.
+                    if (sales != null && paymentResult != null)
+                    {
+                        // Set payment details on the repository (NOT on sales model) so the repository
+                        // can post correct per-instrument debit voucher entries inside the DB transaction.
+                        // Note: sales.PaymentDetails was removed to prevent Dapper mapping the List as a SQL parameter.
+                        if (paymentResult.PaymentDetails != null && paymentResult.PaymentDetails.Count > 0)
+                        {
+                            operations.PendingPaymentDetails = new List<SalesPaymentDetail>(paymentResult.PaymentDetails);
+                        }
+
+                        // Update TenderedAmount from the settlement dialog
+                        if (!string.IsNullOrEmpty(paymentResult.TenderedAmount) && double.TryParse(paymentResult.TenderedAmount, out double tendered))
+                        {
+                            sales.TenderedAmount = tendered;
+                        }
+                    }
+
                     // Check if this is a held bill completion
                     Int64 existingHoldBillNo = 0;
                     bool isCompletingHeldBill = !string.IsNullOrEmpty(lblBillNo.Text) &&
@@ -5188,7 +5211,7 @@ namespace PosBranch_Win.Transaction
                             catch (Exception paymentEx)
                             {
                                 System.Diagnostics.Debug.WriteLine($"Warning: Failed to save payment details: {paymentEx.Message}");
-                                // Don't fail the whole transaction for payment details
+                                MessageBox.Show($"Warning: Payment breakdown could not be saved: {paymentEx.Message}", "Payment Notice", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                             }
                         }
 
