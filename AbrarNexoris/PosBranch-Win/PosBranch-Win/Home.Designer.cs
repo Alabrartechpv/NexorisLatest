@@ -1,4 +1,4 @@
-﻿namespace PosBranch_Win
+namespace PosBranch_Win
 {
     partial class Home
     {
