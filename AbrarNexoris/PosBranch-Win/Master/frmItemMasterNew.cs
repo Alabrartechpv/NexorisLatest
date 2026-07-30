@@ -4065,9 +4065,14 @@ namespace PosBranch_Win.Master
                 {
                     Label lbl = (Label)control;
 
-                    // Skip styling for labels 29, 30, 31, and 44 - keep them with default style
+                    // Ensure labels 29, 30, 31, and 44 have white font in all cases
                     if (lbl.Name == "label29" || lbl.Name == "label30" || lbl.Name == "label31" || lbl.Name == "label44")
                     {
+                        lbl.ForeColor = Color.White;
+                        lbl.BackColor = Color.Transparent;
+                        lbl.Cursor = Cursors.Hand;
+                        lbl.MouseEnter += (sender, e) => { lbl.ForeColor = Color.White; };
+                        lbl.MouseLeave += (sender, e) => { lbl.ForeColor = Color.White; };
                         continue;
                     }
 
@@ -4466,31 +4471,29 @@ namespace PosBranch_Win.Master
                 {
                     try
                     {
-                        using (BaseRepostitory repo = new BaseRepostitory())
+                        using (Repository.BaseRepostitory repo = new Repository.BaseRepostitory())
                         {
                             SqlConnection conn = repo.DataConnection as SqlConnection;
-                            if (conn == null)
+                            if (conn != null)
                             {
-                                return;
-                            }
-
-                            if (conn.State != ConnectionState.Open)
-                            {
-                                conn.Open();
-                            }
-
-                            string sql = @"SELECT TOP 1 Pid FROM PMaster 
-                                           WHERE (@PNo > 0 AND PurchaseNo = @PNo)
-                                              OR (@InvNo <> '' AND InvoiceNo = @InvNo)
-                                           ORDER BY Pid DESC";
-                            using (var cmd = new System.Data.SqlClient.SqlCommand(sql, conn))
-                            {
-                                cmd.Parameters.AddWithValue("@PNo", purchaseNo > 0 ? purchaseNo : 0);
-                                cmd.Parameters.AddWithValue("@InvNo", invoiceNo ?? string.Empty);
-                                object scalarRes = cmd.ExecuteScalar();
-                                if (scalarRes != null && scalarRes != DBNull.Value && int.TryParse(scalarRes.ToString(), out int foundPid) && foundPid > 0)
+                                if (conn.State != ConnectionState.Open)
                                 {
-                                    pid = foundPid;
+                                    conn.Open();
+                                }
+
+                                string sql = @"SELECT TOP 1 Pid FROM PMaster 
+                                               WHERE (@PNo > 0 AND PurchaseNo = @PNo)
+                                                  OR (@InvNo <> '' AND InvoiceNo = @InvNo)
+                                               ORDER BY Pid DESC";
+                                using (var cmd = new System.Data.SqlClient.SqlCommand(sql, conn))
+                                {
+                                    cmd.Parameters.AddWithValue("@PNo", purchaseNo > 0 ? purchaseNo : 0);
+                                    cmd.Parameters.AddWithValue("@InvNo", invoiceNo ?? string.Empty);
+                                    object scalarRes = cmd.ExecuteScalar();
+                                    if (scalarRes != null && scalarRes != DBNull.Value && int.TryParse(scalarRes.ToString(), out int foundPid) && foundPid > 0)
+                                    {
+                                        pid = foundPid;
+                                    }
                                 }
                             }
                         }
@@ -6303,35 +6306,40 @@ namespace PosBranch_Win.Master
                 ultraGrid1.DisplayLayout.Override.RowSpacingAfter = 0;
                 ultraGrid1.DisplayLayout.Override.CellSpacing = 0;
 
-                // Set light blue border color for cells
-                Color lightBlue = Color.FromArgb(173, 216, 230); // Light blue for borders
-                Color headerBlue = Color.FromArgb(0, 123, 255); // Slightly darker blue for headers
+                Color lightBlue = Color.FromArgb(197, 217, 241);
+                Color gridHeaderBlue = Color.FromArgb(93, 151, 214);
+                Color gridHeaderBlueDark = Color.FromArgb(67, 118, 184);
+                Color headerBorder = Color.FromArgb(118, 154, 198);
+                Color headerBlue = gridHeaderBlue;
+
+                ultraGrid1.UseAppStyling = false;
+                ultraGrid1.UseOsThemes = DefaultableBoolean.False;
 
                 // Apply border colors
                 ultraGrid1.DisplayLayout.Override.CellAppearance.BorderColor = lightBlue;
                 ultraGrid1.DisplayLayout.Override.RowAppearance.BorderColor = lightBlue;
-                ultraGrid1.DisplayLayout.Override.HeaderAppearance.BorderColor = headerBlue;
-                ultraGrid1.DisplayLayout.Override.RowSelectorAppearance.BorderColor = headerBlue;
+                ultraGrid1.DisplayLayout.Override.HeaderAppearance.BorderColor = headerBorder;
+                ultraGrid1.DisplayLayout.Override.RowSelectorAppearance.BorderColor = headerBorder;
 
                 // Configure row height - increase to match the clean look
                 ultraGrid1.DisplayLayout.Override.MinRowHeight = 30;
                 ultraGrid1.DisplayLayout.Override.DefaultRowHeight = 30;
 
-                // Add header styling - blue headers
-                ultraGrid1.DisplayLayout.Override.HeaderStyle = HeaderStyle.WindowsXPCommand;
-                ultraGrid1.DisplayLayout.Override.HeaderAppearance.BackColor = headerBlue;
-                ultraGrid1.DisplayLayout.Override.HeaderAppearance.BackColor2 = headerBlue; // Same color for no gradient
-                ultraGrid1.DisplayLayout.Override.HeaderAppearance.BackGradientStyle = GradientStyle.None;
+                // Add header styling - exact gridreport cell header look from frmvendorpurchasereport
+                ultraGrid1.DisplayLayout.Override.HeaderStyle = HeaderStyle.Standard;
+                ultraGrid1.DisplayLayout.Override.HeaderAppearance.BackColor = gridHeaderBlue;
+                ultraGrid1.DisplayLayout.Override.HeaderAppearance.BackColor2 = gridHeaderBlueDark;
+                ultraGrid1.DisplayLayout.Override.HeaderAppearance.BackGradientStyle = GradientStyle.Vertical;
                 ultraGrid1.DisplayLayout.Override.HeaderAppearance.ForeColor = Color.White;
                 ultraGrid1.DisplayLayout.Override.HeaderAppearance.TextHAlign = HAlign.Center;
                 ultraGrid1.DisplayLayout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.True;
                 ultraGrid1.DisplayLayout.Override.HeaderAppearance.FontData.SizeInPoints = 9;
                 ultraGrid1.DisplayLayout.Override.HeaderAppearance.ThemedElementAlpha = Alpha.Transparent;
 
-                // Configure row selector appearance with blue - clean row headers
-                ultraGrid1.DisplayLayout.Override.RowSelectorAppearance.BackColor = headerBlue;
-                ultraGrid1.DisplayLayout.Override.RowSelectorAppearance.BackColor2 = headerBlue; // Same color for no gradient
-                ultraGrid1.DisplayLayout.Override.RowSelectorAppearance.BackGradientStyle = GradientStyle.None;
+                // Configure row selector appearance with blue gradient
+                ultraGrid1.DisplayLayout.Override.RowSelectorAppearance.BackColor = gridHeaderBlueDark;
+                ultraGrid1.DisplayLayout.Override.RowSelectorAppearance.BackColor2 = gridHeaderBlue;
+                ultraGrid1.DisplayLayout.Override.RowSelectorAppearance.BackGradientStyle = GradientStyle.Vertical;
                 ultraGrid1.DisplayLayout.Override.RowSelectorAppearance.ForeColor = Color.White;
                 ultraGrid1.DisplayLayout.Override.RowSelectorHeaderStyle = RowSelectorHeaderStyle.Default;
                 ultraGrid1.DisplayLayout.Override.RowSelectorNumberStyle = RowSelectorNumberStyle.None; // Remove numbers
@@ -6544,25 +6552,26 @@ namespace PosBranch_Win.Master
                 e.Layout.Override.RowAlternateAppearance.BackColor2 = Color.White;
                 e.Layout.Override.RowAlternateAppearance.BackGradientStyle = GradientStyle.None;
 
-                // Add header styling with solid color - matching FrmPurchaseDisplayDialog
-                e.Layout.Override.HeaderStyle = HeaderStyle.WindowsXPCommand;
-                e.Layout.Override.HeaderAppearance.BackColor = headerBlue;
-                e.Layout.Override.HeaderAppearance.BackColor2 = headerBlue;
-                e.Layout.Override.HeaderAppearance.BackGradientStyle = GradientStyle.None;
+                // Add header styling with blue gradient - exact gridreport cell header look from frmvendorpurchasereport
+                e.Layout.Override.HeaderStyle = HeaderStyle.Standard;
+                e.Layout.Override.HeaderAppearance.BackColor = Color.FromArgb(93, 151, 214);
+                e.Layout.Override.HeaderAppearance.BackColor2 = Color.FromArgb(67, 118, 184);
+                e.Layout.Override.HeaderAppearance.BackGradientStyle = GradientStyle.Vertical;
                 e.Layout.Override.HeaderAppearance.ForeColor = Color.White;
                 e.Layout.Override.HeaderAppearance.TextHAlign = HAlign.Center;
                 e.Layout.Override.HeaderAppearance.TextVAlign = VAlign.Middle;
                 e.Layout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.True;
                 e.Layout.Override.HeaderAppearance.FontData.SizeInPoints = 9;
                 e.Layout.Override.HeaderAppearance.ThemedElementAlpha = Alpha.Transparent;
-                e.Layout.Override.HeaderAppearance.BorderColor = headerBlue;
+                e.Layout.Override.HeaderAppearance.BorderColor = Color.FromArgb(118, 154, 198);
+                e.Layout.Override.BorderStyleHeader = UIElementBorderStyle.Solid;
 
-                // Configure row selector appearance - matching FrmPurchaseDisplayDialog
-                e.Layout.Override.RowSelectorAppearance.BackColor = headerBlue;
-                e.Layout.Override.RowSelectorAppearance.BackColor2 = headerBlue;
-                e.Layout.Override.RowSelectorAppearance.BackGradientStyle = GradientStyle.None;
+                // Configure row selector appearance - matching gridreport
+                e.Layout.Override.RowSelectorAppearance.BackColor = Color.FromArgb(67, 118, 184);
+                e.Layout.Override.RowSelectorAppearance.BackColor2 = Color.FromArgb(93, 151, 214);
+                e.Layout.Override.RowSelectorAppearance.BackGradientStyle = GradientStyle.Vertical;
                 e.Layout.Override.RowSelectorAppearance.ForeColor = Color.White;
-                e.Layout.Override.RowSelectorAppearance.BorderColor = headerBlue;
+                e.Layout.Override.RowSelectorAppearance.BorderColor = Color.FromArgb(118, 154, 198);
                 e.Layout.Override.RowSelectorHeaderStyle = RowSelectorHeaderStyle.Default;
                 e.Layout.Override.RowSelectorWidth = 15;
                 e.Layout.Override.RowSelectorNumberStyle = RowSelectorNumberStyle.None;
@@ -13556,7 +13565,7 @@ namespace PosBranch_Win.Master
                 // Primary required fields with peach/champagne fill and skyblue outline
                 Control[] peachFields = new Control[]
                 {
-                    txt_ItemNo, txt_description, txt_ItemType, Txt_UnitCost,
+                    txt_barcode, txt_ItemNo, txt_description, txt_ItemType, Txt_UnitCost,
                     txt_walkin, txt_Retail, txt_SF, txt_CEP, txt_Mrp, txt_CardP, txt_MinP
                 };
 
@@ -13649,8 +13658,11 @@ namespace PosBranch_Win.Master
             {
                 if (c is Label lbl)
                 {
-                    if (lbl.Name != null && lbl.Name.StartsWith("lblFooter_", StringComparison.OrdinalIgnoreCase))
+                    if (lbl.Name != null && (lbl.Name.StartsWith("lblFooter_", StringComparison.OrdinalIgnoreCase) ||
+                        lbl.Name == "label29" || lbl.Name == "label30" || lbl.Name == "label31" || lbl.Name == "label44"))
                     {
+                        lbl.BackColor = Color.Transparent;
+                        lbl.ForeColor = Color.White;
                         continue;
                     }
                     lbl.BackColor = Color.Transparent;
@@ -13687,7 +13699,7 @@ namespace PosBranch_Win.Master
                     ute.BorderStyle = UIElementBorderStyle.Solid;
                     ute.Appearance.BorderColor = skyBlueOutline;
 
-                    if (ute != txt_ItemNo && ute != txt_description && ute != txt_ItemType && ute != Txt_UnitCost &&
+                    if (ute != txt_barcode && ute != txt_ItemNo && ute != txt_description && ute != txt_ItemType && ute != Txt_UnitCost &&
                         ute != txt_walkin && ute != txt_Retail && ute != txt_SF && ute != txt_CEP &&
                         ute != txt_Mrp && ute != txt_CardP && ute != txt_MinP &&
                         ute != txt_qty && ute != txt_available && ute != txt_hold)
@@ -14042,6 +14054,12 @@ namespace PosBranch_Win.Master
             {
                 if (layout == null) return;
 
+                if (grid != null)
+                {
+                    grid.UseAppStyling = false;
+                    grid.UseOsThemes = DefaultableBoolean.False;
+                }
+
                 Color pageBack = Color.FromArgb(226, 239, 255);
                 Color gridHeaderBlue = Color.FromArgb(93, 151, 214);
                 Color gridHeaderBlueDark = Color.FromArgb(67, 118, 184);
@@ -14073,11 +14091,13 @@ namespace PosBranch_Win.Master
                 layout.Appearance.BackColor = pageBack;
                 layout.Appearance.BorderColor = Color.FromArgb(118, 154, 198);
 
+                layout.Override.HeaderStyle = HeaderStyle.Standard;
                 layout.Override.HeaderAppearance.BackColor = gridHeaderBlue;
                 layout.Override.HeaderAppearance.BackColor2 = gridHeaderBlueDark;
                 layout.Override.HeaderAppearance.BackGradientStyle = GradientStyle.Vertical;
                 layout.Override.HeaderAppearance.ForeColor = Color.White;
                 layout.Override.HeaderAppearance.BorderColor = Color.FromArgb(118, 154, 198);
+                layout.Override.HeaderAppearance.ThemedElementAlpha = Alpha.Transparent;
                 layout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.True;
                 layout.Override.HeaderAppearance.FontData.SizeInPoints = 9;
 
