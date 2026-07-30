@@ -45,6 +45,10 @@ namespace PosBranch_Win.Transaction
         // In the class, add a new field to control payment method reset
         private bool skipPaymentMethodReset = false;
 
+        // Navigation state: list of PR numbers for |◄ ◄ ► ►| buttons
+        private List<string> _navPRNumbers = new List<string>();
+        private int _navCurrentIndex = -1;
+
         public frmPurchaseReturn()
         {
             InitializeComponent();
@@ -124,14 +128,13 @@ namespace PosBranch_Win.Transaction
                 cmbPaymntMethod.TabStop = false;
             }
 
-            if (ultraPanel6 != null)
+           
             {
-                foreach (Control control in ultraPanel6.ClientArea.Controls)
+
                 {
-                    if (control is Label label &&
-                        label.Text.IndexOf("Payment", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {}
                     {
-                        label.Visible = false;
+                      
                     }
                 }
             }
@@ -286,6 +289,9 @@ namespace PosBranch_Win.Transaction
 
                 HidePaymentMethodControls();
 
+                // Apply modern Image 2 light ice-blue theme
+                ApplyImage2Theme();
+
                 // Add resize event handler to ensure grid fills available space
                 this.Resize += frmPurchaseReturn_Resize;
 
@@ -297,6 +303,198 @@ namespace PosBranch_Win.Transaction
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("Error in form load: " + ex.Message);
+            }
+        }
+
+        private void ApplyImage2Theme()
+        {
+            try
+            {
+                Color mainBgColor = Color.FromArgb(220, 235, 252);
+                Color panelBgColor = Color.FromArgb(220, 235, 252);
+                Color panelBorderColor = Color.FromArgb(170, 205, 245);
+                Color darkTextColor = Color.FromArgb(0, 35, 80);
+                Color inputBgColor = Color.White;
+                Color inputBorderColor = Color.FromArgb(170, 205, 245);
+                Color headerGradientStart = Color.FromArgb(170, 205, 245);
+                Color headerGradientEnd = Color.FromArgb(200, 225, 252);
+
+                Font controlFont = new Font("Segoe UI", 9.75F, FontStyle.Regular);
+                Font labelFont = new Font("Segoe UI", 9.75F, FontStyle.Regular);
+
+                // 1. Form & Main Container Appearance
+                this.BackColor = mainBgColor;
+                if (ultraPanel1 != null)
+                {
+                    ultraPanel1.Appearance.BackColor = mainBgColor;
+                    ultraPanel1.Appearance.BackColor2 = Color.FromArgb(205, 228, 250);
+                    ultraPanel1.Appearance.BackGradientStyle = GradientStyle.Vertical;
+                }
+
+                // 2. Section Panels
+                UltraPanel[] panels = new UltraPanel[] { ultraPanel3 };
+                foreach (UltraPanel pnl in panels)
+                {
+                    if (pnl != null)
+                    {
+                        pnl.Appearance.BackColor = panelBgColor;
+                        pnl.Appearance.BackColor2 = Color.FromArgb(210, 230, 250);
+                        pnl.Appearance.BackGradientStyle = GradientStyle.Vertical;
+                        pnl.Appearance.BorderColor = panelBorderColor;
+                        pnl.BorderStyle = UIElementBorderStyle.Solid;
+                    }
+                }
+
+                // 3. Child Controls Theme (Labels, UltraTextEditors, UltraComboEditors, Buttons)
+                ApplyThemeToChildControls(this.Controls, darkTextColor, inputBgColor, inputBorderColor, controlFont, labelFont);
+
+                // 4. Infragistics UltraGrid Theme
+                if (ultraGrid1 != null && ultraGrid1.DisplayLayout != null)
+                {
+                    var layout = ultraGrid1.DisplayLayout;
+                    layout.Appearance.BackColor = Color.White;
+                    layout.Appearance.BorderColor = panelBorderColor;
+                    layout.BorderStyle = UIElementBorderStyle.Solid;
+
+                    layout.Override.HeaderStyle = HeaderStyle.WindowsXPCommand;
+                    layout.Override.HeaderAppearance.BackColor = headerGradientStart;
+                    layout.Override.HeaderAppearance.BackColor2 = headerGradientEnd;
+                    layout.Override.HeaderAppearance.BackGradientStyle = GradientStyle.Vertical;
+                    layout.Override.HeaderAppearance.ForeColor = darkTextColor;
+                    layout.Override.HeaderAppearance.FontData.Name = "Segoe UI";
+                    layout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.True;
+                    layout.Override.HeaderAppearance.FontData.SizeInPoints = 9;
+
+                    layout.Override.RowAppearance.BackColor = Color.White;
+                    layout.Override.RowAppearance.ForeColor = darkTextColor;
+                    layout.Override.RowAppearance.FontData.Name = "Segoe UI";
+                    layout.Override.RowAppearance.FontData.SizeInPoints = 9;
+                    layout.Override.RowAlternateAppearance.BackColor = Color.FromArgb(245, 250, 255);
+                    layout.Override.ActiveRowAppearance.BackColor = Color.FromArgb(185, 218, 250);
+                    layout.Override.ActiveRowAppearance.ForeColor = darkTextColor;
+                    layout.Override.SelectedRowAppearance.BackColor = Color.FromArgb(185, 218, 250);
+                    layout.Override.SelectedRowAppearance.ForeColor = darkTextColor;
+
+                    layout.Override.BorderStyleCell = UIElementBorderStyle.Solid;
+                    layout.Override.CellAppearance.BorderColor = Color.FromArgb(210, 232, 252);
+                }
+
+                // 5. Net Amount / Bottom Box (Restored to original Maroon LED gradient box style)
+                if (ultraPanel10 != null)
+                {
+                    ultraPanel10.Appearance.BackColor = Color.Maroon;
+                    ultraPanel10.Appearance.BackColor2 = Color.FromArgb(255, 128, 0);
+                    ultraPanel10.Appearance.BackGradientStyle = GradientStyle.GlassTop50;
+                    ultraPanel10.Appearance.BorderColor = Color.White;
+                    ultraPanel10.BorderStyle = UIElementBorderStyle.Etched;
+                    ultraPanel10.ForeColor = Color.Beige;
+                    ultraPanel10.UseFlatMode = DefaultableBoolean.True;
+                }
+
+                if (lblNetAmount != null)
+                {
+                    lblNetAmount.Font = new Font("DS-Digital", 36F, FontStyle.Regular);
+                    lblNetAmount.ForeColor = Color.Beige;
+                    lblNetAmount.BackColor = Color.Transparent;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error applying Image2 theme: {ex.Message}");
+            }
+        }
+
+        private void ApplyThemeToChildControls(Control.ControlCollection controls, Color darkTextColor, Color inputBgColor, Color inputBorderColor, Font controlFont, Font labelFont)
+        {
+            foreach (Control c in controls)
+            {
+                Label lbl = c as Label;
+                if (lbl != null && lbl != lblNetAmount)
+                {
+                    lbl.ForeColor = darkTextColor;
+                    lbl.Font = labelFont;
+                }
+
+                UltraLabel ulbl = c as UltraLabel;
+                if (ulbl != null)
+                {
+                    ulbl.Appearance.ForeColor = darkTextColor;
+                    ulbl.Font = labelFont;
+                }
+
+                Infragistics.Win.UltraWinEditors.UltraTextEditor utxt = c as Infragistics.Win.UltraWinEditors.UltraTextEditor;
+                if (utxt != null)
+                {
+                    utxt.Font = controlFont;
+                    utxt.ForeColor = darkTextColor;
+                    utxt.Appearance.BackColor = inputBgColor;
+                    utxt.Appearance.ForeColor = darkTextColor;
+                    utxt.Appearance.BorderColor = inputBorderColor;
+                    utxt.BorderStyle = UIElementBorderStyle.Solid;
+                    utxt.UseOsThemes = DefaultableBoolean.False;
+                }
+
+                Infragistics.Win.UltraWinEditors.UltraComboEditor ucmb = c as Infragistics.Win.UltraWinEditors.UltraComboEditor;
+                if (ucmb != null)
+                {
+                    ucmb.Font = controlFont;
+                    ucmb.ForeColor = darkTextColor;
+                    ucmb.Appearance.BackColor = inputBgColor;
+                    ucmb.Appearance.ForeColor = darkTextColor;
+                    ucmb.Appearance.BorderColor = inputBorderColor;
+                    ucmb.BorderStyle = UIElementBorderStyle.Solid;
+                    ucmb.UseOsThemes = DefaultableBoolean.False;
+                }
+
+                Infragistics.Win.UltraWinEditors.UltraDateTimeEditor udte = c as Infragistics.Win.UltraWinEditors.UltraDateTimeEditor;
+                if (udte != null)
+                {
+                    udte.Font = controlFont;
+                    udte.ForeColor = darkTextColor;
+                    udte.Appearance.BackColor = inputBgColor;
+                    udte.Appearance.ForeColor = darkTextColor;
+                    udte.Appearance.BorderColor = inputBorderColor;
+                    udte.BorderStyle = UIElementBorderStyle.Solid;
+                    udte.UseOsThemes = DefaultableBoolean.False;
+                }
+
+                TextBox txt = c as TextBox;
+                if (txt != null && utxt == null)
+                {
+                    txt.Font = controlFont;
+                    txt.BackColor = inputBgColor;
+                    txt.ForeColor = darkTextColor;
+                    txt.BorderStyle = BorderStyle.FixedSingle;
+                }
+
+                ComboBox cmb = c as ComboBox;
+                if (cmb != null && ucmb == null)
+                {
+                    cmb.Font = controlFont;
+                    cmb.BackColor = inputBgColor;
+                    cmb.ForeColor = darkTextColor;
+                    cmb.FlatStyle = FlatStyle.Flat;
+                }
+
+                Button btn = c as Button;
+                if (btn != null)
+                {
+                    btn.Font = controlFont;
+                    // Preserve icon/checkmark buttons (those with BackgroundImage) —
+                    // do NOT flatten or recolor them or they blend into the background.
+                    if (btn.BackgroundImage == null)
+                    {
+                        btn.BackColor = Color.FromArgb(195, 222, 250);
+                        btn.ForeColor = darkTextColor;
+                        btn.FlatStyle = FlatStyle.Flat;
+                        btn.FlatAppearance.BorderColor = Color.FromArgb(140, 190, 240);
+                    }
+                }
+
+                if (c.HasChildren)
+                {
+                    ApplyThemeToChildControls(c.Controls, darkTextColor, inputBgColor, inputBorderColor, controlFont, labelFont);
+                }
             }
         }
 
@@ -313,26 +511,17 @@ namespace PosBranch_Win.Transaction
         {
             try
             {
-                // Find the parent panel of the ultraGrid1
-                Control gridParent = ultraGrid1.Parent;
-
-                if (gridParent != null)
+                // Ensure the UltraGrid fills its parent panel (ultraPanel3) completely without Dock.Fill on parent
+                if (ultraGrid1 != null)
                 {
-                    // Set the parent panel to dock and fill its container
-                    gridParent.Dock = DockStyle.Fill;
-
-                    // Minimize any margins or padding to avoid blank spaces
-                    if (gridParent is Panel panel)
+                    ultraGrid1.Dock = DockStyle.None;
+                    ultraGrid1.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+                    ultraGrid1.Location = new Point(5, 51);
+                    if (ultraPanel3 != null)
                     {
-                        panel.Padding = new Padding(0);
-                        panel.Margin = new Padding(0);
+                        ultraGrid1.Size = new Size(Math.Max(100, ultraPanel3.ClientArea.Width - 10), Math.Max(100, ultraPanel3.ClientArea.Height - 56));
                     }
 
-                    // Ensure the UltraGrid fills its parent completely
-                    ultraGrid1.Dock = DockStyle.Fill;
-                    ultraGrid1.Margin = new Padding(0);
-
-                    // Set sizing properties for grid rows to prevent blank space
                     if (ultraGrid1.DisplayLayout != null)
                     {
                         ultraGrid1.DisplayLayout.Override.RowSizing = RowSizing.AutoFree;
@@ -715,6 +904,171 @@ namespace PosBranch_Win.Transaction
         private void TxtSRNO_TextChanged(object sender, EventArgs e)
         {
 
+        }
+
+        // ─── Navigation Buttons ──────────────────────────────────────────────────
+
+        /// <summary>
+        /// Lazily loads the full list of PR numbers for the current branch/year
+        /// so that |◄ ◄ ► ►| can navigate through them.
+        /// </summary>
+        private void EnsureNavListLoaded()
+        {
+            try
+            {
+                if (_navPRNumbers.Count == 0)
+                {
+                    // Pull all PR return numbers via the repo (returns newest-first or oldest-first)
+                    var allRecords = prRepo.GetAllPurchaseReturnNumbers();
+                    _navPRNumbers.Clear();
+                    if (allRecords != null)
+                        foreach (var n in allRecords)
+                            _navPRNumbers.Add(n.ToString());
+
+                    // Set current position to the record shown in TxtSRNO (if any)
+                    string current = TxtSRNO.Text?.Trim();
+                    if (!string.IsNullOrEmpty(current))
+                        _navCurrentIndex = _navPRNumbers.IndexOf(current);
+                    if (_navCurrentIndex < 0 && _navPRNumbers.Count > 0)
+                        _navCurrentIndex = 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("NavList load error: " + ex.Message);
+            }
+        }
+
+        /// <summary>Navigates to a PR record by index in _navPRNumbers.</summary>
+        private void NavigateToIndex(int index)
+        {
+            try
+            {
+                if (_navPRNumbers.Count == 0) return;
+                index = Math.Max(0, Math.Min(index, _navPRNumbers.Count - 1));
+                _navCurrentIndex = index;
+                string prNumber = _navPRNumbers[_navCurrentIndex];
+                TxtSRNO.Text = prNumber;
+                // Trigger the same load logic used when a PR number is typed/selected
+                TxtSRNO_TextChanged(TxtSRNO, EventArgs.Empty);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Navigation error: " + ex.Message);
+            }
+        }
+
+        private void btnNavFirst_Click(object sender, EventArgs e)
+        {
+            EnsureNavListLoaded();
+            NavigateToIndex(0);
+        }
+
+        private void btnNavPrev_Click(object sender, EventArgs e)
+        {
+            EnsureNavListLoaded();
+            NavigateToIndex(_navCurrentIndex - 1);
+        }
+
+        private void btnNavNext_Click(object sender, EventArgs e)
+        {
+            EnsureNavListLoaded();
+            NavigateToIndex(_navCurrentIndex + 1);
+        }
+
+        private void btnNavLast_Click(object sender, EventArgs e)
+        {
+            EnsureNavListLoaded();
+            NavigateToIndex(_navPRNumbers.Count - 1);
+        }
+
+        // ─── Return / Return All Buttons ─────────────────────────────────────────
+
+        private void btnReturn_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                // Validate that a PR number is loaded
+                if (string.IsNullOrWhiteSpace(TxtSRNO.Text))
+                {
+                    MessageBox.Show("Please load a Purchase Return record first.",
+                        "No Record", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                // Find selected / checked rows in the grid and process them
+                bool anyProcessed = false;
+                foreach (Infragistics.Win.UltraWinGrid.UltraGridRow row in ultraGrid1.Rows)
+                {
+                    if (row == null || row.IsFilterRow) continue;
+                    // Mark row as returned (set Return Qty = Qty if not already set)
+                    try
+                    {
+                        if (row.Selected)
+                        {
+                            var returnQtyCell = row.Cells["Return Qty"] ?? row.Cells["ReturnQty"] ?? row.Cells["ReturnQuantity"];
+                            var qtyCell       = row.Cells["Qty"]        ?? row.Cells["Quantity"];
+                            if (returnQtyCell != null && qtyCell != null)
+                            {
+                                returnQtyCell.Value = qtyCell.Value;
+                                anyProcessed = true;
+                            }
+                        }
+                    }
+                    catch { /* skip cells that do not exist */ }
+                }
+
+                if (!anyProcessed)
+                    MessageBox.Show("Please select one or more rows in the grid to return.",
+                        "No Rows Selected", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                else
+                    MessageBox.Show("Selected rows marked for return. Click Save to confirm.",
+                        "Return", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error processing return: " + ex.Message,
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void btnReturnAll_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(TxtSRNO.Text))
+                {
+                    MessageBox.Show("Please load a Purchase Return record first.",
+                        "No Record", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                if (MessageBox.Show("Mark ALL items for return?",
+                    "Confirm Return All", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+                    return;
+
+                // Set Return Qty = Qty for every row in the grid
+                foreach (Infragistics.Win.UltraWinGrid.UltraGridRow row in ultraGrid1.Rows)
+                {
+                    if (row == null || row.IsFilterRow) continue;
+                    try
+                    {
+                        var returnQtyCell = row.Cells["Return Qty"] ?? row.Cells["ReturnQty"] ?? row.Cells["ReturnQuantity"];
+                        var qtyCell       = row.Cells["Qty"]        ?? row.Cells["Quantity"];
+                        if (returnQtyCell != null && qtyCell != null)
+                            returnQtyCell.Value = qtyCell.Value;
+                    }
+                    catch { /* skip missing columns */ }
+                }
+
+                MessageBox.Show("All items marked for return. Click Save to confirm.",
+                    "Return All", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error processing return all: " + ex.Message,
+                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void button1_Click(object sender, EventArgs e)
@@ -4523,12 +4877,12 @@ namespace PosBranch_Win.Transaction
                 e.Layout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
                 e.Layout.Override.RowSizing = RowSizing.AutoFree;
 
-                // Configure header appearance with modern gradient look
+                // Configure header appearance matching Image 2 soft sky-blue theme
                 e.Layout.Override.HeaderStyle = HeaderStyle.WindowsXPCommand;
-                e.Layout.Override.HeaderAppearance.BackColor = Color.FromArgb(0, 122, 204); // Modern blue color
-                e.Layout.Override.HeaderAppearance.BackColor2 = Color.FromArgb(0, 102, 184); // Slightly darker blue for gradient
+                e.Layout.Override.HeaderAppearance.BackColor = Color.FromArgb(170, 205, 245);
+                e.Layout.Override.HeaderAppearance.BackColor2 = Color.FromArgb(200, 225, 252);
                 e.Layout.Override.HeaderAppearance.BackGradientStyle = GradientStyle.Vertical;
-                e.Layout.Override.HeaderAppearance.ForeColor = Color.White;
+                e.Layout.Override.HeaderAppearance.ForeColor = Color.FromArgb(0, 35, 80);
                 e.Layout.Override.HeaderAppearance.TextHAlign = HAlign.Center;
                 e.Layout.Override.HeaderAppearance.TextVAlign = VAlign.Middle;
                 e.Layout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.True;
@@ -4537,23 +4891,34 @@ namespace PosBranch_Win.Transaction
 
                 // Configure row appearance
                 e.Layout.Override.RowAppearance.BackColor = Color.White;
-                e.Layout.Override.RowAppearance.BackColor2 = SystemColors.Menu;
-                e.Layout.Override.RowAppearance.BackGradientStyle = GradientStyle.Vertical;
+                e.Layout.Override.RowAppearance.ForeColor = Color.FromArgb(0, 35, 80);
+                e.Layout.Override.RowAlternateAppearance.BackColor = Color.FromArgb(245, 250, 255);
+                e.Layout.Override.ActiveRowAppearance.BackColor = Color.FromArgb(185, 218, 250);
+                e.Layout.Override.ActiveRowAppearance.ForeColor = Color.FromArgb(0, 35, 80);
+                e.Layout.Override.SelectedRowAppearance.BackColor = Color.FromArgb(185, 218, 250);
+                e.Layout.Override.SelectedRowAppearance.ForeColor = Color.FromArgb(0, 35, 80);
 
                 // Row spacing and height (minimize spacing)
                 e.Layout.Override.DefaultRowHeight = 22;
-                e.Layout.Override.RowSpacingBefore = 2;
+                e.Layout.Override.RowSpacingBefore = 0;
 
-                // Set border style to dotted for cells and rows
-                e.Layout.Override.BorderStyleCell = UIElementBorderStyle.Dotted;
-                e.Layout.Override.BorderStyleRow = UIElementBorderStyle.Dotted;
+                // Set border style to solid light blue for cells and rows
+                e.Layout.Override.BorderStyleCell = UIElementBorderStyle.Solid;
+                e.Layout.Override.BorderStyleRow = UIElementBorderStyle.Solid;
+                e.Layout.Override.CellAppearance.BorderColor = Color.FromArgb(210, 232, 252);
 
                 // Configure spacing and expansion behavior
                 e.Layout.InterBandSpacing = 0;
                 e.Layout.Override.ExpansionIndicator = ShowExpansionIndicator.Never;
 
-                // Ensure grid uses all available space
-                ultraGrid1.Dock = DockStyle.Fill;
+                // Position grid below top controls (Barcode, Up/Down buttons, Clear, SubTotal) inside ultraPanel3
+                ultraGrid1.Dock = DockStyle.None;
+                ultraGrid1.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+                ultraGrid1.Location = new Point(5, 51);
+                if (ultraPanel3 != null)
+                {
+                    ultraGrid1.Size = new Size(Math.Max(100, ultraPanel3.ClientArea.Width - 10), Math.Max(100, ultraPanel3.ClientArea.Height - 56));
+                }
 
                 // Set ScrollBars to use space efficiently
                 e.Layout.ScrollBounds = ScrollBounds.ScrollToFill;
@@ -9107,5 +9472,10 @@ namespace PosBranch_Win.Transaction
         }
 
         #endregion
+
+        private void TxtSubTotal_ValueChanged(object sender, EventArgs e)
+        {
+
+        }
     }
 }
