@@ -2538,9 +2538,9 @@ namespace Repository.TransactionRepository
                 double taxPercentage = gstEntry.Key;
                 double totalTaxAmount = gstEntry.Value;
 
-                // Split GST into CGST and SGST (50% each)
-                double cgstAmount = totalTaxAmount / 2;
-                double sgstAmount = totalTaxAmount / 2;
+                // Split GST into CGST and SGST (50% each, guaranteeing exact sum equals totalTaxAmount)
+                double cgstAmount = Math.Round(totalTaxAmount / 2.0, 2, MidpointRounding.AwayFromZero);
+                double sgstAmount = Math.Round(totalTaxAmount - cgstAmount, 2, MidpointRounding.AwayFromZero);
                 double cgstPercentage = taxPercentage / 2;
                 double sgstPercentage = taxPercentage / 2;
 
@@ -2554,7 +2554,7 @@ namespace Repository.TransactionRepository
                 voucher.LedgerName = $"OUTPUT CGST {cgstPercentageStr}%";
                 voucher.LedgerID = GetOrCreateGSTLedger(voucher.LedgerName, GST_OUTPUT_GROUP_ID, trans);
                 voucher.Debit = 0;
-                voucher.Credit = Math.Round(cgstAmount, 2);
+                voucher.Credit = cgstAmount;
                 voucher.SlNo = slNo++;
 
                 CreateVoucherEntry(voucher, trans, $"VoucherID={voucher.VoucherID}, Type=CREDIT, Account={voucher.LedgerName}, Amount={cgstAmount}");
@@ -2565,7 +2565,7 @@ namespace Repository.TransactionRepository
                 voucher.LedgerName = $"OUTPUT SGST {sgstPercentageStr}%";
                 voucher.LedgerID = GetOrCreateGSTLedger(voucher.LedgerName, GST_OUTPUT_GROUP_ID, trans);
                 voucher.Debit = 0;
-                voucher.Credit = Math.Round(sgstAmount, 2);
+                voucher.Credit = sgstAmount;
                 voucher.SlNo = slNo++;
 
                 CreateVoucherEntry(voucher, trans, $"VoucherID={voucher.VoucherID}, Type=CREDIT, Account={voucher.LedgerName}, Amount={sgstAmount}");
@@ -2657,56 +2657,62 @@ namespace Repository.TransactionRepository
             // Fallback to Cash ledger if no PendingPaymentDetails provided.
             // -------------------------------------------------------
             bool paymentDetailsPosted = false;
-            if (PendingPaymentDetails != null && PendingPaymentDetails.Count > 0)
+            try
             {
-                foreach (var pd in PendingPaymentDetails)
+                if (PendingPaymentDetails != null && PendingPaymentDetails.Count > 0)
                 {
-                    double amount = (double)pd.Amount;
-                    if (amount <= 0) continue;
-
-                    // Resolve the ledger for this payment instrument via PayMode table
-                    long ledgerId = 0;
-                    string ledgerName = DefaultLedgers.CASH;
-                    try
+                    foreach (var pd in PendingPaymentDetails)
                     {
-                        string sql = "SELECT TOP 1 pm.LedgerID, lm.LedgerName FROM PayMode pm LEFT JOIN LedgerMaster lm ON lm.LedgerID = pm.LedgerID WHERE pm.PayModeID = @PayModeID";
-                        using (SqlCommand cmd = new SqlCommand(sql, (SqlConnection)DataConnection, (SqlTransaction)trans))
+                        double amount = (double)pd.Amount;
+                        if (amount <= 0) continue;
+
+                        // Resolve the ledger for this payment instrument via PayMode table
+                        long ledgerId = 0;
+                        string ledgerName = DefaultLedgers.CASH;
+                        try
                         {
-                            cmd.Parameters.AddWithValue("@PayModeID", pd.PaymodeId);
-                            using (SqlDataReader rdr = cmd.ExecuteReader())
+                            string sql = "SELECT TOP 1 pm.LedgerID, lm.LedgerName FROM PayMode pm LEFT JOIN LedgerMaster lm ON lm.LedgerID = pm.LedgerID WHERE pm.PayModeID = @PayModeID";
+                            using (SqlCommand cmd = new SqlCommand(sql, (SqlConnection)DataConnection, (SqlTransaction)trans))
                             {
-                                if (rdr.Read())
+                                cmd.Parameters.AddWithValue("@PayModeID", pd.PaymodeId);
+                                using (SqlDataReader rdr = cmd.ExecuteReader())
                                 {
-                                    if (rdr["LedgerID"] != DBNull.Value)
-                                        ledgerId = Convert.ToInt64(rdr["LedgerID"]);
-                                    if (rdr["LedgerName"] != DBNull.Value)
-                                        ledgerName = rdr["LedgerName"].ToString();
+                                    if (rdr.Read())
+                                    {
+                                        if (rdr["LedgerID"] != DBNull.Value)
+                                            ledgerId = Convert.ToInt64(rdr["LedgerID"]);
+                                        if (rdr["LedgerName"] != DBNull.Value)
+                                            ledgerName = rdr["LedgerName"].ToString();
+                                    }
                                 }
                             }
                         }
-                    }
-                    catch { }
+                        catch { }
 
-                    if (ledgerId <= 0)
-                    {
-                        ledgerId = ledgerRepository.GetLedgerId(DefaultLedgers.CASH, (int)AccountGroup.CASH_IN_HAND, SessionContext.BranchId);
-                        ledgerName = DefaultLedgers.CASH;
-                    }
+                        if (ledgerId <= 0)
+                        {
+                            ledgerId = ledgerRepository.GetLedgerId(DefaultLedgers.CASH, (int)AccountGroup.CASH_IN_HAND, SessionContext.BranchId);
+                            ledgerName = DefaultLedgers.CASH;
+                        }
 
-                    PopulateBaseVoucherProperties(voucher, sales, voucherDate);
-                    voucher.GroupID = Convert.ToInt32(AccountGroup.CASH_IN_HAND);
-                    voucher.LedgerID = ledgerId;
-                    voucher.LedgerName = ledgerName;
-                    voucher.Debit = Math.Round(amount, 2);
-                    voucher.Credit = 0;
-                    voucher.SlNo = slNo++;
+                        PopulateBaseVoucherProperties(voucher, sales, voucherDate);
+                        voucher.GroupID = Convert.ToInt32(AccountGroup.CASH_IN_HAND);
+                        voucher.LedgerID = ledgerId;
+                        voucher.LedgerName = ledgerName;
+                        voucher.Debit = Math.Round(amount, 2);
+                        voucher.Credit = 0;
+                        voucher.SlNo = slNo++;
 
-                    CreateVoucherEntry(voucher, trans, $"VoucherID={voucher.VoucherID}, Type=DEBIT, Account={ledgerName}, Amount={amount}");
-                    paymentDetailsPosted = true;
-                } // end foreach
-            } // end if PendingPaymentDetails
-            // Null out property reference so it doesn't leak into subsequent saves, without mutating the caller's list
-            PendingPaymentDetails = null;
+                        CreateVoucherEntry(voucher, trans, $"VoucherID={voucher.VoucherID}, Type=DEBIT, Account={ledgerName}, Amount={voucher.Debit}");
+                        paymentDetailsPosted = true;
+                    } // end foreach
+                } // end if PendingPaymentDetails
+            }
+            finally
+            {
+                // Null out property reference so it doesn't leak into subsequent saves, without mutating the caller's list
+                PendingPaymentDetails = null;
+            }
 
             // Fallback: no SPaymentDetails — debit Cash / mapped paymode ledger for full amount
             if (!paymentDetailsPosted)
