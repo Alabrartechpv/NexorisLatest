@@ -115,6 +115,50 @@ namespace Repository.TransactionRepository
             return item;
         }
 
+        /// <summary>
+        /// Returns all PReturnNo values for the current branch and financial year,
+        /// ordered ascending, for use with the |◄ ◄ ► ►| navigation buttons.
+        /// </summary>
+        public List<int> GetAllPurchaseReturnNumbers()
+        {
+            var list = new List<int>();
+            try
+            {
+                if (DataConnection.State != ConnectionState.Open)
+                    DataConnection.Open();
+
+                string query = @"
+                    SELECT DISTINCT PReturnNo 
+                    FROM PReturnMaster 
+                    WHERE BranchId = @BranchId 
+                      AND FinYearId = @FinYearId 
+                      AND (CancelFlag IS NULL OR CancelFlag = 0)
+                    ORDER BY PReturnNo ASC";
+
+                using (SqlCommand cmd = new SqlCommand(query, (SqlConnection)DataConnection))
+                {
+                    cmd.Parameters.AddWithValue("@BranchId",  Convert.ToInt32(DataBase.BranchId));
+                    cmd.Parameters.AddWithValue("@FinYearId", Convert.ToInt32(DataBase.FinyearId));
+
+                    using (SqlDataReader reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                            list.Add(reader.GetInt32(0));
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("GetAllPurchaseReturnNumbers error: " + ex.Message);
+            }
+            finally
+            {
+                if (DataConnection.State == ConnectionState.Open)
+                    DataConnection.Close();
+            }
+            return list;
+        }
+
         public int PReturnNo = 0;
         public int GeneratePReturnNo(SqlTransaction trans = null)
         {
