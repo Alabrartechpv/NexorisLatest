@@ -49,7 +49,7 @@ namespace PosBranch_Win
             // 
             // pictureBoxLogo
             // 
-            this.pictureBoxLogo.Image = global::PosBranch_Win.Properties.Resources.splash_logo1;
+            //this.pictureBoxLogo.Image = global::PosBranch_Win.Properties.Resources.splash_logo1;
             this.pictureBoxLogo.Location = new System.Drawing.Point(0, 0);
             this.pictureBoxLogo.Name = "pictureBoxLogo";
             this.pictureBoxLogo.Size = new System.Drawing.Size(594, 344);

@@ -952,6 +952,7 @@ namespace PosBranch_Win
 
             toolStripStatusLabel1.Text = DataBase.Branch;
             toolStripStatusUserValLabel3.Text = DataBase.UserName;
+            InitializeCustomStatusBar();
             ultraRadialMenu1.Show(this, new Point(Bounds.Right, Bounds.Top));
 
             // Initialize Report Navigator sidebar
@@ -3654,9 +3655,12 @@ namespace PosBranch_Win
                 // Add gradient paint to header to match IRS Office2007 Blue Dock Pane exactly
                 headerPanel.Paint += (s, e) => 
                 {
-                    using (LinearGradientBrush b = new LinearGradientBrush(headerPanel.ClientRectangle, Color.FromArgb(241, 247, 255), Color.FromArgb(191, 216, 243), LinearGradientMode.Vertical))
+                    Rectangle rect = headerPanel.ClientRectangle;
+                    if (rect.Width <= 0 || rect.Height <= 0) return;
+
+                    using (LinearGradientBrush b = new LinearGradientBrush(rect, Color.FromArgb(241, 247, 255), Color.FromArgb(191, 216, 243), LinearGradientMode.Vertical))
                     {
-                        e.Graphics.FillRectangle(b, headerPanel.ClientRectangle);
+                        e.Graphics.FillRectangle(b, rect);
                     }
                     using (Pen borderPen = new Pen(Color.FromArgb(142, 179, 220)))
                     using (Font headerFont = new Font("Segoe UI", 8.5f, FontStyle.Bold))
@@ -4227,6 +4231,314 @@ namespace PosBranch_Win
                 MessageBox.Show($"Error opening report: {ex.Message}");
             }
         }
+
+        #endregion
+
+        #region Custom Status Bar (Image 3 Look)
+
+        private Panel pnlCustomStatusBar;
+        private Label lblUserVal;
+        private Label lblDateVal;
+        private Label lblVersionVal;
+
+        private void InitializeCustomStatusBar()
+        {
+            try
+            {
+                if (statusStrip != null)
+                {
+                    statusStrip.Visible = false;
+                }
+
+                if (_Home_Toolbars_Dock_Area_Bottom != null)
+                {
+                    _Home_Toolbars_Dock_Area_Bottom.Visible = false;
+                }
+
+                // Remove dark 3D sunken border from MdiClient workspace using Win32 API
+                RemoveMdiClientBorder();
+
+                if (pnlCustomStatusBar != null)
+                {
+                    this.Controls.Remove(pnlCustomStatusBar);
+                    pnlCustomStatusBar.Dispose();
+                }
+
+                pnlCustomStatusBar = new Panel
+                {
+                    Dock = DockStyle.Bottom,
+                    Height = 22,
+                    Padding = new Padding(4, 1, 6, 1)
+                };
+
+                pnlCustomStatusBar.Paint += (s, e) =>
+                {
+                    Rectangle rect = pnlCustomStatusBar.ClientRectangle;
+                    if (rect.Width <= 0 || rect.Height <= 0) return;
+
+                    using (LinearGradientBrush b = new LinearGradientBrush(
+                        rect,
+                        Color.FromArgb(195, 235, 255),
+                        Color.FromArgb(150, 210, 250),
+                        LinearGradientMode.Vertical))
+                    {
+                        e.Graphics.FillRectangle(b, rect);
+                    }
+
+                    // Soft sky-blue top line
+                    using (Pen p = new Pen(Color.FromArgb(135, 198, 242), 1))
+                    {
+                        e.Graphics.DrawLine(p, 0, 0, pnlCustomStatusBar.Width, 0);
+                    }
+                };
+
+                Font labelFont = new Font("Segoe UI", 8.25F, FontStyle.Regular);
+                Font boxFont = new Font("Segoe UI", 8.25F, FontStyle.Regular);
+                Color darkTextColor = Color.FromArgb(0, 30, 80);
+                Color borderColor = Color.FromArgb(0, 145, 230);
+
+                // Left Flow Panel
+                FlowLayoutPanel leftFlow = new FlowLayoutPanel
+                {
+                    Dock = DockStyle.Left,
+                    AutoSize = true,
+                    AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                    BackColor = Color.Transparent,
+                    WrapContents = false,
+                    Margin = new Padding(0)
+                };
+
+                // 1. User
+                Label lblUserHead = new Label
+                {
+                    Text = "User",
+                    Font = labelFont,
+                    ForeColor = darkTextColor,
+                    AutoSize = true,
+                    Margin = new Padding(2, 2, 2, 0)
+                };
+
+                Panel pnlUserBox = CreateStatusBox(out lblUserVal, 68, 17, borderColor, boxFont, darkTextColor);
+                string currentUser = !string.IsNullOrWhiteSpace(SessionContext.UserName) 
+                    ? SessionContext.UserName 
+                    : (!string.IsNullOrWhiteSpace(DataBase.UserName) ? DataBase.UserName : "admin2");
+                lblUserVal.Text = currentUser;
+
+                // 2. Business Date (Textbox look without combobox dropdown arrow)
+                Label lblDateHead = new Label
+                {
+                    Text = "Business Date",
+                    Font = labelFont,
+                    ForeColor = darkTextColor,
+                    AutoSize = true,
+                    Margin = new Padding(10, 2, 2, 0)
+                };
+
+                Panel pnlDateBox = CreateStatusBox(out lblDateVal, 85, 17, borderColor, boxFont, darkTextColor);
+                lblDateVal.Text = DateTime.Now.ToString("dd-MMM-yyyy");
+
+                leftFlow.Controls.Add(lblUserHead);
+                leftFlow.Controls.Add(pnlUserBox);
+                leftFlow.Controls.Add(lblDateHead);
+                leftFlow.Controls.Add(pnlDateBox);
+
+                // Right Flow Panel
+                FlowLayoutPanel rightFlow = new FlowLayoutPanel
+                {
+                    Dock = DockStyle.Right,
+                    AutoSize = true,
+                    AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                    BackColor = Color.Transparent,
+                    WrapContents = false,
+                    Margin = new Padding(0)
+                };
+
+                // 3. SQL File Size (Accurate dynamic indicator box matching Image 2)
+                Label lblSqlHead = new Label
+                {
+                    Text = "SQL File Size",
+                    Font = labelFont,
+                    ForeColor = darkTextColor,
+                    AutoSize = true,
+                    Margin = new Padding(2, 2, 2, 0)
+                };
+
+                Panel pnlSqlBox = new Panel
+                {
+                    Size = new Size(40, 17),
+                    BackColor = Color.White,
+                    Margin = new Padding(2, 1, 2, 0)
+                };
+
+                string sqlSizeText = "0.0 MB";
+                float fillRatio = GetSqlDatabaseFillRatio(out sqlSizeText);
+
+                ToolTip ttSql = new ToolTip();
+                ttSql.SetToolTip(pnlSqlBox, $"SQL Database Size: {sqlSizeText}");
+                ttSql.SetToolTip(lblSqlHead, $"SQL Database Size: {sqlSizeText}");
+
+                pnlSqlBox.Paint += (s, e) =>
+                {
+                    if (pnlSqlBox.Width <= 0 || pnlSqlBox.Height <= 0) return;
+
+                    using (Pen p = new Pen(borderColor, 1))
+                    {
+                        e.Graphics.DrawRectangle(p, 0, 0, pnlSqlBox.Width - 1, pnlSqlBox.Height - 1);
+                    }
+
+                    // Accurate dynamic blue vertical indicator bar calculated from real database size
+                    int maxBarWidth = pnlSqlBox.Width - 4;
+                    if (maxBarWidth <= 0) return;
+                    int barWidth = Math.Max(1, (int)(maxBarWidth * fillRatio));
+                    int barHeight = Math.Max(1, pnlSqlBox.Height - 4);
+
+                    Rectangle fillRect = new Rectangle(2, 2, barWidth, barHeight);
+                    if (fillRect.Width > 0 && fillRect.Height > 0)
+                    {
+                        using (LinearGradientBrush gb = new LinearGradientBrush(fillRect, Color.FromArgb(0, 160, 235), Color.FromArgb(0, 120, 200), LinearGradientMode.Vertical))
+                        {
+                            e.Graphics.FillRectangle(gb, fillRect);
+                        }
+                    }
+                };
+
+                // 4. Version
+                lblVersionVal = new Label
+                {
+                    Text = "Nexoris Version ( version 2.00.00)",
+                    Font = labelFont,
+                    ForeColor = darkTextColor,
+                    AutoSize = true,
+                    Margin = new Padding(12, 2, 4, 0)
+                };
+
+                rightFlow.Controls.Add(lblSqlHead);
+                rightFlow.Controls.Add(pnlSqlBox);
+                rightFlow.Controls.Add(lblVersionVal);
+
+                pnlCustomStatusBar.Controls.Add(leftFlow);
+                pnlCustomStatusBar.Controls.Add(rightFlow);
+
+                // Insert into Controls collection in correct z-order to prevent workspace overflow
+                int statusIndex = statusStrip != null ? this.Controls.IndexOf(statusStrip) : -1;
+                if (statusIndex >= 0)
+                {
+                    this.Controls.Add(pnlCustomStatusBar);
+                    this.Controls.SetChildIndex(pnlCustomStatusBar, statusIndex);
+                }
+                else
+                {
+                    this.Controls.Add(pnlCustomStatusBar);
+                    pnlCustomStatusBar.SendToBack();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error initializing custom status bar: {ex.Message}");
+            }
+        }
+
+        private float GetSqlDatabaseFillRatio(out string sizeText)
+        {
+            sizeText = "0.0 MB";
+            try
+            {
+                using (var baseRepo = new Repository.BaseRepostitory())
+                using (var conn = (System.Data.SqlClient.SqlConnection)baseRepo.DataConnection)
+                {
+                    if (conn.State == System.Data.ConnectionState.Closed) conn.Open();
+                    string sql = "SELECT ISNULL(SUM(size * 8.0 / 1024), 0) FROM sys.database_files";
+                    using (var cmd = new System.Data.SqlClient.SqlCommand(sql, conn))
+                    {
+                        var val = cmd.ExecuteScalar();
+                        if (val != null && val != DBNull.Value)
+                        {
+                            double dbSizeMB = Convert.ToDouble(val);
+                            sizeText = $"{dbSizeMB:N1} MB";
+                            double maxLimitMB = 10240.0; // SQL Express 10GB limit
+                            float ratio = (float)(dbSizeMB / maxLimitMB);
+                            return Math.Max(0.15f, Math.Min(1.0f, ratio));
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error querying database size: {ex.Message}");
+            }
+            return 0.15f;
+        }
+
+        private Panel CreateStatusBox(out Label lblVal, int width, int height, Color borderColor, Font font, Color textColor)
+        {
+            Panel box = new Panel
+            {
+                Size = new Size(width, height),
+                BackColor = Color.White,
+                Margin = new Padding(2, 1, 2, 0)
+            };
+
+            box.Paint += (s, e) =>
+            {
+                using (Pen p = new Pen(borderColor, 1))
+                {
+                    e.Graphics.DrawRectangle(p, 0, 0, box.Width - 1, box.Height - 1);
+                }
+            };
+
+            lblVal = new Label
+            {
+                Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleCenter,
+                Font = font,
+                ForeColor = textColor,
+                BackColor = Color.Transparent
+            };
+
+            box.Controls.Add(lblVal);
+            return box;
+        }
+
+        #region Win32 MdiClient Border Removal
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
+        private const int GWL_EXSTYLE = -20;
+        private const int WS_EX_CLIENTEDGE = 0x00000200;
+        private const uint SWP_NOSIZE = 0x0001;
+        private const uint SWP_NOMOVE = 0x0002;
+        private const uint SWP_NOZORDER = 0x0004;
+        private const uint SWP_FRAMECHANGED = 0x0020;
+
+        private void RemoveMdiClientBorder()
+        {
+            try
+            {
+                foreach (Control c in this.Controls)
+                {
+                    MdiClient mdi = c as MdiClient;
+                    if (mdi != null)
+                    {
+                        int style = GetWindowLong(mdi.Handle, GWL_EXSTYLE);
+                        if ((style & WS_EX_CLIENTEDGE) != 0)
+                        {
+                            SetWindowLong(mdi.Handle, GWL_EXSTYLE, style & ~WS_EX_CLIENTEDGE);
+                            SetWindowPos(mdi.Handle, IntPtr.Zero, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+                        }
+                    }
+                }
+            }
+            catch { }
+        }
+
+        #endregion
 
         #endregion
 

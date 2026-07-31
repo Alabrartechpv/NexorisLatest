@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -15,9 +15,14 @@ namespace PosBranch_Win
         public Color colorBottom { get; set; }
         protected override void OnPaint(PaintEventArgs e)
         {
-            LinearGradientBrush lgb = new LinearGradientBrush(this.ClientRectangle, this.colorTop, this.colorBottom,90F);
-            Graphics g = e.Graphics;
-            g.FillRectangle(lgb,this.ClientRectangle);
+            Rectangle rect = this.ClientRectangle;
+            if (rect.Width > 0 && rect.Height > 0)
+            {
+                using (LinearGradientBrush lgb = new LinearGradientBrush(rect, this.colorTop, this.colorBottom, 90F))
+                {
+                    e.Graphics.FillRectangle(lgb, rect);
+                }
+            }
             base.OnPaint(e);
         }
     }
