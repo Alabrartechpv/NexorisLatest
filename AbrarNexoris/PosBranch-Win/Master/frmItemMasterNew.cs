@@ -14997,6 +14997,10 @@ namespace PosBranch_Win.Master
 
         #endregion
 
+        private void ultraTabControl1_SelectedTabChanged(object sender, Infragistics.Win.UltraWinTabControl.SelectedTabChangedEventArgs e)
+        {
+
+        }
     }
 }
 
