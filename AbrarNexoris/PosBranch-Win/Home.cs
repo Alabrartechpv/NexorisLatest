@@ -3650,9 +3650,12 @@ namespace PosBranch_Win
                 // Add gradient paint to header to match IRS Office2007 Blue Dock Pane exactly
                 headerPanel.Paint += (s, e) => 
                 {
-                    using (LinearGradientBrush b = new LinearGradientBrush(headerPanel.ClientRectangle, Color.FromArgb(241, 247, 255), Color.FromArgb(191, 216, 243), LinearGradientMode.Vertical))
+                    Rectangle rect = headerPanel.ClientRectangle;
+                    if (rect.Width <= 0 || rect.Height <= 0) return;
+
+                    using (LinearGradientBrush b = new LinearGradientBrush(rect, Color.FromArgb(241, 247, 255), Color.FromArgb(191, 216, 243), LinearGradientMode.Vertical))
                     {
-                        e.Graphics.FillRectangle(b, headerPanel.ClientRectangle);
+                        e.Graphics.FillRectangle(b, rect);
                     }
                     using (Pen borderPen = new Pen(Color.FromArgb(142, 179, 220)))
                     using (Font headerFont = new Font("Segoe UI", 8.5f, FontStyle.Bold))
@@ -4265,13 +4268,16 @@ namespace PosBranch_Win
 
                 pnlCustomStatusBar.Paint += (s, e) =>
                 {
+                    Rectangle rect = pnlCustomStatusBar.ClientRectangle;
+                    if (rect.Width <= 0 || rect.Height <= 0) return;
+
                     using (LinearGradientBrush b = new LinearGradientBrush(
-                        pnlCustomStatusBar.ClientRectangle,
+                        rect,
                         Color.FromArgb(195, 235, 255),
                         Color.FromArgb(150, 210, 250),
                         LinearGradientMode.Vertical))
                     {
-                        e.Graphics.FillRectangle(b, pnlCustomStatusBar.ClientRectangle);
+                        e.Graphics.FillRectangle(b, rect);
                     }
 
                     // Soft sky-blue top line
@@ -4368,6 +4374,8 @@ namespace PosBranch_Win
 
                 pnlSqlBox.Paint += (s, e) =>
                 {
+                    if (pnlSqlBox.Width <= 0 || pnlSqlBox.Height <= 0) return;
+
                     using (Pen p = new Pen(borderColor, 1))
                     {
                         e.Graphics.DrawRectangle(p, 0, 0, pnlSqlBox.Width - 1, pnlSqlBox.Height - 1);
@@ -4375,12 +4383,17 @@ namespace PosBranch_Win
 
                     // Accurate dynamic blue vertical indicator bar calculated from real database size
                     int maxBarWidth = pnlSqlBox.Width - 4;
-                    int barWidth = Math.Max(5, (int)(maxBarWidth * fillRatio));
+                    if (maxBarWidth <= 0) return;
+                    int barWidth = Math.Max(1, (int)(maxBarWidth * fillRatio));
+                    int barHeight = Math.Max(1, pnlSqlBox.Height - 4);
 
-                    Rectangle fillRect = new Rectangle(2, 2, barWidth, pnlSqlBox.Height - 4);
-                    using (LinearGradientBrush gb = new LinearGradientBrush(fillRect, Color.FromArgb(0, 160, 235), Color.FromArgb(0, 120, 200), LinearGradientMode.Vertical))
+                    Rectangle fillRect = new Rectangle(2, 2, barWidth, barHeight);
+                    if (fillRect.Width > 0 && fillRect.Height > 0)
                     {
-                        e.Graphics.FillRectangle(gb, fillRect);
+                        using (LinearGradientBrush gb = new LinearGradientBrush(fillRect, Color.FromArgb(0, 160, 235), Color.FromArgb(0, 120, 200), LinearGradientMode.Vertical))
+                        {
+                            e.Graphics.FillRectangle(gb, fillRect);
+                        }
                     }
                 };
 
