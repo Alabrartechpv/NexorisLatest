@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -634,6 +634,65 @@ namespace Repository.TransactionRepository
                     }
                 }
 
+                // Step 3: Handle items that were removed from the purchase bill
+                if (oldPurchaseDetails != null && oldPurchaseDetails.Count > 0)
+                {
+                    foreach (var oldDetail in oldPurchaseDetails)
+                    {
+                        bool stillPresent = false;
+                        if (dgvPurchase != null)
+                        {
+                            for (int i = 0; i < dgvPurchase.Rows.Count; i++)
+                            {
+                                if (dgvPurchase.Rows[i].Cells["ItemId"] != null &&
+                                    dgvPurchase.Rows[i].Cells["ItemId"].Value != null &&
+                                    int.TryParse(dgvPurchase.Rows[i].Cells["ItemId"].Value.ToString(), out int gridItemId) &&
+                                    gridItemId == oldDetail.ItemID)
+                                {
+                                    if (dgvPurchase.Rows[i].Cells["UnitId"] != null &&
+                                        dgvPurchase.Rows[i].Cells["UnitId"].Value != null &&
+                                        int.TryParse(dgvPurchase.Rows[i].Cells["UnitId"].Value.ToString(), out int gridUnitId) &&
+                                        gridUnitId == oldDetail.UnitId)
+                                    {
+                                        stillPresent = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
+                        if (!stillPresent)
+                        {
+                            // Item was removed from purchase bill: call SP with DELETE to reverse its stock
+                            var existingPrices = GetExistingItemPrices(oldDetail.ItemID, oldDetail.UnitId, trans);
+                            int packingValue = (int)oldDetail.Packing;
+                            if (packingValue <= 0) packingValue = 1;
+
+                            var deleteObj = new PurchaseStockUpdateOnPricesettings();
+                            deleteObj._Operation = "DELETE";
+                            deleteObj.CompanyId = SessionContext.CompanyId;
+                            deleteObj.BranchID = SessionContext.BranchId;
+                            deleteObj.FinYearId = originalFinYearId;
+                            deleteObj.ItemID = oldDetail.ItemID;
+                            deleteObj.UnitId = oldDetail.UnitId;
+                            deleteObj.Qty = (float)oldDetail.Qty;
+                            deleteObj.Free = (float)oldDetail.Free;
+                            deleteObj.OldQty = 0;
+                            deleteObj.SingleItemCost = (float)oldDetail.Cost;
+                            deleteObj.Packing = packingValue;
+                            deleteObj.RetailPrice = existingPrices.RetailPrice;
+                            deleteObj.WholeSalePrice = existingPrices.WholeSalePrice;
+                            deleteObj.CreditPrice = existingPrices.CreditPrice;
+
+                            DataConnection.Query<PurchaseStockUpdateOnPricesettings>(
+                                STOREDPROCEDURE.POS_PurchaseInvoice_PriceSettings,
+                                deleteObj, trans, commandType: CommandType.StoredProcedure).ToList();
+
+                            System.Diagnostics.Debug.WriteLine($"UPDATE Purchase REMOVED ITEM - ItemId={oldDetail.ItemID}, UnitId={oldDetail.UnitId}, OldQty={oldDetail.Qty}, OldFree={oldDetail.Free} reversed from PriceSettings.");
+                        }
+                    }
+                }
+
                 // Calculate subtotal (GrandTotal - TaxAmount) - reuse totalTaxAmount calculated above
                 float subtotalAmount = (float)ObjPmaster.GrandTotal - totalTaxAmount;
 
@@ -836,6 +895,40 @@ namespace Repository.TransactionRepository
                     DataConnection.Open();
                 }
                 trans = DataConnection.BeginTransaction();
+
+                // Reverse stock in PriceSettings for all items in this purchase invoice BEFORE deleting
+                List<PurchaseDetails> oldPurchaseDetails = GetOldPurchaseDetails(purchaseNo, finYearId, trans);
+                if (oldPurchaseDetails != null && oldPurchaseDetails.Count > 0)
+                {
+                    foreach (var oldDetail in oldPurchaseDetails)
+                    {
+                        var existingPrices = GetExistingItemPrices(oldDetail.ItemID, oldDetail.UnitId, trans);
+                        int packingValue = (int)oldDetail.Packing;
+                        if (packingValue <= 0) packingValue = 1;
+
+                        var deleteObj = new PurchaseStockUpdateOnPricesettings();
+                        deleteObj._Operation = "DELETE";
+                        deleteObj.CompanyId = Convert.ToInt32(DataBase.CompanyId);
+                        deleteObj.BranchID = branchId;
+                        deleteObj.FinYearId = finYearId;
+                        deleteObj.ItemID = oldDetail.ItemID;
+                        deleteObj.UnitId = oldDetail.UnitId;
+                        deleteObj.Qty = (float)oldDetail.Qty;
+                        deleteObj.Free = (float)oldDetail.Free;
+                        deleteObj.OldQty = 0;
+                        deleteObj.SingleItemCost = (float)oldDetail.Cost;
+                        deleteObj.Packing = packingValue;
+                        deleteObj.RetailPrice = existingPrices.RetailPrice;
+                        deleteObj.WholeSalePrice = existingPrices.WholeSalePrice;
+                        deleteObj.CreditPrice = existingPrices.CreditPrice;
+
+                        DataConnection.Query<PurchaseStockUpdateOnPricesettings>(
+                            STOREDPROCEDURE.POS_PurchaseInvoice_PriceSettings,
+                            deleteObj, trans, commandType: CommandType.StoredProcedure).ToList();
+
+                        System.Diagnostics.Debug.WriteLine($"DELETE Purchase Invoice - Reversing stock for ItemId={oldDetail.ItemID}, UnitId={oldDetail.UnitId}, Qty={oldDetail.Qty}, Free={oldDetail.Free} from PriceSettings.");
+                    }
+                }
 
                 // Create a parameter object with the DELETE operation
                 var parameters = new

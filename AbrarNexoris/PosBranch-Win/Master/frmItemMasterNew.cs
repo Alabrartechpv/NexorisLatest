@@ -3582,6 +3582,8 @@ namespace PosBranch_Win.Master
                 if (txt_TaxType != null) txt_TaxType.Clear();
                 if (txt_TaxPer != null) txt_TaxPer.Clear();
                 if (txt_TaxAmount != null) txt_TaxAmount.Text = "0";
+                if (Txt_UnitCost != null) Txt_UnitCost.Text = "0.000";
+                if (textBox1 != null) textBox1.Text = "0.00";
                 if (txt_qty != null) txt_qty.Clear();
                 if (txt_available != null) txt_available.Clear();
                 if (txt_hold != null) txt_hold.Text = "0.00";
