@@ -19,6 +19,7 @@ using System.Data.SqlClient;
 using System.Reflection;
 using System.IO;
 using Repository.SettingsRepo;
+using System.Drawing.Drawing2D;
 
 namespace PosBranch_Win.Transaction
 {
@@ -38,6 +39,18 @@ namespace PosBranch_Win.Transaction
 
         // Track the currently loaded purchase number to prevent duplicates
         private int _currentlyLoadedPurchaseNo = -1;
+
+        // Column chooser, drag-to-hide, and footer cell synchronization
+        private Form columnChooserForm;
+        private ListBox columnChooserListBox;
+        private bool isDraggingHeaderToHide;
+        private UltraGridColumn columnBeingDragged;
+        private Point headerDragStartPoint;
+        private readonly System.Windows.Forms.ToolTip headerToolTip = new System.Windows.Forms.ToolTip();
+        private readonly HashSet<string> userHiddenColumnKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Cursor blackXCursor = CreateBlackXCursor();
+        private readonly Dictionary<string, Label> footerLabels = new Dictionary<string, Label>();
+        private readonly Dictionary<string, string> columnAggregations = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         // Add a class-level variable for the quantity column name
         private string _quantityColumnName = "Quantity";
@@ -74,6 +87,9 @@ namespace PosBranch_Win.Transaction
 
             // Add form-level KeyDown event handler for custom tab navigation
             this.KeyDown += new KeyEventHandler(frmPurchaseReturn_KeyDown);
+
+            // Initialize navigation panels (ultraPanel11, ultraPanel4, ultraPanel6, ultraPanel5) as interactive buttons
+            InitializePanelButtons();
         }
 
         private void RegisterEventHandlers()
@@ -110,7 +126,14 @@ namespace PosBranch_Win.Transaction
                 // Register the row selection event for custom row highlighting
                 ultraGrid1.AfterSelectChange += UltraGrid1_AfterSelectChange;
 
-                // Register the panel paint handler to draw dashed line
+                // Register footer cell sync and column drag-to-hide handlers matching gridReport in frmvendorpurchasereport
+                ultraGrid1.Resize += (s, e) => UpdateFooterCellPositions();
+                ultraGrid1.AfterColPosChanged += (s, e) => UpdateFooterCellPositions();
+                ultraGrid1.AfterColRegionScroll += (s, e) => UpdateFooterCellPositions();
+                ultraGrid1.AfterRowRegionScroll += (s, e) => UpdateFooterCellPositions();
+                ultraGrid1.Paint += (s, e) => UpdateFooterCellPositions();
+
+                SetupHeaderDragToHideAndColumnChooser();
 
             }
             catch (Exception ex)
@@ -298,11 +321,151 @@ namespace PosBranch_Win.Transaction
                 // Force an initial resize to set column proportions
                 ResizeGridColumns();
 
-
+                // Initialize GRN vs Without GRN mode checkboxes
+                InitializeGRNModeCheckBoxes();
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("Error in form load: " + ex.Message);
+            }
+        }
+
+        private bool _isUpdatingModeCheckBoxes = false;
+
+        private void InitializeGRNModeCheckBoxes()
+        {
+            try
+            {
+                if (chkGRN == null || chkWithoutGRN == null) return;
+
+                chkGRN.CheckedChanged -= chkGRN_CheckedChanged;
+                chkWithoutGRN.CheckedChanged -= chkWithoutGRN_CheckedChanged;
+
+                chkGRN.CheckedChanged += chkGRN_CheckedChanged;
+                chkWithoutGRN.CheckedChanged += chkWithoutGRN_CheckedChanged;
+
+                ApplyGRNModeState(chkGRN.Checked);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Error initializing GRN mode check boxes: " + ex.Message);
+            }
+        }
+
+        private void chkGRN_CheckedChanged(object sender, EventArgs e)
+        {
+            if (_isUpdatingModeCheckBoxes) return;
+            try
+            {
+                _isUpdatingModeCheckBoxes = true;
+                if (chkGRN.Checked)
+                {
+                    chkWithoutGRN.Checked = false;
+                    ApplyGRNModeState(isGRNMode: true);
+                }
+                else if (!chkWithoutGRN.Checked)
+                {
+                    chkGRN.Checked = true;
+                }
+            }
+            finally
+            {
+                _isUpdatingModeCheckBoxes = false;
+            }
+        }
+
+        private void chkWithoutGRN_CheckedChanged(object sender, EventArgs e)
+        {
+            if (_isUpdatingModeCheckBoxes) return;
+            try
+            {
+                _isUpdatingModeCheckBoxes = true;
+                if (chkWithoutGRN.Checked)
+                {
+                    chkGRN.Checked = false;
+                    ApplyGRNModeState(isGRNMode: false);
+                }
+                else if (!chkGRN.Checked)
+                {
+                    chkWithoutGRN.Checked = true;
+                }
+            }
+            finally
+            {
+                _isUpdatingModeCheckBoxes = false;
+            }
+        }
+
+        private void ApplyGRNModeState(bool isGRNMode)
+        {
+            try
+            {
+                if (isGRNMode)
+                {
+                    // ── GRN MODE ────────────────────────────────────────────────
+                    // Show: textBox1, btnAddPurchaceList, ultraTextEditor1, lblPRamount, lblPno
+                    if (textBox1 != null) { textBox1.Visible = true; textBox1.Enabled = true; }
+                    if (btnAddPurchaceList != null) { btnAddPurchaceList.Visible = true; btnAddPurchaceList.Enabled = true; }
+                    if (ultraTextEditor1 != null) { ultraTextEditor1.Visible = true; ultraTextEditor1.Enabled = true; }
+                    if (lblPRamount != null) lblPRamount.Visible = true;  // Purchase Amt label
+                    if (lblPno != null) lblPno.Visible = true;            // Purchase No label
+                    // Also restore Outstanding row, action buttons and panels in GRN mode
+                    if (label2 != null) { label2.Visible = true; label2.Enabled = true; }
+                    if (textBox2 != null) { textBox2.Visible = true; textBox2.Enabled = true; }
+                    if (btnReturn != null) { btnReturn.Visible = true; btnReturn.Enabled = true; }
+                    if (btnReturnAll != null) { btnReturnAll.Visible = true; btnReturnAll.Enabled = true; }
+                    if (ultraPanel11 != null) ultraPanel11.Visible = true;
+                    if (ultraPanel5 != null) ultraPanel5.Visible = true;
+                    if (ultraPanel6 != null) ultraPanel6.Visible = true;
+                    if (ultraPanel4 != null) ultraPanel4.Visible = true;
+                    if (ultraPictureBox13 != null) ultraPictureBox13.Visible = true;
+                    if (ultraPictureBox3 != null) ultraPictureBox3.Visible = true;
+                    if (ultraPictureBox10 != null) ultraPictureBox10.Visible = true;
+                    if (ultraPictureBox14 != null) ultraPictureBox14.Visible = true;
+
+                    // Hide: ultraTextEditor3, button2 (Master reason row), TxtBarcode, BtnDial, lblBarcode, label3
+                    if (ultraTextEditor3 != null) { ultraTextEditor3.Text = ""; ultraTextEditor3.Enabled = false; ultraTextEditor3.Visible = false; }
+                    if (button2 != null) { button2.Enabled = false; button2.Visible = false; }
+                    if (label3 != null) label3.Visible = false;           // Master reason label
+                    if (TxtBarcode != null) { TxtBarcode.Text = ""; TxtBarcode.ReadOnly = true; TxtBarcode.Enabled = false; TxtBarcode.Visible = false; }
+                    if (BtnDial != null) { BtnDial.Enabled = false; BtnDial.Visible = false; }
+                    if (lblBarcode != null) lblBarcode.Visible = false;
+                }
+                else
+                {
+                    // ── WITHOUT GRN MODE ────────────────────────────────────────
+                    // Show: ultraTextEditor3, button2, label3 (Master reason), TxtBarcode, BtnDial, lblBarcode
+                    if (ultraTextEditor3 != null) { ultraTextEditor3.Visible = true; ultraTextEditor3.Enabled = true; }
+                    if (button2 != null) { button2.Visible = true; button2.Enabled = true; }
+                    if (label3 != null) label3.Visible = true;            // Master reason label
+                    if (TxtBarcode != null) { TxtBarcode.Enabled = true; TxtBarcode.ReadOnly = false; TxtBarcode.Visible = true; }
+                    if (BtnDial != null) { BtnDial.Enabled = true; BtnDial.Visible = true; }
+                    if (lblBarcode != null) lblBarcode.Visible = true;
+
+                    // Hide: textBox1, btnAddPurchaceList, ultraTextEditor1, lblPRamount, lblPno
+                    if (textBox1 != null) { textBox1.Text = ""; textBox1.Enabled = false; textBox1.Visible = false; }
+                    if (btnAddPurchaceList != null) { btnAddPurchaceList.Enabled = false; btnAddPurchaceList.Visible = false; }
+                    if (ultraTextEditor1 != null) { ultraTextEditor1.Text = ""; ultraTextEditor1.Enabled = false; ultraTextEditor1.Visible = false; }
+                    if (lblPRamount != null) lblPRamount.Visible = false; // Purchase Amt label
+                    if (lblPno != null) lblPno.Visible = false;           // Purchase No label
+                    // Also hide Outstanding row, action buttons and panels in Without GRN mode
+                    if (label2 != null) { label2.Visible = false; label2.Enabled = false; }
+                    if (textBox2 != null) { textBox2.Visible = false; textBox2.Enabled = false; }
+                    if (btnReturn != null) { btnReturn.Visible = false; btnReturn.Enabled = false; }
+                    if (btnReturnAll != null) { btnReturnAll.Visible = false; btnReturnAll.Enabled = false; }
+                    if (ultraPanel11 != null) ultraPanel11.Visible = false;
+                    if (ultraPanel5 != null) ultraPanel5.Visible = false;
+                    if (ultraPanel6 != null) ultraPanel6.Visible = false;
+                    if (ultraPanel4 != null) ultraPanel4.Visible = false;
+                    if (ultraPictureBox13 != null) ultraPictureBox13.Visible = false;
+                    if (ultraPictureBox3 != null) ultraPictureBox3.Visible = false;
+                    if (ultraPictureBox10 != null) ultraPictureBox10.Visible = false;
+                    if (ultraPictureBox14 != null) ultraPictureBox14.Visible = false;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Error applying GRN mode state: " + ex.Message);
             }
         }
 
@@ -356,14 +519,16 @@ namespace PosBranch_Win.Transaction
                     layout.Appearance.BorderColor = panelBorderColor;
                     layout.BorderStyle = UIElementBorderStyle.Solid;
 
-                    layout.Override.HeaderStyle = HeaderStyle.WindowsXPCommand;
-                    layout.Override.HeaderAppearance.BackColor = headerGradientStart;
-                    layout.Override.HeaderAppearance.BackColor2 = headerGradientEnd;
+                    layout.Override.HeaderStyle = HeaderStyle.Standard;
+                    layout.Override.HeaderAppearance.BackColor = Color.FromArgb(93, 151, 214);
+                    layout.Override.HeaderAppearance.BackColor2 = Color.FromArgb(67, 118, 184);
                     layout.Override.HeaderAppearance.BackGradientStyle = GradientStyle.Vertical;
-                    layout.Override.HeaderAppearance.ForeColor = darkTextColor;
-                    layout.Override.HeaderAppearance.FontData.Name = "Segoe UI";
-                    layout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.True;
-                    layout.Override.HeaderAppearance.FontData.SizeInPoints = 9;
+                    layout.Override.HeaderAppearance.ForeColor = Color.White;
+                    layout.Override.HeaderAppearance.BorderColor = Color.FromArgb(118, 154, 198);
+                    layout.Override.HeaderAppearance.FontData.Name = "Microsoft Sans Serif";
+                    layout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.False;
+                    layout.Override.HeaderAppearance.FontData.SizeInPoints = 8.25F;
+                    layout.Override.HeaderAppearance.ThemedElementAlpha = Alpha.Transparent;
 
                     layout.Override.RowAppearance.BackColor = Color.White;
                     layout.Override.RowAppearance.ForeColor = darkTextColor;
@@ -479,17 +644,16 @@ namespace PosBranch_Win.Transaction
                 Button btn = c as Button;
                 if (btn != null)
                 {
-                    btn.Font = controlFont;
-                    btn.BackColor = Color.FromArgb(0, 122, 204);
                     btn.FlatStyle = FlatStyle.Flat;
-                    btn.FlatAppearance.BorderColor = Color.FromArgb(0, 90, 158);
+                    btn.FlatAppearance.BorderColor = Color.FromArgb(62, 104, 166);
+                    btn.FlatAppearance.MouseOverBackColor = Color.FromArgb(169, 197, 230);
+                    btn.FlatAppearance.MouseDownBackColor = Color.FromArgb(126, 166, 214);
+                    btn.BackColor = Color.FromArgb(155, 188, 224);
+                    btn.ForeColor = Color.FromArgb(14, 47, 108);
+
                     if (btn.BackgroundImage == null)
                     {
-                        btn.ForeColor = Color.White;
-                    }
-                    else
-                    {
-                        btn.ForeColor = Color.Aquamarine;
+                        btn.Font = new Font("Tahoma", btn.Font.SizeInPoints > 9F ? btn.Font.SizeInPoints : 8.25F, FontStyle.Bold);
                     }
                 }
 
@@ -509,35 +673,116 @@ namespace PosBranch_Win.Transaction
             GeneratePurchaseReturnNumber();
         }
 
+        private void ApplyUnifiedGridTheme(UltraGrid grid)
+        {
+            if (grid == null) return;
+
+            grid.UseAppStyling = false;
+            grid.UseOsThemes = DefaultableBoolean.False;
+
+            UltraGridLayout layout = grid.DisplayLayout;
+
+            // Background matching Image 3 empty grid space
+            layout.Appearance.BackColor = Color.FromArgb(232, 246, 255);
+            layout.Appearance.BackColor2 = Color.FromArgb(232, 246, 255);
+            layout.Appearance.BackGradientStyle = GradientStyle.None;
+            layout.Appearance.BorderColor = Color.FromArgb(197, 217, 241);
+            layout.BorderStyle = UIElementBorderStyle.Solid;
+
+            // Header style matching Image 3 (flat blue header theme)
+            layout.Override.HeaderStyle = HeaderStyle.Standard;
+            layout.Override.HeaderAppearance.BackColor = Color.FromArgb(93, 151, 214);
+            layout.Override.HeaderAppearance.BackColor2 = Color.FromArgb(67, 118, 184);
+            layout.Override.HeaderAppearance.BackGradientStyle = GradientStyle.Vertical;
+            layout.Override.HeaderAppearance.ForeColor = Color.White;
+            layout.Override.HeaderAppearance.BorderColor = Color.FromArgb(118, 154, 198);
+            layout.Override.HeaderAppearance.TextHAlign = HAlign.Center;
+            layout.Override.HeaderAppearance.TextVAlign = VAlign.Middle;
+            layout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.False;
+            layout.Override.HeaderAppearance.FontData.Name = "Microsoft Sans Serif";
+            layout.Override.HeaderAppearance.FontData.SizeInPoints = 8.25F;
+            layout.Override.HeaderAppearance.ThemedElementAlpha = Alpha.Transparent;
+
+            // Row selector styling matching headers
+            layout.Override.RowSelectors = DefaultableBoolean.True;
+            layout.Override.RowSelectorWidth = 20;
+            layout.Override.RowSelectorNumberStyle = RowSelectorNumberStyle.RowIndex;
+            layout.Override.RowSelectorAppearance.BackColor = Color.FromArgb(67, 118, 184);
+            layout.Override.RowSelectorAppearance.BackColor2 = Color.FromArgb(93, 151, 214);
+            layout.Override.RowSelectorAppearance.BackGradientStyle = GradientStyle.Vertical;
+            layout.Override.RowSelectorAppearance.BorderColor = Color.FromArgb(118, 154, 198);
+            layout.Override.RowSelectorAppearance.ForeColor = Color.White;
+            layout.Override.RowSelectorAppearance.FontData.Bold = DefaultableBoolean.True;
+            layout.Override.RowSelectorAppearance.TextHAlign = HAlign.Center;
+
+            // Row & Cell appearance matching Image 3
+            layout.Override.RowAppearance.BackColor = Color.White;
+            layout.Override.RowAppearance.ForeColor = Color.FromArgb(10, 31, 79);
+            layout.Override.RowAppearance.BorderColor = Color.FromArgb(197, 217, 241);
+            layout.Override.RowAlternateAppearance.BackColor = Color.FromArgb(245, 250, 255);
+            layout.Override.RowAlternateAppearance.BorderColor = Color.FromArgb(197, 217, 241);
+
+            // Selected / Active Row
+            layout.Override.SelectedRowAppearance.BackColor = Color.FromArgb(173, 216, 255);
+            layout.Override.SelectedRowAppearance.ForeColor = Color.FromArgb(10, 31, 79);
+            layout.Override.SelectedRowAppearance.FontData.Bold = DefaultableBoolean.False;
+            layout.Override.ActiveRowAppearance.BackColor = Color.FromArgb(173, 216, 255);
+            layout.Override.ActiveRowAppearance.ForeColor = Color.FromArgb(10, 31, 79);
+            layout.Override.ActiveRowAppearance.FontData.Bold = DefaultableBoolean.False;
+
+            // Borders
+            layout.Override.BorderStyleHeader = UIElementBorderStyle.Solid;
+            layout.Override.BorderStyleCell = UIElementBorderStyle.Solid;
+            layout.Override.BorderStyleRow = UIElementBorderStyle.Solid;
+            layout.Override.CellAppearance.BorderColor = Color.FromArgb(197, 217, 241);
+            layout.Override.CellAppearance.ForeColor = Color.FromArgb(10, 31, 79);
+            layout.Override.CellAppearance.FontData.Name = "Microsoft Sans Serif";
+            layout.Override.CellAppearance.FontData.SizeInPoints = 8.25F;
+            layout.Override.CellAppearance.TextVAlign = VAlign.Middle;
+
+            // Compact spacing
+            layout.Override.RowSizing = RowSizing.AutoFree;
+            layout.Override.DefaultRowHeight = 22;
+            layout.Override.RowSpacingBefore = 0;
+            layout.Override.RowSpacingAfter = 0;
+            layout.Override.CellPadding = 2;
+            layout.Override.CellSpacing = 0;
+
+            layout.GroupByBox.Hidden = true;
+            layout.AutoFitStyle = AutoFitStyle.None;
+            layout.ScrollBounds = ScrollBounds.ScrollToFill;
+            layout.Scrollbars = Scrollbars.Both;
+        }
+
         private void SetupGridDocking()
         {
             try
             {
-                // Ensure the UltraGrid fills its parent panel (ultraPanel3) completely without Dock.Fill on parent
-                if (ultraGrid1 != null)
+                if (ultraGrid1 != null && ultraPanel3 != null)
                 {
                     ultraGrid1.Dock = DockStyle.None;
                     ultraGrid1.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
                     ultraGrid1.Location = new Point(5, 51);
-                    if (ultraPanel3 != null)
-                    {
-                        ultraGrid1.Size = new Size(Math.Max(100, ultraPanel3.ClientArea.Width - 10), Math.Max(100, ultraPanel3.ClientArea.Height - 56));
-                    }
-
-                    if (ultraGrid1.DisplayLayout != null)
-                    {
-                        ultraGrid1.DisplayLayout.Override.RowSizing = RowSizing.AutoFree;
-                        ultraGrid1.DisplayLayout.Override.DefaultRowHeight = 22;
-                        ultraGrid1.DisplayLayout.Override.RowSpacingBefore = 0;
-                        ultraGrid1.DisplayLayout.Override.RowSpacingAfter = 0;
-                        ultraGrid1.DisplayLayout.Override.CellPadding = 0;
-                        ultraGrid1.DisplayLayout.Override.CellSpacing = 0;
-                        ultraGrid1.DisplayLayout.ScrollBounds = ScrollBounds.ScrollToFill;
-                        ultraGrid1.DisplayLayout.MaxColScrollRegions = 1;
-                        ultraGrid1.DisplayLayout.MaxRowScrollRegions = 1;
-                        ultraGrid1.DisplayLayout.BorderStyle = UIElementBorderStyle.Solid;
-                    }
+                    ultraGrid1.Size = new Size(Math.Max(100, ultraPanel3.ClientArea.Width - 10), Math.Max(100, ultraPanel3.ClientArea.Height - 81));
                 }
+
+                if (ultraPanelGridFooter != null && ultraPanel3 != null)
+                {
+                    ultraPanelGridFooter.Dock = DockStyle.None;
+                    ultraPanelGridFooter.Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
+                    ultraPanelGridFooter.Location = new Point(5, ultraPanel3.ClientArea.Height - 30);
+                    ultraPanelGridFooter.Size = new Size(Math.Max(100, ultraPanel3.ClientArea.Width - 10), 24);
+
+                    ultraPanelGridFooter.Appearance.BackColor = Color.FromArgb(93, 151, 214);
+                    ultraPanelGridFooter.Appearance.BackColor2 = Color.FromArgb(93, 151, 214);
+                    ultraPanelGridFooter.Appearance.BackGradientStyle = GradientStyle.None;
+                    ultraPanelGridFooter.Appearance.BorderColor = Color.FromArgb(144, 181, 223);
+                    ultraPanelGridFooter.BorderStyle = UIElementBorderStyle.Solid;
+                    ultraPanelGridFooter.Visible = true;
+                    ultraPanelGridFooter.BringToFront();
+                }
+
+                ApplyUnifiedGridTheme(ultraGrid1);
             }
             catch (Exception ex)
             {
@@ -982,6 +1227,164 @@ namespace PosBranch_Win.Transaction
         {
             EnsureNavListLoaded();
             NavigateToIndex(_navPRNumbers.Count - 1);
+        }
+
+        // ─── Panel Navigation Buttons (ultraPanel11, ultraPanel4, ultraPanel6, ultraPanel5) ───
+
+        private void InitializePanelButtons()
+        {
+            RegisterPanelButton(ultraPanel11); // First
+            RegisterPanelButton(ultraPanel4);  // Prev
+            RegisterPanelButton(ultraPanel6);  // Next
+            RegisterPanelButton(ultraPanel5);  // Last
+        }
+
+        private void RegisterPanelButton(Infragistics.Win.Misc.UltraPanel panel)
+        {
+            if (panel == null)
+                return;
+
+            panel.UseAppStyling = false;
+            panel.Cursor = Cursors.Hand;
+            panel.BorderStyle = Infragistics.Win.UIElementBorderStyle.Rounded1;
+            ApplyPanelButtonStyle(panel, false, false);
+
+            panel.Click += PanelButton_Click;
+            panel.MouseEnter += PanelButton_MouseEnter;
+            panel.MouseLeave += PanelButton_MouseLeave;
+            panel.MouseDown += PanelButton_MouseDown;
+            panel.MouseUp += PanelButton_MouseUp;
+
+            panel.ClientArea.Click += PanelButton_Click;
+            panel.ClientArea.MouseEnter += PanelButton_MouseEnter;
+            panel.ClientArea.MouseLeave += PanelButton_MouseLeave;
+            panel.ClientArea.MouseDown += PanelButton_MouseDown;
+            panel.ClientArea.MouseUp += PanelButton_MouseUp;
+
+            foreach (Control child in panel.ClientArea.Controls)
+            {
+                child.Cursor = Cursors.Hand;
+                child.Click += PanelButton_Click;
+                child.MouseEnter += PanelButton_MouseEnter;
+                child.MouseLeave += PanelButton_MouseLeave;
+                child.MouseDown += PanelButton_MouseDown;
+                child.MouseUp += PanelButton_MouseUp;
+            }
+        }
+
+        private static readonly Color NavButtonBlueTop = Color.FromArgb(232, 241, 252);
+        private static readonly Color NavButtonBlueBottom = Color.FromArgb(145, 181, 224);
+        private static readonly Color NavButtonBlueBorder = Color.FromArgb(62, 104, 166);
+        private static readonly Color NavButtonTextBlue = Color.FromArgb(14, 47, 108);
+        private static readonly Color NavPanelHoverTopColor = Color.FromArgb(245, 250, 255);
+        private static readonly Color NavPanelHoverBottomColor = Color.FromArgb(170, 206, 244);
+        private static readonly Color NavPanelPressedTopColor = Color.FromArgb(205, 226, 248);
+        private static readonly Color NavPanelPressedBottomColor = Color.FromArgb(128, 170, 224);
+
+        private static void ApplyPanelButtonStyle(Infragistics.Win.Misc.UltraPanel panel, bool isHover, bool isPressed)
+        {
+            if (panel == null) return;
+            Infragistics.Win.AppearanceBase appearance = panel.Appearance;
+            appearance.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
+            appearance.BorderColor = NavButtonBlueBorder;
+            appearance.ForeColor = NavButtonTextBlue;
+
+            if (isPressed)
+            {
+                appearance.BackColor = NavPanelPressedTopColor;
+                appearance.BackColor2 = NavPanelPressedBottomColor;
+            }
+            else if (isHover)
+            {
+                appearance.BackColor = NavPanelHoverTopColor;
+                appearance.BackColor2 = NavPanelHoverBottomColor;
+            }
+            else
+            {
+                appearance.BackColor = NavButtonBlueTop;
+                appearance.BackColor2 = NavButtonBlueBottom;
+            }
+        }
+
+        private Infragistics.Win.Misc.UltraPanel GetActionPanel(object sender)
+        {
+            Control control = sender as Control;
+            while (control != null)
+            {
+                Infragistics.Win.Misc.UltraPanel panel = control as Infragistics.Win.Misc.UltraPanel;
+                if (panel != null)
+                    return panel;
+
+                control = control.Parent;
+            }
+
+            return null;
+        }
+
+        private void PanelButton_MouseEnter(object sender, EventArgs e)
+        {
+            Infragistics.Win.Misc.UltraPanel panel = GetActionPanel(sender);
+            if (panel != null)
+            {
+                ApplyPanelButtonStyle(panel, true, false);
+            }
+        }
+
+        private void PanelButton_MouseLeave(object sender, EventArgs e)
+        {
+            Infragistics.Win.Misc.UltraPanel panel = GetActionPanel(sender);
+            if (panel != null)
+            {
+                Point clientPoint = panel.PointToClient(Control.MousePosition);
+                bool isInside = panel.ClientRectangle.Contains(clientPoint);
+                ApplyPanelButtonStyle(panel, isInside, false);
+            }
+        }
+
+        private void PanelButton_MouseDown(object sender, MouseEventArgs e)
+        {
+            Infragistics.Win.Misc.UltraPanel panel = GetActionPanel(sender);
+            if (panel != null && e.Button == MouseButtons.Left)
+            {
+                ApplyPanelButtonStyle(panel, true, true);
+            }
+        }
+
+        private void PanelButton_MouseUp(object sender, MouseEventArgs e)
+        {
+            Infragistics.Win.Misc.UltraPanel panel = GetActionPanel(sender);
+            if (panel != null)
+            {
+                Point clientPoint = panel.PointToClient(Control.MousePosition);
+                bool isInside = panel.ClientRectangle.Contains(clientPoint);
+                ApplyPanelButtonStyle(panel, isInside, false);
+            }
+        }
+
+        private void PanelButton_Click(object sender, EventArgs e)
+        {
+            Infragistics.Win.Misc.UltraPanel panel = GetActionPanel(sender);
+            if (panel != null)
+            {
+                panel.Focus();
+
+                if (panel == ultraPanel11)
+                {
+                    btnNavFirst_Click(sender, e);
+                }
+                else if (panel == ultraPanel4)
+                {
+                    btnNavPrev_Click(sender, e);
+                }
+                else if (panel == ultraPanel6)
+                {
+                    btnNavNext_Click(sender, e);
+                }
+                else if (panel == ultraPanel5)
+                {
+                    btnNavLast_Click(sender, e);
+                }
+            }
         }
 
         // ─── Return / Return All Buttons ─────────────────────────────────────────
@@ -2547,52 +2950,8 @@ namespace PosBranch_Win.Transaction
                 ultraGrid1.DisplayLayout.Override.RowSpacingBefore = 0;
                 ultraGrid1.DisplayLayout.Override.RowSpacingAfter = 0;
                 ultraGrid1.DisplayLayout.Override.CellPadding = 2;
-                ultraGrid1.DisplayLayout.Override.CellSpacing = 0;
-                ultraGrid1.DisplayLayout.BorderStyle = UIElementBorderStyle.Solid;
-                ultraGrid1.DisplayLayout.Appearance.BorderColor = lightBlue;
-
-                // Configure header appearance - keep existing header color but apply modern styling
-                ultraGrid1.DisplayLayout.Override.HeaderStyle = HeaderStyle.WindowsXPCommand;
-                ultraGrid1.DisplayLayout.Override.HeaderAppearance.BackColor = Color.SteelBlue; // Keep existing header color
-                ultraGrid1.DisplayLayout.Override.HeaderAppearance.ForeColor = Color.White;
-                ultraGrid1.DisplayLayout.Override.HeaderAppearance.TextHAlign = HAlign.Center;
-                ultraGrid1.DisplayLayout.Override.HeaderAppearance.TextVAlign = VAlign.Middle;
-                ultraGrid1.DisplayLayout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.False; // Regular font weight
-                ultraGrid1.DisplayLayout.Override.HeaderAppearance.FontData.Name = "Segoe UI";
-                ultraGrid1.DisplayLayout.Override.HeaderAppearance.ThemedElementAlpha = Alpha.Transparent;
-                ultraGrid1.DisplayLayout.Override.HeaderAppearance.BorderColor = lightBlue;
-
-                // Configure row appearance with light blue styling
-                ultraGrid1.DisplayLayout.Override.RowAppearance.BackColor = Color.White;
-                ultraGrid1.DisplayLayout.Override.RowAppearance.BackColor2 = Color.FromArgb(250, 250, 250);
-                ultraGrid1.DisplayLayout.Override.RowAppearance.BackGradientStyle = GradientStyle.None;
-                ultraGrid1.DisplayLayout.Override.RowAppearance.BorderColor = lightBlue;
-
-                // Configure alternate row appearance
-                ultraGrid1.DisplayLayout.Override.RowAlternateAppearance.BackColor = Color.FromArgb(250, 250, 250);
-
-                // Set selected row appearance with light blue highlighting
-                ultraGrid1.DisplayLayout.Override.SelectedRowAppearance.BackColor = selectedBlue;
-                ultraGrid1.DisplayLayout.Override.SelectedRowAppearance.BackColor2 = selectedBlue;
-                ultraGrid1.DisplayLayout.Override.SelectedRowAppearance.BackGradientStyle = GradientStyle.None;
-                ultraGrid1.DisplayLayout.Override.SelectedRowAppearance.ForeColor = Color.Black;
-                ultraGrid1.DisplayLayout.Override.SelectedRowAppearance.FontData.Bold = DefaultableBoolean.False;
-
-                // Active row appearance - same as selected row
-                ultraGrid1.DisplayLayout.Override.ActiveRowAppearance.BackColor = selectedBlue;
-                ultraGrid1.DisplayLayout.Override.ActiveRowAppearance.BackColor2 = selectedBlue;
-                ultraGrid1.DisplayLayout.Override.ActiveRowAppearance.BackGradientStyle = GradientStyle.None;
-                ultraGrid1.DisplayLayout.Override.ActiveRowAppearance.ForeColor = Color.Black;
-                ultraGrid1.DisplayLayout.Override.ActiveRowAppearance.FontData.Bold = DefaultableBoolean.False;
-                // Configure cell and row borders
-                ultraGrid1.DisplayLayout.Override.BorderStyleRow = UIElementBorderStyle.Solid;
-                ultraGrid1.DisplayLayout.Override.BorderStyleCell = UIElementBorderStyle.Solid;
-                ultraGrid1.DisplayLayout.Override.CellAppearance.BorderColor = lightBlue;
-                ultraGrid1.DisplayLayout.Override.CellAppearance.FontData.Name = "Segoe UI";
-                ultraGrid1.DisplayLayout.Override.CellAppearance.FontData.Bold = DefaultableBoolean.False;
-
-                // Hide the "Drag a column here to group by that column" box
-                ultraGrid1.DisplayLayout.GroupByBox.Hidden = true;
+                // Apply unified theme
+                ApplyUnifiedGridTheme(ultraGrid1);
 
                 if (ultraGrid1.DisplayLayout.Bands.Count > 0)
                 {
@@ -2722,7 +3081,6 @@ namespace PosBranch_Win.Transaction
                                     column.Header.Caption = "Qty";
                                     column.CellAppearance.TextHAlign = HAlign.Right;
                                     column.Format = "N2";
-                                    column.CellAppearance.BackColor = lightYellow; // Light yellow for historical data
                                     break;
 
                                 case "Returned qty":
@@ -2731,7 +3089,6 @@ namespace PosBranch_Win.Transaction
                                     column.Format = "N2";
                                     column.Header.Caption = "Return Qty";
                                     column.CellAppearance.TextHAlign = HAlign.Right;
-                                    column.CellAppearance.BackColor = lightGreen; // Light green for user-entered values
                                     break;
 
                                 case "Returned":
@@ -2740,7 +3097,6 @@ namespace PosBranch_Win.Transaction
                                     column.Format = "N2";
                                     column.Header.Caption = "Returned";
                                     column.CellAppearance.TextHAlign = HAlign.Right;
-                                    column.CellAppearance.BackColor = lightYellow; // Read-only calculated data
                                     break;
 
                                 case "Amount":
@@ -2793,9 +3149,6 @@ namespace PosBranch_Win.Transaction
                                     column.ValueList = reasonList;
                                     column.CellAppearance.TextHAlign = HAlign.Left;
 
-                                    // Set cell appearance to highlight that it's a required field
-                                    column.CellAppearance.BackColor = System.Drawing.Color.FromArgb(255, 224, 192); // Light orange/peach background
-
                                     // Make sure that the reason values from the database are respected
                                     // The dropdown style is already set by using ColumnStyle.DropDownList above
 
@@ -2833,23 +3186,24 @@ namespace PosBranch_Win.Transaction
                     ultraGrid1.DisplayLayout.Override.HeaderClickAction = HeaderClickAction.SortSingle;
                     ultraGrid1.DisplayLayout.Override.CellClickAction = CellClickAction.EditAndSelectText;
 
-                    // Ensure grid fills all available space
-                    ultraGrid1.Dock = DockStyle.Fill;
-                    ultraGrid1.DisplayLayout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
+                    // Basic grid behavior
+                    ultraGrid1.DisplayLayout.AutoFitStyle = AutoFitStyle.None;
                     ultraGrid1.DisplayLayout.Override.RowSizing = RowSizing.AutoFree;
                     ultraGrid1.DisplayLayout.ScrollBounds = ScrollBounds.ScrollToFill;
                     ultraGrid1.DisplayLayout.Scrollbars = Scrollbars.Both;
 
-                    // Configure header appearance with modern gradient look
-                    ultraGrid1.DisplayLayout.Override.HeaderStyle = HeaderStyle.WindowsXPCommand;
-                    ultraGrid1.DisplayLayout.Override.HeaderAppearance.BackColor = Color.FromArgb(0, 122, 204); // Modern blue color
-                    ultraGrid1.DisplayLayout.Override.HeaderAppearance.BackColor2 = Color.FromArgb(0, 102, 184); // Slightly darker blue for gradient
+                    // Configure header appearance matching Image 2 flat blue header theme
+                    ultraGrid1.DisplayLayout.Override.HeaderStyle = HeaderStyle.Standard;
+                    ultraGrid1.DisplayLayout.Override.HeaderAppearance.BackColor = Color.FromArgb(93, 151, 214);
+                    ultraGrid1.DisplayLayout.Override.HeaderAppearance.BackColor2 = Color.FromArgb(67, 118, 184);
                     ultraGrid1.DisplayLayout.Override.HeaderAppearance.BackGradientStyle = GradientStyle.Vertical;
                     ultraGrid1.DisplayLayout.Override.HeaderAppearance.ForeColor = Color.White;
+                    ultraGrid1.DisplayLayout.Override.HeaderAppearance.BorderColor = Color.FromArgb(118, 154, 198);
                     ultraGrid1.DisplayLayout.Override.HeaderAppearance.TextHAlign = HAlign.Center;
                     ultraGrid1.DisplayLayout.Override.HeaderAppearance.TextVAlign = VAlign.Middle;
-                    ultraGrid1.DisplayLayout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.True;
-                    ultraGrid1.DisplayLayout.Override.HeaderAppearance.FontData.SizeInPoints = 9;
+                    ultraGrid1.DisplayLayout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.False;
+                    ultraGrid1.DisplayLayout.Override.HeaderAppearance.FontData.Name = "Microsoft Sans Serif";
+                    ultraGrid1.DisplayLayout.Override.HeaderAppearance.FontData.SizeInPoints = 8.25F;
                     ultraGrid1.DisplayLayout.Override.HeaderAppearance.ThemedElementAlpha = Alpha.Transparent;
 
                     // Configure row appearance
@@ -4875,56 +5229,11 @@ namespace PosBranch_Win.Transaction
                     }
                 }
 
-                // Remove any margins and padding to maximize grid space utilization
-                e.Layout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
-                e.Layout.Override.RowSizing = RowSizing.AutoFree;
+                // Apply unified theme cleanly
+                ApplyUnifiedGridTheme(ultraGrid1);
 
-                // Configure header appearance matching Image 2 soft sky-blue theme
-                e.Layout.Override.HeaderStyle = HeaderStyle.WindowsXPCommand;
-                e.Layout.Override.HeaderAppearance.BackColor = Color.FromArgb(170, 205, 245);
-                e.Layout.Override.HeaderAppearance.BackColor2 = Color.FromArgb(200, 225, 252);
-                e.Layout.Override.HeaderAppearance.BackGradientStyle = GradientStyle.Vertical;
-                e.Layout.Override.HeaderAppearance.ForeColor = Color.FromArgb(0, 35, 80);
-                e.Layout.Override.HeaderAppearance.TextHAlign = HAlign.Center;
-                e.Layout.Override.HeaderAppearance.TextVAlign = VAlign.Middle;
-                e.Layout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.True;
-                e.Layout.Override.HeaderAppearance.FontData.SizeInPoints = 9;
-                e.Layout.Override.HeaderAppearance.ThemedElementAlpha = Alpha.Transparent;
-
-                // Configure row appearance
-                e.Layout.Override.RowAppearance.BackColor = Color.White;
-                e.Layout.Override.RowAppearance.ForeColor = Color.FromArgb(0, 35, 80);
-                e.Layout.Override.RowAlternateAppearance.BackColor = Color.FromArgb(245, 250, 255);
-                e.Layout.Override.ActiveRowAppearance.BackColor = Color.FromArgb(185, 218, 250);
-                e.Layout.Override.ActiveRowAppearance.ForeColor = Color.FromArgb(0, 35, 80);
-                e.Layout.Override.SelectedRowAppearance.BackColor = Color.FromArgb(185, 218, 250);
-                e.Layout.Override.SelectedRowAppearance.ForeColor = Color.FromArgb(0, 35, 80);
-
-                // Row spacing and height (minimize spacing)
-                e.Layout.Override.DefaultRowHeight = 22;
-                e.Layout.Override.RowSpacingBefore = 0;
-
-                // Set border style to solid light blue for cells and rows
-                e.Layout.Override.BorderStyleCell = UIElementBorderStyle.Solid;
-                e.Layout.Override.BorderStyleRow = UIElementBorderStyle.Solid;
-                e.Layout.Override.CellAppearance.BorderColor = Color.FromArgb(210, 232, 252);
-
-                // Configure spacing and expansion behavior
-                e.Layout.InterBandSpacing = 0;
-                e.Layout.Override.ExpansionIndicator = ShowExpansionIndicator.Never;
-
-                // Position grid below top controls (Barcode, Up/Down buttons, Clear, SubTotal) inside ultraPanel3
-                ultraGrid1.Dock = DockStyle.None;
-                ultraGrid1.Anchor = AnchorStyles.Top | AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right;
-                ultraGrid1.Location = new Point(5, 51);
-                if (ultraPanel3 != null)
-                {
-                    ultraGrid1.Size = new Size(Math.Max(100, ultraPanel3.ClientArea.Width - 10), Math.Max(100, ultraPanel3.ClientArea.Height - 56));
-                }
-
-                // Set ScrollBars to use space efficiently
-                e.Layout.ScrollBounds = ScrollBounds.ScrollToFill;
-                e.Layout.Scrollbars = Scrollbars.Both;
+                // Disable column auto-fitting so columns keep explicit widths without stretching/filling grid area
+                e.Layout.AutoFitStyle = AutoFitStyle.None;
 
                 // Set vertical alignment for all cells to middle
                 e.Layout.Override.CellAppearance.TextVAlign = VAlign.Middle;
@@ -4942,21 +5251,6 @@ namespace PosBranch_Win.Transaction
                         e.Layout.Bands[0].Columns["SELECT"].Header.VisiblePosition = reasonPos + 1;
                     }
 
-                    // Ensure columns fill width proportionally
-                    float totalWeight = 0;
-                    foreach (UltraGridColumn col in e.Layout.Bands[0].Columns)
-                    {
-                        if (!col.Hidden)
-                        {
-                            // Assign weight based on current width
-                            col.Tag = col.Width;
-                            totalWeight += col.Width;
-
-                            // Set vertical alignment to middle for each column
-                            col.CellAppearance.TextVAlign = VAlign.Middle;
-                        }
-                    }
-
                     foreach (UltraGridColumn col in e.Layout.Bands[0].Columns)
                     {
                         // Apply text alignment based on column content
@@ -4968,12 +5262,16 @@ namespace PosBranch_Win.Transaction
                         }
 
                         // Format numeric columns
-                        if (col.Key == "Cost" || col.Key == "Amount" || col.Key == "TaxPer" || col.Key == "TaxAmt")
+                        if (col.Key == "Cost" || col.Key == "Amount" || col.Key == "TaxPer" || col.Key == "TaxAmt" || col.Key == "Quantity" || col.Key == "Returned qty" || col.Key == "Returned")
                         {
                             col.Format = "N2";
                         }
                     }
                 }
+
+                CreateFooterCells();
+                UpdateFooterCellPositions();
+                UpdateFooterValues();
             }
             catch (Exception ex)
             {
@@ -8964,9 +9262,14 @@ namespace PosBranch_Win.Transaction
 
                     dt.Rows.Clear();
                     ultraGrid1.DataSource = dt;
+                    UpdateFooterValues();
                 }
 
                 // Clear totals
+                if (textBox2 != null)
+                {
+                    textBox2.Text = "0.00";
+                }
                 if (TxtSubTotal != null)
                 {
                     TxtSubTotal.Text = "0.00";
@@ -8982,6 +9285,9 @@ namespace PosBranch_Win.Transaction
                     TxtBarcode.Clear();
                     TxtBarcode.ReadOnly = _originalTxtBarcodeReadOnly;
                 }
+
+                // Re-apply GRN mode control states
+                ApplyGRNModeState(chkGRN != null ? chkGRN.Checked : true);
 
                 // Generate new PR number
                 GeneratePurchaseReturnNumber();
@@ -9471,6 +9777,765 @@ namespace PosBranch_Win.Transaction
                 form.BringToFront();
                 System.Diagnostics.Debug.WriteLine($"Error opening in tab, showing as regular form: {ex.Message}");
             }
+        }
+
+        #endregion
+
+        #region Column Chooser & Drag-Down to Hide
+
+        private static Cursor CreateBlackXCursor()
+        {
+            try
+            {
+                using (Bitmap bmp = new Bitmap(32, 32))
+                using (Graphics g = Graphics.FromImage(bmp))
+                {
+                    g.SmoothingMode = SmoothingMode.AntiAlias;
+                    g.Clear(Color.Transparent);
+
+                    using (SolidBrush bgBrush = new SolidBrush(Color.Black))
+                    {
+                        g.FillEllipse(bgBrush, 4, 4, 24, 24);
+                    }
+
+                    using (Pen whitePen = new Pen(Color.White, 3.5f))
+                    {
+                        whitePen.StartCap = LineCap.Round;
+                        whitePen.EndCap = LineCap.Round;
+                        g.DrawLine(whitePen, 11, 11, 21, 21);
+                        g.DrawLine(whitePen, 21, 11, 11, 21);
+                    }
+
+                    IntPtr hIcon = bmp.GetHicon();
+                    return new Cursor(hIcon);
+                }
+            }
+            catch
+            {
+                return Cursors.No;
+            }
+        }
+
+        private void SetupHeaderDragToHideAndColumnChooser()
+        {
+            ultraGrid1.AllowDrop = true;
+            ultraGrid1.MouseDown += Grid_MouseDown;
+            ultraGrid1.MouseMove += Grid_MouseMove;
+            ultraGrid1.MouseUp += Grid_MouseUp;
+            ultraGrid1.DragOver += Grid_DragOver;
+            ultraGrid1.DragDrop += Grid_DragDrop;
+
+            ContextMenuStrip headerMenu = new ContextMenuStrip { Font = new Font("Segoe UI", 9F) };
+            ToolStripMenuItem chooserItem = new ToolStripMenuItem("📋 Field / Column Chooser...", null, (s, e) => ShowColumnChooserForm());
+            chooserItem.Font = new Font("Segoe UI Semibold", 9.5F, FontStyle.Bold);
+            headerMenu.Items.Add(chooserItem);
+
+            ToolStripMenuItem showAllItem = new ToolStripMenuItem("🔓 Show / Unhide All Columns", null, (s, e) => UnhideAllColumns());
+            headerMenu.Items.Add(showAllItem);
+
+            ultraGrid1.ContextMenuStrip = headerMenu;
+        }
+
+        private void Grid_MouseDown(object sender, MouseEventArgs e)
+        {
+            if (ultraGrid1.DisplayLayout == null || ultraGrid1.DisplayLayout.Bands.Count == 0)
+                return;
+
+            UIElement element = ultraGrid1.DisplayLayout.UIElement?.ElementFromPoint(new Point(e.X, e.Y));
+            HeaderUIElement headerUI = element as HeaderUIElement ?? element?.GetAncestor(typeof(HeaderUIElement)) as HeaderUIElement;
+
+            UltraGridColumn col = headerUI?.Header?.Column;
+            if (headerUI != null && col != null)
+            {
+                if (e.Button == MouseButtons.Right)
+                {
+                    ShowHeaderContextMenu(col, e.Location);
+                    return;
+                }
+
+                if (e.Button == MouseButtons.Left)
+                {
+                    isDraggingHeaderToHide = true;
+                    columnBeingDragged = col;
+                    headerDragStartPoint = new Point(e.X, e.Y);
+                }
+            }
+        }
+
+        private void Grid_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (!isDraggingHeaderToHide || columnBeingDragged == null || e.Button != MouseButtons.Left)
+                return;
+
+            int deltaX = Math.Abs(e.X - headerDragStartPoint.X);
+            int deltaY = e.Y - headerDragStartPoint.Y;
+
+            if (deltaY > 25 && deltaY > deltaX)
+            {
+                ultraGrid1.Cursor = blackXCursor;
+                string colName = !string.IsNullOrEmpty(columnBeingDragged.Header.Caption) ? columnBeingDragged.Header.Caption : columnBeingDragged.Key;
+                headerToolTip.SetToolTip(ultraGrid1, $"✖ Drag down to hide '{colName}' column");
+
+                if (deltaY > 50)
+                {
+                    HideColumn(columnBeingDragged);
+                    isDraggingHeaderToHide = false;
+                    columnBeingDragged = null;
+                    ultraGrid1.Cursor = Cursors.Default;
+                    headerToolTip.SetToolTip(ultraGrid1, string.Empty);
+                }
+            }
+        }
+
+        private void Grid_MouseUp(object sender, MouseEventArgs e)
+        {
+            if (isDraggingHeaderToHide)
+            {
+                if (columnBeingDragged != null && (e.Y - headerDragStartPoint.Y) > 40)
+                {
+                    HideColumn(columnBeingDragged);
+                }
+                isDraggingHeaderToHide = false;
+                columnBeingDragged = null;
+                ultraGrid1.Cursor = Cursors.Default;
+                headerToolTip.SetToolTip(ultraGrid1, string.Empty);
+            }
+        }
+
+        private void Grid_DragOver(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(typeof(ColumnChooserItem)))
+            {
+                e.Effect = DragDropEffects.Move;
+            }
+        }
+
+        private void Grid_DragDrop(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetData(typeof(ColumnChooserItem)) is ColumnChooserItem item)
+            {
+                Point clientPt = ultraGrid1.PointToClient(new Point(e.X, e.Y));
+                int dropPosition = GetTargetColumnPositionFromPoint(clientPt);
+                UnhideColumn(item.ColumnKey, dropPosition);
+            }
+        }
+
+        private int GetTargetColumnPositionFromPoint(Point pt)
+        {
+            if (ultraGrid1.DisplayLayout == null || ultraGrid1.DisplayLayout.Bands.Count == 0)
+                return 0;
+
+            UIElement element = ultraGrid1.DisplayLayout.UIElement?.ElementFromPoint(pt);
+            HeaderUIElement headerUI = element as HeaderUIElement ?? element?.GetAncestor(typeof(HeaderUIElement)) as HeaderUIElement;
+
+            if (headerUI != null && headerUI.Header?.Column != null)
+            {
+                return headerUI.Header.Column.Header.VisiblePosition;
+            }
+
+            UltraGridBand band = ultraGrid1.DisplayLayout.Bands[0];
+            foreach (UltraGridColumn col in band.Columns.Cast<UltraGridColumn>().OrderBy(c => c.Header.VisiblePosition))
+            {
+                if (!col.Hidden)
+                {
+                    UIElement hUI = col.Header.GetUIElement();
+                    if (hUI != null && pt.X >= hUI.Rect.Left && pt.X <= hUI.Rect.Right)
+                    {
+                        return col.Header.VisiblePosition;
+                    }
+                }
+            }
+
+            return band.Columns.Count;
+        }
+
+        private void HideColumn(UltraGridColumn col)
+        {
+            if (col == null) return;
+            userHiddenColumnKeys.Add(col.Key);
+            col.Hidden = true;
+            UpdateFooterCellPositions();
+            UpdateFooterValues();
+            if (columnChooserForm != null && columnChooserForm.Visible)
+            {
+                PopulateColumnChooserListBox();
+            }
+        }
+
+        private void ShowHeaderContextMenu(UltraGridColumn col, Point location)
+        {
+            if (col == null) return;
+            ContextMenuStrip menu = new ContextMenuStrip { Font = new Font("Segoe UI", 9F) };
+            string colName = !string.IsNullOrEmpty(col.Header.Caption) ? col.Header.Caption : col.Key;
+
+            ToolStripMenuItem hideItem = new ToolStripMenuItem($"🙈 Hide Column '{colName}'", null, (s, e) => HideColumn(col));
+            hideItem.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
+            menu.Items.Add(hideItem);
+
+            menu.Items.Add(new ToolStripSeparator());
+
+            ToolStripMenuItem chooserItem = new ToolStripMenuItem("📋 Field / Column Chooser...", null, (s, e) => ShowColumnChooserForm());
+            menu.Items.Add(chooserItem);
+
+            ToolStripMenuItem showAllItem = new ToolStripMenuItem("🔓 Show / Unhide All Columns", null, (s, e) => UnhideAllColumns());
+            menu.Items.Add(showAllItem);
+
+            menu.Show(ultraGrid1, location);
+        }
+
+        private void ShowColumnChooserForm()
+        {
+            if (columnChooserForm == null || columnChooserForm.IsDisposed)
+            {
+                CreateColumnChooserForm();
+            }
+
+            PopulateColumnChooserListBox();
+            columnChooserForm.Show(this);
+            PositionColumnChooser();
+        }
+
+        private void CreateColumnChooserForm()
+        {
+            columnChooserForm = new Form
+            {
+                Text = "Customization (Field Chooser)",
+                Size = new Size(240, 300),
+                FormBorderStyle = FormBorderStyle.FixedSingle,
+                StartPosition = FormStartPosition.Manual,
+                TopMost = true,
+                MaximizeBox = false,
+                MinimizeBox = false,
+                BackColor = Color.FromArgb(240, 244, 248),
+                ShowIcon = false,
+                ShowInTaskbar = false
+            };
+
+            columnChooserForm.FormClosing += (s, e) =>
+            {
+                e.Cancel = true;
+                columnChooserForm.Hide();
+            };
+
+            columnChooserListBox = new ListBox
+            {
+                Dock = DockStyle.Fill,
+                AllowDrop = true,
+                DrawMode = DrawMode.OwnerDrawFixed,
+                BorderStyle = BorderStyle.None,
+                BackColor = Color.FromArgb(240, 244, 248),
+                ItemHeight = 34,
+                IntegralHeight = false
+            };
+
+            columnChooserListBox.DrawItem += ColumnChooserListBox_DrawItem;
+            columnChooserListBox.DoubleClick += ColumnChooserListBox_DoubleClick;
+            columnChooserListBox.MouseDown += ColumnChooserListBox_MouseDown;
+
+            columnChooserForm.Controls.Add(columnChooserListBox);
+        }
+
+        private void ColumnChooserListBox_MouseDown(object sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Left && columnChooserListBox != null)
+            {
+                int index = columnChooserListBox.IndexFromPoint(e.Location);
+                if (index >= 0 && index < columnChooserListBox.Items.Count)
+                {
+                    if (columnChooserListBox.Items[index] is ColumnChooserItem item)
+                    {
+                        columnChooserListBox.DoDragDrop(item, DragDropEffects.Move);
+                    }
+                }
+            }
+        }
+
+        private void PopulateColumnChooserListBox()
+        {
+            if (columnChooserListBox == null || ultraGrid1.DisplayLayout.Bands.Count == 0)
+                return;
+
+            columnChooserListBox.Items.Clear();
+            UltraGridBand band = ultraGrid1.DisplayLayout.Bands[0];
+
+            foreach (UltraGridColumn col in band.Columns)
+            {
+                if (col.Hidden && !col.Key.EndsWith("Id", StringComparison.OrdinalIgnoreCase))
+                {
+                    string caption = !string.IsNullOrEmpty(col.Header.Caption) ? col.Header.Caption : col.Key;
+                    columnChooserListBox.Items.Add(new ColumnChooserItem(col.Key, caption));
+                }
+            }
+        }
+
+        private void ColumnChooserListBox_DoubleClick(object sender, EventArgs e)
+        {
+            if (columnChooserListBox.SelectedItem is ColumnChooserItem item)
+            {
+                UnhideColumn(item.ColumnKey);
+            }
+        }
+
+        private void UnhideColumn(string columnKey, int? targetVisiblePosition = null)
+        {
+            userHiddenColumnKeys.Remove(columnKey);
+            if (ultraGrid1.DisplayLayout.Bands.Count > 0 && ultraGrid1.DisplayLayout.Bands[0].Columns.Exists(columnKey))
+            {
+                UltraGridColumn col = ultraGrid1.DisplayLayout.Bands[0].Columns[columnKey];
+                col.Hidden = false;
+                if (targetVisiblePosition.HasValue)
+                {
+                    col.Header.VisiblePosition = targetVisiblePosition.Value;
+                }
+                UpdateFooterCellPositions();
+                UpdateFooterValues();
+                PopulateColumnChooserListBox();
+            }
+        }
+
+        private void UnhideAllColumns()
+        {
+            userHiddenColumnKeys.Clear();
+            if (ultraGrid1.DisplayLayout.Bands.Count == 0) return;
+            UltraGridBand band = ultraGrid1.DisplayLayout.Bands[0];
+            foreach (UltraGridColumn col in band.Columns)
+            {
+                if (!col.Key.EndsWith("Id", StringComparison.OrdinalIgnoreCase))
+                {
+                    col.Hidden = false;
+                }
+            }
+            UpdateFooterCellPositions();
+            UpdateFooterValues();
+            PopulateColumnChooserListBox();
+        }
+
+        private void PositionColumnChooser()
+        {
+            if (columnChooserForm != null && !columnChooserForm.IsDisposed && columnChooserForm.Visible)
+            {
+                columnChooserForm.Location = new Point(
+                    Right - columnChooserForm.Width - 30,
+                    Bottom - columnChooserForm.Height - 30);
+                columnChooserForm.BringToFront();
+            }
+        }
+
+        private void ColumnChooserListBox_DrawItem(object sender, DrawItemEventArgs e)
+        {
+            if (e.Index < 0 || columnChooserListBox == null || e.Index >= columnChooserListBox.Items.Count)
+                return;
+
+            if (!(columnChooserListBox.Items[e.Index] is ColumnChooserItem item))
+                return;
+
+            Rectangle rect = e.Bounds;
+            rect.Inflate(-4, -3);
+
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+
+            using (SolidBrush bgBrush = new SolidBrush(Color.FromArgb(0, 121, 211)))
+            using (GraphicsPath path = RoundedRect(rect, 4))
+            {
+                e.Graphics.FillPath(bgBrush, path);
+            }
+
+            using (SolidBrush textBrush = new SolidBrush(Color.White))
+            {
+                StringFormat sf = new StringFormat
+                {
+                    LineAlignment = StringAlignment.Center,
+                    Alignment = StringAlignment.Center
+                };
+                using (Font textFont = new Font("Segoe UI", 9F, FontStyle.Bold))
+                {
+                    e.Graphics.DrawString(item.DisplayText, textFont, textBrush, rect, sf);
+                }
+            }
+        }
+
+        private static GraphicsPath RoundedRect(Rectangle bounds, int radius)
+        {
+            int diameter = radius * 2;
+            Size size = new Size(diameter, diameter);
+            Rectangle arc = new Rectangle(bounds.Location, size);
+            GraphicsPath path = new GraphicsPath();
+
+            if (radius == 0)
+            {
+                path.AddRectangle(bounds);
+                return path;
+            }
+
+            path.AddArc(arc, 180, 90);
+
+            arc.X = bounds.Right - diameter;
+            path.AddArc(arc, 270, 90);
+
+            arc.Y = bounds.Bottom - diameter;
+            path.AddArc(arc, 0, 90);
+
+            arc.X = bounds.Left;
+            path.AddArc(arc, 90, 90);
+
+            path.CloseFigure();
+            return path;
+        }
+
+        private sealed class ColumnChooserItem
+        {
+            public string ColumnKey { get; }
+            public string DisplayText { get; }
+
+            public ColumnChooserItem(string key, string text)
+            {
+                ColumnKey = key;
+                DisplayText = text;
+            }
+
+            public override string ToString()
+            {
+                return DisplayText;
+            }
+        }
+
+        #endregion
+
+        #region UltraPanelGridFooter Dynamic Alignment & Calculation
+
+        private void CreateFooterCells()
+        {
+            if (ultraPanelGridFooter == null) return;
+            ultraPanelGridFooter.ClientArea.Controls.Clear();
+            footerLabels.Clear();
+
+            if (ultraGrid1.DisplayLayout == null || ultraGrid1.DisplayLayout.Bands.Count == 0)
+                return;
+
+            UltraGridBand band = ultraGrid1.DisplayLayout.Bands[0];
+            int xOffset = ultraGrid1.DisplayLayout.Override.RowSelectorWidth;
+
+            foreach (UltraGridColumn column in band.Columns.Cast<UltraGridColumn>().OrderBy(c => c.Header.VisiblePosition))
+            {
+                if (column.Hidden)
+                    continue;
+
+                Label footerLabel = new Label();
+                footerLabel.Name = "footer_" + column.Key;
+                footerLabel.Text = string.Empty;
+                footerLabel.TextAlign = ContentAlignment.MiddleCenter;
+                footerLabel.BackColor = Color.FromArgb(93, 151, 214);
+                footerLabel.BorderStyle = BorderStyle.None;
+                footerLabel.AutoSize = false;
+                footerLabel.Width = column.Width;
+                footerLabel.Height = Math.Max(ultraPanelGridFooter.Height - 2, 20);
+                footerLabel.Left = xOffset;
+                footerLabel.Top = 1;
+                footerLabel.Tag = Tuple.Create(column.Key, string.Empty);
+                footerLabel.ForeColor = Color.White;
+                footerLabel.Font = new Font("Microsoft Sans Serif", 8.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
+                footerLabel.Paint += FooterLabel_Paint;
+                footerLabel.ContextMenuStrip = CreateFooterContextMenu(column.Key);
+
+                ultraPanelGridFooter.ClientArea.Controls.Add(footerLabel);
+                footerLabels[column.Key] = footerLabel;
+
+                if (!columnAggregations.ContainsKey(column.Key))
+                {
+                    columnAggregations[column.Key] = "None";
+                }
+
+                xOffset += column.Width;
+            }
+        }
+
+        private void FooterLabel_Paint(object sender, PaintEventArgs e)
+        {
+            Label lbl = sender as Label;
+            if (lbl == null) return;
+
+            using (Pen borderPen = new Pen(Color.FromArgb(118, 154, 198), 1))
+            {
+                e.Graphics.DrawLine(borderPen, lbl.Width - 1, 0, lbl.Width - 1, lbl.Height);
+            }
+        }
+
+        private ContextMenuStrip CreateFooterContextMenu(string columnKey)
+        {
+            ContextMenuStrip menu = new ContextMenuStrip();
+            menu.Tag = columnKey;
+
+            bool isNumeric = ultraGrid1.DisplayLayout.Bands.Count > 0 &&
+                             ultraGrid1.DisplayLayout.Bands[0].Columns.Exists(columnKey) &&
+                             IsSummableColumn(ultraGrid1.DisplayLayout.Bands[0].Columns[columnKey]);
+
+            ToolStripMenuItem itemSum = new ToolStripMenuItem("Sum");
+            itemSum.Tag = "Sum";
+            itemSum.Enabled = isNumeric;
+            itemSum.Click += FooterContextMenu_Click;
+
+            ToolStripMenuItem itemMin = new ToolStripMenuItem("Min");
+            itemMin.Tag = "Min";
+            itemMin.Click += FooterContextMenu_Click;
+
+            ToolStripMenuItem itemMax = new ToolStripMenuItem("Max");
+            itemMax.Tag = "Max";
+            itemMax.Click += FooterContextMenu_Click;
+
+            ToolStripMenuItem itemCount = new ToolStripMenuItem("Count");
+            itemCount.Tag = "Count";
+            itemCount.Click += FooterContextMenu_Click;
+
+            ToolStripMenuItem itemAverage = new ToolStripMenuItem("Average");
+            itemAverage.Tag = "Avg";
+            itemAverage.Enabled = isNumeric;
+            itemAverage.Click += FooterContextMenu_Click;
+
+            ToolStripMenuItem itemNone = new ToolStripMenuItem("None");
+            itemNone.Tag = "None";
+            itemNone.Click += FooterContextMenu_Click;
+
+            menu.Items.Add(itemSum);
+            menu.Items.Add(itemMin);
+            menu.Items.Add(itemMax);
+            menu.Items.Add(itemCount);
+            menu.Items.Add(itemAverage);
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add(itemNone);
+
+            menu.Opening += (sender, e) =>
+            {
+                string currentAggregation = columnAggregations.ContainsKey(columnKey)
+                    ? columnAggregations[columnKey]
+                    : "None";
+
+                foreach (ToolStripItem menuItem in menu.Items)
+                {
+                    ToolStripMenuItem toolStripMenuItem = menuItem as ToolStripMenuItem;
+                    if (toolStripMenuItem != null && toolStripMenuItem.Tag != null)
+                    {
+                        toolStripMenuItem.Checked = string.Equals(toolStripMenuItem.Tag.ToString(), currentAggregation, StringComparison.OrdinalIgnoreCase);
+                    }
+                }
+            };
+
+            return menu;
+        }
+
+        private bool IsSummableColumn(UltraGridColumn column)
+        {
+            if (column == null || column.DataType == null) return false;
+            Type t = System.Nullable.GetUnderlyingType(column.DataType) ?? column.DataType;
+            return t == typeof(decimal) || t == typeof(double) || t == typeof(float) ||
+                   t == typeof(int) || t == typeof(long) || t == typeof(short);
+        }
+
+        private void FooterContextMenu_Click(object sender, EventArgs e)
+        {
+            ToolStripMenuItem item = sender as ToolStripMenuItem;
+            if (item == null)
+                return;
+
+            ContextMenuStrip menu = item.Owner as ContextMenuStrip;
+            if (menu == null || menu.Tag == null || item.Tag == null)
+                return;
+
+            string columnKey = menu.Tag.ToString();
+            string aggregation = item.Tag.ToString();
+
+            columnAggregations[columnKey] = aggregation;
+            UpdateFooterValues();
+        }
+
+        private void UpdateFooterCellPositions()
+        {
+            if (ultraGrid1.DisplayLayout == null || ultraGrid1.DisplayLayout.Bands.Count == 0 || footerLabels.Count == 0 || ultraPanelGridFooter == null)
+                return;
+
+            UltraGridBand band = ultraGrid1.DisplayLayout.Bands[0];
+            int rowSelectorWidth = ultraGrid1.DisplayLayout.Override.RowSelectorWidth;
+            int scrollOffset = 0;
+            if (ultraGrid1.ActiveColScrollRegion != null)
+            {
+                scrollOffset = ultraGrid1.ActiveColScrollRegion.Position;
+            }
+
+            int calculatedX = rowSelectorWidth - scrollOffset;
+
+            foreach (UltraGridColumn column in band.Columns.Cast<UltraGridColumn>().OrderBy(c => c.Header.VisiblePosition))
+            {
+                if (column.Hidden || !footerLabels.ContainsKey(column.Key))
+                    continue;
+
+                Label footerLabel = footerLabels[column.Key];
+                var headerUI = column.Header.GetUIElement();
+                int left, width;
+
+                if (headerUI != null)
+                {
+                    left = headerUI.Rect.Left;
+                    width = headerUI.Rect.Width;
+                }
+                else
+                {
+                    left = calculatedX;
+                    width = column.Width;
+                }
+
+                calculatedX += column.Width;
+
+                footerLabel.Left = left;
+                footerLabel.Width = width;
+                footerLabel.Top = 0;
+                footerLabel.Height = ultraPanelGridFooter.Height;
+                footerLabel.Visible = (left + width > 0 && left < ultraPanelGridFooter.Width);
+                footerLabel.Invalidate();
+            }
+        }
+
+        private void UpdateFooterValues()
+        {
+            if (footerLabels.Count == 0)
+                return;
+
+            List<UltraGridRow> visibleRows = GetVisibleDataRows().ToList();
+            foreach (KeyValuePair<string, Label> footerEntry in footerLabels)
+            {
+                string columnKey = footerEntry.Key;
+                Label footerLabel = footerEntry.Value;
+
+                if (!columnAggregations.ContainsKey(columnKey) ||
+                    string.Equals(columnAggregations[columnKey], "None", StringComparison.OrdinalIgnoreCase))
+                {
+                    footerLabel.Text = string.Empty;
+                    footerLabel.Tag = Tuple.Create(columnKey, string.Empty);
+                    footerLabel.Invalidate();
+                    continue;
+                }
+
+                object result = CalculateAggregation(columnKey, columnAggregations[columnKey], visibleRows);
+                string displayValue = FormatAggregationResult(columnKey, columnAggregations[columnKey], result);
+
+                footerLabel.Text = displayValue;
+                footerLabel.Tag = Tuple.Create(columnKey, displayValue);
+                footerLabel.ForeColor = Color.White;
+                footerLabel.Invalidate();
+            }
+        }
+
+        private IEnumerable<UltraGridRow> GetVisibleDataRows()
+        {
+            if (ultraGrid1.Rows == null) yield break;
+            foreach (UltraGridRow row in ultraGrid1.Rows)
+            {
+                if (row != null && row.IsDataRow && !row.IsFilteredOut)
+                    yield return row;
+            }
+        }
+
+        private object CalculateAggregation(string columnKey, string aggregation, List<UltraGridRow> visibleRows)
+        {
+            if (visibleRows == null || visibleRows.Count == 0)
+                return null;
+
+            switch (aggregation)
+            {
+                case "Sum":
+                    return visibleRows
+                        .Where(row => row.Cells.Exists(columnKey))
+                        .Select(row => GetNumericValue(row.Cells[columnKey].Value))
+                        .Where(value => value.HasValue)
+                        .Sum(value => value.Value);
+                case "Min":
+                    return visibleRows
+                        .Where(row => row.Cells.Exists(columnKey))
+                        .Select(row => row.Cells[columnKey].Value)
+                        .Where(HasCellValue)
+                        .Cast<IComparable>()
+                        .OrderBy(value => value)
+                        .FirstOrDefault();
+                case "Max":
+                    return visibleRows
+                        .Where(row => row.Cells.Exists(columnKey))
+                        .Select(row => row.Cells[columnKey].Value)
+                        .Where(HasCellValue)
+                        .Cast<IComparable>()
+                        .OrderByDescending(value => value)
+                        .FirstOrDefault();
+                case "Count":
+                    return visibleRows.Count(row => row.Cells.Exists(columnKey) && HasCellValue(row.Cells[columnKey].Value));
+                case "Avg":
+                    List<decimal> values = visibleRows
+                        .Where(row => row.Cells.Exists(columnKey))
+                        .Select(row => GetNumericValue(row.Cells[columnKey].Value))
+                        .Where(value => value.HasValue)
+                        .Select(value => value.Value)
+                        .ToList();
+                    return values.Count == 0 ? 0m : values.Average();
+                default:
+                    return null;
+            }
+        }
+
+        private string FormatAggregationResult(string columnKey, string aggregation, object result)
+        {
+            if (string.Equals(aggregation, "None", StringComparison.OrdinalIgnoreCase))
+                return string.Empty;
+
+            if (result == null)
+            {
+                if (string.Equals(aggregation, "Count", StringComparison.OrdinalIgnoreCase))
+                    return "0";
+                if (string.Equals(aggregation, "Sum", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(aggregation, "Avg", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(aggregation, "Min", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(aggregation, "Max", StringComparison.OrdinalIgnoreCase))
+                    return "0.00";
+                return string.Empty;
+            }
+
+            if (aggregation == "Count")
+                return Convert.ToString(result);
+
+            if (ultraGrid1.DisplayLayout != null &&
+                ultraGrid1.DisplayLayout.Bands.Count > 0 &&
+                ultraGrid1.DisplayLayout.Bands[0].Columns.Exists(columnKey))
+            {
+                UltraGridColumn column = ultraGrid1.DisplayLayout.Bands[0].Columns[columnKey];
+                decimal? numericValue = GetNumericValue(result);
+                if (numericValue.HasValue)
+                {
+                    if (!string.IsNullOrWhiteSpace(column.Format))
+                        return numericValue.Value.ToString(column.Format);
+
+                    return numericValue.Value.ToString("N2");
+                }
+            }
+
+            return Convert.ToString(result);
+        }
+
+        private static decimal? GetNumericValue(object rawValue)
+        {
+            if (rawValue == null || rawValue == DBNull.Value)
+                return null;
+
+            if (rawValue is decimal decVal) return decVal;
+            if (rawValue is double dblVal) return Convert.ToDecimal(dblVal);
+            if (rawValue is float fltVal) return Convert.ToDecimal(fltVal);
+            if (rawValue is int intVal) return Convert.ToDecimal(intVal);
+            if (rawValue is long lngVal) return Convert.ToDecimal(lngVal);
+
+            string strVal = Convert.ToString(rawValue);
+            if (decimal.TryParse(strVal, out decimal parsed))
+                return parsed;
+
+            return null;
+        }
+
+        private static bool HasCellValue(object value)
+        {
+            return value != null && value != DBNull.Value && !string.IsNullOrWhiteSpace(value.ToString());
         }
 
         #endregion
