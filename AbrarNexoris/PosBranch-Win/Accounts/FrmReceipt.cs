@@ -437,6 +437,13 @@ namespace PosBranch_Win.Accounts
 
         private bool ValidateReceipt()
         {
+            if (radioBtnAllDocument != null && radioBtnAllDocument.Checked)
+            {
+                MessageBox.Show("Please switch to Outstanding mode to select invoices and process receipts.", "Validation Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
+
             // Simplified validation - remove redundant checks
             if (totalReceivedAmount <= 0)
             {
@@ -725,6 +732,24 @@ namespace PosBranch_Win.Accounts
                     band.Columns["Adjusted Amount"].CellActivation = Activation.AllowEdit;
                     band.Columns["Adjusted Amount"].Format = "##,##0.00";
                     band.Columns["Adjusted Amount"].Width = 120;
+                }
+
+                if (band.Columns.Exists("Paymode")) band.Columns["Paymode"].Hidden = true;
+                if (band.Columns.Exists("PayMode")) band.Columns["PayMode"].Hidden = true;
+                if (band.Columns.Exists("PaymodeID")) band.Columns["PaymodeID"].Hidden = true;
+                if (band.Columns.Exists("PayModeId")) band.Columns["PayModeId"].Hidden = true;
+                if (band.Columns.Exists("PayModeID")) band.Columns["PayModeID"].Hidden = true;
+                if (band.Columns.Exists("PaymodeName")) band.Columns["PaymodeName"].Hidden = true;
+
+                if (radioBtnAllDocument != null && radioBtnAllDocument.Checked)
+                {
+                    if (band.Columns.Exists("Select")) band.Columns["Select"].Hidden = true;
+                    if (band.Columns.Exists("Adjusted Amount")) band.Columns["Adjusted Amount"].Hidden = true;
+                }
+                else
+                {
+                    if (band.Columns.Exists("Select")) band.Columns["Select"].Hidden = false;
+                    if (band.Columns.Exists("Adjusted Amount")) band.Columns["Adjusted Amount"].Hidden = false;
                 }
             }
         }

@@ -2373,9 +2373,10 @@ namespace Repository.TransactionRepository
             {
                 try
                 {
-                    string ledgerQuery = "SELECT TOP 1 LedgerID FROM PayMode WHERE PayModeID = @PaymodeID";
-                    using (SqlCommand ledgerCmd = new SqlCommand(ledgerQuery, (SqlConnection)DataConnection))
+                    using (SqlCommand ledgerCmd = new SqlCommand(STOREDPROCEDURE.POS_PayMode, (SqlConnection)DataConnection))
                     {
+                        ledgerCmd.CommandType = CommandType.StoredProcedure;
+                        ledgerCmd.Parameters.AddWithValue("@_Operation", "GETBYID");
                         ledgerCmd.Parameters.AddWithValue("@PaymodeID", sales.PaymodeId);
                         object ledgerResult = ledgerCmd.ExecuteScalar();
                         if (ledgerResult != null && ledgerResult != DBNull.Value)
@@ -2591,9 +2592,15 @@ namespace Repository.TransactionRepository
                 try
                 {
                     int nextLedgerId = 1;
-                    using (SqlCommand idCmd = new SqlCommand("SELECT ISNULL(MAX(LedgerID), 0) + 1 FROM LedgerMaster", (SqlConnection)DataConnection, (SqlTransaction)trans))
+                    using (SqlCommand idCmd = new SqlCommand(STOREDPROCEDURE.POS_Ledger, (SqlConnection)DataConnection, (SqlTransaction)trans))
                     {
-                        nextLedgerId = Convert.ToInt32(idCmd.ExecuteScalar());
+                        idCmd.CommandType = CommandType.StoredProcedure;
+                        idCmd.Parameters.AddWithValue("@_Operation", "GETNEXTID");
+                        object res = idCmd.ExecuteScalar();
+                        if (res != null && res != DBNull.Value)
+                        {
+                            nextLedgerId = Convert.ToInt32(res);
+                        }
                     }
 
                     // Create the GST ledger using stored procedure
@@ -2671,18 +2678,17 @@ namespace Repository.TransactionRepository
                         string ledgerName = DefaultLedgers.CASH;
                         try
                         {
-                            string sql = "SELECT TOP 1 pm.LedgerID, lm.LedgerName FROM PayMode pm LEFT JOIN LedgerMaster lm ON lm.LedgerID = pm.LedgerID WHERE pm.PayModeID = @PayModeID";
-                            using (SqlCommand cmd = new SqlCommand(sql, (SqlConnection)DataConnection, (SqlTransaction)trans))
+                            using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_PayMode, (SqlConnection)DataConnection, (SqlTransaction)trans))
                             {
-                                cmd.Parameters.AddWithValue("@PayModeID", pd.PaymodeId);
+                                cmd.CommandType = CommandType.StoredProcedure;
+                                cmd.Parameters.AddWithValue("@_Operation", "GETBYID");
+                                cmd.Parameters.AddWithValue("@PaymodeID", pd.PaymodeId);
                                 using (SqlDataReader rdr = cmd.ExecuteReader())
                                 {
                                     if (rdr.Read())
                                     {
-                                        if (rdr["LedgerID"] != DBNull.Value)
-                                            ledgerId = Convert.ToInt64(rdr["LedgerID"]);
-                                        if (rdr["LedgerName"] != DBNull.Value)
-                                            ledgerName = rdr["LedgerName"].ToString();
+                                         try { ledgerId = Convert.ToInt64(rdr["LedgerID"]); } catch { }
+                                         try { ledgerName = rdr["LedgerName"].ToString(); } catch { }
                                     }
                                 }
                             }
@@ -2724,10 +2730,11 @@ namespace Repository.TransactionRepository
                 {
                     try
                     {
-                        string sql = "SELECT TOP 1 LedgerID FROM PayMode WHERE PayModeID = @PayModeID";
-                        using (SqlCommand cmd = new SqlCommand(sql, (SqlConnection)DataConnection, (SqlTransaction)trans))
+                        using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_PayMode, (SqlConnection)DataConnection, (SqlTransaction)trans))
                         {
-                            cmd.Parameters.AddWithValue("@PayModeID", sales.PaymodeId);
+                            cmd.CommandType = CommandType.StoredProcedure;
+                            cmd.Parameters.AddWithValue("@_Operation", "GETBYID");
+                            cmd.Parameters.AddWithValue("@PaymodeID", sales.PaymodeId);
                             object res = cmd.ExecuteScalar();
                             if (res != null && res != DBNull.Value)
                                 targetLedgerId = Convert.ToInt64(res);
@@ -2740,9 +2747,10 @@ namespace Repository.TransactionRepository
                 {
                     try
                     {
-                        string sqlL = "SELECT TOP 1 LedgerName FROM LedgerMaster WHERE LedgerID = @LedgerID";
-                        using (SqlCommand cmdL = new SqlCommand(sqlL, (SqlConnection)DataConnection, (SqlTransaction)trans))
+                        using (SqlCommand cmdL = new SqlCommand(STOREDPROCEDURE.POS_Ledger, (SqlConnection)DataConnection, (SqlTransaction)trans))
                         {
+                            cmdL.CommandType = CommandType.StoredProcedure;
+                            cmdL.Parameters.AddWithValue("@_Operation", "GETBYID");
                             cmdL.Parameters.AddWithValue("@LedgerID", targetLedgerId);
                             object resL = cmdL.ExecuteScalar();
                             if (resL != null && resL != DBNull.Value)

@@ -1634,30 +1634,99 @@ WHERE ItemId IN ({string.Join(", ", parameterNames)})";
         public ReasonDDLGrid getReasonDDl()
         {
             ReasonDDLGrid grid = new ReasonDDLGrid();
+            List<Reason> reasonList = new List<Reason>();
+            HashSet<int> addedLedgerIds = new HashSet<int>();
+
+            if (DataConnection.State == ConnectionState.Open)
+                DataConnection.Close();
+
             DataConnection.Open();
 
             try
             {
-                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_dropdown, (SqlConnection)DataConnection))
+                // 1. Try stored procedure POS_dropdown
+                try
                 {
-                    cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
-                    cmd.Parameters.AddWithValue("@CompanyId", SessionContext.CompanyId);
-                    cmd.Parameters.AddWithValue("@Operation", DataBase.Operations);
-                    using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
+                    using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_dropdown, (SqlConnection)DataConnection))
                     {
-                        DataSet ds = new DataSet();
-                        adapt.Fill(ds);
-                        if ((ds != null) && (ds.Tables.Count > 0) && (ds.Tables[0] != null) && (ds.Tables[0].Rows.Count > 0))
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
+                        cmd.Parameters.AddWithValue("@CompanyId", SessionContext.CompanyId);
+                        cmd.Parameters.AddWithValue("@Operation", string.IsNullOrEmpty(DataBase.Operations) ? "Reason" : DataBase.Operations);
+                        using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
                         {
-                            grid.List = ds.Tables[0].ToListOfObject<Reason>();
+                            DataSet ds = new DataSet();
+                            adapt.Fill(ds);
+                            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0] != null && ds.Tables[0].Rows.Count > 0)
+                            {
+                                var spList = ds.Tables[0].ToListOfObject<Reason>();
+                                if (spList != null)
+                                {
+                                    foreach (var r in spList)
+                                    {
+                                        if (r != null && addedLedgerIds.Add(r.LedgerID))
+                                        {
+                                            reasonList.Add(r);
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine("POS_dropdown Reason SP error: " + ex.Message);
+                }
+
+                // 2. Fetch ledgers under Expense Groups via stored procedure
+                try
+                {
+                    using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._4GetAccountLedgerDDL, (SqlConnection)DataConnection))
+                    {
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
+                        cmd.Parameters.AddWithValue("@For", "Expenses");
+                        using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
+                        {
+                            DataSet ds = new DataSet();
+                            adapt.Fill(ds);
+                            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0] != null && ds.Tables[0].Rows.Count > 0)
+                            {
+                                foreach (DataRow row in ds.Tables[0].Rows)
+                                {
+                                    string idCol = row.Table.Columns.Contains("Id") ? "Id" :
+                                                   row.Table.Columns.Contains("ID") ? "ID" :
+                                                   row.Table.Columns.Contains("LedgerID") ? "LedgerID" : null;
+
+                                    string nameCol = row.Table.Columns.Contains("Name") ? "Name" :
+                                                     row.Table.Columns.Contains("LedgerName") ? "LedgerName" :
+                                                     row.Table.Columns.Contains("ReasonName") ? "ReasonName" : null;
+
+                                    if (idCol != null && row[idCol] != DBNull.Value)
+                                    {
+                                        int ledgerId = Convert.ToInt32(row[idCol]);
+                                        string reasonName = nameCol != null && row[nameCol] != DBNull.Value ? row[nameCol].ToString() : "";
+                                        if (addedLedgerIds.Add(ledgerId))
+                                        {
+                                            reasonList.Add(new Reason { LedgerID = ledgerId, ReasonName = reasonName });
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine("Stored procedure for reason ledgers error: " + ex.Message);
+                }
+
+                grid.List = reasonList;
             }
             catch (Exception ex)
             {
-                throw ex;
+                System.Diagnostics.Debug.WriteLine("getReasonDDl Error: " + ex.Message);
             }
             finally
             {

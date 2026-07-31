@@ -2690,9 +2690,15 @@ namespace Repository.TransactionRepository
                 try
                 {
                     int nextLedgerId = 1;
-                    using (SqlCommand idCmd = new SqlCommand("SELECT ISNULL(MAX(LedgerID), 0) + 1 FROM LedgerMaster", (SqlConnection)DataConnection, trans))
+                    using (SqlCommand idCmd = new SqlCommand(STOREDPROCEDURE.POS_Ledger, (SqlConnection)DataConnection, trans))
                     {
-                        nextLedgerId = Convert.ToInt32(idCmd.ExecuteScalar());
+                        idCmd.CommandType = CommandType.StoredProcedure;
+                        idCmd.Parameters.AddWithValue("@_Operation", "GETNEXTID");
+                        object res = idCmd.ExecuteScalar();
+                        if (res != null && res != DBNull.Value)
+                        {
+                            nextLedgerId = Convert.ToInt32(res);
+                        }
                     }
 
                     // Create the GST ledger using stored procedure
