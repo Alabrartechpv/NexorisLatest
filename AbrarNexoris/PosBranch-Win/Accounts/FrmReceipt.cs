@@ -31,6 +31,8 @@ namespace PosBranch_Win.Accounts
         private int currentBranchId = 0; // Will be set from DataBase.BranchId in constructor
         private int selectionOrderCounter = 0; // Added for tracking selection order
         private int currentReceiptId = 0; // Tracks the currently loaded Receipt record ID
+        private const string ReceiptStatusActive = "Active";
+        private const string ReceiptStatusCancel = "Cancel";
 
         public FrmReceipt()
         {
@@ -46,6 +48,7 @@ namespace PosBranch_Win.Accounts
             InitializeEventHandlers();
             LoadPaimentMethod();
             receiptRepo = new CustomerReceiptInfoRepository();
+            InitializeReceiptStatusCombo();
             rdbtnoutstanding.Checked = true; // Ensure Outstanding is selected by default
 
 
@@ -73,6 +76,16 @@ namespace PosBranch_Win.Accounts
 
             // Wire up button click events
             btnSales.Click += btnSales_Click;
+            btnUpdate.Click += (s, e) =>
+            {
+                if (IsCancelStatusSelected())
+                {
+                    CancelLoadedReceipt();
+                    return;
+                }
+                MessageBox.Show("Please select Cancel status to cancel/reverse a loaded customer receipt.",
+                    "Receipt Status", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            };
         }
         private void ultraPictureBox7_Click(object sender, EventArgs e)
         {
@@ -283,6 +296,12 @@ namespace PosBranch_Win.Accounts
         {
             try
             {
+                if (IsCancelStatusSelected())
+                {
+                    CancelLoadedReceipt();
+                    return;
+                }
+
                 if (!ValidateReceipt())
                 {
                     return;
@@ -482,6 +501,7 @@ namespace PosBranch_Win.Accounts
             lblOutStanding.Text = "Outstanding";
             ultraTextEditor1.Text = "0.00";
             dtpPurchaseDate.Value = DateTime.Now;
+            ultraTextEditor2.Value = ReceiptStatusActive;
             // Repository is already initialized in constructor - no need to recreate
         }
         private void RadioButton_CheckedChanged(object sender, EventArgs e)
@@ -1200,6 +1220,7 @@ namespace PosBranch_Win.Accounts
                 txtPurchaseNo.Text = master["VoucherId"].ToString();
                 currentCustomerLedgerId = Convert.ToInt32(master["CustomerLedgerId"]);
                 textBox4.Text = currentCustomerLedgerId.ToString();
+                ultraTextEditor2.Value = ReceiptStatusActive;
                 
                 // Get customer name from the 3rd table if available (Customer Info / Balance)
                 if (ds.Tables.Count > 2 && ds.Tables[2].Rows.Count > 0)
@@ -1304,6 +1325,71 @@ namespace PosBranch_Win.Accounts
                 {
                     MessageBox.Show($"Error deleting Receipt: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
+            }
+        }
+        private void InitializeReceiptStatusCombo()
+        {
+            ultraTextEditor2.Items.Clear();
+            ultraTextEditor2.Items.Add(ReceiptStatusActive, ReceiptStatusActive);
+            ultraTextEditor2.Items.Add(ReceiptStatusCancel, ReceiptStatusCancel);
+            ultraTextEditor2.DropDownStyle = Infragistics.Win.DropDownStyle.DropDownList;
+            ultraTextEditor2.Value = ReceiptStatusActive;
+        }
+
+        private bool IsCancelStatusSelected()
+        {
+            string status = Convert.ToString(ultraTextEditor2.Value ?? ultraTextEditor2.Text);
+            return string.Equals(status, ReceiptStatusCancel, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void CancelLoadedReceipt()
+        {
+            try
+            {
+                if (currentReceiptId <= 0)
+                {
+                    MessageBox.Show("Please load an existing customer receipt before selecting Cancel.",
+                        "Receipt Required", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    ultraTextEditor2.Value = ReceiptStatusActive;
+                    return;
+                }
+
+                string voucherText = string.IsNullOrWhiteSpace(txtPurchaseNo.Text) ? currentReceiptId.ToString() : txtPurchaseNo.Text.Trim();
+                DialogResult confirm = MessageBox.Show(
+                    "Do you want to cancel/reverse customer receipt voucher " + voucherText + "?"
+                    + Environment.NewLine + Environment.NewLine
+                    + "All active bill allocations in this receipt voucher will be reversed and the receipt will be preserved as cancelled.",
+                    "Cancel Customer Receipt",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question);
+
+                if (confirm != DialogResult.Yes)
+                {
+                    ultraTextEditor2.Value = ReceiptStatusActive;
+                    return;
+                }
+
+                CustomerReceiptInfoRepository.CustomerReceiptCancellationSummary cancelled =
+                    receiptRepo.CancelCustomerReceipt(
+                        currentReceiptId,
+                        currentBranchId,
+                        SessionContext.UserId,
+                        "Cancelled from Receipt screen");
+
+                MessageBox.Show(
+                    "Customer receipt cancelled successfully."
+                    + Environment.NewLine + "Cancelled voucher(s): " + cancelled.ReceiptVoucherCount
+                    + Environment.NewLine + "Reversed amount: " + cancelled.ReceiptAmount.ToString("N2"),
+                    "Receipt Cancelled",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+
+                ClearForm();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error cancelling receipt: " + ex.Message,
+                    "Receipt Cancellation Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
     }

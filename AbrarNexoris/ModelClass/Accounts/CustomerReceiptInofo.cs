@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -34,6 +34,8 @@ namespace ModelClass.Accounts
         public int BranchId { get; set; }
         public string CreatedBy { get; set; }
         public DateTime CreatedDate { get; set; }
+        public bool CancelFlag { get; set; }
+        public string Status { get; set; }
     }
 
     public class CustomerReceiptDetails
@@ -45,6 +47,7 @@ namespace ModelClass.Accounts
         public decimal InvoiceAmount { get; set; }
         public decimal AdjustedAmount { get; set; }
         public decimal Balance { get; set; }
+        public bool CancelFlag { get; set; }
     }
 
 

@@ -1458,19 +1458,23 @@ namespace PosBranch_Win.Transaction
                 }
 
 
-                if (e.Cell != null && (e.Cell.Column.Key == "Qty" || e.Cell.Column.Key == "UnitPrice" || e.Cell.Column.Key == "DiscPer" || e.Cell.Column.Key == "Packing" || e.Cell.Column.Key == "Amount" || e.Cell.Column.Key == "TaxPer" || e.Cell.Column.Key == "TaxType"))
+                if (e.Cell != null && (e.Cell.Column.Key == "Qty" || e.Cell.Column.Key == "UnitPrice" || e.Cell.Column.Key == "DiscPer" || e.Cell.Column.Key == "DiscAmt" || e.Cell.Column.Key == "Packing" || e.Cell.Column.Key == "Amount" || e.Cell.Column.Key == "TaxPer" || e.Cell.Column.Key == "TaxType"))
                 {
                     Infragistics.Win.UltraWinGrid.UltraGridRow row = e.Cell.Row;
 
                     // Handle different column updates with specific logic
                     if (e.Cell.Column.Key == "Qty")
                     {
-                        // When Qty changes, recalculate TotalAmount = Qty Ã— SellingPrice (keep SellingPrice unchanged)
+                        // When Qty changes, recalculate TotalAmount = Qty × SellingPrice (keep SellingPrice unchanged)
                         UpdateTotalAmountFromQtyAndSellingPrice(row);
+                    }
+                    else if (e.Cell.Column.Key == "DiscAmt")
+                    {
+                        UpdateRowFromDiscountAmount(row);
                     }
                     else if (e.Cell.Column.Key == "Amount")
                     {
-                        // When SellingPrice (Amount) changes, recalculate based on Qty Ã— SellingPrice
+                        // When SellingPrice (Amount) changes, recalculate based on Qty × SellingPrice
                         UpdateTotalAmountFromQtyAndSellingPrice(row);
                     }
                     else if (e.Cell.Column.Key == "TaxPer" || e.Cell.Column.Key == "TaxType")
@@ -2635,29 +2639,43 @@ namespace PosBranch_Win.Transaction
 
         }
 
+        /// <summary>
+        /// Gets the unrounded net total (Grid Total minus Bill Discount).
+        /// </summary>
+        private float GetUnroundedNetTotal()
+        {
+            double gridNetTotal = CalculateNetTotalFromGrid();
+            float discountAmount = 0;
+            if (!string.IsNullOrEmpty(txtDisc.Text) && txtDisc.Text != "0")
+            {
+                discountAmount = operations.CalculateDiscountAmount((float)gridNetTotal, txtDisc.Text.Trim());
+                if (discountAmount > (float)gridNetTotal)
+                {
+                    discountAmount = (float)gridNetTotal;
+                }
+            }
+            return (float)Math.Round(gridNetTotal - discountAmount, 2);
+        }
+
         // Add new method to handle rounding
         private void ApplyRounding()
         {
             try
             {
+                float unroundedNetTotal = GetUnroundedNetTotal();
                 if (ultraCheckEditorApplyRounding.Checked)
                 {
-                    if (float.TryParse(txtNetTotal.Text, out float netAmount))
-                    {
-                        float roundingValue = operations.CalculateRoundingAmount(netAmount);
-                        float roundedValue = operations.ApplyRounding(netAmount);
-                        textBoxround.Text = roundingValue.ToString("0.00");
-                        SetNetTotal(roundedValue);
-                        sales.RoundOff = roundingValue;
-                        sales.RoundOffFlag = true;
-                    }
+                    float roundingValue = operations.CalculateRoundingAmount(unroundedNetTotal);
+                    float roundedValue = operations.ApplyRounding(unroundedNetTotal);
+                    textBoxround.Text = roundingValue.ToString("0.00");
+                    SetNetTotal(roundedValue);
+                    sales.RoundOff = roundingValue;
+                    sales.RoundOffFlag = true;
                 }
                 else
                 {
                     textBoxround.Text = "0.00";
-                    // When rounding is disabled, use the calculated net total from grid
-                    double netTotal = CalculateNetTotalFromGrid();
-                    SetNetTotal((float)netTotal);
+                    SetNetTotal(unroundedNetTotal);
                     sales.RoundOff = 0;
                     sales.RoundOffFlag = false;
                 }
@@ -2681,9 +2699,8 @@ namespace PosBranch_Win.Transaction
                         float manualRounding = 0;
                         float.TryParse(textBoxround.Text, out manualRounding);
 
-                        // Get the base net total from grid and add manual rounding
-                        double baseNetTotal = CalculateNetTotalFromGrid();
-                        float netTotal = (float)baseNetTotal + manualRounding;
+                        float unroundedNetTotal = GetUnroundedNetTotal();
+                        float netTotal = unroundedNetTotal + manualRounding;
                         SetNetTotal(netTotal);
 
                         // Update sales object
@@ -4231,6 +4248,7 @@ namespace PosBranch_Win.Transaction
                 lblledger.Text = master.LedgerID.ToString();
                 txtDisc.Text = master.DiscountAmt != 0 ? master.DiscountAmt.ToString("0.00") : string.Empty;
                 textBoxround.Text = master.RoundOff.ToString("0.00");
+                ultraCheckEditorApplyRounding.Checked = master.RoundOffFlag;
 
                 ApplySavedPaymentModeSelection(master);
                 CaptureSalesActivitySnapshot(master);
@@ -6802,6 +6820,7 @@ namespace PosBranch_Win.Transaction
 
                     // Force set the Net Total to the saved value
                     // This ensures that any "Net Total Override" (..300) is preserved
+                    ultraCheckEditorApplyRounding.Checked = sm.RoundOffFlag;
                     SetNetTotal((float)sm.NetAmount);
 
                     System.Diagnostics.Debug.WriteLine($"Restored Bill Values: NetTotal={sm.NetAmount}, Discount={sm.DiscountAmt}");
@@ -7285,11 +7304,10 @@ namespace PosBranch_Win.Transaction
                         {
                             // Apply the discount
                             decimal discountAmount = discountDialog.DiscountAmount;
-                            decimal newAmount = discountDialog.NewAmount;
                             decimal discountPercent = discountDialog.DiscountPercent;
                             bool isPercentage = discountDialog.IsPercentageDiscount;
 
-                            // Update the discount textbox with the right format
+                            // Update the discount textbox with the right format (triggers txtDisc_TextChanged -> ApplyOverallDiscount)
                             if (isPercentage)
                             {
                                 txtDisc.Text = $"{discountPercent}%";
@@ -7299,21 +7317,7 @@ namespace PosBranch_Win.Transaction
                                 txtDisc.Text = discountAmount.ToString("0.00");
                             }
 
-                            // Store values directly in the sales object
-                            sales.DiscountPer = (float)discountPercent;
-                            sales.DiscountAmt = (float)discountAmount;
-
-                            // Calculate and set the new total
-                            float newTotal = (float)newAmount;
-                            SetNetTotal(newTotal);
-
-                            // Apply rounding if enabled
-                            if (ultraCheckEditorApplyRounding.Checked)
-                            {
-                                ApplyRounding();
-                            }
-
-                            System.Diagnostics.Debug.WriteLine($"Discount dialog: Amount={discountAmount}, Percent={discountPercent}%, IsPercentage={isPercentage}");
+                            System.Diagnostics.Debug.WriteLine($"Discount dialog applied: Amount={discountAmount}, Percent={discountPercent}%, IsPercentage={isPercentage}");
                         }
                     }
                 }
@@ -7716,6 +7720,77 @@ namespace PosBranch_Win.Transaction
             float marginPer = sPrice > 0 ? (marginAmt / sPrice) * 100 : 0;
 
             // Update grid cells - DO NOT change the Amount (S/Price) column
+            row.Cells["DiscAmt"].Value = (float)discAmt;
+            row.Cells["TaxAmt"].Value = (float)taxAmount;
+            row.Cells["BaseAmount"].Value = (float)baseAmount;
+            row.Cells["TotalAmount"].Value = (float)totalAmount;
+            row.Cells["Marginper"].Value = marginPer;
+            row.Cells["MarginAmt"].Value = marginAmt;
+        }
+
+        /// <summary>
+        /// Updates DiscPer and row totals when DiscAmt is edited directly in the grid.
+        /// </summary>
+        private void UpdateRowFromDiscountAmount(Infragistics.Win.UltraWinGrid.UltraGridRow row)
+        {
+            if (row == null) return;
+
+            float qty = ParseFloat(row.Cells["Qty"].Value, 1);
+            float unitPrice = ParseFloat(row.Cells["UnitPrice"].Value, 0);
+            float discAmt = ParseFloat(row.Cells["DiscAmt"].Value, 0);
+            double lineTotal = Math.Round(qty * unitPrice, 2);
+            float discPer = lineTotal > 0 ? (float)Math.Round((discAmt / lineTotal) * 100.0, 2) : 0f;
+
+            ultraGrid1.AfterCellUpdate -= ultraGrid1_AfterCellUpdate;
+            try
+            {
+                row.Cells["DiscPer"].Value = discPer;
+                UpdateGridRowTotalsWithFixedDiscount(row, discAmt);
+            }
+            finally
+            {
+                ultraGrid1.AfterCellUpdate += ultraGrid1_AfterCellUpdate;
+            }
+        }
+
+        /// <summary>
+        /// Recalculates row totals using an exact override discount amount without re-deriving it from percentage.
+        /// </summary>
+        private void UpdateGridRowTotalsWithFixedDiscount(Infragistics.Win.UltraWinGrid.UltraGridRow row, float overrideDiscAmt)
+        {
+            if (row == null) return;
+
+            float qty = ParseFloat(row.Cells["Qty"].Value, 1);
+            float unitPrice = ParseFloat(row.Cells["UnitPrice"].Value, 0);
+            float cost = ParseFloat(row.Cells["Cost"].Value, 0);
+            float taxPer = ParseFloat(row.Cells["TaxPer"].Value, 0);
+            string taxType = row.Cells["TaxType"].Value?.ToString() ?? "incl";
+
+            row.Cells["Amount"].Value = unitPrice;
+
+            double lineTotal = Math.Round(qty * unitPrice, 2);
+            double discAmt = Math.Round(overrideDiscAmt, 2);
+            double totalAmount = Math.Round(lineTotal - discAmt, 2);
+
+            double baseAmount;
+            double taxAmount;
+
+            if (taxType.ToLower() == "incl")
+            {
+                double divisor = 1.0 + (taxPer / 100.0);
+                baseAmount = divisor > 0 ? Math.Round(totalAmount / divisor, 2) : totalAmount;
+                taxAmount = Math.Round(totalAmount - baseAmount, 2);
+            }
+            else
+            {
+                baseAmount = totalAmount;
+                taxAmount = Math.Round(baseAmount * (taxPer / 100.0), 2);
+                totalAmount = Math.Round(baseAmount + taxAmount, 2);
+            }
+
+            float marginAmt = unitPrice - cost;
+            float marginPer = unitPrice > 0 ? (marginAmt / unitPrice) * 100 : 0;
+
             row.Cells["DiscAmt"].Value = (float)discAmt;
             row.Cells["TaxAmt"].Value = (float)taxAmount;
             row.Cells["BaseAmount"].Value = (float)baseAmount;
