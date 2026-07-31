@@ -151,11 +151,11 @@ namespace PosBranch_Win.Transaction
             // btnReturn
             // 
             this.btnReturn.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-            this.btnReturn.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(169)))), ((int)(((byte)(204)))), ((int)(((byte)(227)))));
-            this.btnReturn.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(100)))), ((int)(((byte)(160)))), ((int)(((byte)(210)))));
+            this.btnReturn.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(122)))), ((int)(((byte)(204)))));
+            this.btnReturn.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(90)))), ((int)(((byte)(158)))));
             this.btnReturn.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnReturn.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.btnReturn.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(48)))), ((int)(((byte)(96)))));
+            this.btnReturn.ForeColor = System.Drawing.Color.White;
             this.btnReturn.Location = new System.Drawing.Point(12, 605);
             this.btnReturn.Name = "btnReturn";
             this.btnReturn.Size = new System.Drawing.Size(120, 51);
@@ -167,11 +167,11 @@ namespace PosBranch_Win.Transaction
             // btnReturnAll
             // 
             this.btnReturnAll.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-            this.btnReturnAll.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(169)))), ((int)(((byte)(204)))), ((int)(((byte)(227)))));
-            this.btnReturnAll.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(100)))), ((int)(((byte)(160)))), ((int)(((byte)(210)))));
+            this.btnReturnAll.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(122)))), ((int)(((byte)(204)))));
+            this.btnReturnAll.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(90)))), ((int)(((byte)(158)))));
             this.btnReturnAll.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnReturnAll.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.btnReturnAll.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(48)))), ((int)(((byte)(96)))));
+            this.btnReturnAll.ForeColor = System.Drawing.Color.White;
             this.btnReturnAll.Location = new System.Drawing.Point(139, 605);
             this.btnReturnAll.Name = "btnReturnAll";
             this.btnReturnAll.Size = new System.Drawing.Size(120, 51);
@@ -258,7 +258,7 @@ namespace PosBranch_Win.Transaction
             this.ultraPanel10.ForeColor = System.Drawing.Color.Beige;
             this.ultraPanel10.Location = new System.Drawing.Point(1007, 601);
             this.ultraPanel10.Name = "ultraPanel10";
-            this.ultraPanel10.Size = new System.Drawing.Size(203, 67);
+            this.ultraPanel10.Size = new System.Drawing.Size(203, 80);
             this.ultraPanel10.TabIndex = 43;
             this.ultraPanel10.UseFlatMode = Infragistics.Win.DefaultableBoolean.True;
             // 
@@ -267,7 +267,7 @@ namespace PosBranch_Win.Transaction
             this.lblNetAmount.AutoSize = true;
             this.lblNetAmount.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(0)))), ((int)(((byte)(0)))), ((int)(((byte)(0)))));
             this.lblNetAmount.Font = new System.Drawing.Font("DS-Digital", 36F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.lblNetAmount.Location = new System.Drawing.Point(9, 7);
+            this.lblNetAmount.Location = new System.Drawing.Point(48, 17);
             this.lblNetAmount.Name = "lblNetAmount";
             this.lblNetAmount.Size = new System.Drawing.Size(100, 47);
             this.lblNetAmount.TabIndex = 34;
@@ -752,7 +752,7 @@ namespace PosBranch_Win.Transaction
             this.btnAddPurchaceList.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Stretch;
             this.btnAddPurchaceList.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnAddPurchaceList.ForeColor = System.Drawing.Color.Aquamarine;
-            this.btnAddPurchaceList.Location = new System.Drawing.Point(236, 73);
+            this.btnAddPurchaceList.Location = new System.Drawing.Point(236, 47);
             this.btnAddPurchaceList.Name = "btnAddPurchaceList";
             this.btnAddPurchaceList.Size = new System.Drawing.Size(23, 22);
             this.btnAddPurchaceList.TabIndex = 40;
@@ -812,7 +812,7 @@ namespace PosBranch_Win.Transaction
             // textBox1
             // 
             this.textBox1.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.textBox1.Location = new System.Drawing.Point(101, 72);
+            this.textBox1.Location = new System.Drawing.Point(101, 46);
             this.textBox1.Name = "textBox1";
             this.textBox1.Size = new System.Drawing.Size(133, 24);
             this.textBox1.TabIndex = 39;
@@ -832,7 +832,7 @@ namespace PosBranch_Win.Transaction
             // 
             this.lblPno.AutoSize = true;
             this.lblPno.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.lblPno.Location = new System.Drawing.Point(14, 77);
+            this.lblPno.Location = new System.Drawing.Point(14, 51);
             this.lblPno.Name = "lblPno";
             this.lblPno.Size = new System.Drawing.Size(89, 16);
             this.lblPno.TabIndex = 11;

@@ -480,14 +480,16 @@ namespace PosBranch_Win.Transaction
                 if (btn != null)
                 {
                     btn.Font = controlFont;
-                    // Preserve icon/checkmark buttons (those with BackgroundImage) —
-                    // do NOT flatten or recolor them or they blend into the background.
+                    btn.BackColor = Color.FromArgb(0, 122, 204);
+                    btn.FlatStyle = FlatStyle.Flat;
+                    btn.FlatAppearance.BorderColor = Color.FromArgb(0, 90, 158);
                     if (btn.BackgroundImage == null)
                     {
-                        btn.BackColor = Color.FromArgb(195, 222, 250);
-                        btn.ForeColor = darkTextColor;
-                        btn.FlatStyle = FlatStyle.Flat;
-                        btn.FlatAppearance.BorderColor = Color.FromArgb(140, 190, 240);
+                        btn.ForeColor = Color.White;
+                    }
+                    else
+                    {
+                        btn.ForeColor = Color.Aquamarine;
                     }
                 }
 
