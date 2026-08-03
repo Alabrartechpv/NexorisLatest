@@ -1,4 +1,4 @@
-﻿using Infragistics.Win;
+using Infragistics.Win;
 using Infragistics.Win.UltraWinGrid;
 using ModelClass;
 using ModelClass.TransactionModels;
@@ -70,7 +70,7 @@ namespace PosBranch_Win.DialogBox
             try
             {
                 GetHoldBillGrid hold = Sales.GetHolBill();
-                holdBillData = hold.List.ToList();
+                holdBillData = (hold?.List ?? Enumerable.Empty<GetHoldBill>()).ToList();
                 ultraGrid1.DataSource = holdBillData;
 
                 if (ultraGrid1.Rows.Count > 0)

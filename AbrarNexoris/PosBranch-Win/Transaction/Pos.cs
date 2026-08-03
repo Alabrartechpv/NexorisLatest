@@ -61,10 +61,10 @@ namespace PosBranch_Win.Transaction
             // here selecting the branch ddl
             //
             BranchDDlGrid bd =  dp.getBanchDDl();
-            if(bd.List.Count<BranchDDl>() >  0)
+            var branchList = (bd?.List ?? Enumerable.Empty<BranchDDl>()).ToList();
+            if (branchList.Any())
             {
-                txtBranch.Text = bd.List.First().BranchName;
-
+                txtBranch.Text = branchList.First().BranchName;
             }
             else
             {
