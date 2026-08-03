@@ -150,6 +150,8 @@ namespace Repository.SettingsRepo
                 string tableName = GetTableName(logType);
                 EnsureActivityLogTable(tableName);
 
+                long searchTransNo = ExtractTransactionNo(searchText);
+
                 using (SqlCommand cmd = new SqlCommand($@"
 SELECT
     ActivityLogId,
@@ -184,12 +186,15 @@ SELECT
     CounterId,
     CounterSessionId
 FROM dbo.{tableName}
-WHERE CreatedOn >= @FromDate
-  AND CreatedOn < DATEADD(DAY, 1, @ToDate)
+WHERE (CreatedOn >= @FromDate AND CreatedOn < DATEADD(DAY, 1, @ToDate))
+   OR (@SearchTransNo > 0 AND TransactionNo = @SearchTransNo)
+   OR (@SearchText <> '' AND (InvoiceNo LIKE '%' + @SearchText + '%' OR PartyName LIKE '%' + @SearchText + '%'))
 ORDER BY CreatedOn DESC, ActivityLogId DESC;", (SqlConnection)DataConnection))
                 {
                     cmd.Parameters.AddWithValue("@FromDate", fromDate.Date);
                     cmd.Parameters.AddWithValue("@ToDate", toDate.Date);
+                    cmd.Parameters.AddWithValue("@SearchText", searchText ?? string.Empty);
+                    cmd.Parameters.AddWithValue("@SearchTransNo", searchTransNo);
 
                     using (SqlDataAdapter adapter = new SqlDataAdapter(cmd))
                     {
@@ -197,7 +202,7 @@ ORDER BY CreatedOn DESC, ActivityLogId DESC;", (SqlConnection)DataConnection))
                     }
                 }
 
-                AppendRecoveredTransactionRows(result, logType, fromDate, toDate, string.Empty, string.Empty, string.Empty);
+                AppendRecoveredTransactionRows(result, logType, fromDate, toDate, userName, activityType, searchText);
                 ApplyPersistentDisplayLogNumbers(result);
                 result = FilterActivityRows(result, userName, activityType, searchText);
                 result.DefaultView.Sort = result.Columns.Contains("DisplayLogNo")
@@ -502,6 +507,47 @@ ORDER BY Value;", (SqlConnection)DataConnection))
                    string.Equals(activityType, "Hold bill saved", StringComparison.OrdinalIgnoreCase);
         }
 
+        public static long ExtractTransactionNo(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return 0;
+            }
+
+            string clean = text.Trim();
+            if (clean.StartsWith("GRN-", StringComparison.OrdinalIgnoreCase))
+            {
+                clean = clean.Substring(4).Trim();
+            }
+            else if (clean.StartsWith("GRN", StringComparison.OrdinalIgnoreCase))
+            {
+                clean = clean.Substring(3).TrimStart('-', ' ', '#');
+            }
+            else if (clean.StartsWith("BILL-", StringComparison.OrdinalIgnoreCase))
+            {
+                clean = clean.Substring(5).Trim();
+            }
+            else if (clean.StartsWith("BILL", StringComparison.OrdinalIgnoreCase))
+            {
+                clean = clean.Substring(4).TrimStart('-', ' ', '#');
+            }
+            else if (clean.StartsWith("PR-", StringComparison.OrdinalIgnoreCase))
+            {
+                clean = clean.Substring(3).Trim();
+            }
+            else if (clean.StartsWith("SR-", StringComparison.OrdinalIgnoreCase))
+            {
+                clean = clean.Substring(3).Trim();
+            }
+
+            if (long.TryParse(clean, out long result) && result > 0)
+            {
+                return result;
+            }
+
+            return 0;
+        }
+
         private static bool MatchesActivitySearch(DataRow row, string searchText)
         {
             if (string.IsNullOrWhiteSpace(searchText))
@@ -509,9 +555,41 @@ ORDER BY Value;", (SqlConnection)DataConnection))
                 return true;
             }
 
-            return ContainsText(Convert.ToString(row["TransactionNo"]), searchText) ||
-                   ContainsText(Convert.ToString(row["InvoiceNo"]), searchText) ||
-                   ContainsText(Convert.ToString(row["PartyName"]), searchText);
+            string transNoStr = Convert.ToString(row["TransactionNo"]) ?? string.Empty;
+            string invoiceNoStr = Convert.ToString(row["InvoiceNo"]) ?? string.Empty;
+            string partyNameStr = Convert.ToString(row["PartyName"]) ?? string.Empty;
+            string detailsStr = Convert.ToString(row["ActivityDetails"]) ?? string.Empty;
+
+            if (ContainsText(transNoStr, searchText) ||
+                ContainsText(invoiceNoStr, searchText) ||
+                ContainsText(partyNameStr, searchText) ||
+                ContainsText(detailsStr, searchText))
+            {
+                return true;
+            }
+
+            string formattedGrn = "GRN-" + transNoStr;
+            string formattedGrnNoDash = "GRN" + transNoStr;
+            string formattedGrnSpace = "GRN " + transNoStr;
+
+            if (ContainsText(formattedGrn, searchText) ||
+                ContainsText(formattedGrnNoDash, searchText) ||
+                ContainsText(formattedGrnSpace, searchText) ||
+                ContainsText(searchText, formattedGrn))
+            {
+                return true;
+            }
+
+            long searchTransNo = ExtractTransactionNo(searchText);
+            if (searchTransNo > 0)
+            {
+                if (long.TryParse(transNoStr, out long rowTransNo) && rowTransNo == searchTransNo)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static bool ContainsText(string value, string searchText)
@@ -545,12 +623,15 @@ ORDER BY Value;", (SqlConnection)DataConnection))
                 ? BuildRecoveredPurchaseSql()
                 : BuildRecoveredSalesSql();
 
+            long searchTransNo = ExtractTransactionNo(searchText);
+
             using (SqlCommand cmd = new SqlCommand(sql, (SqlConnection)DataConnection))
             {
                 cmd.Parameters.AddWithValue("@FromDate", fromDate.Date);
                 cmd.Parameters.AddWithValue("@ToDate", toDate.Date);
                 cmd.Parameters.AddWithValue("@ActivityType", activityType ?? string.Empty);
                 cmd.Parameters.AddWithValue("@SearchText", searchText ?? string.Empty);
+                cmd.Parameters.AddWithValue("@SearchTransNo", searchTransNo);
 
                 using (SqlDataAdapter adapter = new SqlDataAdapter(cmd))
                 {
@@ -697,8 +778,11 @@ ELSE
           AND sd.FinYearId = sm.FinYearId
     ) d
     WHERE ISNULL(sm.CancelFlag, 0) = 0
-      AND sm.BillDate >= @FromDate
-      AND sm.BillDate < DATEADD(DAY, 1, @ToDate)
+      AND (
+            (sm.BillDate >= @FromDate AND sm.BillDate < DATEADD(DAY, 1, @ToDate))
+            OR (@SearchTransNo > 0 AND sm.BillNo = @SearchTransNo)
+            OR (@SearchText <> '' AND (CONVERT(nvarchar(50), sm.BillNo) LIKE '%' + @SearchText + '%' OR ISNULL(sm.CustomerName, '') LIKE '%' + @SearchText + '%'))
+          )
       AND NOT EXISTS
       (
           SELECT 1
@@ -711,6 +795,7 @@ ELSE
           )
       AND (
             @SearchText = ''
+            OR @SearchTransNo > 0
             OR CONVERT(nvarchar(50), sm.BillNo) LIKE '%' + @SearchText + '%'
             OR ISNULL(sm.CustomerName, '') LIKE '%' + @SearchText + '%'
           )
@@ -808,8 +893,11 @@ ELSE
           AND pd.FinYearId = pm.FinYearId
     ) d
     WHERE ISNULL(pm.CancelFlag, 0) = 0
-      AND pm.PurchaseDate >= @FromDate
-      AND pm.PurchaseDate < DATEADD(DAY, 1, @ToDate)
+      AND (
+            (pm.PurchaseDate >= @FromDate AND pm.PurchaseDate < DATEADD(DAY, 1, @ToDate))
+            OR (@SearchTransNo > 0 AND pm.PurchaseNo = @SearchTransNo)
+            OR (@SearchText <> '' AND (CONVERT(nvarchar(50), pm.PurchaseNo) LIKE '%' + @SearchText + '%' OR ISNULL(pm.InvoiceNo, '') LIKE '%' + @SearchText + '%' OR ISNULL(pm.VendorName, '') LIKE '%' + @SearchText + '%'))
+          )
       AND NOT EXISTS
       (
           SELECT 1
@@ -819,6 +907,7 @@ ELSE
       )
       AND (
             @SearchText = ''
+            OR @SearchTransNo > 0
             OR CONVERT(nvarchar(50), pm.PurchaseNo) LIKE '%' + @SearchText + '%'
             OR ISNULL(pm.InvoiceNo, '') LIKE '%' + @SearchText + '%'
             OR ISNULL(pm.VendorName, '') LIKE '%' + @SearchText + '%'

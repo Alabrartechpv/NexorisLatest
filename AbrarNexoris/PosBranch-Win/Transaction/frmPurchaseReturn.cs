@@ -58,6 +58,13 @@ namespace PosBranch_Win.Transaction
         // In the class, add a new field to control payment method reset
         private bool skipPaymentMethodReset = false;
 
+        // Class-level variable to store original total amount of loaded bill (GRN) for real-time outstanding calculation
+        private decimal _originalBillTotal = 0m;
+
+        // Vendor suggestion popup list for ultraTextEditor2
+        private ListBox _lstVendorSuggestions = null;
+        private bool _isSettingVendorInfo = false;
+
         // Navigation state: list of PR numbers for |◄ ◄ ► ►| buttons
         private List<string> _navPRNumbers = new List<string>();
         private int _navCurrentIndex = -1;
@@ -122,6 +129,26 @@ namespace PosBranch_Win.Transaction
 
                 // Register KeyDown for textBox1 to load items on Enter
                 textBox1.KeyDown += textBox1_KeyDown;
+
+                // Register KeyDown for VendorName to load vendor by ID on Enter
+                VendorName.KeyDown += VendorName_KeyDown;
+
+                // Register KeyDown for ultraTextEditor2 to load vendor by Name on Enter and show suggestions on ValueChanged
+                if (ultraTextEditor2 != null)
+                {
+                    ultraTextEditor2.KeyDown += ultraTextEditor2_KeyDown;
+                    ultraTextEditor2.ValueChanged += ultraTextEditor2_ValueChanged;
+                }
+
+                // Register CheckedChanged for chkGRN and chkWithoutGRN
+                if (chkGRN != null)
+                {
+                    chkGRN.CheckedChanged += chkGRN_CheckedChanged;
+                }
+                if (chkWithoutGRN != null)
+                {
+                    chkWithoutGRN.CheckedChanged += chkWithoutGRN_CheckedChanged;
+                }
 
                 // Register the row selection event for custom row highlighting
                 ultraGrid1.AfterSelectChange += UltraGrid1_AfterSelectChange;
@@ -315,6 +342,9 @@ namespace PosBranch_Win.Transaction
                 // Apply modern Image 2 light ice-blue theme
                 ApplyImage2Theme();
 
+                // Apply custom styles for VendorName, ultraTextEditor2, ultraTextEditor1, TxtSubTotal
+                ApplyCustomControlStyles();
+
                 // Style date editors to match ActivityLog dtpFrom look
                 StyleDateEditors();
 
@@ -430,10 +460,12 @@ namespace PosBranch_Win.Transaction
                 if (isGRNMode)
                 {
                     // ── GRN MODE ────────────────────────────────────────────────
-                    // Show: textBox1, btnAddPurchaceList, ultraTextEditor1, lblPRamount, lblPno
+                    // Show: textBox1, btnAddPurchaceList, ultraTextEditor1, lblPRamount, lblPno, ultraTextEditor4, label1
                     if (textBox1 != null) { textBox1.Visible = true; textBox1.Enabled = true; }
                     if (btnAddPurchaceList != null) { btnAddPurchaceList.Visible = true; btnAddPurchaceList.Enabled = true; }
                     if (ultraTextEditor1 != null) { ultraTextEditor1.Visible = true; ultraTextEditor1.Enabled = true; }
+                    if (ultraTextEditor4 != null) { ultraTextEditor4.Visible = true; ultraTextEditor4.Enabled = true; }
+                    if (label1 != null) label1.Visible = true;
                     if (lblPRamount != null) lblPRamount.Visible = true;  // Purchase Amt label
                     if (lblPno != null) lblPno.Visible = true;            // Purchase No label
                     // Also restore Outstanding row, action buttons and panels in GRN mode
@@ -469,10 +501,12 @@ namespace PosBranch_Win.Transaction
                     if (BtnDial != null) { BtnDial.Enabled = true; BtnDial.Visible = true; }
                     if (lblBarcode != null) lblBarcode.Visible = true;
 
-                    // Hide: textBox1, btnAddPurchaceList, ultraTextEditor1, lblPRamount, lblPno
+                    // Hide: textBox1, btnAddPurchaceList, ultraTextEditor1, lblPRamount, lblPno, ultraTextEditor4, label1
                     if (textBox1 != null) { textBox1.Text = ""; textBox1.Enabled = false; textBox1.Visible = false; }
                     if (btnAddPurchaceList != null) { btnAddPurchaceList.Enabled = false; btnAddPurchaceList.Visible = false; }
                     if (ultraTextEditor1 != null) { ultraTextEditor1.Text = ""; ultraTextEditor1.Enabled = false; ultraTextEditor1.Visible = false; }
+                    if (ultraTextEditor4 != null) { ultraTextEditor4.Text = ""; ultraTextEditor4.Enabled = false; ultraTextEditor4.Visible = false; }
+                    if (label1 != null) label1.Visible = false;
                     if (lblPRamount != null) lblPRamount.Visible = false; // Purchase Amt label
                     if (lblPno != null) lblPno.Visible = false;           // Purchase No label
                     // Also hide Outstanding row, action buttons and panels in Without GRN mode
@@ -589,6 +623,9 @@ namespace PosBranch_Win.Transaction
                     lblNetAmount.ForeColor = Color.Beige;
                     lblNetAmount.BackColor = Color.Transparent;
                 }
+
+                // Ensure custom control styling is reapplied after main theme
+                ApplyCustomControlStyles();
             }
             catch (Exception ex)
             {
@@ -1414,53 +1451,72 @@ namespace PosBranch_Win.Transaction
             }
         }
 
-        // ─── Return / Return All Buttons ─────────────────────────────────────────
-
         private void btnReturn_Click(object sender, EventArgs e)
         {
             try
             {
-                // Validate that a PR number is loaded
-                if (string.IsNullOrWhiteSpace(TxtSRNO.Text))
+                if (ultraGrid1 == null || ultraGrid1.Rows == null || ultraGrid1.Rows.Count == 0)
                 {
-                    MessageBox.Show("Please load a Purchase Return record first.",
-                        "No Record", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show("No items available to return.", "Validation Error",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
-                // Find selected / checked rows in the grid and process them
-                bool anyProcessed = false;
-                foreach (Infragistics.Win.UltraWinGrid.UltraGridRow row in ultraGrid1.Rows)
+                // Exit edit mode to commit any active cell edits
+                ultraGrid1.PerformAction(UltraGridAction.ExitEditMode);
+                ultraGrid1.UpdateData();
+
+                // Check how many items are checked in the SELECT column
+                int checkedCount = 0;
+                foreach (UltraGridRow row in ultraGrid1.Rows)
                 {
-                    if (row == null || row.IsFilterRow) continue;
-                    // Mark row as returned (set Return Qty = Qty if not already set)
-                    try
+                    if (!row.IsDataRow || row.IsFilteredOut) continue;
+                    if (row.Cells.Exists("SELECT") && row.Cells["SELECT"].Value != null &&
+                        row.Cells["SELECT"].Value != DBNull.Value && Convert.ToBoolean(row.Cells["SELECT"].Value))
                     {
-                        if (row.Selected)
-                        {
-                            var returnQtyCell = row.Cells["Return Qty"] ?? row.Cells["ReturnQty"] ?? row.Cells["ReturnQuantity"];
-                            var qtyCell       = row.Cells["Qty"]        ?? row.Cells["Quantity"];
-                            if (returnQtyCell != null && qtyCell != null)
-                            {
-                                returnQtyCell.Value = qtyCell.Value;
-                                anyProcessed = true;
-                            }
-                        }
+                        checkedCount++;
                     }
-                    catch { /* skip cells that do not exist */ }
                 }
 
-                if (!anyProcessed)
-                    MessageBox.Show("Please select one or more rows in the grid to return.",
-                        "No Rows Selected", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                else
-                    MessageBox.Show("Selected rows marked for return. Click Save to confirm.",
-                        "Return", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                // If no items are checked, check if there is an active or selected row
+                if (checkedCount == 0)
+                {
+                    UltraGridRow targetRow = ultraGrid1.ActiveRow;
+                    if (targetRow == null || !targetRow.IsDataRow || targetRow.IsFilteredOut)
+                    {
+                        if (ultraGrid1.Selected.Rows.Count > 0)
+                        {
+                            targetRow = ultraGrid1.Selected.Rows[0];
+                        }
+                    }
+
+                    if (targetRow != null && targetRow.IsDataRow && !targetRow.IsFilteredOut)
+                    {
+                        // Check ONLY the single highlighted/active row
+                        foreach (UltraGridRow row in ultraGrid1.Rows)
+                        {
+                            if (row.Cells.Exists("SELECT"))
+                            {
+                                row.Cells["SELECT"].Value = (row == targetRow);
+                            }
+                        }
+                        ultraGrid1.UpdateData();
+                    }
+                    else
+                    {
+                        MessageBox.Show("Please select or highlight an item to return.", "Selection Required",
+                            MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+                }
+
+                // Save/Return the selected item(s)
+                SavePurchaseReturn();
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Error processing return: " + ex.Message,
-                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Error processing return: {ex.Message}", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -1468,38 +1524,35 @@ namespace PosBranch_Win.Transaction
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(TxtSRNO.Text))
+                if (ultraGrid1 == null || ultraGrid1.Rows == null || ultraGrid1.Rows.Count == 0)
                 {
-                    MessageBox.Show("Please load a Purchase Return record first.",
-                        "No Record", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    MessageBox.Show("No items available to return.", "Validation Error",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
-                if (MessageBox.Show("Mark ALL items for return?",
-                    "Confirm Return All", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
-                    return;
+                // Exit edit mode to commit any active cell edits
+                ultraGrid1.PerformAction(UltraGridAction.ExitEditMode);
+                ultraGrid1.UpdateData();
 
-                // Set Return Qty = Qty for every row in the grid
-                foreach (Infragistics.Win.UltraWinGrid.UltraGridRow row in ultraGrid1.Rows)
+                // Select ALL items in ultraGrid1
+                foreach (UltraGridRow row in ultraGrid1.Rows)
                 {
-                    if (row == null || row.IsFilterRow) continue;
-                    try
+                    if (!row.IsDataRow || row.IsFilteredOut) continue;
+                    if (row.Cells.Exists("SELECT"))
                     {
-                        var returnQtyCell = row.Cells["Return Qty"] ?? row.Cells["ReturnQty"] ?? row.Cells["ReturnQuantity"];
-                        var qtyCell       = row.Cells["Qty"]        ?? row.Cells["Quantity"];
-                        if (returnQtyCell != null && qtyCell != null)
-                            returnQtyCell.Value = qtyCell.Value;
+                        row.Cells["SELECT"].Value = true;
                     }
-                    catch { /* skip missing columns */ }
                 }
+                ultraGrid1.UpdateData();
 
-                MessageBox.Show("All items marked for return. Click Save to confirm.",
-                    "Return All", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                // Save/Return all items for this bill
+                SavePurchaseReturn();
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Error processing return all: " + ex.Message,
-                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Error processing return all: {ex.Message}", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -1620,6 +1673,12 @@ namespace PosBranch_Win.Transaction
                         int vendorId = int.Parse(vendorid.Text);
                         // Load purchase items based on the purchase number
                         LoadPurchaseItems(vendorId, purchaseNo);
+
+                        // Populate Invoice No in ultraTextEditor4
+                        if (ultraTextEditor4 != null && chkGRN != null && chkGRN.Checked)
+                        {
+                            ultraTextEditor4.Text = GetInvoiceNoFromPurchaseNo(purchaseNo);
+                        }
 
                         // Set the flag to indicate purchase data is loaded
                         _isPurchaseDataLoaded = true;
@@ -2442,8 +2501,23 @@ namespace PosBranch_Win.Transaction
                 // Get purchase items data
                 DataTable purchaseItemsData = GetPurchaseItems(ledgerId, purchaseNo);
 
+                if (ultraTextEditor4 != null && chkGRN != null && chkGRN.Checked && string.IsNullOrEmpty(ultraTextEditor4.Text))
+                {
+                    ultraTextEditor4.Text = GetInvoiceNoFromPurchaseNo(purchaseNo);
+                }
+
                 if (purchaseItemsData != null && purchaseItemsData.Rows.Count > 0)
                 {
+                    // Calculate and store original GRN bill total for real-time outstanding calculation
+                    _originalBillTotal = 0m;
+                    foreach (DataRow row in purchaseItemsData.Rows)
+                    {
+                        decimal itemCost = row.Table.Columns.Contains("Cost") && row["Cost"] != DBNull.Value ? Convert.ToDecimal(row["Cost"]) : 0m;
+                        double itemQty = row.Table.Columns.Contains("Qty") && row["Qty"] != DBNull.Value ? Convert.ToDouble(row["Qty"]) : 0.0;
+                        double itemPacking = row.Table.Columns.Contains("Packing") && row["Packing"] != DBNull.Value ? Convert.ToDouble(row["Packing"]) : 1.0;
+                        _originalBillTotal += itemCost * (decimal)(itemQty * (itemPacking > 0 ? itemPacking : 1.0));
+                    }
+                    _originalBillTotal = Math.Round(_originalBillTotal, 2);
 
                     // Log the raw data to help debug
                     System.Diagnostics.Debug.WriteLine($"Loaded {purchaseItemsData.Rows.Count} rows from purchase items for ledger {ledgerId}, purchase {purchaseNo}");
@@ -4002,6 +4076,9 @@ namespace PosBranch_Win.Transaction
                     TxtSubTotal.Refresh();
                 }
 
+                // Update real-time outstanding balance on ultraTextEditor1 for the loaded GRN Bill
+                UpdateBillOutstandingRealTime(netAmount);
+
                 // Log the update to debug output
                 System.Diagnostics.Debug.WriteLine($"Updated Net Amount: {formattedAmount}");
             }
@@ -4337,12 +4414,374 @@ namespace PosBranch_Win.Transaction
             if (frmVend.ShowDialog() == DialogResult.OK)
             {
                 // Get the selected vendor data from the dialog
-                int vendorId = frmVend.SelectedVendorId;
-                string vendorName = frmVend.SelectedVendorName;
+                int vendorIdVal = frmVend.SelectedVendorId;
+                string vendorNameVal = frmVend.SelectedVendorName;
 
-                // Update the UI with the selected vendor information
-                VendorName.Text = vendorName;
-                vendorid.Text = vendorId.ToString();
+                // Update the UI: VendorName shows Vendor ID, ultraTextEditor2 shows Vendor Name
+                SetVendorInfo(vendorIdVal, vendorNameVal);
+            }
+        }
+
+        private void VendorName_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+                LoadVendorFromInput();
+            }
+        }
+
+        private void LoadVendorFromInput()
+        {
+            try
+            {
+                if (VendorName == null || string.IsNullOrWhiteSpace(VendorName.Text))
+                {
+                    if (ultraTextEditor2 != null) ultraTextEditor2.Text = string.Empty;
+                    if (vendorid != null) vendorid.Text = "0";
+                    return;
+                }
+
+                string input = VendorName.Text.Trim();
+                if (int.TryParse(input, out int vId) && vId > 0)
+                {
+                    VendorDDLGrids vendorGrid = drop.VendorDDL();
+                    var vendor = vendorGrid?.List?.FirstOrDefault(v => v.LedgerID == vId);
+                    if (vendor != null)
+                    {
+                        SetVendorInfo(vendor.LedgerID, vendor.LedgerName);
+
+                        if (textBox1 != null && textBox1.Visible && textBox1.Enabled)
+                        {
+                            textBox1.Focus();
+                        }
+                        else if (ultraDateTimeEditor1 != null)
+                        {
+                            ultraDateTimeEditor1.Focus();
+                        }
+                    }
+                    else
+                    {
+                        MessageBox.Show($"Vendor ID '{vId}' not found.", "Vendor Search", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        if (ultraTextEditor2 != null) ultraTextEditor2.Text = string.Empty;
+                        if (vendorid != null) vendorid.Text = "0";
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error loading vendor by ID: {ex.Message}");
+            }
+        }
+
+        public void SetVendorInfo(int vendorIdVal, string vendorNameVal)
+        {
+            try
+            {
+                _isSettingVendorInfo = true;
+                if (VendorName != null) VendorName.Text = vendorIdVal > 0 ? vendorIdVal.ToString() : string.Empty;
+                if (ultraTextEditor2 != null) ultraTextEditor2.Text = vendorNameVal ?? string.Empty;
+                if (vendorid != null) vendorid.Text = vendorIdVal > 0 ? vendorIdVal.ToString() : "0";
+                if (_lstVendorSuggestions != null) _lstVendorSuggestions.Visible = false;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error setting vendor info: {ex.Message}");
+            }
+            finally
+            {
+                _isSettingVendorInfo = false;
+            }
+        }
+
+        private void InitializeVendorSuggestionPopup()
+        {
+            if (_lstVendorSuggestions != null) return;
+
+            _lstVendorSuggestions = new ListBox
+            {
+                Visible = false,
+                Width = ultraTextEditor2.Width,
+                Height = 140,
+                Font = new Font("Segoe UI", 9.75F, FontStyle.Regular),
+                BackColor = Color.White,
+                ForeColor = Color.Black,
+                BorderStyle = BorderStyle.FixedSingle
+            };
+
+            if (ultraTextEditor2.Parent != null)
+            {
+                Point pt = ultraTextEditor2.Parent.PointToScreen(ultraTextEditor2.Location);
+                Point formPt = this.PointToClient(pt);
+                _lstVendorSuggestions.Location = new Point(formPt.X, formPt.Y + ultraTextEditor2.Height);
+            }
+
+            _lstVendorSuggestions.Click += LstVendorSuggestions_Click;
+            _lstVendorSuggestions.KeyDown += LstVendorSuggestions_KeyDown;
+
+            this.Controls.Add(_lstVendorSuggestions);
+            _lstVendorSuggestions.BringToFront();
+        }
+
+        private void LstVendorSuggestions_Click(object sender, EventArgs e)
+        {
+            SelectVendorFromSuggestion();
+        }
+
+        private void LstVendorSuggestions_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+                SelectVendorFromSuggestion();
+            }
+            else if (e.KeyCode == Keys.Escape)
+            {
+                if (_lstVendorSuggestions != null) _lstVendorSuggestions.Visible = false;
+                if (ultraTextEditor2 != null) ultraTextEditor2.Focus();
+            }
+        }
+
+        private void SelectVendorFromSuggestion()
+        {
+            if (_lstVendorSuggestions != null && _lstVendorSuggestions.SelectedItem is ModelClass.VendorDDLG selected)
+            {
+                SetVendorInfo(selected.LedgerID, selected.LedgerName);
+                if (textBox1 != null && textBox1.Visible && textBox1.Enabled)
+                {
+                    textBox1.Focus();
+                }
+                else if (ultraDateTimeEditor1 != null)
+                {
+                    ultraDateTimeEditor1.Focus();
+                }
+            }
+        }
+
+        private void ultraTextEditor2_ValueChanged(object sender, EventArgs e)
+        {
+            if (_isSettingVendorInfo) return;
+
+            try
+            {
+                InitializeVendorSuggestionPopup();
+
+                string query = ultraTextEditor2.Text.Trim();
+                if (string.IsNullOrEmpty(query))
+                {
+                    if (_lstVendorSuggestions != null) _lstVendorSuggestions.Visible = false;
+                    return;
+                }
+
+                VendorDDLGrids vendorGrid = drop.VendorDDL();
+                if (vendorGrid != null && vendorGrid.List != null)
+                {
+                    var matches = vendorGrid.List
+                        .Where(v => !string.IsNullOrEmpty(v.LedgerName) &&
+                                    v.LedgerName.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0)
+                        .Take(20)
+                        .ToList();
+
+                    if (matches.Any())
+                    {
+                        _lstVendorSuggestions.DataSource = matches;
+                        _lstVendorSuggestions.DisplayMember = "LedgerName";
+                        _lstVendorSuggestions.ValueMember = "LedgerID";
+
+                        if (ultraTextEditor2.Parent != null)
+                        {
+                            Point pt = ultraTextEditor2.Parent.PointToScreen(ultraTextEditor2.Location);
+                            Point formPt = this.PointToClient(pt);
+                            _lstVendorSuggestions.Location = new Point(formPt.X, formPt.Y + ultraTextEditor2.Height);
+                            _lstVendorSuggestions.Width = ultraTextEditor2.Width;
+                        }
+
+                        _lstVendorSuggestions.Visible = true;
+                        _lstVendorSuggestions.BringToFront();
+                    }
+                    else
+                    {
+                        if (_lstVendorSuggestions != null) _lstVendorSuggestions.Visible = false;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error showing vendor suggestions: {ex.Message}");
+            }
+        }
+
+        private void ultraTextEditor2_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Down && _lstVendorSuggestions != null && _lstVendorSuggestions.Visible && _lstVendorSuggestions.Items.Count > 0)
+            {
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+                _lstVendorSuggestions.Focus();
+                if (_lstVendorSuggestions.SelectedIndex < 0) _lstVendorSuggestions.SelectedIndex = 0;
+                return;
+            }
+
+            if (e.KeyCode == Keys.Escape && _lstVendorSuggestions != null)
+            {
+                _lstVendorSuggestions.Visible = false;
+                return;
+            }
+
+            if (e.KeyCode == Keys.Enter)
+            {
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+
+                if (_lstVendorSuggestions != null && _lstVendorSuggestions.Visible && _lstVendorSuggestions.SelectedItem is ModelClass.VendorDDLG selected)
+                {
+                    SelectVendorFromSuggestion();
+                }
+                else
+                {
+                    LoadVendorByNameInput();
+                }
+            }
+        }
+
+        private void LoadVendorByNameInput()
+        {
+            try
+            {
+                if (ultraTextEditor2 == null || string.IsNullOrWhiteSpace(ultraTextEditor2.Text))
+                {
+                    if (VendorName != null) VendorName.Text = string.Empty;
+                    if (vendorid != null) vendorid.Text = "0";
+                    if (_lstVendorSuggestions != null) _lstVendorSuggestions.Visible = false;
+                    return;
+                }
+
+                string inputName = ultraTextEditor2.Text.Trim();
+                VendorDDLGrids vendorGrid = drop.VendorDDL();
+
+                if (vendorGrid != null && vendorGrid.List != null)
+                {
+                    var vendor = vendorGrid.List.FirstOrDefault(v => v.LedgerName.Equals(inputName, StringComparison.OrdinalIgnoreCase))
+                              ?? vendorGrid.List.FirstOrDefault(v => v.LedgerName.IndexOf(inputName, StringComparison.OrdinalIgnoreCase) >= 0);
+
+                    if (vendor != null)
+                    {
+                        SetVendorInfo(vendor.LedgerID, vendor.LedgerName);
+
+                        if (textBox1 != null && textBox1.Visible && textBox1.Enabled)
+                        {
+                            textBox1.Focus();
+                        }
+                        else if (ultraDateTimeEditor1 != null)
+                        {
+                            ultraDateTimeEditor1.Focus();
+                        }
+                    }
+                    else
+                    {
+                        MessageBox.Show($"Vendor '{inputName}' not found.", "Vendor Search", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        if (VendorName != null) VendorName.Text = string.Empty;
+                        if (vendorid != null) vendorid.Text = "0";
+                        if (_lstVendorSuggestions != null) _lstVendorSuggestions.Visible = false;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error loading vendor by name: {ex.Message}");
+            }
+        }
+
+        private void SetupVendorAutoComplete()
+        {
+            try
+            {
+                if (ultraTextEditor2 == null) return;
+                ultraTextEditor2.ReadOnly = false;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error setting up vendor auto-complete: {ex.Message}");
+            }
+        }
+
+        private void ApplyCustomControlStyles()
+        {
+            try
+            {
+                // 1. VendorName: Peach color like txt_barcode
+                if (VendorName != null)
+                {
+                    VendorName.UseOsThemes = DefaultableBoolean.False;
+                    VendorName.UseAppStyling = false;
+                    VendorName.BackColor = Color.FromArgb(255, 224, 192);
+                    VendorName.Appearance.BackColor = Color.FromArgb(255, 224, 192);
+                }
+
+                // 2. ultraTextEditor2: Writable with AutoComplete suggestions
+                SetupVendorAutoComplete();
+
+                // 3. ultraTextEditor1: Styled like txtTotal of frmPurchaseOrder.cs but reduced to 8pt font
+                ApplyTxtTotalStyle(ultraTextEditor1);
+
+                // 4. Revert TxtSubTotal back to standard white background
+                if (TxtSubTotal != null)
+                {
+                    TxtSubTotal.UseOsThemes = DefaultableBoolean.False;
+                    TxtSubTotal.UseAppStyling = false;
+                    TxtSubTotal.BackColor = Color.White;
+                    TxtSubTotal.ForeColor = Color.FromArgb(0, 35, 80);
+                    TxtSubTotal.Font = new Font("Segoe UI", 9.75F, FontStyle.Bold);
+                    TxtSubTotal.Appearance.BackColor = Color.White;
+                    TxtSubTotal.Appearance.ForeColor = Color.FromArgb(0, 35, 80);
+                    TxtSubTotal.Appearance.FontData.Name = "Segoe UI";
+                    TxtSubTotal.Appearance.FontData.SizeInPoints = 9.75F;
+                    TxtSubTotal.Appearance.FontData.Bold = DefaultableBoolean.True;
+                    TxtSubTotal.Appearance.TextHAlign = HAlign.Center;
+                }
+
+                // 5. Update visibility of ultraTextEditor4 & label1 based on chkGRN
+                UpdateInvoiceNoVisibility();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error applying custom control styles: {ex.Message}");
+            }
+        }
+
+        private void ApplyTxtTotalStyle(Infragistics.Win.UltraWinEditors.UltraTextEditor editor)
+        {
+            if (editor == null) return;
+            editor.UseOsThemes = DefaultableBoolean.False;
+            editor.UseAppStyling = false;
+            editor.ReadOnly = true;
+            editor.BackColor = Color.Black;
+            editor.ForeColor = Color.Yellow;
+            editor.Font = new Font("Tahoma", 8F, FontStyle.Bold, GraphicsUnit.Point, 0);
+            editor.Appearance.BackColor = Color.Black;
+            editor.Appearance.ForeColor = Color.Yellow;
+            editor.Appearance.FontData.Name = "Tahoma";
+            editor.Appearance.FontData.SizeInPoints = 8F;
+            editor.Appearance.FontData.Bold = DefaultableBoolean.True;
+            editor.Appearance.TextHAlign = HAlign.Center;
+        }
+
+        private void UpdateBillOutstandingRealTime(decimal currentTotalReturnAmount)
+        {
+            try
+            {
+                if (ultraTextEditor1 != null)
+                {
+                    decimal outstanding = Math.Max(0m, _originalBillTotal - currentTotalReturnAmount);
+                    ultraTextEditor1.Text = outstanding.ToString("N2");
+                    ultraTextEditor1.Refresh();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error updating bill outstanding real-time: {ex.Message}");
             }
         }
 
@@ -5385,20 +5824,14 @@ namespace PosBranch_Win.Transaction
                     // Set the purchase number in textBox1
                     textBox1.Text = invoiceNo;
 
-                    // Set the purchase date in ultraDateTimeEditor2
-                    if (ultraDateTimeEditor2 != null)
+                    // Set the invoice number in ultraTextEditor4
+                    if (ultraTextEditor4 != null)
                     {
-                        ultraDateTimeEditor2.Value = invoiceDate;
-                    }
+                        string actualInvoiceNo = !string.IsNullOrWhiteSpace(purchaseDialog.SelectedInvoiceNo)
+                            ? purchaseDialog.SelectedInvoiceNo
+                            : GetInvoiceNoFromPurchaseNo(purchaseNo);
 
-                    // Set the invoice number in txtInvoiceNo if it exists
-                    if (this.Controls.Find("txtInvoiceNo", true).Length > 0)
-                    {
-                        TextBox txtInvoiceNo = this.Controls.Find("txtInvoiceNo", true)[0] as TextBox;
-                        if (txtInvoiceNo != null)
-                        {
-                            txtInvoiceNo.Text = invoiceNo;
-                        }
+                        ultraTextEditor4.Text = actualInvoiceNo;
                     }
 
                     // Set the invoice date if the control exists
@@ -5414,7 +5847,6 @@ namespace PosBranch_Win.Transaction
                     // Set the form Tag to indicate this is from a vendor search
                     this.Tag = "VendorSearch";
 
-                    // Clear the existing grid data since we're loading a different purchase
                     if (ultraGrid1.DataSource != null)
                     {
                         DataTable dt = ultraGrid1.DataSource as DataTable;
@@ -5514,6 +5946,61 @@ namespace PosBranch_Win.Transaction
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
+
+        private string GetInvoiceNoFromPurchaseNo(int purchaseNo)
+        {
+            try
+            {
+                BaseRepostitory baseRepo = new BaseRepostitory();
+                using (var conn = (System.Data.SqlClient.SqlConnection)baseRepo.DataConnection)
+                {
+                    conn.Open();
+                    string sql = "SELECT TOP 1 InvoiceNo FROM PMaster WHERE PurchaseNo = @PurchaseNo";
+                    using (var cmd = new System.Data.SqlClient.SqlCommand(sql, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@PurchaseNo", purchaseNo);
+                        object result = cmd.ExecuteScalar();
+                        if (result != null && result != DBNull.Value)
+                        {
+                            return result.ToString();
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error fetching InvoiceNo for PurchaseNo {purchaseNo}: {ex.Message}");
+            }
+            return string.Empty;
+        }
+
+        private void UpdateInvoiceNoVisibility()
+        {
+            try
+            {
+                bool isGrnChecked = chkGRN != null && chkGRN.Checked;
+                if (ultraTextEditor4 != null)
+                {
+                    ultraTextEditor4.Visible = isGrnChecked;
+                    if (!isGrnChecked)
+                    {
+                        ultraTextEditor4.Text = string.Empty;
+                    }
+                }
+                if (label1 != null)
+                {
+                    label1.Visible = isGrnChecked;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error updating InvoiceNo visibility: {ex.Message}");
+            }
+        }
+
+
+
+
 
         private UltraGridCell FindNextEditableCell(UltraGridRow row, UltraGridCell currentCell)
         {
@@ -9237,10 +9724,23 @@ namespace PosBranch_Win.Transaction
                 {
                     VendorName.Text = "";
                 }
+                if (ultraTextEditor2 != null)
+                {
+                    ultraTextEditor2.Text = "";
+                }
+                if (_lstVendorSuggestions != null)
+                {
+                    _lstVendorSuggestions.Visible = false;
+                }
+                if (ultraTextEditor1 != null)
+                {
+                    ultraTextEditor1.Text = "0.00";
+                }
                 if (vendorid != null)
                 {
-                    vendorid.Text = "";
+                    vendorid.Text = "0";
                 }
+                _originalBillTotal = 0m;
 
                 // Clear invoice information
                 if (textBox1 != null)
