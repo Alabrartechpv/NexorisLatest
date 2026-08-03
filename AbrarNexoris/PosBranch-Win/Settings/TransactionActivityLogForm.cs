@@ -128,6 +128,13 @@ namespace PosBranch_Win.Settings
             btnApply.Click += btnApply_Click;
             btnReset.Click += btnReset_Click;
 
+            txtSearch.KeyDown += FilterControl_KeyDown;
+            cmbUser.KeyDown += FilterControl_KeyDown;
+            cmbActivityType.KeyDown += FilterControl_KeyDown;
+            cmbAction.KeyDown += FilterControl_KeyDown;
+            dtpFrom.KeyDown += FilterControl_KeyDown;
+            dtpTo.KeyDown += FilterControl_KeyDown;
+
             filters.Controls.Add(filterTitle);
             AddDateRangeFilter(filters);
             AddFilter(filters, "User", cmbUser);
@@ -739,6 +746,15 @@ namespace PosBranch_Win.Settings
             if (cmbQuickDate != null && cmbQuickDate.SelectedItem != null)
             {
                 cmbQuickDate.Text = "Custom";
+            }
+        }
+
+        private void FilterControl_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                e.SuppressKeyPress = true;
+                LoadActivityLog();
             }
         }
 
