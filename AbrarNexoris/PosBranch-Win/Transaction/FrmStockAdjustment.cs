@@ -23,7 +23,6 @@ namespace PosBranch_Win.Transaction
     {
         StockAdjustmentDetails StockAdjDetails = new StockAdjustmentDetails();
         Dropdowns dp = new Dropdowns();
-        bool CheckExists;
         StockAdjMaster stockadjsmaster = new StockAdjMaster();
         StockAdjPriceDetails stockadjsdetails = new StockAdjPriceDetails();
         StockAdjustmentRepository stockrepos = new StockAdjustmentRepository();
@@ -382,90 +381,29 @@ namespace PosBranch_Win.Transaction
             }
         }
 
-        // Handle cell editing logic (replaces dgv_stockadjustment_CellEndEdit)
+        // Handle cell editing logic
         private void UltraGrid1_AfterCellUpdate(object sender, CellEventArgs e)
         {
             try
             {
-                // Handle cell edit logic for both radio button modes
-                if (e.Cell.Column.Key == "Adjustment Qty")
-                {
-                    UltraGridRow row = e.Cell.Row;
+                if (e.Cell.Column.Key != "Adjustment Qty") return;
 
-                    // Get cell values with validation
-                    var adjQtyCell = row.Cells["Adjustment Qty"];
-                    var qtyOnHandCell = row.Cells["Qty On Hand"];
-                    var qtyDifferenceCell = row.Cells["Qty Difference"];
-                    var newBalanceCell = row.Cells["New Balance"];
+                UltraGridRow row    = e.Cell.Row;
+                var adjQtyCell      = row.Cells["Adjustment Qty"];
+                var qtyOnHandCell   = row.Cells["Qty On Hand"];
+                var newBalanceCell  = row.Cells["New Balance"];
+                var qtyDiffCell     = row.Cells["Qty Difference"];
 
-                    if (adjQtyCell != null && adjQtyCell.Value != null &&
-                        qtyOnHandCell != null && qtyOnHandCell.Value != null)
-                    {
-                        int adjQty = Convert.ToInt32(adjQtyCell.Value);
-                        int sysQty = Convert.ToInt32(qtyOnHandCell.Value);
+                if (adjQtyCell?.Value == null || qtyOnHandCell?.Value == null) return;
 
-                        // Calculate New Balance = Current Stock + Adjustment Qty
-                        int newBalance = sysQty + adjQty;
-                        newBalanceCell.Value = newBalance;
+                int adjQty       = Convert.ToInt32(adjQtyCell.Value);
+                int currentStock = Convert.ToInt32(qtyOnHandCell.Value);
 
-                        // Qty Difference is the same as Adjustment Qty (for display purposes)
-                        int difference = adjQty;
-                        qtyDifferenceCell.Value = difference;
-
-                        // Enhanced visual feedback based on difference
-                        if (difference < 0)
-                        {
-                            // Stock decrease (negative adjustment)
-                            qtyDifferenceCell.Appearance.ForeColor = Color.White;
-                            qtyDifferenceCell.Appearance.BackColor = Color.FromArgb(231, 76, 60); // Red background
-                            qtyDifferenceCell.Appearance.BackColor2 = Color.FromArgb(192, 57, 43); // Gradient effect
-                            qtyDifferenceCell.Appearance.BackGradientStyle = GradientStyle.Vertical;
-                            qtyDifferenceCell.Appearance.FontData.Bold = DefaultableBoolean.True;
-
-                            adjQtyCell.Appearance.ForeColor = Color.FromArgb(192, 57, 43); // Dark red text
-                            adjQtyCell.Appearance.BackColor = Color.FromArgb(255, 235, 235); // Light red background
-                            adjQtyCell.Appearance.FontData.Bold = DefaultableBoolean.True;
-
-                            // Update status column
-                            row.Cells["Status"].Value = "Stock OUT";
-                        }
-                        else if (difference > 0)
-                        {
-                            // Stock increase (positive adjustment)
-                            qtyDifferenceCell.Appearance.ForeColor = Color.White;
-                            qtyDifferenceCell.Appearance.BackColor = Color.FromArgb(46, 204, 113); // Green background
-                            qtyDifferenceCell.Appearance.BackColor2 = Color.FromArgb(39, 174, 96); // Gradient effect
-                            qtyDifferenceCell.Appearance.BackGradientStyle = GradientStyle.Vertical;
-                            qtyDifferenceCell.Appearance.FontData.Bold = DefaultableBoolean.True;
-
-                            adjQtyCell.Appearance.ForeColor = Color.FromArgb(39, 174, 96); // Dark green text
-                            adjQtyCell.Appearance.BackColor = Color.FromArgb(235, 255, 235); // Light green background
-                            adjQtyCell.Appearance.FontData.Bold = DefaultableBoolean.True;
-
-                            // Update status column
-                            row.Cells["Status"].Value = "Stock IN";
-                        }
-                        else
-                        {
-                            // No change
-                            qtyDifferenceCell.Appearance.ForeColor = Color.FromArgb(52, 73, 94);
-                            qtyDifferenceCell.Appearance.BackColor = Color.FromArgb(245, 245, 245);
-                            qtyDifferenceCell.Appearance.BackGradientStyle = GradientStyle.None;
-                            qtyDifferenceCell.Appearance.ResetFontData();
-
-                            adjQtyCell.Appearance.ForeColor = Color.FromArgb(52, 73, 94);
-                            adjQtyCell.Appearance.BackColor = Color.FromArgb(248, 248, 248);
-                            adjQtyCell.Appearance.ResetFontData();
-
-                            // Update status column
-                            row.Cells["Status"].Value = "No Change";
-                        }
-
-                        // Highlight the New Balance cell with a subtle color
-                        newBalanceCell.Appearance.BackColor = Color.FromArgb(245, 245, 245);
-
-                    }
-                }
+                var (newBalance, difference) = CalculateBalance(currentStock, adjQty);
+                newBalanceCell.Value = newBalance;
+                qtyDiffCell.Value    = difference;
+                newBalanceCell.Appearance.BackColor = Color.FromArgb(245, 245, 245);
+                ApplyColorFormatting(row, difference);
             }
             catch (Exception ex)
             {
@@ -481,16 +419,14 @@ namespace PosBranch_Win.Transaction
             {
                 if (e.Cell != null && e.Cell.Column.Key == "DeleteButton")
                 {
-                    // Ask for confirmation
-                    DialogResult result = MessageBox.Show("Are you sure you want to delete this item?",
+                    string itemName = e.Cell.Row.Cells["Description"]?.Value?.ToString() ?? "this item";
+                    DialogResult result = MessageBox.Show($"Delete '{itemName}' from the adjustment?",
                         "Confirm Delete", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
 
                     if (result == DialogResult.Yes)
                     {
-                        // Get the DataTable and remove the row
                         DataTable dt = (DataTable)ultraGrid1.DataSource;
                         dt.Rows.RemoveAt(e.Cell.Row.Index);
-
                     }
                 }
             }
@@ -604,7 +540,8 @@ namespace PosBranch_Win.Transaction
                 // Handle delete key press
                 if (e.KeyCode == Keys.Delete && ultraGrid1.ActiveRow != null)
                 {
-                    DialogResult result = MessageBox.Show("Are you sure you want to delete this item?",
+                    string itemName = ultraGrid1.ActiveRow.Cells["Description"]?.Value?.ToString() ?? "this item";
+                    DialogResult result = MessageBox.Show($"Delete '{itemName}' from the adjustment?",
                         "Confirm Delete", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
 
                     if (result == DialogResult.Yes)
@@ -623,146 +560,98 @@ namespace PosBranch_Win.Transaction
 
         private void ultraRadioButton1_CheckedChanged(object sender, EventArgs e)
         {
-            if (ultraRadioButton1.Checked)
-            {
-                int rowIndex = ultraGrid1.ActiveRow?.Index ?? -1;
-
-                if (rowIndex >= 0 && rowIndex < ultraGrid1.Rows.Count)
-                {
-                    FillGridWithValue(ultraRadioButton1.Text, rowIndex);
-                }
-
-                // Update all cells to reflect the new radio button selection
-                foreach (UltraGridRow row in ultraGrid1.Rows)
-                {
-                    if (row.Cells["Adjustment Qty"].Value != null && row.Cells["Qty On Hand"].Value != null)
-                    {
-                        int adjQty = Convert.ToInt32(row.Cells["Adjustment Qty"].Value);
-                        int sysQty = Convert.ToInt32(row.Cells["Qty On Hand"].Value);
-
-                        // Calculate New Balance = Current Stock + Adjustment Qty
-                        int newBalance = sysQty + adjQty;
-                        row.Cells["New Balance"].Value = newBalance;
-
-                        // Qty Difference is the same as Adjustment Qty
-                        int difference = adjQty;
-                        row.Cells["Qty Difference"].Value = difference;
-
-                        // Apply color formatting based on difference
-                        if (difference < 0)
-                        {
-                            row.Cells["Qty Difference"].Appearance.ForeColor = Color.Red;
-                            row.Cells["Qty Difference"].Appearance.FontData.Bold = DefaultableBoolean.True;
-                            row.Cells["Adjustment Qty"].Appearance.ForeColor = Color.Red;
-                            row.Cells["Adjustment Qty"].Appearance.FontData.Bold = DefaultableBoolean.True;
-                        }
-                        else if (difference > 0)
-                        {
-                            row.Cells["Qty Difference"].Appearance.ForeColor = Color.Green;
-                            row.Cells["Qty Difference"].Appearance.FontData.Bold = DefaultableBoolean.True;
-                            row.Cells["Adjustment Qty"].Appearance.ForeColor = Color.Green;
-                            row.Cells["Adjustment Qty"].Appearance.FontData.Bold = DefaultableBoolean.True;
-                        }
-                        else
-                        {
-                            row.Cells["Qty Difference"].Appearance.ForeColor = SystemColors.WindowText;
-                            row.Cells["Qty Difference"].Appearance.ResetFontData();
-                            row.Cells["Adjustment Qty"].Appearance.ForeColor = SystemColors.WindowText;
-                            row.Cells["Adjustment Qty"].Appearance.ResetFontData();
-                        }
-                    }
-                }
-
-            }
+            if (ultraRadioButton1.Checked) RefreshGridCalculations();
         }
 
         private void ultraRadioButton2_CheckedChanged(object sender, EventArgs e)
         {
-            if (ultraRadioButton2.Checked)
+            if (ultraRadioButton2.Checked) RefreshGridCalculations();
+        }
+
+        /// <summary>
+        /// Recalculates all grid row values when the adjustment mode radio button changes.
+        /// Adjustment IN/OUT: NewBalance = CurrentStock + AdjQty,  Difference = AdjQty
+        /// Actual Qty:        NewBalance = AdjQty (physical count), Difference = AdjQty - CurrentStock
+        /// </summary>
+        private void RefreshGridCalculations()
+        {
+            foreach (UltraGridRow row in ultraGrid1.Rows)
             {
-                int rowIndex = ultraGrid1.ActiveRow?.Index ?? -1;
+                if (row.Cells["Adjustment Qty"].Value == null || row.Cells["Qty On Hand"].Value == null)
+                    continue;
 
-                if (rowIndex >= 0 && rowIndex < ultraGrid1.Rows.Count)
-                {
-                    FillGridWithValue(ultraRadioButton2.Text, rowIndex);
-                }
+                int adjQty       = Convert.ToInt32(row.Cells["Adjustment Qty"].Value);
+                int currentStock = Convert.ToInt32(row.Cells["Qty On Hand"].Value);
 
-                // Update all cells to reflect the new radio button selection
-                foreach (UltraGridRow row in ultraGrid1.Rows)
-                {
-                    if (row.Cells["Adjustment Qty"].Value != null && row.Cells["Qty On Hand"].Value != null)
-                    {
-                        int adjQty = Convert.ToInt32(row.Cells["Adjustment Qty"].Value);
-                        int sysQty = Convert.ToInt32(row.Cells["Qty On Hand"].Value);
+                var (newBalance, difference) = CalculateBalance(currentStock, adjQty);
 
-                        // Calculate New Balance = Current Stock + Adjustment Qty
-                        int newBalance = sysQty + adjQty;
-                        row.Cells["New Balance"].Value = newBalance;
-
-                        // Qty Difference is the same as Adjustment Qty
-                        int difference = adjQty;
-                        row.Cells["Qty Difference"].Value = difference;
-
-                        // Apply color formatting based on difference
-                        if (difference < 0)
-                        {
-                            row.Cells["Qty Difference"].Appearance.ForeColor = Color.Red;
-                            row.Cells["Qty Difference"].Appearance.FontData.Bold = DefaultableBoolean.True;
-                            row.Cells["Adjustment Qty"].Appearance.ForeColor = Color.Red;
-                            row.Cells["Adjustment Qty"].Appearance.FontData.Bold = DefaultableBoolean.True;
-                        }
-                        else if (difference > 0)
-                        {
-                            row.Cells["Qty Difference"].Appearance.ForeColor = Color.Green;
-                            row.Cells["Qty Difference"].Appearance.FontData.Bold = DefaultableBoolean.True;
-                            row.Cells["Adjustment Qty"].Appearance.ForeColor = Color.Green;
-                            row.Cells["Adjustment Qty"].Appearance.FontData.Bold = DefaultableBoolean.True;
-                        }
-                        else
-                        {
-                            row.Cells["Qty Difference"].Appearance.ForeColor = SystemColors.WindowText;
-                            row.Cells["Qty Difference"].Appearance.ResetFontData();
-                            row.Cells["Adjustment Qty"].Appearance.ForeColor = SystemColors.WindowText;
-                            row.Cells["Adjustment Qty"].Appearance.ResetFontData();
-                        }
-                    }
-                }
-
+                row.Cells["New Balance"].Value    = newBalance;
+                row.Cells["Qty Difference"].Value = difference;
+                ApplyColorFormatting(row, difference);
             }
         }
 
-        // Helper method to apply color formatting based on difference
+        /// <summary>
+        /// Returns (newBalance, difference) based on the active adjustment mode.
+        /// Adjustment IN/OUT: user enters delta (+/-). Actual Qty: user enters physical count.
+        /// </summary>
+        private (int newBalance, int difference) CalculateBalance(int currentStock, int adjQty)
+        {
+            if (ultraRadioButton2.Checked) // Actual Qty mode
+                return (adjQty, adjQty - currentStock);
+            // Adjustment IN/OUT mode (default)
+            return (currentStock + adjQty, adjQty);
+        }
+
+        /// <summary>
+        /// Applies consistent rich color formatting to Adjustment Qty, Qty Difference, and Status cells.
+        /// </summary>
         private void ApplyColorFormatting(UltraGridRow row, int difference)
         {
+            var diffCell   = row.Cells["Qty Difference"];
+            var adjCell    = row.Cells["Adjustment Qty"];
+            var statusCell = row.Cells["Status"];
+
             if (difference < 0)
             {
-                row.Cells["Qty Difference"].Appearance.ForeColor = Color.Red;
-                row.Cells["Qty Difference"].Appearance.FontData.Bold = DefaultableBoolean.True;
-                row.Cells["Adjustment Qty"].Appearance.ForeColor = Color.Red;
-                row.Cells["Adjustment Qty"].Appearance.FontData.Bold = DefaultableBoolean.True;
+                diffCell.Appearance.ForeColor = Color.White;
+                diffCell.Appearance.BackColor = Color.FromArgb(231, 76, 60);
+                diffCell.Appearance.BackColor2 = Color.FromArgb(192, 57, 43);
+                diffCell.Appearance.BackGradientStyle = GradientStyle.Vertical;
+                diffCell.Appearance.FontData.Bold = DefaultableBoolean.True;
+
+                adjCell.Appearance.ForeColor = Color.FromArgb(192, 57, 43);
+                adjCell.Appearance.BackColor = Color.FromArgb(255, 235, 235);
+                adjCell.Appearance.FontData.Bold = DefaultableBoolean.True;
+
+                if (statusCell != null) statusCell.Value = "Stock OUT";
             }
             else if (difference > 0)
             {
-                row.Cells["Qty Difference"].Appearance.ForeColor = Color.Green;
-                row.Cells["Qty Difference"].Appearance.FontData.Bold = DefaultableBoolean.True;
-                row.Cells["Adjustment Qty"].Appearance.ForeColor = Color.Green;
-                row.Cells["Adjustment Qty"].Appearance.FontData.Bold = DefaultableBoolean.True;
+                diffCell.Appearance.ForeColor = Color.White;
+                diffCell.Appearance.BackColor = Color.FromArgb(46, 204, 113);
+                diffCell.Appearance.BackColor2 = Color.FromArgb(39, 174, 96);
+                diffCell.Appearance.BackGradientStyle = GradientStyle.Vertical;
+                diffCell.Appearance.FontData.Bold = DefaultableBoolean.True;
+
+                adjCell.Appearance.ForeColor = Color.FromArgb(39, 174, 96);
+                adjCell.Appearance.BackColor = Color.FromArgb(235, 255, 235);
+                adjCell.Appearance.FontData.Bold = DefaultableBoolean.True;
+
+                if (statusCell != null) statusCell.Value = "Stock IN";
             }
             else
             {
-                row.Cells["Qty Difference"].Appearance.ForeColor = SystemColors.WindowText;
-                row.Cells["Qty Difference"].Appearance.ResetFontData();
-                row.Cells["Adjustment Qty"].Appearance.ForeColor = SystemColors.WindowText;
-                row.Cells["Adjustment Qty"].Appearance.ResetFontData();
-            }
-        }
+                diffCell.Appearance.ForeColor = Color.FromArgb(52, 73, 94);
+                diffCell.Appearance.BackColor = Color.FromArgb(245, 245, 245);
+                diffCell.Appearance.BackGradientStyle = GradientStyle.None;
+                diffCell.Appearance.ResetFontData();
 
-        private void FillGridWithValue(string optionLabel, int rowIndex)
-        {
-            if (rowIndex >= 0 && rowIndex < ultraGrid1.Rows.Count)
-            {
-                // Set the status cell value
-                ultraGrid1.Rows[rowIndex].Cells["Status"].Value = optionLabel;
+                adjCell.Appearance.ForeColor = Color.FromArgb(52, 73, 94);
+                adjCell.Appearance.BackColor = Color.FromArgb(248, 248, 248);
+                adjCell.Appearance.ResetFontData();
+
+                if (statusCell != null) statusCell.Value = "No Change";
             }
         }
 
@@ -794,21 +683,14 @@ namespace PosBranch_Win.Transaction
                             var qtyDifferenceCell = row.Cells["Qty Difference"];
                             var newBalanceCell = row.Cells["New Balance"];
 
-                            if (adjQtyCell != null && adjQtyCell.Value != null &&
-                                qtyOnHandCell != null && qtyOnHandCell.Value != null)
+                            if (adjQtyCell?.Value != null && qtyOnHandCell?.Value != null)
                             {
-                                int adjQty = Convert.ToInt32(adjQtyCell.Value);
-                                int sysQty = Convert.ToInt32(qtyOnHandCell.Value);
+                                int adjQty       = Convert.ToInt32(adjQtyCell.Value);
+                                int currentStock = Convert.ToInt32(qtyOnHandCell.Value);
 
-                                // Calculate New Balance = Current Stock + Adjustment Qty
-                                int newBalance = sysQty + adjQty;
-                                newBalanceCell.Value = newBalance;
-
-                                // Qty Difference is the same as Adjustment Qty
-                                int difference = adjQty;
+                                var (newBalance, difference) = CalculateBalance(currentStock, adjQty);
+                                newBalanceCell.Value    = newBalance;
                                 qtyDifferenceCell.Value = difference;
-
-                                // Apply color formatting based on difference
                                 ApplyColorFormatting(row, difference);
                             }
                         }
@@ -892,9 +774,8 @@ namespace PosBranch_Win.Transaction
             {
                 foreach (UltraGridRow row in ultraGrid1.Rows)
                 {
-                    if (row.Cells["BarCode"].Value.ToString() == barcode)
+                    if (row.Cells["BarCode"].Value?.ToString() == barcode)
                     {
-                        CheckExists = true;
                         MessageBox.Show("Item already selected");
                         this.barcodeFocus();
                     }
@@ -907,14 +788,12 @@ namespace PosBranch_Win.Transaction
             try
             {
                 this.ActiveControl = txtb_barcode;
-                txtb_barcode.Clear();
-                txtb_barcode.Text = "";
+                txtb_barcode.Text  = string.Empty;
                 txtb_barcode.Focus();
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("Error setting barcode focus: " + ex.Message);
-                // Non-critical error, don't show message box
             }
         }
 
@@ -970,6 +849,32 @@ namespace PosBranch_Win.Transaction
             }
         }
 
+        /// <summary>
+        /// Validates common inputs before Save or Update.
+        /// Returns null on success; an error message string on failure.
+        /// </summary>
+        private string ValidateInputs()
+        {
+            if (string.IsNullOrWhiteSpace(txtb_reason.Text))
+                return "Please select a reason for the adjustment.";
+
+            if (txtb_reason.Text.Trim().Equals(DefaultLedgers.BEGINSTOCK, StringComparison.OrdinalIgnoreCase))
+                return "The primary Stock In Hand ledger cannot be selected as the adjustment reason.";
+
+            if (ultraGrid1.Rows.Count == 0)
+                return "Please add at least one item to adjust.";
+
+            // Ensure at least one item actually has a stock change (prevents saving a no-op adjustment)
+            bool hasChange = ultraGrid1.Rows.Cast<UltraGridRow>()
+                .Any(r => r.Cells["Qty Difference"].Value != null &&
+                          Convert.ToInt32(r.Cells["Qty Difference"].Value) != 0);
+
+            if (!hasChange)
+                return "No stock changes detected. Please enter a non-zero quantity for at least one item before saving.";
+
+            return null;
+        }
+
         private void btnSave_Click(object sender, EventArgs e)
         {
             try
@@ -989,23 +894,10 @@ namespace PosBranch_Win.Transaction
                 }
 
                 // 1. Validate inputs
-                if (string.IsNullOrWhiteSpace(txtb_reason.Text))
+                string validationError = ValidateInputs();
+                if (validationError != null)
                 {
-                    MessageBox.Show("Please select a reason for the adjustment.", "Validation Error",
-                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-
-                if (txtb_reason.Text.Trim().Equals(DefaultLedgers.BEGINSTOCK, StringComparison.OrdinalIgnoreCase))
-                {
-                    MessageBox.Show("The primary Stock In Hand ledger cannot be selected as the adjustment reason.", "Validation Error",
-                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-
-                if (ultraGrid1.Rows.Count == 0)
-                {
-                    MessageBox.Show("Please add at least one item to adjust.", "Validation Error",
+                    MessageBox.Show(validationError, "Validation Error",
                         MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
@@ -1166,8 +1058,6 @@ namespace PosBranch_Win.Transaction
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine($"  ERROR adding row: {ex.Message}");
-                    MessageBox.Show($"Error preparing grid data: {ex.Message}", "Error",
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
                     throw;
                 }
             }
@@ -1190,23 +1080,10 @@ namespace PosBranch_Win.Transaction
             try
             {
                 // 1. Validate inputs
-                if (string.IsNullOrWhiteSpace(txtb_reason.Text))
+                string validationError = ValidateInputs();
+                if (validationError != null)
                 {
-                    MessageBox.Show("Please select a reason for the adjustment.", "Validation Error",
-                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-
-                if (txtb_reason.Text.Trim().Equals(DefaultLedgers.BEGINSTOCK, StringComparison.OrdinalIgnoreCase))
-                {
-                    MessageBox.Show("The primary Stock In Hand ledger cannot be selected as the adjustment reason.", "Validation Error",
-                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-
-                if (ultraGrid1.Rows.Count == 0)
-                {
-                    MessageBox.Show("Please add at least one item to adjust.", "Validation Error",
+                    MessageBox.Show(validationError, "Validation Error",
                         MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
@@ -1402,91 +1279,32 @@ namespace PosBranch_Win.Transaction
                     }
                 }
 
+                int currentStock = Convert.ToInt32(qtyOnHand);
+
+                // In Actual Qty mode, default the Adjustment Qty to the current stock so the
+                // difference starts at zero — the user types the physical count to adjust from there.
+                int initialAdjQty = (adjQty == 0 && ultraRadioButton2.Checked) ? currentStock : adjQty;
+
+                var (newBalance, difference) = CalculateBalance(currentStock, initialAdjQty);
+
                 // Add a new row to the DataTable
                 DataRow newRow = stockAdjustmentTable.NewRow();
-
-                newRow["NO"] = stockAdjustmentTable.Rows.Count + 1;
-                newRow["ItemNo"] = itemId;
-                newRow["BarCode"] = barcode;
-                newRow["Description"] = description;
-                newRow["UOM"] = uom;
-                newRow["Qty On Hand"] = qtyOnHand;
-                newRow["Adjustment Qty"] = adjQty; // Amount to add/subtract
-
-                int adjAmount = adjQty;
-                int sysQty = Convert.ToInt32(qtyOnHand);
-
-                // Calculate New Balance = Current Stock + Adjustment Qty
-                int newBalance = sysQty + adjAmount;
-                int difference = adjAmount; // Qty Difference is the same as Adjustment Qty
-
-                // Set New Balance and Qty Difference
-                newRow["New Balance"] = newBalance;
+                newRow["NO"]             = stockAdjustmentTable.Rows.Count + 1;
+                newRow["ItemNo"]         = itemId;
+                newRow["BarCode"]        = barcode;
+                newRow["Description"]    = description;
+                newRow["UOM"]            = uom;
+                newRow["Qty On Hand"]    = currentStock;
+                newRow["Adjustment Qty"] = initialAdjQty;
+                newRow["New Balance"]    = newBalance;
                 newRow["Qty Difference"] = difference;
-
-                // Set status based on which radio button is selected
-                if (ultraRadioButton1.Checked)
-                {
-                    newRow["Status"] = "Adjustment IN/OUT";
-                }
-                else if (ultraRadioButton2.Checked)
-                {
-                    newRow["Status"] = "Actual Qty";
-                }
-
-
-
-                // Add the new row to the DataTable
+                newRow["Status"]         = "No Change";
                 stockAdjustmentTable.Rows.Add(newRow);
 
-                // Get the index of the newly added row
+                // Apply color formatting to the newly added grid row
                 int lastRowIndex = ultraGrid1.Rows.Count - 1;
-
-                // Apply color formatting
                 UltraGridRow newGridRow = ultraGrid1.Rows[lastRowIndex];
-
-                // Apply formatting based on difference value
-                if (difference < 0)
-                {
-                    newGridRow.Cells["Qty Difference"].Appearance.ForeColor = Color.White;
-                    newGridRow.Cells["Qty Difference"].Appearance.BackColor = Color.FromArgb(231, 76, 60);
-                    newGridRow.Cells["Qty Difference"].Appearance.BackColor2 = Color.FromArgb(192, 57, 43);
-                    newGridRow.Cells["Qty Difference"].Appearance.BackGradientStyle = GradientStyle.Vertical;
-                    newGridRow.Cells["Qty Difference"].Appearance.FontData.Bold = DefaultableBoolean.True;
-
-                    newGridRow.Cells["Adjustment Qty"].Appearance.ForeColor = Color.FromArgb(192, 57, 43);
-                    newGridRow.Cells["Adjustment Qty"].Appearance.BackColor = Color.FromArgb(255, 235, 235);
-                    newGridRow.Cells["Adjustment Qty"].Appearance.FontData.Bold = DefaultableBoolean.True;
-
-                    newGridRow.Cells["Status"].Value = "Stock OUT";
-                }
-                else if (difference > 0)
-                {
-                    newGridRow.Cells["Qty Difference"].Appearance.ForeColor = Color.White;
-                    newGridRow.Cells["Qty Difference"].Appearance.BackColor = Color.FromArgb(46, 204, 113);
-                    newGridRow.Cells["Qty Difference"].Appearance.BackColor2 = Color.FromArgb(39, 174, 96);
-                    newGridRow.Cells["Qty Difference"].Appearance.BackGradientStyle = GradientStyle.Vertical;
-                    newGridRow.Cells["Qty Difference"].Appearance.FontData.Bold = DefaultableBoolean.True;
-
-                    newGridRow.Cells["Adjustment Qty"].Appearance.ForeColor = Color.FromArgb(39, 174, 96);
-                    newGridRow.Cells["Adjustment Qty"].Appearance.BackColor = Color.FromArgb(235, 255, 235);
-                    newGridRow.Cells["Adjustment Qty"].Appearance.FontData.Bold = DefaultableBoolean.True;
-
-                    newGridRow.Cells["Status"].Value = "Stock IN";
-                }
-                else
-                {
-                    newGridRow.Cells["Qty Difference"].Appearance.ForeColor = Color.FromArgb(52, 73, 94);
-                    newGridRow.Cells["Qty Difference"].Appearance.BackColor = Color.FromArgb(245, 245, 245);
-                    newGridRow.Cells["Qty Difference"].Appearance.BackGradientStyle = GradientStyle.None;
-                    newGridRow.Cells["Qty Difference"].Appearance.ResetFontData();
-
-                    newGridRow.Cells["Adjustment Qty"].Appearance.ForeColor = Color.FromArgb(52, 73, 94);
-                    newGridRow.Cells["Adjustment Qty"].Appearance.BackColor = Color.FromArgb(248, 248, 248);
-                    newGridRow.Cells["Adjustment Qty"].Appearance.ResetFontData();
-
-                    newGridRow.Cells["Status"].Value = "No Change";
-                }
+                ApplyColorFormatting(newGridRow, difference);
 
                 // Handle after-add tasks
                 AfterRowAdded();
@@ -1540,22 +1358,8 @@ namespace PosBranch_Win.Transaction
 
 
 
-        public void SetRemarkForLastRow(string remark)
-        {
-            try
-            {
-                // Remark column removed, this method is no longer needed but kept for compatibility
-                // if (ultraGrid1.Rows.Count > 0)
-                // {
-                //     int lastRowIndex = ultraGrid1.Rows.Count - 1;
-                //     ultraGrid1.Rows[lastRowIndex].Cells["Remark"].Value = remark;
-                // }
-            }
-            catch (Exception ex)
-            {
-                // Ignore errors
-            }
-        }
+        // The Remark column has been removed; kept as a no-op stub for compatibility.
+        public void SetRemarkForLastRow(string remark) { }
 
         // Update double click handler to use the new method
         private void UltraGrid1_DoubleClickCell(object sender, DoubleClickCellEventArgs e)
