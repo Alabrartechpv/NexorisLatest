@@ -2,13 +2,12 @@ using System;
 using System.Data;
 using System.Drawing;
 using System.Windows.Forms;
-using Repository.SettingsRepo;
 
 namespace PosBranch_Win.Settings
 {
     public class frmItemHistoryPopup : Form
     {
-        private string searchText;
+        private readonly string searchText;
         private DataGridView gridHistory;
         private Label lblHeader;
         private readonly Color navy = Color.FromArgb(20, 55, 120);
@@ -23,14 +22,14 @@ namespace PosBranch_Win.Settings
 
         private void InitializeComponent()
         {
-            this.Text = "Item History Details";
-            this.Size = new Size(950, 550);
-            this.StartPosition = FormStartPosition.CenterParent;
-            this.FormBorderStyle = FormBorderStyle.FixedDialog;
-            this.MaximizeBox = false;
-            this.MinimizeBox = false;
-            this.BackColor = Color.FromArgb(247, 252, 255);
-            this.Font = new Font("Segoe UI", 9F);
+            Text = "Item History Details";
+            Size = new Size(1100, 580);
+            StartPosition = FormStartPosition.CenterParent;
+            FormBorderStyle = FormBorderStyle.FixedDialog;
+            MaximizeBox = false;
+            MinimizeBox = false;
+            BackColor = Color.FromArgb(247, 252, 255);
+            Font = new Font("Segoe UI", 9F);
 
             var panelTop = new Panel
             {
@@ -61,11 +60,13 @@ namespace PosBranch_Win.Settings
                 AllowUserToDeleteRows = false,
                 ReadOnly = true,
                 SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                RowHeadersVisible = false,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.None,
+                ScrollBars = ScrollBars.Both,
                 RowTemplate = { Height = 30 }
             };
 
             gridHistory.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(20, 55, 120);
-            gridHistory.GridColor = border;
             gridHistory.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
             gridHistory.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
             gridHistory.DefaultCellStyle.ForeColor = Color.FromArgb(30, 62, 120);
@@ -88,33 +89,34 @@ namespace PosBranch_Win.Settings
             {
                 Text = "Close",
                 Size = new Size(90, 30),
-                Location = new Point(830, 10),
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                Location = new Point(990, 10),
                 FlatStyle = FlatStyle.Flat,
                 BackColor = navy,
                 ForeColor = Color.White,
                 Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold)
             };
             btnClose.FlatAppearance.BorderColor = navy;
-            btnClose.Click += (s, e) => this.Close();
+            btnClose.Click += (s, e) => Close();
             panelBottom.Controls.Add(btnClose);
 
-            this.Controls.Add(gridHistory);
-            this.Controls.Add(panelTop);
-            this.Controls.Add(panelBottom);
+            Controls.Add(gridHistory);
+            Controls.Add(panelTop);
+            Controls.Add(panelBottom);
         }
 
         private void LoadHistory()
         {
             try
             {
-                using (var repo = new ItemActivityLogRepository())
+                DataTable data;
+                using (var repo = new ItemHistoryLogRepository())
                 {
-                    DataTable data = repo.GetItemHistoryLog(searchText);
-
-                    gridHistory.DataSource = data;
-                    ConfigureGrid();
-                    ApplyActionColors();
+                    data = repo.GetItemDedicatedHistory(searchText);
                 }
+                gridHistory.DataSource = data;
+                ConfigureGrid();
+                ApplyActionColors();
             }
             catch (Exception ex)
             {
@@ -127,30 +129,45 @@ namespace PosBranch_Win.Settings
             if (gridHistory.Columns.Count == 0) return;
             GridPinningHelper.Attach(gridHistory);
 
-            // Hide unneeded database IDs
-            HideColumn("ItemActivityLogId");
-            HideColumn("CompanyId");
-            HideColumn("BranchId");
-            HideColumn("FinYearId");
-            HideColumn("UserId");
-            HideColumn("CounterId");
-            HideColumn("CounterSessionId");
+            HideColumn("SortNo");
+            HideColumn("ActivityType");
 
-            // Format columns
             SetColumn("CreatedOn", "Date & Time", 140);
+            SetColumn("Action", "Action", 170);
+            SetColumn("Source", "Source", 130);
             SetColumn("UserName", "User", 100);
-            SetColumn("ActivityType", "Action", 80);
             SetColumn("ItemNo", "Item Code", 85);
             SetColumn("ItemName", "Item Name", 180);
             SetColumn("Barcode", "Barcode", 110);
+            SetColumn("UOM", "UOM", 70);
+            SetColumn("Qty", "Qty", 70);
+            SetColumn("StockIn", "Stock In", 80);
+            SetColumn("StockOut", "Stock Out", 85);
+            SetColumn("QtyDifference", "Qty Difference", 110);
+            SetColumn("UnitCost", "Unit Cost", 90);
+            SetColumn("RetailPrice", "Retail Price", 95);
+            SetColumn("WalkinPrice", "Walkin Price", 95);
+            SetColumn("TransactionNo", "Doc No", 95);
+            SetColumn("InvoiceNo", "Invoice No", 110);
+            SetColumn("PartyName", "Party", 150);
             SetColumn("ActivityDetails", "Details", 300);
+            SetColumn("CounterName", "Counter", 120);
+            SetColumn("CounterSessionId", "Session", 90);
 
-            // Add details button
             EnsureDetailsColumn();
 
             if (gridHistory.Columns.Contains("CreatedOn"))
             {
                 gridHistory.Columns["CreatedOn"].DefaultCellStyle.Format = "dd MMM yyyy hh:mm tt";
+            }
+
+            foreach (string numericColumn in new[] { "Qty", "StockIn", "StockOut", "QtyDifference", "UnitCost", "RetailPrice", "WalkinPrice" })
+            {
+                if (gridHistory.Columns.Contains(numericColumn))
+                {
+                    gridHistory.Columns[numericColumn].DefaultCellStyle.Format = "0.####";
+                    gridHistory.Columns[numericColumn].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+                }
             }
         }
 
@@ -178,7 +195,9 @@ namespace PosBranch_Win.Settings
         private void HideColumn(string name)
         {
             if (gridHistory.Columns.Contains(name))
+            {
                 gridHistory.Columns[name].Visible = false;
+            }
         }
 
         private void SetColumn(string name, string header, int width)
@@ -188,6 +207,8 @@ namespace PosBranch_Win.Settings
                 var col = gridHistory.Columns[name];
                 col.HeaderText = header;
                 col.Width = width;
+                col.MinimumWidth = Math.Min(width, 80);
+                col.AutoSizeMode = DataGridViewAutoSizeColumnMode.None;
             }
         }
 
@@ -230,69 +251,7 @@ namespace PosBranch_Win.Settings
 
         private void ApplyActionColors()
         {
-            if (gridHistory == null || !gridHistory.Columns.Contains("ActivityType")) return;
-
-            foreach (DataGridViewRow row in gridHistory.Rows)
-            {
-                string action = Convert.ToString(row.Cells["ActivityType"].Value);
-                Color color = GetActionColor(action);
-                if (color == Color.Empty) continue;
-
-                row.DefaultCellStyle.ForeColor = color;
-                row.Cells["ActivityType"].Style.ForeColor = color;
-                row.Cells["ActivityType"].Style.Font = new Font(gridHistory.Font, FontStyle.Bold);
-            }
-        }
-
-        private static Color GetActionColor(string action)
-        {
-            if (action == null) return Color.Empty;
-
-            if (action.IndexOf("(Purchase)", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                action.IndexOf("(Stock IN)", StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                return Color.FromArgb(24, 128, 70);
-            }
-
-            if (action.IndexOf("(Sales)", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                action.IndexOf("(Stock OUT)", StringComparison.OrdinalIgnoreCase) >= 0)
-            {
-                return Color.FromArgb(190, 35, 35);
-            }
-
-            if (string.Equals(action, "Sales", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(action, "Stock OUT", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(action, "Stock Out", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(action, "DELETE", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(action, "REMOVE", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(action, "CANCEL", StringComparison.OrdinalIgnoreCase))
-            {
-                return Color.FromArgb(190, 35, 35);
-            }
-
-            if (string.Equals(action, "Purchase", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(action, "Stock IN", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(action, "Stock In", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(action, "SAVE", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(action, "ADD", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(action, "CREATE", StringComparison.OrdinalIgnoreCase))
-            {
-                return Color.FromArgb(24, 128, 70);
-            }
-
-            if (string.Equals(action, "Sales Return", StringComparison.OrdinalIgnoreCase))
-            {
-                return Color.FromArgb(204, 112, 0);
-            }
-
-            if (string.Equals(action, "Purchase Return", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(action, "UPDATE", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(action, "EDIT", StringComparison.OrdinalIgnoreCase))
-            {
-                return Color.FromArgb(35, 95, 190);
-            }
-
-            return Color.Empty;
+            ItemHistoryLog.ApplyActionColors(gridHistory);
         }
     }
 }
