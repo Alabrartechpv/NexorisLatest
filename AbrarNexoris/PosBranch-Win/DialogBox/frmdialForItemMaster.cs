@@ -2516,6 +2516,12 @@ namespace PosBranch_Win.DialogBox
                 {
                     SendItemToPurchaseReturn();
                 }
+                else if (FormName == "ItemHistoryLog")
+                {
+                    CaptureSelectedItemData();
+                    this.DialogResult = DialogResult.OK;
+                    this.Close();
+                }
             }
         }
 
@@ -2568,10 +2574,11 @@ namespace PosBranch_Win.DialogBox
                         SendItemToPurchaseReturn();
                         return true;
                     }
-                    else if (FormName == "FrmBarcode" || FormName == "frmChangeItemNo" || FormName == "frmvendorpurchasereport")
+                    else if (FormName == "FrmBarcode" || FormName == "frmChangeItemNo" || FormName == "frmvendorpurchasereport" || FormName == "ItemHistoryLog")
                     {
                         // Handle simple selection dialogs
                         System.Diagnostics.Debug.WriteLine($"Enter key pressed, selecting item for {FormName}");
+                        CaptureSelectedItemData();
                         this.DialogResult = DialogResult.OK;
                         this.Close();
                         return true;
@@ -2620,7 +2627,7 @@ namespace PosBranch_Win.DialogBox
                     System.Diagnostics.Debug.WriteLine("Double-click detected, sending item to Stock Transfer");
                     SendItemToStockTransfer();
                 }
-                else if (FormName == "FrmBarcode" || FormName == "frmChangeItemNo" || FormName == "frmvendorpurchasereport" || FormName == "ItemStockActivity")
+                else if (FormName == "FrmBarcode" || FormName == "frmChangeItemNo" || FormName == "frmvendorpurchasereport" || FormName == "ItemStockActivity" || FormName == "ItemHistoryLog")
                 {
                     // Handle simple selection dialogs
                     System.Diagnostics.Debug.WriteLine($"Double-click detected, selecting item for {FormName}");
@@ -2642,9 +2649,10 @@ namespace PosBranch_Win.DialogBox
             // Items will only be loaded on double-click or Enter key press
 
             // However, for FrmBarcode, we can allow single click for better UX
-            if (FormName == "FrmBarcode" || FormName == "frmChangeItemNo" || FormName == "frmvendorpurchasereport")
+            if (FormName == "FrmBarcode" || FormName == "frmChangeItemNo" || FormName == "frmvendorpurchasereport" || FormName == "ItemHistoryLog")
             {
                 // For simple selection dialogs, allow single click selection
+                CaptureSelectedItemData();
                 this.DialogResult = DialogResult.OK;
                 this.Close();
             }
@@ -4421,7 +4429,7 @@ namespace PosBranch_Win.DialogBox
                     {
                         SendItemToPurchaseReturn();
                     }
-                    else if (FormName == "FrmBarcode" || FormName == "ItemStockActivity")
+                    else if (FormName == "FrmBarcode" || FormName == "ItemStockActivity" || FormName == "ItemHistoryLog")
                     {
                         // Handle barcode form / item stock activity selection
                         System.Diagnostics.Debug.WriteLine($"OK button clicked, selecting item for {FormName}");

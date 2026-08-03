@@ -11,6 +11,7 @@ namespace PosBranch_Win.Settings
         private readonly string searchText;
         private DataGridView gridHistory;
         private Label lblHeader;
+        private Label lblSummary;
         private readonly Color navy = Color.FromArgb(20, 55, 120);
         private readonly Color border = Color.FromArgb(190, 226, 250);
 
@@ -42,13 +43,23 @@ namespace PosBranch_Win.Settings
             lblHeader = new Label
             {
                 Text = $"Activity History for: '{searchText}'",
-                Dock = DockStyle.Fill,
+                Dock = DockStyle.Top,
+                Height = 34,
                 Font = new Font("Segoe UI Semibold", 12F, FontStyle.Bold),
                 ForeColor = navy,
                 TextAlign = ContentAlignment.MiddleLeft,
                 Padding = new Padding(15, 0, 0, 0)
             };
+            lblSummary = new Label
+            {
+                Text = string.Empty,
+                Dock = DockStyle.Fill,
+                ForeColor = Color.FromArgb(55, 95, 150),
+                TextAlign = ContentAlignment.MiddleLeft,
+                Padding = new Padding(15, 0, 0, 0)
+            };
             panelTop.Controls.Add(lblHeader);
+            panelTop.Controls.Add(lblSummary);
 
             gridHistory = new DataGridView
             {
@@ -119,6 +130,7 @@ namespace PosBranch_Win.Settings
                 gridHistory.DataSource = data;
                 ConfigureGrid();
                 ApplyActionColors();
+                LoadSummary();
             }
             catch (Exception ex)
             {
@@ -223,6 +235,43 @@ namespace PosBranch_Win.Settings
             {
                 string details = ItemHistoryLog.BuildBriefActivityDetails(gridHistory.Rows[e.RowIndex]);
                 MessageBox.Show(details, "Activity Details", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
+        private void LoadSummary()
+        {
+            if (lblSummary == null) return;
+
+            try
+            {
+                using (var repo = new ItemHistoryLogRepository())
+                {
+                    DataTable summary = repo.GetItemHistorySummary(searchText);
+                    if (summary == null || summary.Rows.Count == 0)
+                    {
+                        lblSummary.Text = string.Empty;
+                        return;
+                    }
+
+                    DataRow row = summary.Rows[0];
+                    string itemName = Convert.ToString(row["ItemName"]);
+                    string barcode = Convert.ToString(row["Barcode"]);
+                    decimal currentStock = 0m;
+                    decimal.TryParse(Convert.ToString(row["CurrentStock"]), out currentStock);
+                    DateTime createdOn;
+                    bool hasCreatedOn = DateTime.TryParse(Convert.ToString(row["CreatedOn"]), out createdOn);
+
+                    lblSummary.Text =
+                        (!string.IsNullOrWhiteSpace(itemName) ? itemName : searchText) +
+                        (!string.IsNullOrWhiteSpace(barcode) ? " | Barcode: " + barcode : string.Empty) +
+                        " | Current Stock: " + currentStock.ToString("0.####") +
+                        (hasCreatedOn ? " | Created: " + createdOn.ToString("dd MMM yyyy hh:mm tt") : string.Empty);
+                }
+            }
+            catch (Exception ex)
+            {
+                lblSummary.Text = string.Empty;
+                System.Diagnostics.Debug.WriteLine("Unable to load item history summary: " + ex.Message);
             }
         }
 

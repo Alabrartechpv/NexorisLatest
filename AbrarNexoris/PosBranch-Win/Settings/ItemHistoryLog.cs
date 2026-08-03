@@ -1,6 +1,7 @@
 using Infragistics.Win;
 using Infragistics.Win.UltraWinEditors;
 using PosBranch_Win.DialogBox;
+using PosBranch_Win.Master;
 using Repository.SettingsRepo;
 using System;
 using System.Collections.Generic;
@@ -20,6 +21,8 @@ namespace PosBranch_Win.Settings
         private bool applyButtonHot;
         private bool applyButtonPressed;
         private DataTable currentData;
+        private Timer pollTimer;
+        private DateTime lastKnownActivityStamp = DateTime.MinValue;
 
         private UltraComboEditor cmbQuickDate;
         private UltraDateTimeEditor dtpFrom;
@@ -37,6 +40,7 @@ namespace PosBranch_Win.Settings
         private Label lblMonth;
         private Label lblYear;
         private Label lblShowing;
+        private Label lblDedicatedItemSummary;
 
         public ItemHistoryLog()
         {
@@ -51,6 +55,20 @@ namespace PosBranch_Win.Settings
             cmbQuickDate.Text = "Today";
             ApplyQuickDate();
             LoadActivityLog();
+            frmItemMasterNew.OnItemMasterUpdated += OnItemMasterUpdated;
+            StartNetworkRefresh();
+        }
+
+        protected override void OnFormClosed(FormClosedEventArgs e)
+        {
+            frmItemMasterNew.OnItemMasterUpdated -= OnItemMasterUpdated;
+            if (pollTimer != null)
+            {
+                pollTimer.Stop();
+                pollTimer.Dispose();
+                pollTimer = null;
+            }
+            base.OnFormClosed(e);
         }
 
         private void InitializeLogUi()
@@ -143,6 +161,14 @@ namespace PosBranch_Win.Settings
             content.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
 
             var titlePanel = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent };
+            lblDedicatedItemSummary = new Label
+            {
+                Text = string.Empty,
+                Dock = DockStyle.Bottom,
+                Height = 18,
+                ForeColor = Color.FromArgb(55, 95, 150),
+                TextAlign = ContentAlignment.MiddleLeft
+            };
             titlePanel.Controls.Add(new Label
             {
                 Text = "Track item creation, edits, purchase, sales, returns, and stock adjustments.",
@@ -158,6 +184,7 @@ namespace PosBranch_Win.Settings
                 Font = new Font("Segoe UI Semibold", 13F, FontStyle.Bold),
                 ForeColor = navy
             });
+            titlePanel.Controls.Add(lblDedicatedItemSummary);
 
             var cards = new FlowLayoutPanel { Dock = DockStyle.Fill, BackColor = Color.White, WrapContents = false, FlowDirection = FlowDirection.LeftToRight };
             lblTotal = CreateCard(cards, "Selected Range");
@@ -282,8 +309,10 @@ namespace PosBranch_Win.Settings
                 gridActivity.DataSource = currentData;
                 ConfigureGridColumns();
                 ApplyActionColors(gridActivity);
+                UpdateDedicatedItemSummary();
                 UpdateSummaryCards();
                 lblShowing.Text = "Showing " + currentData.Rows.Count + " record(s)";
+                UpdateLastKnownActivityStamp();
             }
             catch (Exception ex)
             {
@@ -665,6 +694,7 @@ namespace PosBranch_Win.Settings
                         if (!string.IsNullOrWhiteSpace(selected))
                         {
                             txtItemSearch.Text = selected;
+                            SetDedicatedQuickDateRange();
                             LoadActivityLog();
                         }
                     }
@@ -851,6 +881,111 @@ namespace PosBranch_Win.Settings
                    string.Equals(value, "UPDATED", StringComparison.OrdinalIgnoreCase);
         }
 
+        private void OnItemMasterUpdated(int itemId)
+        {
+            if (IsDisposed || !IsHandleCreated) return;
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action<int>(OnItemMasterUpdated), itemId);
+                return;
+            }
+            LoadActivityLog();
+        }
+
+        private void StartNetworkRefresh()
+        {
+            pollTimer = new Timer { Interval = 10000 };
+            pollTimer.Tick += PollTimer_Tick;
+            pollTimer.Start();
+        }
+
+        private void PollTimer_Tick(object sender, EventArgs e)
+        {
+            if (IsDisposed || !IsHandleCreated) return;
+            try
+            {
+                using (var repo = new ItemHistoryLogRepository())
+                {
+                    DateTime latest = repo.GetLatestActivityStamp();
+                    if (latest > lastKnownActivityStamp)
+                    {
+                        lastKnownActivityStamp = latest;
+                        LoadActivityLog();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Item history refresh failed: " + ex.Message);
+            }
+        }
+
+        private void UpdateLastKnownActivityStamp()
+        {
+            try
+            {
+                using (var repo = new ItemHistoryLogRepository())
+                {
+                    DateTime latest = repo.GetLatestActivityStamp();
+                    if (latest > lastKnownActivityStamp)
+                    {
+                        lastKnownActivityStamp = latest;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Item history stamp update failed: " + ex.Message);
+            }
+        }
+
+        private void UpdateDedicatedItemSummary()
+        {
+            if (lblDedicatedItemSummary == null) return;
+
+            string searchText = txtItemSearch.Text.Trim();
+            if (string.IsNullOrWhiteSpace(searchText))
+            {
+                lblDedicatedItemSummary.Text = string.Empty;
+                return;
+            }
+
+            try
+            {
+                using (var repo = new ItemHistoryLogRepository())
+                {
+                    DataTable summary = repo.GetItemHistorySummary(searchText);
+                    if (summary == null || summary.Rows.Count == 0)
+                    {
+                        lblDedicatedItemSummary.Text = "Loaded item: " + searchText;
+                        return;
+                    }
+
+                    DataRow row = summary.Rows[0];
+                    string itemName = Convert.ToString(row["ItemName"]);
+                    string barcode = Convert.ToString(row["Barcode"]);
+                    string stock = FormatDecimal(FirstDecimal(row, "CurrentStock"));
+                    DateTime createdOn = FirstDate(row, "CreatedOn");
+                    lblDedicatedItemSummary.Text =
+                        "Loaded item: " + FirstNonEmpty(itemName, searchText) +
+                        (!string.IsNullOrWhiteSpace(barcode) ? " | Barcode: " + barcode : string.Empty) +
+                        " | Current Stock: " + (string.IsNullOrWhiteSpace(stock) ? "0" : stock) +
+                        (createdOn != DateTime.MinValue ? " | Created: " + FormatDate(createdOn) : string.Empty);
+                }
+            }
+            catch (Exception ex)
+            {
+                lblDedicatedItemSummary.Text = "Loaded item: " + searchText;
+                System.Diagnostics.Debug.WriteLine("Item history summary display failed: " + ex.Message);
+            }
+        }
+
+        private void SetDedicatedQuickDateRange()
+        {
+            cmbQuickDate.Text = "Custom";
+            SetDateRange(new DateTime(2000, 1, 1), DateTime.Today.AddYears(5));
+        }
+
         public static void ApplyBriefActivityDetails(DataTable table)
         {
             if (table == null || !table.Columns.Contains("ActivityDetails")) return;
@@ -963,8 +1098,8 @@ namespace PosBranch_Win.Settings
             if (!string.IsNullOrWhiteSpace(filteredDetails) && !LooksLikeBriefDetails(filteredDetails))
             {
                 builder.AppendLine();
-                builder.AppendLine("Notes:");
-                builder.Append(filteredDetails);
+                builder.AppendLine(IsUpdate(action) ? "Updated:" : "Notes:");
+                builder.Append(NormalizeDetailSection(filteredDetails, IsUpdate(action)));
             }
 
             return builder.ToString().Trim();
@@ -1062,6 +1197,26 @@ namespace PosBranch_Win.Settings
                 filtered.AppendLine(line);
             }
             return filtered.ToString().TrimEnd();
+        }
+
+        private static string NormalizeDetailSection(string details, bool isUpdate)
+        {
+            if (string.IsNullOrWhiteSpace(details)) return string.Empty;
+
+            var lines = details.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+            var normalized = new StringBuilder();
+            foreach (string line in lines)
+            {
+                string trimmed = line.Trim();
+                if (trimmed.Length == 0) continue;
+                if (isUpdate && (trimmed.Equals("Changes:", StringComparison.OrdinalIgnoreCase) ||
+                                 trimmed.Equals("Updated:", StringComparison.OrdinalIgnoreCase)))
+                {
+                    continue;
+                }
+                normalized.AppendLine(trimmed);
+            }
+            return normalized.ToString().TrimEnd();
         }
 
         private static string CellText(DataGridViewRow row, string columnName)
