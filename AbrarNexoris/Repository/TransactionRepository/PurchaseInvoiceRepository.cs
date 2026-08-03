@@ -241,35 +241,15 @@ namespace Repository.TransactionRepository
                             objPricesettingsStock.MDStaffPrice = existingPrices.MDStaffPrice;
                             objPricesettingsStock.MDMinPrice = existingPrices.MDMinPrice;
 
-                            // Calculate average cost based on existing stock and new purchase
-                            // Formula: AvgCost = ((ExistingCost × ExistingStock) + (PurchaseCost × PurchaseQty)) / (ExistingStock + PurchaseQty)
+                            // Purchases update stock only. Preserve Item Master unit costs so a
+                            // purchase made in a packing unit cannot overwrite the saved UOM cost.
                             float existingCost = (float)existingPrices.Cost;
-                            float existingStock = (float)existingPrices.Stock;
-                            float purchaseCost = cost; // Cost from the purchase grid
-                            float purchaseQty = qty;   // Quantity being purchased
-
-                            // Check if Free = Qty (free items case)
-                            // When Free = Qty and Free >= 1, cost is 0, so average cost should not change
-                            bool isFreeItem = (free >= 1 && Math.Abs(free - qty) < 0.01f && Math.Abs(cost) < 0.01f);
-
-                            // If this is a free item (Free = Qty, Cost = 0), don't change average cost
-                            if (isFreeItem)
-                            {
-                                // Keep the existing average cost unchanged
-                                objPricesettingsStock.SingleItemCost = existingCost;
-                                System.Diagnostics.Debug.WriteLine($"CREATE Purchase (Free Item) - ItemId={objPricesettingsStock.ItemID}, Free={free}, Qty={qty}, Cost=0, KeepingAvgCost={existingCost}");
-                            }
-                            else
-                            {
-                                float averageCost = CalculateAverageCost(existingCost, existingStock, purchaseCost, purchaseQty);
-                                objPricesettingsStock.SingleItemCost = averageCost;
-                                System.Diagnostics.Debug.WriteLine($"CREATE Purchase - ItemId={objPricesettingsStock.ItemID}, ExistingCost={existingCost}, ExistingStock={existingStock}, PurchaseCost={purchaseCost}, PurchaseQty={purchaseQty}, CalculatedAvgCost={averageCost}");
-                            }
+                            objPricesettingsStock.SingleItemCost = existingCost;
+                            System.Diagnostics.Debug.WriteLine($"CREATE Purchase - Preserving Item Master Cost={existingCost} for ItemId={objPricesettingsStock.ItemID}, UnitId={objPricesettingsStock.UnitId}");
 
                             List<PurchaseStockUpdateOnPricesettings> UpdatePriceSettingsWithStock = DataConnection.Query<PurchaseStockUpdateOnPricesettings>(STOREDPROCEDURE.POS_PurchaseInvoice_PriceSettings, objPricesettingsStock, trans, commandType: CommandType.StoredProcedure).ToList<PurchaseStockUpdateOnPricesettings>();
 
-                            // Update ItemMaster cost directly to ensure our calculated average cost is saved
-                            UpdateItemMasterCostDirectly(objPricesettingsStock.ItemID, objPricesettingsStock.UnitId, (float)objPricesettingsStock.SingleItemCost, trans);
+                            UpdateItemMasterCostDirectly(objPricesettingsStock.ItemID, objPricesettingsStock.UnitId, existingCost, trans);
                         }
                         catch (Exception ex)
                         {
@@ -597,7 +577,7 @@ namespace Repository.TransactionRepository
                                 deleteObj.Free = oldPurchaseFree;
                                 deleteObj.OldQty = 0;
                                 deleteObj.SingleItemCost = oldPurchaseCost;
-                                deleteObj.Packing = packingValue;
+                                deleteObj.Packing = oldDetail.Packing > 0 ? oldDetail.Packing : packingValue;
                                 deleteObj.RetailPrice = existingPrices.RetailPrice;
                                 deleteObj.WholeSalePrice = existingPrices.WholeSalePrice;
                                 deleteObj.CreditPrice = existingPrices.CreditPrice;
@@ -1112,7 +1092,8 @@ namespace Repository.TransactionRepository
                         UnitId,
                         ISNULL(Qty, 0) as Qty,
                         ISNULL(Cost, 0) as Cost,
-                        ISNULL(Free, 0) as Free
+                        ISNULL(Free, 0) as Free,
+                        ISNULL(Packing, 1) as Packing
                     FROM PDetails
                     WHERE PurchaseNo = @PurchaseNo
                         AND FinYearId = @FinYearId

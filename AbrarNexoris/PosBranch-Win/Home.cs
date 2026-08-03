@@ -2075,8 +2075,13 @@ namespace PosBranch_Win
             }
             if (e.Tool.Key == "BankReconciliation")
             {
-                Accounts.FrmBankReconciliation bankRecon = new FrmBankReconciliation();
-                OpenFormInTab(bankRecon, "Bank Reconciliation");
+                Accounts.FrmBankReconciliation bankRec = new Accounts.FrmBankReconciliation();
+                OpenFormInTab(bankRec, "Bank Reconciliation");
+            }
+            if (e.Tool.Key == "PaymodeMaster" || e.Tool.Key == "Paymode")
+            {
+                Master.FrmPaymodeMaster paymodeMaster = new Master.FrmPaymodeMaster();
+                OpenFormInTab(paymodeMaster, "Paymode Account Setup");
             }
             if (e.Tool.Key == "BankStatementReport")
             {

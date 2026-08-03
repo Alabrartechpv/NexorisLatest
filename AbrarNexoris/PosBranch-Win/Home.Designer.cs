@@ -89,6 +89,7 @@ namespace PosBranch_Win
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonTool80 = new Infragistics.Win.UltraWinToolbars.ButtonTool("UnitMaster");
             Infragistics.Win.UltraWinToolbars.RibbonGroup ribbonGroup15 = new Infragistics.Win.UltraWinToolbars.RibbonGroup("ribbonGroup2");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonTool45 = new Infragistics.Win.UltraWinToolbars.ButtonTool("Users");
+            Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolPaymode = new Infragistics.Win.UltraWinToolbars.ButtonTool("PaymodeMaster");
             Infragistics.Win.UltraWinToolbars.RibbonTab ribbonTab3 = new Infragistics.Win.UltraWinToolbars.RibbonTab("ribbon2");
             Infragistics.Win.UltraWinToolbars.RibbonGroup ribbonGroup16 = new Infragistics.Win.UltraWinToolbars.RibbonGroup("Sales");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonTool3 = new Infragistics.Win.UltraWinToolbars.ButtonTool("Pos");
@@ -359,6 +360,8 @@ namespace PosBranch_Win
             Infragistics.Win.Appearance appearance93 = new Infragistics.Win.Appearance();
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolShiftReconciliation = new Infragistics.Win.UltraWinToolbars.ButtonTool("ShiftReconciliationReport");
             Infragistics.Win.Appearance appearance94 = new Infragistics.Win.Appearance();
+            Infragistics.Win.UltraWinToolbars.ButtonTool buttonTool56 = new Infragistics.Win.UltraWinToolbars.ButtonTool("PaymodeMaster");
+            Infragistics.Win.Appearance appearance95 = new Infragistics.Win.Appearance();
             Infragistics.Win.Appearance appearance3 = new Infragistics.Win.Appearance();
             Infragistics.Win.UltraWinExplorerBar.UltraExplorerBarGroup ultraExplorerBarGroup1 = new Infragistics.Win.UltraWinExplorerBar.UltraExplorerBarGroup();
             Infragistics.Win.UltraWinExplorerBar.UltraExplorerBarItem ultraExplorerBarItem1 = new Infragistics.Win.UltraWinExplorerBar.UltraExplorerBarItem();
@@ -632,8 +635,10 @@ namespace PosBranch_Win
             buttonTool80});
             ribbonGroup15.Caption = "Utilities";
             buttonTool45.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
+            buttonToolPaymode.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
             ribbonGroup15.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
-            buttonTool45});
+            buttonTool45,
+            buttonToolPaymode});
             ribbonTab2.Groups.AddRange(new Infragistics.Win.UltraWinToolbars.RibbonGroup[] {
             ribbonGroup13,
             ribbonGroup14,
@@ -1188,6 +1193,10 @@ namespace PosBranch_Win
             buttonToolShiftReconciliation.SharedPropsInternal.AppearancesLarge.Appearance = appearance94;
             buttonToolShiftReconciliation.SharedPropsInternal.Caption = "Counter Closing Report";
             buttonToolShiftReconciliation.SharedPropsInternal.DisplayStyle = Infragistics.Win.UltraWinToolbars.ToolDisplayStyle.ImageAndText;
+            appearance95.Image = global::PosBranch_Win.Properties.Resources.cashless_payment;
+            buttonTool56.SharedPropsInternal.AppearancesLarge.Appearance = appearance95;
+            buttonTool56.SharedPropsInternal.Caption = "Paymode Setup";
+            buttonTool56.SharedPropsInternal.DisplayStyle = Infragistics.Win.UltraWinToolbars.ToolDisplayStyle.ImageAndText;
             this.ultraToolbarsManager1.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
             buttonTool11,
             buttonTool12,
@@ -1286,7 +1295,8 @@ namespace PosBranch_Win
             buttonToolStockTransferShared,
             buttonToolBankReconciliation,
             buttonToolBankStatement,
-            buttonToolShiftReconciliation});
+            buttonToolShiftReconciliation,
+            buttonTool56});
             this.ultraToolbarsManager1.ToolClick += new Infragistics.Win.UltraWinToolbars.ToolClickEventHandler(this.ultraToolbarsManager1_ToolClick_1);
             // 
             // _Home_Toolbars_Dock_Area_Left

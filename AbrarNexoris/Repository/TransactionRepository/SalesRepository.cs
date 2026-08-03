@@ -45,6 +45,14 @@ namespace Repository.TransactionRepository
         // ============================================================================
         LedgerRepository ledgerRepository = new LedgerRepository();
         UnitMasterRepository unitMasterRepository = new UnitMasterRepository();
+
+        /// <summary>
+        /// Set this BEFORE calling SaveSales/UpdateSales when the customer paid via
+        /// FrmSalesCmpt (BankTransfer, UPI, Card, split etc.).
+        /// The repository uses this list to post correct per-instrument debit voucher entries.
+        /// It is cleared automatically after each save.
+        /// </summary>
+        public List<SalesPaymentDetail> PendingPaymentDetails { get; set; } = new List<SalesPaymentDetail>();
         public string SaveSales(SalesMaster sales, SalesDetails salesDetails, DataGridView dgvItems)
         {
             ModelClass.TransactionModels.Voucher voucher = new ModelClass.TransactionModels.Voucher();
@@ -188,7 +196,7 @@ namespace Repository.TransactionRepository
                         cmd.Parameters.AddWithValue("CounterSessionId", SessionContext.CounterSessionId);
                         cmd.Parameters.AddWithValue("Freight", 0);
                         cmd.Parameters.AddWithValue("FreightProfit", 0);
-                        cmd.Parameters.AddWithValue("PaymodeLedgerId", 0);
+                        cmd.Parameters.AddWithValue("PaymodeLedgerId", sales.PaymodeLedgerId);
                         cmd.Parameters.AddWithValue("TaxPer", sales.TaxPer);
                         cmd.Parameters.AddWithValue("TaxAmt", sales.TaxAmt);
                         cmd.Parameters.AddWithValue("CessPer", 0);
@@ -746,7 +754,7 @@ namespace Repository.TransactionRepository
                         cmd.Parameters.AddWithValue("CounterSessionId", SessionContext.CounterSessionId);
                         cmd.Parameters.AddWithValue("Freight", 0);
                         cmd.Parameters.AddWithValue("FreightProfit", 0);
-                        cmd.Parameters.AddWithValue("PaymodeLedgerId", 0);
+                        cmd.Parameters.AddWithValue("PaymodeLedgerId", sales.PaymodeLedgerId);
                         cmd.Parameters.AddWithValue("TaxPer", sales.TaxPer);
                         cmd.Parameters.AddWithValue("TaxAmt", sales.TaxAmt);
                         cmd.Parameters.AddWithValue("CessPer", 0);
@@ -1245,7 +1253,7 @@ namespace Repository.TransactionRepository
                 parameters.Add("CounterSessionId", SessionContext.CounterSessionId);
                 parameters.Add("Freight", 0);
                 parameters.Add("FreightProfit", 0);
-                parameters.Add("PaymodeLedgerId", 0);
+                parameters.Add("PaymodeLedgerId", sales.PaymodeLedgerId);
                 parameters.Add("TaxPer", sales.TaxPer);
                 parameters.Add("TaxAmt", sales.TaxAmt);
                 parameters.Add("CessPer", 0);
@@ -2148,7 +2156,8 @@ namespace Repository.TransactionRepository
 
             try
             {
-                DataConnection.Open();
+                if (DataConnection.State != ConnectionState.Open)
+                    DataConnection.Open();
                 using (var trans = DataConnection.BeginTransaction())
                 {
                     try
@@ -2358,6 +2367,29 @@ namespace Repository.TransactionRepository
             {
                 sales.DueDate = sales.BillDate;
             }
+
+            // Ensure PaymodeLedgerId is resolved from PayMode table if not already set
+            if (sales.PaymodeLedgerId <= 0 && sales.PaymodeId > 0)
+            {
+                try
+                {
+                    using (SqlCommand ledgerCmd = new SqlCommand(STOREDPROCEDURE.POS_PayMode, (SqlConnection)DataConnection))
+                    {
+                        ledgerCmd.CommandType = CommandType.StoredProcedure;
+                        ledgerCmd.Parameters.AddWithValue("@_Operation", "GETBYID");
+                        ledgerCmd.Parameters.AddWithValue("@PaymodeID", sales.PaymodeId);
+                        object ledgerResult = ledgerCmd.ExecuteScalar();
+                        if (ledgerResult != null && ledgerResult != DBNull.Value)
+                        {
+                            sales.PaymodeLedgerId = Convert.ToInt32(ledgerResult);
+                        }
+                    }
+                }
+                catch
+                {
+                    // Fail gracefully if DataConnection is closed or query fails
+                }
+            }
         }
 
         /// <summary>
@@ -2507,9 +2539,9 @@ namespace Repository.TransactionRepository
                 double taxPercentage = gstEntry.Key;
                 double totalTaxAmount = gstEntry.Value;
 
-                // Split GST into CGST and SGST (50% each)
-                double cgstAmount = totalTaxAmount / 2;
-                double sgstAmount = totalTaxAmount / 2;
+                // Split GST into CGST and SGST (50% each, guaranteeing exact sum equals totalTaxAmount)
+                double cgstAmount = Math.Round(totalTaxAmount / 2.0, 2, MidpointRounding.AwayFromZero);
+                double sgstAmount = Math.Round(totalTaxAmount - cgstAmount, 2, MidpointRounding.AwayFromZero);
                 double cgstPercentage = taxPercentage / 2;
                 double sgstPercentage = taxPercentage / 2;
 
@@ -2523,7 +2555,7 @@ namespace Repository.TransactionRepository
                 voucher.LedgerName = $"OUTPUT CGST {cgstPercentageStr}%";
                 voucher.LedgerID = GetOrCreateGSTLedger(voucher.LedgerName, GST_OUTPUT_GROUP_ID, trans);
                 voucher.Debit = 0;
-                voucher.Credit = Math.Round(cgstAmount, 2);
+                voucher.Credit = cgstAmount;
                 voucher.SlNo = slNo++;
 
                 CreateVoucherEntry(voucher, trans, $"VoucherID={voucher.VoucherID}, Type=CREDIT, Account={voucher.LedgerName}, Amount={cgstAmount}");
@@ -2534,7 +2566,7 @@ namespace Repository.TransactionRepository
                 voucher.LedgerName = $"OUTPUT SGST {sgstPercentageStr}%";
                 voucher.LedgerID = GetOrCreateGSTLedger(voucher.LedgerName, GST_OUTPUT_GROUP_ID, trans);
                 voucher.Debit = 0;
-                voucher.Credit = Math.Round(sgstAmount, 2);
+                voucher.Credit = sgstAmount;
                 voucher.SlNo = slNo++;
 
                 CreateVoucherEntry(voucher, trans, $"VoucherID={voucher.VoucherID}, Type=CREDIT, Account={voucher.LedgerName}, Amount={sgstAmount}");
@@ -2560,9 +2592,15 @@ namespace Repository.TransactionRepository
                 try
                 {
                     int nextLedgerId = 1;
-                    using (SqlCommand idCmd = new SqlCommand("SELECT ISNULL(MAX(LedgerID), 0) + 1 FROM LedgerMaster", (SqlConnection)DataConnection, (SqlTransaction)trans))
+                    using (SqlCommand idCmd = new SqlCommand(STOREDPROCEDURE.POS_Ledger, (SqlConnection)DataConnection, (SqlTransaction)trans))
                     {
-                        nextLedgerId = Convert.ToInt32(idCmd.ExecuteScalar());
+                        idCmd.CommandType = CommandType.StoredProcedure;
+                        idCmd.Parameters.AddWithValue("@_Operation", "GETNEXTID");
+                        object res = idCmd.ExecuteScalar();
+                        if (res != null && res != DBNull.Value)
+                        {
+                            nextLedgerId = Convert.ToInt32(res);
+                        }
                     }
 
                     // Create the GST ledger using stored procedure
@@ -2617,22 +2655,132 @@ namespace Repository.TransactionRepository
             DateTime voucherDate = GetValidSqlDateTime(DateTime.Now);
             int slNo = 1;
 
-            // First entry - Debit Cash Account
-            PopulateBaseVoucherProperties(voucher, sales, voucherDate);
-            voucher.GroupID = Convert.ToInt32(AccountGroup.CASH_IN_HAND);
-            voucher.LedgerID = ledgerRepository.GetLedgerId(DefaultLedgers.CASH, (int)AccountGroup.CASH_IN_HAND, SessionContext.BranchId);
-            voucher.LedgerName = DefaultLedgers.CASH;
-            voucher.Debit = Netamount;
-            voucher.Credit = 0;
-            voucher.SlNo = slNo++;
+            // -------------------------------------------------------
+            // DEBIT ENTRIES:
+            // Use PendingPaymentDetails (set on this repository before SaveSales is called)
+            // to post per-instrument debit entries.
+            // e.g. UPI Rs 500 -> Dr SBI A/C Rs 500; Cash Rs 200 -> Dr CASH-IN-HAND Rs 200
+            // SPaymentDetails rows are saved AFTER the transaction, so we cannot read from DB here.
+            // Fallback to Cash ledger if no PendingPaymentDetails provided.
+            // -------------------------------------------------------
+            bool paymentDetailsPosted = false;
+            try
+            {
+                if (PendingPaymentDetails != null && PendingPaymentDetails.Count > 0)
+                {
+                    foreach (var pd in PendingPaymentDetails)
+                    {
+                        double amount = (double)pd.Amount;
+                        if (amount <= 0) continue;
 
-            CreateVoucherEntry(voucher, trans, $"VoucherID={voucher.VoucherID}, Type=DEBIT, Account=Cash, Amount={Netamount}");
+                        // Resolve the ledger for this payment instrument via PayMode table
+                        long ledgerId = 0;
+                        string ledgerName = DefaultLedgers.CASH;
+                        try
+                        {
+                            using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_PayMode, (SqlConnection)DataConnection, (SqlTransaction)trans))
+                            {
+                                cmd.CommandType = CommandType.StoredProcedure;
+                                cmd.Parameters.AddWithValue("@_Operation", "GETBYID");
+                                cmd.Parameters.AddWithValue("@PaymodeID", pd.PaymodeId);
+                                using (SqlDataReader rdr = cmd.ExecuteReader())
+                                {
+                                    if (rdr.Read())
+                                    {
+                                         try { ledgerId = Convert.ToInt64(rdr["LedgerID"]); } catch { }
+                                         try { ledgerName = rdr["LedgerName"].ToString(); } catch { }
+                                    }
+                                }
+                            }
+                        }
+                        catch { }
 
-            // Calculate sales amount without GST
+                        if (ledgerId <= 0)
+                        {
+                            ledgerId = ledgerRepository.GetLedgerId(DefaultLedgers.CASH, (int)AccountGroup.CASH_IN_HAND, SessionContext.BranchId);
+                            ledgerName = DefaultLedgers.CASH;
+                        }
+
+                        PopulateBaseVoucherProperties(voucher, sales, voucherDate);
+                        voucher.GroupID = Convert.ToInt32(AccountGroup.CASH_IN_HAND);
+                        voucher.LedgerID = ledgerId;
+                        voucher.LedgerName = ledgerName;
+                        voucher.Debit = Math.Round(amount, 2);
+                        voucher.Credit = 0;
+                        voucher.SlNo = slNo++;
+
+                        CreateVoucherEntry(voucher, trans, $"VoucherID={voucher.VoucherID}, Type=DEBIT, Account={ledgerName}, Amount={voucher.Debit}");
+                        paymentDetailsPosted = true;
+                    } // end foreach
+                } // end if PendingPaymentDetails
+            }
+            finally
+            {
+                // Null out property reference so it doesn't leak into subsequent saves, without mutating the caller's list
+                PendingPaymentDetails = null;
+            }
+
+            // Fallback: no SPaymentDetails — debit Cash / mapped paymode ledger for full amount
+            if (!paymentDetailsPosted)
+            {
+                long targetLedgerId = sales.PaymodeLedgerId;
+                string targetLedgerName = DefaultLedgers.CASH;
+
+                if (targetLedgerId <= 0 && sales.PaymodeId > 0)
+                {
+                    try
+                    {
+                        using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_PayMode, (SqlConnection)DataConnection, (SqlTransaction)trans))
+                        {
+                            cmd.CommandType = CommandType.StoredProcedure;
+                            cmd.Parameters.AddWithValue("@_Operation", "GETBYID");
+                            cmd.Parameters.AddWithValue("@PaymodeID", sales.PaymodeId);
+                            object res = cmd.ExecuteScalar();
+                            if (res != null && res != DBNull.Value)
+                                targetLedgerId = Convert.ToInt64(res);
+                        }
+                    }
+                    catch { }
+                }
+
+                if (targetLedgerId > 0)
+                {
+                    try
+                    {
+                        using (SqlCommand cmdL = new SqlCommand(STOREDPROCEDURE.POS_Ledger, (SqlConnection)DataConnection, (SqlTransaction)trans))
+                        {
+                            cmdL.CommandType = CommandType.StoredProcedure;
+                            cmdL.Parameters.AddWithValue("@_Operation", "GETBYID");
+                            cmdL.Parameters.AddWithValue("@LedgerID", targetLedgerId);
+                            object resL = cmdL.ExecuteScalar();
+                            if (resL != null && resL != DBNull.Value)
+                                targetLedgerName = resL.ToString();
+                        }
+                    }
+                    catch { }
+                }
+                else
+                {
+                    targetLedgerId = ledgerRepository.GetLedgerId(DefaultLedgers.CASH, (int)AccountGroup.CASH_IN_HAND, SessionContext.BranchId);
+                }
+
+                PopulateBaseVoucherProperties(voucher, sales, voucherDate);
+                voucher.GroupID = Convert.ToInt32(AccountGroup.CASH_IN_HAND);
+                voucher.LedgerID = targetLedgerId;
+                voucher.LedgerName = targetLedgerName;
+                voucher.Debit = Netamount;
+                voucher.Credit = 0;
+                voucher.SlNo = slNo++;
+
+                CreateVoucherEntry(voucher, trans, $"VoucherID={voucher.VoucherID}, Type=DEBIT, Account={targetLedgerName}, Amount={Netamount}");
+            }
+
+            // -------------------------------------------------------
+            // CREDIT ENTRIES: Sales Account + GST
+            // -------------------------------------------------------
             double totalGST = gstTaxAmounts.Values.Sum();
             double salesAmountWithoutGST = Netamount - totalGST;
 
-            // Second entry - Credit Sales Account (without GST)
             PopulateBaseVoucherProperties(voucher, sales, voucherDate);
             voucher.GroupID = Convert.ToInt32(AccountGroup.SALES_ACCOUNT);
             voucher.LedgerID = ledgerRepository.GetLedgerId(DefaultLedgers.SALE, (int)AccountGroup.SALES_ACCOUNT, SessionContext.BranchId);

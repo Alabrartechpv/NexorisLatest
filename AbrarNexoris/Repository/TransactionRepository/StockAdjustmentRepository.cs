@@ -439,14 +439,16 @@ namespace Repository.TransactionRepository
                     contraGroupId = Convert.ToInt32(AccountGroup.SUNDRY_CREDITORS); // Default fallback group
                     try
                     {
-                        var groupIdResult = DataConnection.QueryFirstOrDefault<int?>(
-                            "SELECT GroupID FROM LedgerMaster WHERE LedgerID = @LedgerID",
-                            new { LedgerID = stockMaster.LedgerId },
-                            transaction
-                        );
-                        if (groupIdResult.HasValue)
+                        using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_Ledger, (SqlConnection)DataConnection, (SqlTransaction)transaction))
                         {
-                            contraGroupId = groupIdResult.Value;
+                            cmd.CommandType = CommandType.StoredProcedure;
+                            cmd.Parameters.AddWithValue("@_Operation", "GETBYID");
+                            cmd.Parameters.AddWithValue("@LedgerID", stockMaster.LedgerId);
+                            object result = cmd.ExecuteScalar();
+                            if (result != null && result != DBNull.Value)
+                            {
+                                contraGroupId = Convert.ToInt32(result);
+                            }
                         }
                     }
                     catch { }
@@ -469,15 +471,22 @@ namespace Repository.TransactionRepository
                 string stockInHandLedgerName = DefaultLedgers.BEGINSTOCK;
                 if (stockInHandLedgerId == 0)
                 {
-                    // Fallback: use the first available Group 18 ledger for this branch
-                    var fallbackLedger = DataConnection.QueryFirstOrDefault<dynamic>(
-                        "SELECT TOP 1 LedgerID, LedgerName FROM LedgerMaster WHERE GroupID = 18 AND BranchID = @BranchId ORDER BY LedgerID",
-                        new { BranchId = SessionContext.BranchId }, transaction);
-                    if (fallbackLedger != null)
+                    // Fallback: use stored procedure _4GetAccountLedgerDDL to get stock-in-hand ledgers for this branch
+                    try
                     {
-                        stockInHandLedgerId   = (int)fallbackLedger.LedgerID;
-                        stockInHandLedgerName = (string)fallbackLedger.LedgerName;
+                        var ddlRequest = new AccountLedgerDDLRequest { BranchId = SessionContext.BranchId, For = "Stock" };
+                        var ddlResult = objLedgerRepository.getAccountLedgerDDL(ddlRequest);
+                        if (ddlResult != null && ddlResult.List != null && ddlResult.List.Any())
+                        {
+                            var firstLedger = ddlResult.List.FirstOrDefault();
+                            if (firstLedger != null)
+                            {
+                                stockInHandLedgerId = firstLedger.Id;
+                                stockInHandLedgerName = firstLedger.Name;
+                            }
+                        }
                     }
+                    catch { }
                 }
 
                 // Create appropriate voucher entries based on adjustment type
@@ -829,14 +838,16 @@ namespace Repository.TransactionRepository
                     contraGroupId = Convert.ToInt32(AccountGroup.SUNDRY_CREDITORS); // Default fallback group
                     try
                     {
-                        var groupIdResult = DataConnection.QueryFirstOrDefault<int?>(
-                            "SELECT GroupID FROM LedgerMaster WHERE LedgerID = @LedgerID",
-                            new { LedgerID = sk.LedgerId },
-                            trans
-                        );
-                        if (groupIdResult.HasValue)
+                        using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_Ledger, (SqlConnection)DataConnection, (SqlTransaction)trans))
                         {
-                            contraGroupId = groupIdResult.Value;
+                            cmd.CommandType = CommandType.StoredProcedure;
+                            cmd.Parameters.AddWithValue("@_Operation", "GETBYID");
+                            cmd.Parameters.AddWithValue("@LedgerID", sk.LedgerId);
+                            object result = cmd.ExecuteScalar();
+                            if (result != null && result != DBNull.Value)
+                            {
+                                contraGroupId = Convert.ToInt32(result);
+                            }
                         }
                     }
                     catch { }
@@ -859,15 +870,22 @@ namespace Repository.TransactionRepository
                 string stkInHandLedgerName = DefaultLedgers.BEGINSTOCK;
                 if (stkInHandLedgerId == 0)
                 {
-                    // Fallback: use the first available Group 18 ledger for this branch
-                    var fallbackLedger = DataConnection.QueryFirstOrDefault<dynamic>(
-                        "SELECT TOP 1 LedgerID, LedgerName FROM LedgerMaster WHERE GroupID = 18 AND BranchID = @BranchId ORDER BY LedgerID",
-                        new { BranchId = SessionContext.BranchId }, trans);
-                    if (fallbackLedger != null)
+                    // Fallback: use stored procedure _4GetAccountLedgerDDL to get stock-in-hand ledgers for this branch
+                    try
                     {
-                        stkInHandLedgerId   = (int)fallbackLedger.LedgerID;
-                        stkInHandLedgerName = (string)fallbackLedger.LedgerName;
+                        var ddlRequest = new AccountLedgerDDLRequest { BranchId = SessionContext.BranchId, For = "Stock" };
+                        var ddlResult = objLedgerRepository.getAccountLedgerDDL(ddlRequest);
+                        if (ddlResult != null && ddlResult.List != null && ddlResult.List.Any())
+                        {
+                            var firstLedger = ddlResult.List.FirstOrDefault();
+                            if (firstLedger != null)
+                            {
+                                stkInHandLedgerId = firstLedger.Id;
+                                stkInHandLedgerName = firstLedger.Name;
+                            }
+                        }
                     }
+                    catch { }
                 }
 
                 // Correct double-entry: Dr STOCK IN HAND / Cr Reason (Stock In) | Dr Reason / Cr STOCK IN HAND (Stock Out)

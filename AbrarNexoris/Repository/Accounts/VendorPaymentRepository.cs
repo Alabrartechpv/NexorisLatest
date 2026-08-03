@@ -501,6 +501,7 @@ namespace Repository.Accounts
                     {
                         da.Fill(dt);
                     }
+                    EnhanceInvoiceTableWithCashPaymode(dt);
                     return dt;
                 }
             }
@@ -532,6 +533,7 @@ namespace Repository.Accounts
                     {
                         da.Fill(dt);
                     }
+                    EnhanceInvoiceTableWithCashPaymode(dt);
                     return dt;
                 }
             }
@@ -543,6 +545,76 @@ namespace Repository.Accounts
             {
                 if (DataConnection.State == ConnectionState.Open)
                     DataConnection.Close();
+            }
+        }
+
+        private void EnhanceInvoiceTableWithCashPaymode(DataTable dt)
+        {
+            if (dt == null || dt.Rows.Count == 0) return;
+
+            if (!dt.Columns.Contains("Paymode"))
+                dt.Columns.Add("Paymode", typeof(string));
+            if (!dt.Columns.Contains("PaymodeID"))
+                dt.Columns.Add("PaymodeID", typeof(int));
+
+            try
+            {
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_Purchase, (SqlConnection)DataConnection))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@CompanyId", SessionContext.CompanyId);
+                    cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
+                    cmd.Parameters.AddWithValue("@FinYearId", SessionContext.FinYearId);
+                    cmd.Parameters.AddWithValue("@_Operation", "GETALL");
+
+                    DataTable pmDt = new DataTable();
+                    using (SqlDataAdapter da = new SqlDataAdapter(cmd))
+                    {
+                        da.Fill(pmDt);
+                    }
+
+                    if (pmDt != null && pmDt.Rows.Count > 0)
+                    {
+                        string paymodeCol = pmDt.Columns.Contains("Paymode") ? "Paymode" :
+                                           pmDt.Columns.Contains("PayMode") ? "PayMode" :
+                                           pmDt.Columns.Contains("PaymodeName") ? "PaymodeName" : null;
+
+                        string paymodeIdCol = pmDt.Columns.Contains("PaymodeID") ? "PaymodeID" :
+                                             pmDt.Columns.Contains("PayModeId") ? "PayModeId" :
+                                             pmDt.Columns.Contains("PayModeID") ? "PayModeID" : null;
+
+                        var pmIdMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                        var pmNameMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+                        foreach (DataRow r in pmDt.Rows)
+                        {
+                            if (r.Table.Columns.Contains("PurchaseNo") && r["PurchaseNo"] != DBNull.Value)
+                            {
+                                string pNo = r["PurchaseNo"].ToString().Trim();
+                                string pm = paymodeCol != null && r[paymodeCol] != DBNull.Value ? r[paymodeCol].ToString().Trim() : "";
+                                int pmId = paymodeIdCol != null && r[paymodeIdCol] != DBNull.Value ? Convert.ToInt32(r[paymodeIdCol]) : 0;
+                                pmNameMap[pNo] = pm;
+                                pmIdMap[pNo] = pmId;
+                            }
+                        }
+
+                        foreach (DataRow row in dt.Rows)
+                        {
+                            string billNo = row["BillNo"]?.ToString()?.Trim();
+                            if (!string.IsNullOrEmpty(billNo))
+                            {
+                                if (pmNameMap.TryGetValue(billNo, out string pmName))
+                                    row["Paymode"] = pmName;
+                                if (pmIdMap.TryGetValue(billNo, out int pmId))
+                                    row["PaymodeID"] = pmId;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error enhancing invoice table with paymode via stored procedure: {ex.Message}");
             }
         }
 

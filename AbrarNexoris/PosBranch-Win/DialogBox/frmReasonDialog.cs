@@ -573,9 +573,7 @@ namespace PosBranch_Win.DialogBox
             {
                 MessageBox.Show(
                     "To create a new stock adjustment reason:\n\n" +
-                    "1. Create the ledger under the default 'Indirect Expenses' group.\n" +
-                    "2. Include keywords like 'Damage', 'Expiry', 'Lost', or 'Wastage' in the ledger name.\n\n" +
-                    "Example: 'Wastage - Spoiled Goods'",
+                    "Create a ledger under the 'Indirect Expenses' (or 'Direct Expenses') group with any reason name you prefer.",
                     "Creating Stock Adjustment Reason",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);

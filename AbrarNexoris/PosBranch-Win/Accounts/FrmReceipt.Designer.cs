@@ -113,6 +113,8 @@ namespace PosBranch_Win.Accounts
             this.lblReceivedMethod = new System.Windows.Forms.Label();
             this.lblReceipttVoucherDate = new System.Windows.Forms.Label();
             this.lblSalesPerson = new System.Windows.Forms.Label();
+            this.label2 = new System.Windows.Forms.Label();
+            this.ultraTextEditor2 = new Infragistics.Win.UltraWinEditors.UltraComboEditor();
             this.radioBtnAllDocument = new System.Windows.Forms.RadioButton();
             this.ultraPanel5 = new Infragistics.Win.Misc.UltraPanel();
             this.ultraGrid1 = new Infragistics.Win.UltraWinGrid.UltraGrid();
@@ -143,6 +145,7 @@ namespace PosBranch_Win.Accounts
             this.gboxReceiptInfo.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.dtpPurchaseDate)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.CmboPayment)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.ultraTextEditor2)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.txtSalesMan)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.richTextBox2)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.txtReceivedAmount)).BeginInit();
@@ -642,6 +645,8 @@ namespace PosBranch_Win.Accounts
             // 
             this.gboxReceiptInfo.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
+            this.gboxReceiptInfo.Controls.Add(this.label2);
+            this.gboxReceiptInfo.Controls.Add(this.ultraTextEditor2);
             this.gboxReceiptInfo.Controls.Add(this.ultraPictureBox7);
             this.gboxReceiptInfo.Controls.Add(this.dtpPurchaseDate);
             this.gboxReceiptInfo.Controls.Add(this.CmboPayment);
@@ -660,6 +665,35 @@ namespace PosBranch_Win.Accounts
             this.gboxReceiptInfo.TabIndex = 20;
             this.gboxReceiptInfo.TabStop = false;
             this.gboxReceiptInfo.Text = "Receipt Information";
+            // 
+            // label2
+            // 
+            this.label2.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.label2.AutoSize = true;
+            this.label2.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F);
+            this.label2.Location = new System.Drawing.Point(1156, 83);
+            this.label2.Name = "label2";
+            this.label2.Size = new System.Drawing.Size(45, 16);
+            this.label2.TabIndex = 77;
+            this.label2.Text = "Status";
+            // 
+            // ultraTextEditor2
+            // 
+            this.ultraTextEditor2.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            Infragistics.Win.Appearance appearanceStatus = new Infragistics.Win.Appearance();
+            appearanceStatus.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(224)))), ((int)(((byte)(224)))), ((int)(((byte)(224)))));
+            appearanceStatus.BorderColor = System.Drawing.Color.DeepSkyBlue;
+            appearanceStatus.TextHAlignAsString = "Center";
+            appearanceStatus.TextVAlignAsString = "Middle";
+            this.ultraTextEditor2.Appearance = appearanceStatus;
+            this.ultraTextEditor2.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(224)))), ((int)(((byte)(224)))), ((int)(((byte)(224)))));
+            this.ultraTextEditor2.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
+            this.ultraTextEditor2.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F);
+            this.ultraTextEditor2.Location = new System.Drawing.Point(1207, 81);
+            this.ultraTextEditor2.Name = "ultraTextEditor2";
+            this.ultraTextEditor2.Size = new System.Drawing.Size(113, 22);
+            this.ultraTextEditor2.TabIndex = 75;
+            this.ultraTextEditor2.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
             // 
             // ultraPictureBox7
             // 
@@ -989,6 +1023,7 @@ namespace PosBranch_Win.Accounts
             this.ultraPanel2.ResumeLayout(false);
             this.gboxReceiptInfo.ResumeLayout(false);
             this.gboxReceiptInfo.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.ultraTextEditor2)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.dtpPurchaseDate)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.CmboPayment)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.txtSalesMan)).EndInit();
@@ -1055,5 +1090,7 @@ namespace PosBranch_Win.Accounts
         private Infragistics.Win.UltraWinEditors.UltraDateTimeEditor dtpPurchaseDate;
         private Infragistics.Win.UltraWinEditors.UltraPictureBox ultraPictureBox7;
         private Infragistics.Win.Misc.UltraPanel gridFooterPanel;
+        private System.Windows.Forms.Label label2;
+        private Infragistics.Win.UltraWinEditors.UltraComboEditor ultraTextEditor2;
     }
 }

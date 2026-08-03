@@ -29,6 +29,7 @@ namespace ModelClass
     {
         public int PayModeID { get; set; }
         public string PayModeName { get; set; }
+        public int LedgerID { get; set; }
     }
     public class PaymodeDDlGrid
     {
