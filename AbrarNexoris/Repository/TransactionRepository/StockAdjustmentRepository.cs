@@ -103,10 +103,63 @@ namespace Repository.TransactionRepository
             if (stockDetail == null) return "Failed: Stock detail cannot be null";
             if (itemsGrid == null || itemsGrid.Rows.Count == 0) return "Failed: No items to adjust";
 
-            int validationStockInHandLedgerId = objLedgerRepository.GetLedgerId(DefaultLedgers.BEGINSTOCK, (int)AccountGroup.STOCK_IN_HAND, SessionContext.BranchId);
-            if (stockMaster.LedgerId == validationStockInHandLedgerId)
+            // 1. Pre-fetch ledgers BEFORE opening the connection/transaction to avoid connection/lock issues
+            int stockInHandLedgerId = objLedgerRepository.GetLedgerId(DefaultLedgers.BEGINSTOCK, (int)AccountGroup.STOCK_IN_HAND, SessionContext.BranchId);
+            string stockInHandLedgerName = DefaultLedgers.BEGINSTOCK;
+            if (stockInHandLedgerId == 0)
+            {
+                try
+                {
+                    var ddlRequest = new AccountLedgerDDLRequest { BranchId = SessionContext.BranchId, For = "Stock" };
+                    var ddlResult = objLedgerRepository.getAccountLedgerDDL(ddlRequest);
+                    if (ddlResult != null && ddlResult.List != null && ddlResult.List.Any())
+                    {
+                        var firstLedger = ddlResult.List.FirstOrDefault();
+                        if (firstLedger != null)
+                        {
+                            stockInHandLedgerId = firstLedger.Id;
+                            stockInHandLedgerName = firstLedger.Name;
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            if (stockMaster.LedgerId == stockInHandLedgerId && stockInHandLedgerId > 0)
             {
                 return "Failed: The primary STOCK IN HAND ledger cannot be selected as the adjustment reason.";
+            }
+
+            int defaultPurchaseLedgerId = 0;
+            if (stockMaster.LedgerId <= 0)
+            {
+                defaultPurchaseLedgerId = objLedgerRepository.GetLedgerId(DefaultLedgers.PURCHASE, (int)AccountGroup.PURCHASE_ACCOUNT, SessionContext.BranchId);
+            }
+
+            // 2. Pre-fetch all item details BEFORE opening the transaction.
+            // These calls use their own separate DB connections (via new Dropdowns()).
+            // Running them inside the transaction causes lock contention / timeout
+            // because the transaction holds locks on tables that itemDDlGrid needs to read.
+            var itemCache = new Dictionary<string, List<ItemDDl>>();
+            for (int i = 0; i < itemsGrid.RowCount; i++)
+            {
+                DataGridViewRow row = itemsGrid.Rows[i];
+                if (row.Cells["BarCode"].Value == null) continue;
+
+                string barcode = row.Cells["BarCode"].Value?.ToString() ?? "";
+                if (string.IsNullOrWhiteSpace(barcode) || itemCache.ContainsKey(barcode)) continue;
+
+                // Fetch item details on a separate connection, outside any transaction
+                DataBase.Operations = "BARCODEPURCHASE";
+                ItemDDlGrid itemInfo = new Dropdowns().itemDDlGrid(barcode, null);
+                if (itemInfo != null && itemInfo.List != null && itemInfo.List.Any())
+                {
+                    var matchingItems = itemInfo.List.Where(x => x.BarCode == barcode).ToList();
+                    if (matchingItems.Any())
+                    {
+                        itemCache[barcode] = matchingItems;
+                    }
+                }
             }
 
             Voucher voucher = new Voucher();
@@ -172,30 +225,6 @@ namespace Repository.TransactionRepository
                 {
                     transaction.Rollback();
                     return "Failed: Could not create stock adjustment master record";
-                }
-
-                // 3. Pre-fetch all item details BEFORE processing the loop
-                // This avoids calling itemDDlGrid inside the transaction which causes connection issues
-                var itemCache = new Dictionary<string, List<ItemDDl>>();
-                for (int i = 0; i < itemsGrid.RowCount; i++)
-                {
-                    DataGridViewRow row = itemsGrid.Rows[i];
-                    if (row.Cells["BarCode"].Value == null) continue;
-
-                    string barcode = row.Cells["BarCode"].Value?.ToString() ?? "";
-                    if (string.IsNullOrWhiteSpace(barcode) || itemCache.ContainsKey(barcode)) continue;
-
-                    // Fetch item details outside the transaction
-                    DataBase.Operations = "BARCODEPURCHASE";
-                    ItemDDlGrid itemInfo = new Dropdowns().itemDDlGrid(barcode, null);
-                    if (itemInfo != null && itemInfo.List != null && itemInfo.List.Any())
-                    {
-                        var matchingItems = itemInfo.List.Where(x => x.BarCode == barcode).ToList();
-                        if (matchingItems.Any())
-                        {
-                            itemCache[barcode] = matchingItems;
-                        }
-                    }
                 }
 
                 // 4. Process all items and calculate adjustment values
@@ -459,35 +488,12 @@ namespace Repository.TransactionRepository
                 else
                 {
                     contraGroupId = Convert.ToInt32(AccountGroup.PURCHASE_ACCOUNT);
-                    contraLedgerId = objLedgerRepository.GetLedgerId(DefaultLedgers.PURCHASE, (int)AccountGroup.PURCHASE_ACCOUNT, SessionContext.BranchId);
+                    contraLedgerId = defaultPurchaseLedgerId;
                     contraLedgerName = DefaultLedgers.PURCHASE;
                 }
 
                 // --- Resolve STOCK IN HAND ledger (Group 18) for Leg 1 ---
-                // Correct journal: Dr STOCK IN HAND / Cr Reason (Stock In)
-                //                  Dr Reason / Cr STOCK IN HAND  (Stock Out)
                 int stockInHandGroupId = Convert.ToInt32(AccountGroup.STOCK_IN_HAND);
-                int stockInHandLedgerId = objLedgerRepository.GetLedgerId(DefaultLedgers.BEGINSTOCK, (int)AccountGroup.STOCK_IN_HAND, SessionContext.BranchId);
-                string stockInHandLedgerName = DefaultLedgers.BEGINSTOCK;
-                if (stockInHandLedgerId == 0)
-                {
-                    // Fallback: use stored procedure _4GetAccountLedgerDDL to get stock-in-hand ledgers for this branch
-                    try
-                    {
-                        var ddlRequest = new AccountLedgerDDLRequest { BranchId = SessionContext.BranchId, For = "Stock" };
-                        var ddlResult = objLedgerRepository.getAccountLedgerDDL(ddlRequest);
-                        if (ddlResult != null && ddlResult.List != null && ddlResult.List.Any())
-                        {
-                            var firstLedger = ddlResult.List.FirstOrDefault();
-                            if (firstLedger != null)
-                            {
-                                stockInHandLedgerId = firstLedger.Id;
-                                stockInHandLedgerName = firstLedger.Name;
-                            }
-                        }
-                    }
-                    catch { }
-                }
 
                 // Create appropriate voucher entries based on adjustment type
                 if (totalQtyDifference >= 0) // Stock In (Positive Adjustment)
@@ -570,10 +576,63 @@ namespace Repository.TransactionRepository
 
         public string updateStock(StockAdjMaster sk, StockAdjPriceDetails stkdet, DataGridView dgv_stockadjustment)
         {
-            int validationStockInHandLedgerId = objLedgerRepository.GetLedgerId(DefaultLedgers.BEGINSTOCK, (int)AccountGroup.STOCK_IN_HAND, SessionContext.BranchId);
-            if (sk.LedgerId == validationStockInHandLedgerId)
+            if (sk == null) return "Failed: Stock master cannot be null";
+
+            // 1. Pre-fetch ledgers BEFORE opening the connection/transaction to avoid connection/lock issues
+            int stockInHandLedgerId = objLedgerRepository.GetLedgerId(DefaultLedgers.BEGINSTOCK, (int)AccountGroup.STOCK_IN_HAND, SessionContext.BranchId);
+            string stockInHandLedgerName = DefaultLedgers.BEGINSTOCK;
+            if (stockInHandLedgerId == 0)
+            {
+                try
+                {
+                    var ddlRequest = new AccountLedgerDDLRequest { BranchId = SessionContext.BranchId, For = "Stock" };
+                    var ddlResult = objLedgerRepository.getAccountLedgerDDL(ddlRequest);
+                    if (ddlResult != null && ddlResult.List != null && ddlResult.List.Any())
+                    {
+                        var firstLedger = ddlResult.List.FirstOrDefault();
+                        if (firstLedger != null)
+                        {
+                            stockInHandLedgerId = firstLedger.Id;
+                            stockInHandLedgerName = firstLedger.Name;
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            if (sk.LedgerId == stockInHandLedgerId && stockInHandLedgerId > 0)
             {
                 return "Failed: The primary STOCK IN HAND ledger cannot be selected as the adjustment reason.";
+            }
+
+            int defaultPurchaseLedgerId = 0;
+            if (sk.LedgerId <= 0)
+            {
+                defaultPurchaseLedgerId = objLedgerRepository.GetLedgerId(DefaultLedgers.PURCHASE, (int)AccountGroup.PURCHASE_ACCOUNT, SessionContext.BranchId);
+            }
+
+            // 2. Pre-fetch all item details BEFORE opening the transaction.
+            // These calls use their own separate DB connections (via new Dropdowns()).
+            // Running them inside the transaction causes lock contention / timeout
+            // because the transaction holds locks on tables that itemDDlGrid needs to read.
+            var itemCache = new Dictionary<string, List<ItemDDl>>();
+            for (int i = 0; i < dgv_stockadjustment.RowCount; i++)
+            {
+                if (dgv_stockadjustment.Rows[i].Cells["BarCode"].Value == null) continue;
+
+                string barcode = dgv_stockadjustment.Rows[i].Cells["BarCode"].Value?.ToString() ?? "";
+                if (string.IsNullOrWhiteSpace(barcode) || itemCache.ContainsKey(barcode)) continue;
+
+                DataBase.Operations = "BARCODEPURCHASE";
+                ItemDDlGrid itemInfo = new Dropdowns().itemDDlGrid(barcode, null);
+                if (itemInfo != null && itemInfo.List != null && itemInfo.List.Any())
+                {
+                    var matchingItems = itemInfo.List.Where(x => x.BarCode == barcode).ToList();
+                    if (matchingItems.Any())
+                    {
+                        itemCache[barcode] = matchingItems;
+                    }
+                }
             }
 
             Voucher objVoucher = new Voucher();
@@ -601,28 +660,6 @@ namespace Repository.TransactionRepository
                     foreach (StockAdjMaster stmaster in liststock)
                     {
                         stkdet.StockAdjustmentMasterId = sk.Id;
-                    }
-                }
-
-                // Pre-fetch all item details BEFORE processing the loop
-                // This avoids calling itemDDlGrid inside the transaction which causes connection issues
-                var itemCache = new Dictionary<string, List<ItemDDl>>();
-                for (int i = 0; i < dgv_stockadjustment.RowCount; i++)
-                {
-                    if (dgv_stockadjustment.Rows[i].Cells["BarCode"].Value == null) continue;
-
-                    string barcode = dgv_stockadjustment.Rows[i].Cells["BarCode"].Value?.ToString() ?? "";
-                    if (string.IsNullOrWhiteSpace(barcode) || itemCache.ContainsKey(barcode)) continue;
-
-                    DataBase.Operations = "BARCODEPURCHASE";
-                    ItemDDlGrid itemInfo = new Dropdowns().itemDDlGrid(barcode, null);
-                    if (itemInfo != null && itemInfo.List != null && itemInfo.List.Any())
-                    {
-                        var matchingItems = itemInfo.List.Where(x => x.BarCode == barcode).ToList();
-                        if (matchingItems.Any())
-                        {
-                            itemCache[barcode] = matchingItems;
-                        }
                     }
                 }
 
@@ -858,35 +895,14 @@ namespace Repository.TransactionRepository
                 else
                 {
                     contraGroupId = Convert.ToInt32(AccountGroup.PURCHASE_ACCOUNT);
-                    contraLedgerId = objLedgerRepository.GetLedgerId(DefaultLedgers.PURCHASE, (int)AccountGroup.PURCHASE_ACCOUNT, SessionContext.BranchId);
+                    contraLedgerId = defaultPurchaseLedgerId;
                     contraLedgerName = DefaultLedgers.PURCHASE;
                 }
 
                 // --- Resolve STOCK IN HAND ledger (Group 18) for Leg 1 ---
-                // Correct journal: Dr STOCK IN HAND / Cr Reason (Stock In)
-                //                  Dr Reason / Cr STOCK IN HAND  (Stock Out)
                 int stkInHandGroupId = Convert.ToInt32(AccountGroup.STOCK_IN_HAND);
-                int stkInHandLedgerId = objLedgerRepository.GetLedgerId(DefaultLedgers.BEGINSTOCK, (int)AccountGroup.STOCK_IN_HAND, SessionContext.BranchId);
-                string stkInHandLedgerName = DefaultLedgers.BEGINSTOCK;
-                if (stkInHandLedgerId == 0)
-                {
-                    // Fallback: use stored procedure _4GetAccountLedgerDDL to get stock-in-hand ledgers for this branch
-                    try
-                    {
-                        var ddlRequest = new AccountLedgerDDLRequest { BranchId = SessionContext.BranchId, For = "Stock" };
-                        var ddlResult = objLedgerRepository.getAccountLedgerDDL(ddlRequest);
-                        if (ddlResult != null && ddlResult.List != null && ddlResult.List.Any())
-                        {
-                            var firstLedger = ddlResult.List.FirstOrDefault();
-                            if (firstLedger != null)
-                            {
-                                stkInHandLedgerId = firstLedger.Id;
-                                stkInHandLedgerName = firstLedger.Name;
-                            }
-                        }
-                    }
-                    catch { }
-                }
+                int stkInHandLedgerId = stockInHandLedgerId;
+                string stkInHandLedgerName = stockInHandLedgerName;
 
                 // Correct double-entry: Dr STOCK IN HAND / Cr Reason (Stock In) | Dr Reason / Cr STOCK IN HAND (Stock Out)
                 if (totalQtyDifference >= 0) // Stock In (Positive Adjustment)

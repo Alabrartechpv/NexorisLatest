@@ -2516,6 +2516,12 @@ namespace PosBranch_Win.DialogBox
                 {
                     SendItemToPurchaseReturn();
                 }
+                else
+                {
+                    CaptureSelectedItemData();
+                    this.DialogResult = DialogResult.OK;
+                    this.Close();
+                }
             }
         }
 
@@ -2568,10 +2574,11 @@ namespace PosBranch_Win.DialogBox
                         SendItemToPurchaseReturn();
                         return true;
                     }
-                    else if (FormName == "FrmBarcode" || FormName == "frmChangeItemNo" || FormName == "frmvendorpurchasereport")
+                    else
                     {
-                        // Handle simple selection dialogs
+                        // Handle simple selection dialogs (e.g. FrmBarcode, frmChangeItemNo, frmvendorpurchasereport, ItemStockActivity, frmItemReport)
                         System.Diagnostics.Debug.WriteLine($"Enter key pressed, selecting item for {FormName}");
+                        CaptureSelectedItemData();
                         this.DialogResult = DialogResult.OK;
                         this.Close();
                         return true;
@@ -2620,10 +2627,11 @@ namespace PosBranch_Win.DialogBox
                     System.Diagnostics.Debug.WriteLine("Double-click detected, sending item to Stock Transfer");
                     SendItemToStockTransfer();
                 }
-                else if (FormName == "FrmBarcode" || FormName == "frmChangeItemNo" || FormName == "frmvendorpurchasereport" || FormName == "ItemStockActivity")
+                else
                 {
-                    // Handle simple selection dialogs
+                    // Handle simple selection dialogs (e.g. FrmBarcode, frmChangeItemNo, frmvendorpurchasereport, ItemStockActivity, frmItemReport)
                     System.Diagnostics.Debug.WriteLine($"Double-click detected, selecting item for {FormName}");
+                    CaptureSelectedItemData();
                     this.DialogResult = DialogResult.OK;
                     this.Close();
                 }
