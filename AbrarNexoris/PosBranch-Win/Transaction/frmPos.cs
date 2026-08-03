@@ -49,13 +49,14 @@ namespace PosBranch_Win.Transaction
         private void GetImage(string Barcode)
         {
             ItemPictureGrid Item = Operation.GetItemPicture(Barcode);
-            if (Item.list.Count() > 0 || Item.list != null)
+            if (Item != null && Item.list != null && Item.list.Any())
             {
-                if(flowLayoutPanel1.Controls.Count > 0)
+                if (flowLayoutPanel1.Controls.Count > 0)
                 {
                     flowLayoutPanel1.Controls.Clear();
                 }
 
+                int i = 0;
                 foreach (var item in Item.list)
                 {
                     PictureBox pic = new PictureBox();
@@ -80,27 +81,20 @@ namespace PosBranch_Win.Transaction
                     UNit.Dock = DockStyle.Bottom;
                     UNit.Visible = Visible;
 
-                    for (int i = 0; Item.list.Count() > i; i++){
-                        Button btn = new Button
-                        {
-                            Text = item.ItemName + item.Unit,
-                            Width = 80,
-                            Height = 80,
-                            Location = new System.Drawing.Point(10, 10 + (i * 35)), // Positioning buttons vertically
-                            Name = item.ItemName,                         
-                            
-                        };
-                        btn.Click += GetItemId;
-                        this.Controls.Add(btn);
-                        flowLayoutPanel1.Controls.Add(btn);
-                        flowLayoutPanel1.Controls.Add(UNit);
-                        flowLayoutPanel1.Controls.Add(ItemId);
-                        //this.Controls.Add(flowLayoutPanel1);
-
-                    }
-                   
-
-
+                    Button btn = new Button
+                    {
+                        Text = item.ItemName + item.Unit,
+                        Width = 80,
+                        Height = 80,
+                        Location = new System.Drawing.Point(10, 10 + (i * 35)),
+                        Name = item.ItemName,
+                    };
+                    btn.Click += GetItemId;
+                    this.Controls.Add(btn);
+                    flowLayoutPanel1.Controls.Add(btn);
+                    flowLayoutPanel1.Controls.Add(UNit);
+                    flowLayoutPanel1.Controls.Add(ItemId);
+                    i++;
                 }
             }
         }

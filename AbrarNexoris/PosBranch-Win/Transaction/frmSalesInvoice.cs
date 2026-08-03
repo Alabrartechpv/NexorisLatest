@@ -980,10 +980,9 @@ namespace PosBranch_Win.Transaction
                 // Set up payment modes
                 DataTable dt = getPriceLevel();
                 PaymodeDDlGrid pm = dp.PaymodeDDl();
-                pm.List.ToString();
-                IEnumerable result = pm.List.AsEnumerable();
+                var paymodeList = (pm?.List ?? Enumerable.Empty<PaymodeDDl>()).ToList();
 
-                                cmbPaymt.DataSource = pm.List;
+                cmbPaymt.DataSource = paymodeList;
                 cmbPaymt.DisplayMember = "PayModeName";
                 cmbPaymt.ValueMember = "PayModeId";
                 int defaultCashPaymodeId = GetPaymentModeIdByName(PAYMENT_MODE_CASH, DEFAULT_PAYMENT_MODE_ID);
@@ -997,9 +996,7 @@ namespace PosBranch_Win.Transaction
                 originalPaymentModes.Columns.Add("PayModeId", typeof(int));
                 originalPaymentModes.Columns.Add("PayModeName", typeof(string));
 
-                // Payment UI initialization is now handled by FrmSalesCmpt dialog
-
-                foreach (var item in pm.List)
+                foreach (var item in paymodeList)
                 {
                     originalPaymentModes.Rows.Add(item.PayModeID, item.PayModeName);
                 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -66,7 +66,8 @@ namespace PosBranch_Win.DialogBox
             {
                 Dropdowns dp = new Dropdowns();
                 var stateData = dp.getStateDDl();
-                fullDataTable = ToDataTable(stateData.List.ToList());
+                var stateList = stateData?.List != null ? stateData.List.ToList() : new List<ModelClass.Master.StateDDL>();
+                fullDataTable = ToDataTable(stateList);
                 PreserveOriginalRowOrder(fullDataTable);
                 ultraGridState.DataSource = fullDataTable;
                 if (ultraGridState.DisplayLayout.Bands.Count > 0)

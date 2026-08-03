@@ -1,4 +1,4 @@
-﻿using Infragistics.Win.UltraWinGrid;
+using Infragistics.Win.UltraWinGrid;
 using ModelClass;
 using ModelClass.Master;
 using PosBranch_Win.Master;
@@ -36,7 +36,7 @@ namespace PosBranch_Win.DialogBox
         {
             DataBase.Operations = "GETALL";
             GroupDDlGrid group = drop.getGroupDDl();
-            group.List.ToString();
+            var groupList = (group?.List ?? Enumerable.Empty<GroupDDL>()).ToList();
             DataGridTableStyle ts1 = new DataGridTableStyle();
             DataGridColumnStyle datagrid = new DataGridBoolColumn();
             //datagrid.Width = 400;
@@ -44,7 +44,7 @@ namespace PosBranch_Win.DialogBox
             // Apply consistent UltraGrid look (match frmBrandDialog)
             SetupUltraGridStyle();
             ts1.GridColumnStyles.Add(datagrid);
-            dgv_Grop.DataSource = group.List;
+            dgv_Grop.DataSource = groupList.ToList();
 
             // Wire up double-click handler for grid (same as Enter key)
             this.dgv_Grop.DoubleClickRow += dgv_Grop_DoubleClickRow;

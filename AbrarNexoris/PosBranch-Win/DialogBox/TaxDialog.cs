@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -34,7 +34,7 @@ namespace PosBranch_Win.DialogBox
         private void TaxDialog_Load(object sender, EventArgs e)
         {
             TaxTypeDDLGrid taxObj = drop.TaxTypeDDL();
-            ultraGridTaxType.DataSource = taxObj.List;
+            ultraGridTaxType.DataSource = (taxObj?.List ?? Enumerable.Empty<TaxTypeDDL>()).ToList();
         }
 
         private void UltraGridTaxType_DoubleClickRow(object sender, DoubleClickRowEventArgs e)

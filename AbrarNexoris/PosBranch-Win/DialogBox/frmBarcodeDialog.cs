@@ -1,4 +1,4 @@
-﻿using Infragistics.Win.UltraWinGrid;
+using Infragistics.Win.UltraWinGrid;
 using ModelClass;
 using ModelClass.TransactionModels;
 using PosBranch_Win.Transaction;
@@ -33,14 +33,17 @@ namespace PosBranch_Win.DialogBox
             textBox1.Focus();
             DataBase.Operations = "GETALL";
             ItemDDlGrid im = dp.itemDDlGrid();
-            im.List.ToString();
+            var itemList = im?.List ?? Enumerable.Empty<ItemDDl>();
             DataGridTableStyle ts1 = new DataGridTableStyle();
             DataGridColumnStyle datagrid = new DataGridBoolColumn();
             //datagrid.Width = 400;
             this.ultraGrid1.DisplayLayout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
             ts1.GridColumnStyles.Add(datagrid);
-            ultraGrid1.DataSource = im.List;
-            ultraGrid1.Rows[0].Selected = true;
+            ultraGrid1.DataSource = itemList.ToList();
+            if (ultraGrid1.Rows.Count > 0)
+            {
+                ultraGrid1.Rows[0].Selected = true;
+            }
             this.Design();
             textBox1.Focus();
         }
@@ -161,20 +164,17 @@ namespace PosBranch_Win.DialogBox
                 DataBase.Operations = "GETBYNAME";
                 string output = "%" + textBox1.Text.Replace(" ", "%") + "%";
                 ItemDDlGrid im = dp.itemDDlGrid(output);
-                if (im.List != null)
+                if (im?.List != null && im.List.Any())
                 {
-                    if (im.List.Count() > 0)
-                    {
-                        im.List.ToString();
-                        DataGridTableStyle ts1 = new DataGridTableStyle();
-                        DataGridColumnStyle datagrid = new DataGridBoolColumn();
-                        //datagrid.Width = 400;
-                        this.ultraGrid1.DisplayLayout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
-                        ts1.GridColumnStyles.Add(datagrid);
-                        ultraGrid1.DataSource = im.List;
+                    DataGridTableStyle ts1 = new DataGridTableStyle();
+                    DataGridColumnStyle datagrid = new DataGridBoolColumn();
+                    //datagrid.Width = 400;
+                    this.ultraGrid1.DisplayLayout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
+                    ts1.GridColumnStyles.Add(datagrid);
+                    ultraGrid1.DataSource = im.List.ToList();
+                    if (ultraGrid1.Rows.Count > 0)
                         ultraGrid1.Rows[0].Selected = true;
-                        this.Design();
-                    }
+                    this.Design();
                 }
 
             }
@@ -182,20 +182,17 @@ namespace PosBranch_Win.DialogBox
             {
                 DataBase.Operations = "GETALL";
                 ItemDDlGrid im = dp.itemDDlGrid();
-                if (im.List != null)
+                if (im?.List != null && im.List.Any())
                 {
-                    if (im.List.Count() > 0)
-                    {
-                        im.List.ToString();
-                        DataGridTableStyle ts1 = new DataGridTableStyle();
-                        DataGridColumnStyle datagrid = new DataGridBoolColumn();
-                        //datagrid.Width = 400;
-                        this.ultraGrid1.DisplayLayout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
-                        ts1.GridColumnStyles.Add(datagrid);
-                        ultraGrid1.DataSource = im.List;
+                    DataGridTableStyle ts1 = new DataGridTableStyle();
+                    DataGridColumnStyle datagrid = new DataGridBoolColumn();
+                    //datagrid.Width = 400;
+                    this.ultraGrid1.DisplayLayout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
+                    ts1.GridColumnStyles.Add(datagrid);
+                    ultraGrid1.DataSource = im.List.ToList();
+                    if (ultraGrid1.Rows.Count > 0)
                         ultraGrid1.Rows[0].Selected = true;
-                        this.Design();
-                    }
+                    this.Design();
                 }
             }
         }

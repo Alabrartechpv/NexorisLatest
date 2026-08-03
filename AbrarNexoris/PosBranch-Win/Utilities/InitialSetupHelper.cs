@@ -103,11 +103,11 @@ namespace PosBranch_Win.Utilities
                 {
                     string insertCompSql = @"
                         INSERT INTO CompanyInfo (
-                            CompanyID, CompanyName, CompanyCaption, Address1, Country, State, 
+                            CompanyID, CompanyName, CompanyCaption, Address1, Address2, Address3, Address4, Country, State, 
                             Zipcode, Phone, Mobile, Email, Website, BusinessType, BackupPath, 
                             FinYearFrom, FinYearTo, BookFrom, BookTo, TaxSystem, Currency, IsDelete
                         ) VALUES (
-                            @CompanyID, @CompanyName, @CompanyCaption, @Address1, @Country, @State, 
+                            @CompanyID, @CompanyName, @CompanyCaption, @Address1, @Address2, @Address3, @Address4, @Country, @State, 
                             @Zipcode, @Phone, @Mobile, @Email, @Website, @BusinessType, @BackupPath, 
                             @FinYearFrom, @FinYearTo, @BookFrom, @BookTo, @TaxSystem, @Currency, @IsDelete
                         )";
@@ -118,6 +118,9 @@ namespace PosBranch_Win.Utilities
                         insertComp.Parameters.AddWithValue("@CompanyName", companyName.Trim());
                         insertComp.Parameters.AddWithValue("@CompanyCaption", string.IsNullOrWhiteSpace(companyCaption) ? "Nexoris Retail" : companyCaption.Trim());
                         insertComp.Parameters.AddWithValue("@Address1", "Main Street");
+                        insertComp.Parameters.AddWithValue("@Address2", string.Empty);
+                        insertComp.Parameters.AddWithValue("@Address3", string.Empty);
+                        insertComp.Parameters.AddWithValue("@Address4", string.Empty);
                         insertComp.Parameters.AddWithValue("@Country", 1);
                         insertComp.Parameters.AddWithValue("@State", 1);
                         insertComp.Parameters.AddWithValue("@Zipcode", "12345");
@@ -175,6 +178,7 @@ namespace PosBranch_Win.Utilities
                 if (levelCount == 0)
                 {
                     string insertLevelSql = @"
+                        SET IDENTITY_INSERT dbo.Userlevels ON;
                         INSERT INTO Userlevels (CompanyId, BranchID, UserLevelID, UserLevel) VALUES
                         (@CompanyID, 1, 1, 'Administrator'),
                         (@CompanyID, 1, 6, 'Cashier'),
@@ -182,7 +186,8 @@ namespace PosBranch_Win.Utilities
                         (@CompanyID, 1, 8, 'Sales Man'),
                         (@CompanyID, 1, 9, 'Purchase Manager'),
                         (@CompanyID, 1, 10, 'Transporter'),
-                        (@CompanyID, 1, 11, 'StockTaker')";
+                        (@CompanyID, 1, 11, 'StockTaker');
+                        SET IDENTITY_INSERT dbo.Userlevels OFF;";
 
                     using (SqlCommand insertLevels = new SqlCommand(insertLevelSql, conn, transaction))
                     {
@@ -242,6 +247,7 @@ namespace PosBranch_Win.Utilities
                 if (branchId <= 0)
                     branchId = ResolveCreatedBranchId(conn, branchName.Trim());
                 EnsureReturnLedgers(conn, companyId, branchId);
+                EnsureDefaultPayModes(conn);
 
                 return true;
             }
@@ -350,6 +356,62 @@ namespace PosBranch_Win.Utilities
                 cmd.Parameters.AddWithValue("@_Operation", "GETNEXTID");
 
                 return ToInt(cmd.ExecuteScalar());
+            }
+        }
+
+        public static void EnsureDefaultPayModesOnLaunch()
+        {
+            Repository.BaseRepostitory repo = null;
+            try
+            {
+                repo = new Repository.BaseRepostitory();
+                if (repo.DataConnection != null)
+                {
+                    if (repo.DataConnection.State != ConnectionState.Open)
+                        repo.DataConnection.Open();
+
+                    EnsureDefaultPayModes((SqlConnection)repo.DataConnection);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error checking default PayModes on launch: {ex.Message}");
+            }
+            finally
+            {
+                if (repo != null) repo.Dispose();
+            }
+        }
+
+        private static void EnsureDefaultPayModes(SqlConnection conn)
+        {
+            try
+            {
+                using (SqlCommand checkCmd = new SqlCommand("SELECT COUNT(*) FROM PayMode WHERE IsDelete = 0 OR IsDelete IS NULL", conn))
+                {
+                    int count = ToInt(checkCmd.ExecuteScalar());
+                    if (count == 0)
+                    {
+                        string sql = @"
+                            IF OBJECTPROPERTY(OBJECT_ID('dbo.PayMode'), 'TableHasIdentity') = 1 SET IDENTITY_INSERT dbo.PayMode ON;
+                            INSERT INTO PayMode (PayModeID, PayModeName, IsDelete) VALUES
+                            (1, 'Cash', 0),
+                            (2, 'Credit', 0),
+                            (3, 'Card', 0),
+                            (4, 'Bank Transfer', 0),
+                            (5, 'Cheque', 0);
+                            IF OBJECTPROPERTY(OBJECT_ID('dbo.PayMode'), 'TableHasIdentity') = 1 SET IDENTITY_INSERT dbo.PayMode OFF;";
+
+                        using (SqlCommand insertCmd = new SqlCommand(sql, conn))
+                        {
+                            insertCmd.ExecuteNonQuery();
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error seeding PayMode default records: {ex.Message}");
             }
         }
 

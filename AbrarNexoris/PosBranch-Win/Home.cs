@@ -2517,20 +2517,40 @@ namespace PosBranch_Win
                         }
                         break;
                     case Keys.P:
-                        OpenFormInTab(new Transaction.FrmPurchase(), "Purchase");
-                        return true;
+                        if (!ctrl)
+                        {
+                            OpenFormInTab(new Transaction.FrmPurchase(), "Purchase");
+                            return true;
+                        }
+                        break;
                     case Keys.S:
-                        OpenFormInTab(new Transaction.frmSalesInvoice(), "Sales Invoice");
-                        return true;
+                        if (!ctrl)
+                        {
+                            OpenFormInTab(new Transaction.frmSalesInvoice(), "Sales Invoice");
+                            return true;
+                        }
+                        break;
                     case Keys.A:
-                        OpenFormInTab(new Transaction.FrmStockAdjustment(), "Stock Adjustment");
-                        return true;
+                        if (!ctrl)
+                        {
+                            OpenFormInTab(new Transaction.FrmStockAdjustment(), "Stock Adjustment");
+                            return true;
+                        }
+                        break;
                     case Keys.R:
-                        OpenFormInTab(new Transaction.frmSalesReturn(), "Sales Return");
-                        return true;
+                        if (!ctrl)
+                        {
+                            OpenFormInTab(new Transaction.frmSalesReturn(), "Sales Return");
+                            return true;
+                        }
+                        break;
                     case Keys.E:
-                        OpenFormInTab(new Transaction.frmPurchaseReturn(), "Purchase Return");
-                        return true;
+                        if (!ctrl)
+                        {
+                            OpenFormInTab(new Transaction.frmPurchaseReturn(), "Purchase Return");
+                            return true;
+                        }
+                        break;
                 }
             }
 

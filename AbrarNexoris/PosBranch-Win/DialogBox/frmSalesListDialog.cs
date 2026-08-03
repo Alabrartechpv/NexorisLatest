@@ -88,8 +88,9 @@ namespace PosBranch_Win.DialogBox
             try
             {
                 GetHoldBillGrid data = Sales.GetBill();
+                var rawList = (data?.List ?? Enumerable.Empty<GetHoldBill>()).ToList();
                 // Default: show last sales first
-                salesListData = ApplySort(data.List);
+                salesListData = ApplySort(rawList);
                 ultraGrid1.DataSource = salesListData;
 
                 if (ultraGrid1.Rows.Count > 0)
