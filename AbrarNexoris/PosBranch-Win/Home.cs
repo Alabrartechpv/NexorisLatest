@@ -2494,12 +2494,89 @@ namespace PosBranch_Win
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
-            if (keyData == (Keys.Control | Keys.I))
+            Keys keyCode = keyData & Keys.KeyCode;
+            bool ctrl = (keyData & Keys.Control) == Keys.Control;
+            bool alt = (keyData & Keys.Alt) == Keys.Alt;
+
+            if (ctrl && keyCode == Keys.I)
             {
                 ToggleNexorisAI();
                 return true;
             }
+
+            // Shortcuts to open forms: I (Item Master), P (Purchase), S (Sales Invoice), A (Stock Adjustment), R (Sales Return), E (Purchase Return)
+            if (!IsTextInputControlFocused() || alt || (ctrl && keyCode != Keys.I))
+            {
+                switch (keyCode)
+                {
+                    case Keys.I:
+                        if (!ctrl)
+                        {
+                            OpenFormInTab(new Master.frmItemMasterNew(), "Item Master");
+                            return true;
+                        }
+                        break;
+                    case Keys.P:
+                        OpenFormInTab(new Transaction.FrmPurchase(), "Purchase");
+                        return true;
+                    case Keys.S:
+                        OpenFormInTab(new Transaction.frmSalesInvoice(), "Sales Invoice");
+                        return true;
+                    case Keys.A:
+                        OpenFormInTab(new Transaction.FrmStockAdjustment(), "Stock Adjustment");
+                        return true;
+                    case Keys.R:
+                        OpenFormInTab(new Transaction.frmSalesReturn(), "Sales Return");
+                        return true;
+                    case Keys.E:
+                        OpenFormInTab(new Transaction.frmPurchaseReturn(), "Purchase Return");
+                        return true;
+                }
+            }
+
             return base.ProcessCmdKey(ref msg, keyData);
+        }
+
+        private bool IsTextInputControlFocused()
+        {
+            try
+            {
+                Control focused = GetFocusedControl(this);
+                if (focused == null) return false;
+
+                if (focused is TextBoxBase ||
+                    focused is DateTimePicker ||
+                    focused is ComboBox ||
+                    focused.GetType().Name.Contains("TextBox") ||
+                    focused.GetType().Name.Contains("UltraTextEditor") ||
+                    focused.GetType().Name.Contains("UltraComboEditor") ||
+                    focused.GetType().Name.Contains("UltraDateTimeEditor") ||
+                    focused.GetType().Name.Contains("UltraNumericEditor"))
+                {
+                    return true;
+                }
+
+                if (focused is Infragistics.Win.UltraWinGrid.UltraGrid grid && grid.ActiveCell != null && grid.ActiveCell.IsInEditMode)
+                {
+                    return true;
+                }
+
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private Control GetFocusedControl(Control parent)
+        {
+            if (parent == null) return null;
+            if (parent is ContainerControl container && container.ActiveControl != null)
+            {
+                return GetFocusedControl(container.ActiveControl);
+            }
+            return parent;
         }
 
         private void Home_KeyDown(object sender, KeyEventArgs e)

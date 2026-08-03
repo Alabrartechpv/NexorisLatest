@@ -524,9 +524,9 @@ namespace PosBranch_Win.Transaction
             ultraGrid2.InitializeLayout += UltraGrid2_InitializeLayout;
             ultraGrid2.Resize += (s, e) => UpdateUltraGrid2FooterCellPositions();
 
-            // Register for resize events to update footer position
+            // Register for resize events to update footer position & panel layout
             ultraGrid1.Resize += (s, e) => UpdateFooterCellPositions();
-            this.Resize += (s, e) => UpdateFooterCellPositions();
+            this.Resize += (s, e) => { SetPurchaseOrderPanelVisibility(_purchaseOrderPanelVisible); UpdateFooterCellPositions(); };
             ultraPanel1.Resize += (s, e) => SetPurchaseOrderPanelVisibility(_purchaseOrderPanelVisible);
 
             // Add click event for ultraPictureBox7 to open PurchaseEdit with highlighted row
@@ -799,35 +799,60 @@ namespace PosBranch_Win.Transaction
             ultraPanel1.SuspendLayout();
             ultraPanel7.SuspendLayout();
             ultraPanel4.SuspendLayout();
+            if (ultraPanel5 != null) ultraPanel5.SuspendLayout();
 
             try
             {
                 _purchaseOrderPanelVisible = visible;
 
                 int clientWidth = ultraPanel1.ClientArea.Width;
+                int clientHeight = ultraPanel1.ClientArea.Height;
+
+                if (clientWidth <= 0 || clientHeight <= 0)
+                    return;
+
+                // 1. Position bottom totals panel (ultraPanel5) dynamically at the bottom of ultraPanel1
+                if (ultraPanel5 != null)
+                {
+                    int panel5Height = ultraPanel5.Height > 0 ? ultraPanel5.Height : 95;
+                    ultraPanel5.Left = 6;
+                    ultraPanel5.Width = Math.Max(100, clientWidth - 12);
+                    ultraPanel5.Top = Math.Max(250, clientHeight - panel5Height - 5);
+                }
+
+                // 2. Determine top and height for middle panels (ultraPanel7 & ultraPanel4)
+                int middleTop = _panelTop > 0 ? _panelTop : 162;
+                int bottomTop = (ultraPanel5 != null) ? ultraPanel5.Top : (clientHeight - 95);
+                int middleHeight = Math.Max(100, bottomTop - middleTop - 5);
+
+                // 3. Position ultraPanel7 (PO Panel if visible) and ultraPanel4 (Item Information Panel)
                 int itemPanelLeft = visible ? _itemPanelVisibleLeft : _poPanelLeft;
                 int itemPanelWidth = Math.Max(0, clientWidth - _rightMargin - itemPanelLeft);
 
                 ultraPanel7.Left = _poPanelLeft;
-                ultraPanel7.Top = _poPanelTop;
+                ultraPanel7.Top = middleTop;
                 ultraPanel7.Width = _poPanelWidth;
+                ultraPanel7.Height = middleHeight;
                 ultraPanel7.Visible = visible;
 
                 label9.Location = new Point(_poPanelLeft + _label9OffsetX, _labelOffsetY);
                 label9.Visible = visible;
 
                 ultraPanel4.Left = itemPanelLeft;
-                ultraPanel4.Top = _panelTop;
+                ultraPanel4.Top = middleTop;
                 ultraPanel4.Width = itemPanelWidth;
+                ultraPanel4.Height = middleHeight;
                 label10.Location = new Point(itemPanelLeft + _label10OffsetX, _labelOffsetY);
             }
             finally
             {
+                if (ultraPanel5 != null) ultraPanel5.ResumeLayout();
                 ultraPanel4.ResumeLayout();
                 ultraPanel7.ResumeLayout();
                 ultraPanel1.ResumeLayout();
             }
 
+            if (ultraPanel5 != null) ultraPanel5.PerformLayout();
             ultraPanel4.PerformLayout();
             ultraPanel7.PerformLayout();
             ultraPanel1.PerformLayout();
@@ -1268,6 +1293,7 @@ namespace PosBranch_Win.Transaction
                 .ToList();
             CmboPayment.DisplayMember = "PayModeName";
             CmboPayment.ValueMember = "PayModeID";
+            SetDefaultPaymentMode();
 
             VendorDDLGrids VendorDDLGrids = drop.VendorDDL();
             CmboVendor.DataSource = VendorDDLGrids.List;
@@ -5681,6 +5707,9 @@ namespace PosBranch_Win.Transaction
                 pbxSave.Visible = true;
                 ultraPictureBox4.Visible = false;
 
+                // Reset payment mode to Credit as default
+                SetDefaultPaymentMode();
+
                 // Highlight mandatory fields again
                 HighlightMandatoryFields();
 
@@ -5690,6 +5719,33 @@ namespace PosBranch_Win.Transaction
             finally
             {
                 _isLoadingPurchaseForActivitySnapshot = false;
+            }
+        }
+
+        private void SetDefaultPaymentMode()
+        {
+            try
+            {
+                if (CmboPayment == null || CmboPayment.Items == null || CmboPayment.Items.Count == 0)
+                    return;
+
+                foreach (var item in CmboPayment.Items)
+                {
+                    if (item.ListObject is PaymodeDDl pm && string.Equals(pm.PayModeName, "Credit", StringComparison.OrdinalIgnoreCase))
+                    {
+                        CmboPayment.Value = pm.PayModeID;
+                        return;
+                    }
+                    if (string.Equals(item.DisplayText, "Credit", StringComparison.OrdinalIgnoreCase))
+                    {
+                        CmboPayment.SelectedItem = item;
+                        return;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Error setting default payment mode: " + ex.Message);
             }
         }
 

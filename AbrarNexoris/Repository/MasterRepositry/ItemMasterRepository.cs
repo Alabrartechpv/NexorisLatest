@@ -146,7 +146,11 @@ namespace Repository.MasterRepositry
                         }
                         if ((ds != null) && (ds.Tables.Count > 1) && (ds.Tables[1] != null) && (ds.Tables[1].Rows.Count > 0))
                         {
-                            item.List = ds.Tables[1].ToArrayOfObject<ItemMasterPriceSettings>();
+                            item.List = ds.Tables[1].ToArrayOfObject<ItemMasterPriceSettings>()
+                                .OrderByDescending(p => string.Equals(p.IsBaseUnit, "Y", StringComparison.OrdinalIgnoreCase))
+                                .ThenBy(p => Math.Abs(p.Packing - 1d) < 0.0001d ? 0 : 1)
+                                .ThenBy(p => p.Packing)
+                                .ToArray();
                             System.Diagnostics.Debug.WriteLine($"GetByIdItem: Loaded {item.List?.Length ?? 0} price settings for ItemId {selectedId}");
                         }
                         if ((ds != null) && (ds.Tables.Count > 2) && (ds.Tables[2] != null) && (ds.Tables[2].Rows.Count > 0))
@@ -1188,7 +1192,11 @@ WHERE ItemId = @ItemId";
                         adapt.Fill(ds);
                         if (ds != null && ds.Tables.Count > 0 && ds.Tables[0] != null && ds.Tables[0].Rows.Count > 0)
                         {
-                            priceSettings = ds.Tables[0].ToListOfObject<ItemMasterPriceSettings>();
+                            priceSettings = ds.Tables[0].ToListOfObject<ItemMasterPriceSettings>()
+                                .OrderByDescending(p => string.Equals(p.IsBaseUnit, "Y", StringComparison.OrdinalIgnoreCase))
+                                .ThenBy(p => Math.Abs(p.Packing - 1d) < 0.0001d ? 0 : 1)
+                                .ThenBy(p => p.Packing)
+                                .ToList();
                         }
                     }
                 }

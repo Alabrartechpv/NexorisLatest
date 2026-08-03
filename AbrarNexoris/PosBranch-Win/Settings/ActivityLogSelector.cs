@@ -68,6 +68,7 @@ namespace PosBranch_Win.Settings
             };
             buttonRow.Controls.Add(CreateLogButton("ItemLog", "Activity Log - Item Master", () => new ActivityLog()));
             buttonRow.Controls.Add(CreateLogButton("itemstockactivity", "Activity Log - Item Stock", () => new ItemStockActivity()));
+            buttonRow.Controls.Add(CreateLogButton("ItemHistoryLog", "Activity Log - Item History", () => new ItemHistoryLog()));
             buttonRow.Controls.Add(CreateLogButton("PurchaseLog", "Activity Log - Purchase", () => new PurchaseLog()));
             buttonRow.Controls.Add(CreateLogButton("SalesLog", "Activity Log - Sales", () => new SalesLog()));
             buttonRow.Controls.Add(CreateLogButton("UserLog", "Activity Log - User Logging", () => new UserActivityLog()));
@@ -132,3 +133,4 @@ namespace PosBranch_Win.Settings
         }
     }
 }
+
