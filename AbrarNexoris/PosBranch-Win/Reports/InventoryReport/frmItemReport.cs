@@ -196,6 +196,15 @@ namespace PosBranch_Win.Reports.InventoryReport
                             else if (selectedData.ContainsKey("ItemName") && selectedData["ItemName"] != null)
                                 desc = selectedData["ItemName"].ToString();
 
+                            if (itemId == 0 && itemDialog.SelectedItemId > 0)
+                            {
+                                itemId = (int)itemDialog.SelectedItemId;
+                            }
+                            if (string.IsNullOrEmpty(desc) && !string.IsNullOrEmpty(itemDialog.SelectedItemName))
+                            {
+                                desc = itemDialog.SelectedItemName;
+                            }
+
                             if (itemId > 0)
                             {
                                 selectedItemId = itemId;

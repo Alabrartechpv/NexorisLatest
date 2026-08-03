@@ -2568,9 +2568,9 @@ namespace PosBranch_Win.DialogBox
                         SendItemToPurchaseReturn();
                         return true;
                     }
-                    else if (FormName == "FrmBarcode" || FormName == "frmChangeItemNo" || FormName == "frmvendorpurchasereport")
+                    else
                     {
-                        // Handle simple selection dialogs (e.g. FrmBarcode, frmChangeItemNo, frmvendorpurchasereport, ItemStockActivity, frmItemReport)
+                        // Handle simple selection dialogs (e.g. FrmBarcode, frmChangeItemNo, frmvendorpurchasereport, ItemStockActivity, frmItemReport, etc.)
                         System.Diagnostics.Debug.WriteLine($"Enter key pressed, selecting item for {FormName}");
                         CaptureSelectedItemData();
                         this.DialogResult = DialogResult.OK;
@@ -2621,9 +2621,9 @@ namespace PosBranch_Win.DialogBox
                     System.Diagnostics.Debug.WriteLine("Double-click detected, sending item to Stock Transfer");
                     SendItemToStockTransfer();
                 }
-                else if (FormName == "FrmBarcode" || FormName == "frmChangeItemNo" || FormName == "frmvendorpurchasereport" || FormName == "ItemStockActivity")
+                else
                 {
-                    // Handle simple selection dialogs (e.g. FrmBarcode, frmChangeItemNo, frmvendorpurchasereport, ItemStockActivity, frmItemReport)
+                    // Handle simple selection dialogs (e.g. FrmBarcode, frmChangeItemNo, frmvendorpurchasereport, ItemStockActivity, frmItemReport, etc.)
                     System.Diagnostics.Debug.WriteLine($"Double-click detected, selecting item for {FormName}");
                     CaptureSelectedItemData();
                     this.DialogResult = DialogResult.OK;
@@ -2640,13 +2640,9 @@ namespace PosBranch_Win.DialogBox
 
         private void ultraGrid1_ClickCell(object sender, Infragistics.Win.UltraWinGrid.ClickCellEventArgs e)
         {
-            // We will no longer send items on single click for most forms
-            // Items will only be loaded on double-click or Enter key press
-
-            // However, for FrmBarcode, we can allow single click for better UX
-            if (FormName == "FrmBarcode" || FormName == "frmChangeItemNo" || FormName == "frmvendorpurchasereport" || FormName == "ItemHistoryLog")
+            // For simple selection dialogs, allow single click selection
+            if (FormName == "FrmBarcode" || FormName == "frmChangeItemNo" || FormName == "frmvendorpurchasereport" || FormName == "ItemHistoryLog" || FormName == "ItemStockActivity" || FormName == "frmItemReport")
             {
-                // For simple selection dialogs, allow single click selection
                 CaptureSelectedItemData();
                 this.DialogResult = DialogResult.OK;
                 this.Close();
