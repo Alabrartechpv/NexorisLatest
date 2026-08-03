@@ -1,4 +1,4 @@
-﻿using ModelClass;
+using ModelClass;
 using ModelClass.Master;
 using Repository;
 using Repository.MasterRepositry;
@@ -589,11 +589,11 @@ namespace PosBranch_Win.Master
         public void List()
         {
             ItemlistDDlGrid itemlistgrid = dd.ItemlistgridDDl();
-            itemlistgrid.List.ToString();
+            var itemList = itemlistgrid?.List ?? Enumerable.Empty<ItemlistDDl>();
             DataGridTableStyle ts1 = new DataGridTableStyle();
             DataGridColumnStyle datagrid = new DataGridBoolColumn();
             ts1.GridColumnStyles.Add(datagrid);
-            dgv_list_itemmaster.DataSource = itemlistgrid.List;
+            dgv_list_itemmaster.DataSource = itemList.ToList();
         }
 
         private int rowCount = 0;

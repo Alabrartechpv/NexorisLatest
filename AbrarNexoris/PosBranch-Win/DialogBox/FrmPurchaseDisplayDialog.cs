@@ -1,4 +1,4 @@
-﻿using ModelClass;
+using ModelClass;
 using Infragistics.Win.UltraWinGrid;
 using ModelClass.Master;
 using ModelClass.TransactionModels;
@@ -924,9 +924,7 @@ namespace PosBranch_Win.DialogBox
             // Log the current branch being used (for debugging)
             System.Diagnostics.Debug.WriteLine($"FrmPurchaseDisplayDialog_Load: Loading purchases for BranchId={SessionContext.BranchId}, CompanyId={SessionContext.CompanyId}");
 
-            PurchaseGrid purchaseGrid = new PurchaseGrid();
-            purchaseGrid = drop.getAllPurchaseMaster();
-            purchaseGrid.ListPurchase.ToString();
+            PurchaseGrid purchaseGrid = drop.getAllPurchaseMaster();
 
             // Create DataTable from the list to allow sorting and searching
             DataTable dt = new DataTable();

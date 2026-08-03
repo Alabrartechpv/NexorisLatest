@@ -1,4 +1,4 @@
-﻿using Infragistics.Win.UltraWinGrid;
+using Infragistics.Win.UltraWinGrid;
 using Infragistics.Win.UltraWinTabControl;
 using ModelClass;
 using ModelClass.Master;
@@ -37,14 +37,14 @@ namespace PosBranch_Win.DialogBox
         {
             DataBase.Operations = "GETALL";
             BrandDDLGrid brand = drop.getBrandDDL();
-            brand.List.ToString();
+            var brandList = brand?.List ?? Enumerable.Empty<BrandDDL>();
             DataGridTableStyle ts1 = new DataGridTableStyle();
             DataGridColumnStyle datagrid = new DataGridBoolColumn();
             //datagrid.Width = 400;
             // Apply consistent UltraGrid look (match frmdialForItemMaster)
             SetupUltraGridStyle();
             ts1.GridColumnStyles.Add(datagrid);
-            ultraGrid1.DataSource = brand.List;
+            ultraGrid1.DataSource = brandList.ToList();
 
             // Wire double-click to select brand
             this.ultraGrid1.DoubleClickCell -= ultraGrid1_DoubleClickCell;

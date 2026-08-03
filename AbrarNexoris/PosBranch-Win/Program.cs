@@ -82,6 +82,9 @@ namespace PosBranch_Win
 
             if (runLogin)
             {
+                // Ensure default payment modes (Cash, Credit, Card, Bank, Cheque) exist
+                Utilities.InitialSetupHelper.EnsureDefaultPayModesOnLaunch();
+
                 // Then show the login form
                 Application.Run(new Login());
             }

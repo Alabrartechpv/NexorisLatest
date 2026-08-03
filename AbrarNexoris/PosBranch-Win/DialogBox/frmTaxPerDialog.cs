@@ -1,4 +1,4 @@
-﻿using Infragistics.Win.UltraWinGrid;
+using Infragistics.Win.UltraWinGrid;
 using ModelClass;
 using ModelClass.Master;
 using PosBranch_Win.Master;
@@ -41,13 +41,13 @@ namespace PosBranch_Win.DialogBox
         {
             DataBase.Operations = "GETTAXPER";
             TaxPerDDlGrid taxper = drop.GetTaxPer();
-            taxper.List.ToString();
+            var taxPerList = taxper?.List ?? Enumerable.Empty<TaxPerDDl>();
             DataGridTableStyle ts1 = new DataGridTableStyle();
             DataGridColumnStyle datagrid = new DataGridBoolColumn();
             //datagrid.Width = 400;
             this.ultraGrid1.DisplayLayout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
             ts1.GridColumnStyles.Add(datagrid);
-            ultraGrid1.DataSource = taxper.List;
+            ultraGrid1.DataSource = taxPerList.ToList();
         }
 
         private void ultraGrid1_KeyPress(object sender, KeyPressEventArgs e)

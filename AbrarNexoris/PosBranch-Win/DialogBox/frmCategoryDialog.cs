@@ -1233,14 +1233,17 @@ namespace PosBranch_Win.DialogBox
                 CategoryDDlGrid category = drop.getCategoryDDl("");
 
                 // Fill the datatable with data
-                int rowIndex = 0;
-                foreach (var item in category.List)
+                if (category?.List != null)
                 {
-                    DataRow newRow = fullDataTable.NewRow();
-                    newRow["Id"] = item.Id;
-                    newRow["CategoryName"] = item.CategoryName;
-                    newRow["OriginalRowOrder"] = rowIndex++;
-                    fullDataTable.Rows.Add(newRow);
+                    int rowIndex = 0;
+                    foreach (var item in category.List)
+                    {
+                        DataRow newRow = fullDataTable.NewRow();
+                        newRow["Id"] = item.Id;
+                        newRow["CategoryName"] = item.CategoryName;
+                        newRow["OriginalRowOrder"] = rowIndex++;
+                        fullDataTable.Rows.Add(newRow);
+                    }
                 }
 
                 // Set the initial data source for the grid

@@ -1,4 +1,4 @@
-﻿using Infragistics.Win.UltraWinGrid;
+using Infragistics.Win.UltraWinGrid;
 using ModelClass;
 using ModelClass.Master;
 using Repository;
@@ -25,13 +25,13 @@ namespace PosBranch_Win.DialogBox
         private void frmUnitDialogItem_Load(object sender, EventArgs e)
         {
             UnitDDlGrid unit = dp.getUnitDDl();
-            unit.List.ToString();
+            var unitList = (unit?.List ?? Enumerable.Empty<UnitDDL>()).ToList();
             DataGridTableStyle ts1 = new DataGridTableStyle();
             DataGridColumnStyle datagrid = new DataGridBoolColumn();
             //datagrid.Width = 400;
             this.ultraGrid1.DisplayLayout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
             ts1.GridColumnStyles.Add(datagrid);
-            ultraGrid1.DataSource = unit.List;
+            ultraGrid1.DataSource = unitList.ToList();
         }
     }
 }

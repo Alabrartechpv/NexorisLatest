@@ -1,4 +1,4 @@
-﻿using Infragistics.Win.UltraWinGrid;
+using Infragistics.Win.UltraWinGrid;
 using ModelClass;
 using ModelClass.Master;
 using Repository;
@@ -74,22 +74,20 @@ namespace PosBranch_Win.Transaction
             //here selecting the customer ddl
 
             CustomerDDlGrid cs = dp.CustomerDDl();
-            cs.List.ToString();
-            if(cs.List.Count<CustomerDDl>() > 0)
+            var customerList = (cs?.List ?? Enumerable.Empty<CustomerDDl>()).ToList();
+            if (customerList.Any())
             {              
-                var dt = cs.List.AsEnumerable<CustomerDDl>();
-              var customer =  cs.List.Where(i => i.LedgerName.Contains("DEFAULT CUSTOMER"));
-               if(customer.First().LedgerName == "DEFAULT CUSTOMER")
+                var customer = customerList.FirstOrDefault(i => i.LedgerName != null && i.LedgerName.Contains("DEFAULT CUSTOMER"));
+                if (customer != null)
                 {
-                    txtCustomer.Text = "DEFAULT CUSTOMER";
+                    txtCustomer.Text = customer.LedgerName;
                 }
-               else
+                else
                 {
                     listvCustomer.Visible = true;
-                    listvCustomer.DataSource = cs.List;
+                    listvCustomer.DataSource = customerList;
                     listvCustomer.DisplayMember = "LedgerName";
                 }
-                
             }
 
         }

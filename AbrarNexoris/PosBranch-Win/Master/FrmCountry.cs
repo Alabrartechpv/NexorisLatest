@@ -1,4 +1,4 @@
-﻿using ModelClass;
+using ModelClass;
 using ModelClass.Master;
 using PosBranch_Win.DialogBox;
 using Repository;
@@ -39,10 +39,10 @@ namespace PosBranch_Win.Master
             KeyPreview = true;
 
             TaxTypeDDLGrid taxgrid = drop.TaxTypeDDL();
-            taxgrid.List.ToString();
+            var taxList = taxgrid?.List ?? Enumerable.Empty<TaxTypeDDL>();
             
             // Set data source for UltraGrid
-            ultraGrid1.DataSource = taxgrid.List;
+            ultraGrid1.DataSource = taxList.ToList();
             btnUpdate.Visible = false;
             this.RefreshCountry();
         }
