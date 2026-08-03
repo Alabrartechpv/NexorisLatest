@@ -2640,13 +2640,8 @@ namespace PosBranch_Win.DialogBox
 
         private void ultraGrid1_ClickCell(object sender, Infragistics.Win.UltraWinGrid.ClickCellEventArgs e)
         {
-            // For simple selection dialogs, allow single click selection
-            if (FormName == "FrmBarcode" || FormName == "frmChangeItemNo" || FormName == "frmvendorpurchasereport" || FormName == "ItemHistoryLog" || FormName == "ItemStockActivity" || FormName == "frmItemReport")
-            {
-                CaptureSelectedItemData();
-                this.DialogResult = DialogResult.OK;
-                this.Close();
-            }
+            // Capture selected item data on single click without closing the form
+            CaptureSelectedItemData();
         }
 
 
