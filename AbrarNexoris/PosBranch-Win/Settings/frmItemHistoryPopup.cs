@@ -2,6 +2,7 @@ using System;
 using System.Data;
 using System.Drawing;
 using System.Windows.Forms;
+using Repository.SettingsRepo;
 
 namespace PosBranch_Win.Settings
 {
@@ -114,6 +115,7 @@ namespace PosBranch_Win.Settings
                 {
                     data = repo.GetItemDedicatedHistory(searchText);
                 }
+                ItemHistoryLog.ApplyBriefActivityDetails(data);
                 gridHistory.DataSource = data;
                 ConfigureGrid();
                 ApplyActionColors();
@@ -177,6 +179,7 @@ namespace PosBranch_Win.Settings
             if (gridHistory.Columns.Contains(colName))
             {
                 gridHistory.Columns[colName].DisplayIndex = 0;
+                gridHistory.Columns[colName].Frozen = true;
                 return;
             }
 
@@ -187,7 +190,8 @@ namespace PosBranch_Win.Settings
                 Text = "+",
                 UseColumnTextForButtonValue = true,
                 Width = 38,
-                FlatStyle = FlatStyle.Flat
+                FlatStyle = FlatStyle.Flat,
+                Frozen = true
             };
             gridHistory.Columns.Insert(0, btn);
         }
@@ -217,15 +221,7 @@ namespace PosBranch_Win.Settings
             if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
             if (gridHistory.Columns[e.ColumnIndex].Name == "ViewDetailsHistory")
             {
-                string details = Convert.ToString(gridHistory.Rows[e.RowIndex].Cells["ActivityDetails"].Value);
-                if (string.IsNullOrWhiteSpace(details))
-                {
-                    details = "No additional details available.";
-                }
-                else
-                {
-                    details = FilterActivityDetails(details);
-                }
+                string details = ItemHistoryLog.BuildBriefActivityDetails(gridHistory.Rows[e.RowIndex]);
                 MessageBox.Show(details, "Activity Details", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
