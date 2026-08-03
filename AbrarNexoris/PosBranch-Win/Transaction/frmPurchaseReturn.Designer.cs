@@ -212,12 +212,12 @@ namespace PosBranch_Win.Transaction
             this.ultraPanel1.ClientArea.Controls.Add(this.ultraTextEditor1);
             this.ultraPanel1.ClientArea.Controls.Add(this.textBox2);
             this.ultraPanel1.ClientArea.Controls.Add(this.ultraDateTimeEditor2);
-            this.ultraPanel1.ClientArea.Controls.Add(this.button1);
             this.ultraPanel1.ClientArea.Controls.Add(this.ultraPanel3);
             this.ultraPanel1.ClientArea.Controls.Add(this.lblPRamount);
             this.ultraPanel1.ClientArea.Controls.Add(this.VendorName);
             this.ultraPanel1.ClientArea.Controls.Add(this.lblDte2);
             this.ultraPanel1.ClientArea.Controls.Add(this.TxtSRNO);
+            this.ultraPanel1.ClientArea.Controls.Add(this.button1);
             this.ultraPanel1.ClientArea.Controls.Add(this.ultraDateTimeEditor1);
             this.ultraPanel1.ClientArea.Controls.Add(this.btnAddPurchaceList);
             this.ultraPanel1.ClientArea.Controls.Add(this.Vendorbutton);
@@ -505,14 +505,14 @@ namespace PosBranch_Win.Transaction
             // 
             // button1
             // 
-            this.button1.Anchor = System.Windows.Forms.AnchorStyles.Left;
+            this.button1.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
             this.button1.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(122)))), ((int)(((byte)(204)))));
             this.button1.BackgroundImage = ((System.Drawing.Image)(resources.GetObject("button1.BackgroundImage")));
             this.button1.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Stretch;
             this.button1.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.button1.ForeColor = System.Drawing.Color.Aquamarine;
             this.button1.ImageKey = "(none)";
-            this.button1.Location = new System.Drawing.Point(1270, 145);
+            this.button1.Location = new System.Drawing.Point(1194, 57);
             this.button1.Name = "button1";
             this.button1.Size = new System.Drawing.Size(23, 22);
             this.button1.TabIndex = 41;
@@ -838,14 +838,14 @@ namespace PosBranch_Win.Transaction
             // 
             // TxtSRNO
             // 
-            this.TxtSRNO.Anchor = System.Windows.Forms.AnchorStyles.Left;
+            this.TxtSRNO.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
             appearance29.BackColor = System.Drawing.Color.White;
             appearance29.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(170)))), ((int)(((byte)(205)))), ((int)(((byte)(245)))));
             this.TxtSRNO.Appearance = appearance29;
             this.TxtSRNO.BackColor = System.Drawing.Color.White;
             this.TxtSRNO.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
             this.TxtSRNO.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.TxtSRNO.Location = new System.Drawing.Point(1167, 145);
+            this.TxtSRNO.Location = new System.Drawing.Point(1090, 58);
             this.TxtSRNO.Name = "TxtSRNO";
             this.TxtSRNO.Size = new System.Drawing.Size(102, 22);
             this.TxtSRNO.TabIndex = 33;
@@ -859,7 +859,7 @@ namespace PosBranch_Win.Transaction
             this.ultraDateTimeEditor1.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.ultraDateTimeEditor1.Location = new System.Drawing.Point(1087, 28);
             this.ultraDateTimeEditor1.Name = "ultraDateTimeEditor1";
-            this.ultraDateTimeEditor1.Size = new System.Drawing.Size(111, 24);
+            this.ultraDateTimeEditor1.Size = new System.Drawing.Size(105, 24);
             this.ultraDateTimeEditor1.TabIndex = 4;
             this.ultraDateTimeEditor1.Value = new System.DateTime(2026, 3, 4, 0, 0, 0, 0);
             this.ultraDateTimeEditor1.ValueChanged += new System.EventHandler(this.ultraDateTimeEditor1_ValueChanged);
@@ -918,10 +918,10 @@ namespace PosBranch_Win.Transaction
             // 
             // lblPRno
             // 
-            this.lblPRno.Anchor = System.Windows.Forms.AnchorStyles.Left;
+            this.lblPRno.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
             this.lblPRno.AutoSize = true;
             this.lblPRno.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.lblPRno.Location = new System.Drawing.Point(1115, 149);
+            this.lblPRno.Location = new System.Drawing.Point(1037, 62);
             this.lblPRno.Name = "lblPRno";
             this.lblPRno.Size = new System.Drawing.Size(56, 16);
             this.lblPRno.TabIndex = 10;

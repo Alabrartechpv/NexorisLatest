@@ -1,4 +1,5 @@
 using Infragistics.Win;
+using Infragistics.Win.Misc;
 using Infragistics.Win.UltraWinGrid;
 using ModelClass;
 using ModelClass.Report;
@@ -22,6 +23,18 @@ namespace PosBranch_Win.Reports.InventoryReport
     {
         private ItemReportRepo itemReportRepo;
         private BaseRepostitory baseRepo;
+        private int selectedItemId = 0;
+        private string selectedItemName = "";
+
+        private Dictionary<string, Label> summaryLabels = new Dictionary<string, Label>();
+        private Dictionary<string, string> columnAggregations = new Dictionary<string, string>
+        {
+            { "Qty", "None" },
+            { "Cost", "Average" },
+            { "UnitPrice", "Average" },
+            { "Balance", "None" }
+        };
+        private readonly string[] summaryTypes = new string[] { "None", "Sum", "Average", "Min", "Max", "Count" };
 
         public frmItemReport()
         {
@@ -36,24 +49,58 @@ namespace PosBranch_Win.Reports.InventoryReport
                 itemReportRepo = new ItemReportRepo();
                 baseRepo = new BaseRepostitory();
 
-                // Load initial data
+                // Load branches dropdown
                 LoadBranches();
-                LoadItems();
 
-                // Configure Grids
+                // Configure Grid & Buttons
                 ConfigureTransactionGrid();
-                ConfigurePriceSettingsGrid();
-                ConfigureVendorGrid();
-                ConfigureStockGrid();
-                ConfigurePendingOrdersGrid();
-
-                // Style Buttons
                 StyleButtons();
+                SetupSearchIcon();
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Error initializing form: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        private void SetupSearchIcon()
+        {
+            try
+            {
+                picItemSearch.UseAppStyling = false;
+                picItemSearch.UseOsThemes = DefaultableBoolean.False;
+                picItemSearch.Appearance.BackColor = Color.FromArgb(72, 122, 214);
+                picItemSearch.Appearance.BackColor2 = Color.FromArgb(48, 90, 175);
+                picItemSearch.Appearance.BackGradientStyle = GradientStyle.Vertical;
+                picItemSearch.Appearance.BorderColor = Color.FromArgb(40, 80, 160);
+                picItemSearch.BorderStyle = UIElementBorderStyle.Solid;
+                picItemSearch.Cursor = Cursors.Hand;
+
+                Bitmap bmp = new Bitmap(28, 25);
+                using (Graphics g = Graphics.FromImage(bmp))
+                {
+                    g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                    g.Clear(Color.Transparent);
+                    using (Pen p = new Pen(Color.White, 2.4f))
+                    {
+                        g.DrawEllipse(p, 6, 5, 10, 10);
+                        g.DrawLine(p, 14, 13, 21, 19);
+                    }
+                }
+                picItemSearch.Image = bmp;
+
+                picItemSearch.MouseEnter += (s, e) =>
+                {
+                    picItemSearch.Appearance.BackColor = Color.FromArgb(95, 145, 230);
+                    picItemSearch.Appearance.BackColor2 = Color.FromArgb(72, 122, 214);
+                };
+                picItemSearch.MouseLeave += (s, e) =>
+                {
+                    picItemSearch.Appearance.BackColor = Color.FromArgb(72, 122, 214);
+                    picItemSearch.Appearance.BackColor2 = Color.FromArgb(48, 90, 175);
+                };
+            }
+            catch { }
         }
 
         private void LoadBranches()
@@ -79,13 +126,9 @@ namespace PosBranch_Win.Reports.InventoryReport
                         ultraComboBranch.DisplayMember = "BranchName";
                         ultraComboBranch.DataSource = dt;
 
-                        // Set current branch as default
                         if (!string.IsNullOrEmpty(DataBase.BranchId))
                         {
-                            // ultraComboBranch.Value = Convert.ToInt32(DataBase.BranchId);
-                            // To avoid issues if BranchId not in list, try safe cast or check
-                            int currentBranchId;
-                            if (int.TryParse(DataBase.BranchId, out currentBranchId))
+                            if (int.TryParse(DataBase.BranchId, out int currentBranchId))
                             {
                                 ultraComboBranch.Value = currentBranchId;
                             }
@@ -99,64 +142,435 @@ namespace PosBranch_Win.Reports.InventoryReport
             }
         }
 
-        private void LoadItems()
+        private void picItemSearch_Click(object sender, EventArgs e)
+        {
+            OpenItemSearchDialog();
+        }
+
+        private void txtItemName_Click(object sender, EventArgs e)
+        {
+            OpenItemSearchDialog();
+        }
+
+        private void txtItemName_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.F7 || e.KeyCode == Keys.Enter)
+            {
+                OpenItemSearchDialog();
+                e.Handled = true;
+            }
+        }
+
+        private void frmItemReport_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.F7)
+            {
+                OpenItemSearchDialog();
+                e.Handled = true;
+            }
+        }
+
+        private void OpenItemSearchDialog()
         {
             try
             {
-                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_ItemDetalisDDL, (SqlConnection)baseRepo.DataConnection))
+                using (var itemDialog = new PosBranch_Win.DialogBox.frmdialForItemMaster("frmItemReport"))
                 {
-                    cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@BranchId", DataBase.BranchId);
-                    cmd.Parameters.AddWithValue("@CompanyId", DataBase.CompanyId);
-                    cmd.Parameters.AddWithValue("@Operation", "GETALL");
-
-                    using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
+                    itemDialog.StartPosition = FormStartPosition.CenterParent;
+                    if (itemDialog.ShowDialog(this) == DialogResult.OK)
                     {
-                        DataTable dt = new DataTable();
-                        adapt.Fill(dt);
+                        Dictionary<string, object> selectedData = itemDialog.GetSelectedItemData();
+                        if (selectedData != null)
+                        {
+                            int itemId = 0;
+                            if (selectedData.ContainsKey("ItemId") && selectedData["ItemId"] != null)
+                                int.TryParse(selectedData["ItemId"].ToString(), out itemId);
+                            else if (selectedData.ContainsKey("ItemID") && selectedData["ItemID"] != null)
+                                int.TryParse(selectedData["ItemID"].ToString(), out itemId);
+                            else if (selectedData.ContainsKey("Id") && selectedData["Id"] != null)
+                                int.TryParse(selectedData["Id"].ToString(), out itemId);
 
-                        ultraComboItem.ValueMember = "ItemId";
-                        ultraComboItem.DisplayMember = "Description";
-                        ultraComboItem.DataSource = dt;
+                            string desc = "";
+                            if (selectedData.ContainsKey("Description") && selectedData["Description"] != null)
+                                desc = selectedData["Description"].ToString();
+                            else if (selectedData.ContainsKey("ItemName") && selectedData["ItemName"] != null)
+                                desc = selectedData["ItemName"].ToString();
+
+                            if (itemId > 0)
+                            {
+                                selectedItemId = itemId;
+                                selectedItemName = desc;
+                                txtItemName.Text = desc;
+                                btnSearch.Focus();
+                            }
+                        }
                     }
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error loading items: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Error selecting item: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
         private void ConfigureTransactionGrid()
         {
             ApplyGridStyling(ultraGridTransactions);
+            ultraGridTransactions.InitializeLayout += UltraGridTransactions_InitializeLayout;
+            ultraGridTransactions.InitializeRow += UltraGridTransactions_InitializeRow;
+            InitializeGridFooterPanel();
         }
 
-        private void ConfigurePriceSettingsGrid()
+        private void InitializeGridFooterPanel()
         {
-            ApplyGridStyling(ultraGridPriceSettings);
+            if (gridFooterPanel == null)
+                return;
+
+            gridFooterPanel.Paint += (s, e) => { AlignSummaryLabels(); };
+            gridFooterPanel.Resize += (s, e) => { AlignSummaryLabels(); };
+            ultraGridTransactions.AfterColPosChanged += (s, e) => AlignSummaryLabels();
+            ultraGridTransactions.AfterSortChange += (s, e) => AlignSummaryLabels();
+            ultraGridTransactions.AfterRowFilterChanged += (s, e) => AlignSummaryLabels();
+            ultraGridTransactions.InitializeLayout += (s, e) => { AlignSummaryLabels(); UpdateSummaryFooter(); };
+            ultraGridTransactions.SizeChanged += (s, e) => AlignSummaryLabels();
+
+            var panelMenu = new ContextMenuStrip();
+            foreach (var type in summaryTypes)
+            {
+                var item = new ToolStripMenuItem(type, null, OnPanelSummaryTypeSelected) { Tag = type };
+                panelMenu.Items.Add(item);
+            }
+            gridFooterPanel.ClientArea.ContextMenuStrip = panelMenu;
+            gridFooterPanel.ClientArea.MouseUp += (s, e) =>
+            {
+                if (e.Button == MouseButtons.Right)
+                {
+                    var ctrl = gridFooterPanel.ClientArea.GetChildAtPoint(e.Location);
+                    if (ctrl == null || !(ctrl is Label))
+                        panelMenu.Show(gridFooterPanel.ClientArea, e.Location);
+                }
+            };
+
+            UpdateSummaryFooter();
         }
 
-        private void ConfigureVendorGrid()
+        private void OnPanelSummaryTypeSelected(object sender, EventArgs e)
         {
-            ApplyGridStyling(ultraGridVendors);
+            if (sender is ToolStripMenuItem item && item.Tag is string type)
+            {
+                if (ultraGridTransactions.DisplayLayout.Bands.Count > 0)
+                {
+                    foreach (var col in ultraGridTransactions.DisplayLayout.Bands[0].Columns.Cast<UltraGridColumn>())
+                    {
+                        if (!col.Hidden && IsNumericColumn(col))
+                            columnAggregations[col.Key] = type;
+                    }
+                }
+                UpdateSummaryFooter();
+            }
         }
 
-        private void ConfigureStockGrid()
+        private bool IsNumericColumn(UltraGridColumn col)
         {
-            ApplyGridStyling(ultraGridStock);
+            if (col == null) return false;
+            Type DataType = col.DataType;
+            return DataType == typeof(int) || DataType == typeof(decimal) || DataType == typeof(double) || DataType == typeof(float) || DataType == typeof(long);
         }
 
-        private void ConfigurePendingOrdersGrid()
+        private ContextMenuStrip CreateFooterLabelMenu(string columnKey)
         {
-            ApplyGridStyling(ultraGridPendingOrders);
+            var menu = new ContextMenuStrip();
+            foreach (var type in summaryTypes)
+            {
+                var item = new ToolStripMenuItem(type) { Tag = type };
+                item.Click += (s, e) =>
+                {
+                    columnAggregations[columnKey] = type;
+                    UpdateFooterValues();
+                };
+                menu.Items.Add(item);
+            }
+            menu.Opening += (s, e) =>
+            {
+                foreach (ToolStripMenuItem item in menu.Items)
+                {
+                    item.Checked = columnAggregations.ContainsKey(columnKey) && columnAggregations[columnKey] == (string)item.Tag;
+                }
+            };
+            return menu;
         }
 
-        /// <summary>
-        /// Apply professional styling to UltraGrid - matching frmAuditReport design
-        /// </summary>
+        private void UpdateSummaryFooter()
+        {
+            if (gridFooterPanel == null || gridFooterPanel.ClientArea == null || ultraGridTransactions == null || ultraGridTransactions.DisplayLayout == null || ultraGridTransactions.DisplayLayout.Bands.Count == 0)
+                return;
+
+            gridFooterPanel.ClientArea.SuspendLayout();
+            gridFooterPanel.ClientArea.Controls.Clear();
+            summaryLabels.Clear();
+
+            var band = ultraGridTransactions.DisplayLayout.Bands[0];
+            foreach (var col in band.Columns.Cast<UltraGridColumn>())
+            {
+                if (col.Hidden) continue;
+                if (!IsNumericColumn(col)) continue;
+                if (!columnAggregations.ContainsKey(col.Key) || columnAggregations[col.Key] == "None") continue;
+
+                var lbl = new Label
+                {
+                    Name = $"lblSummary_{col.Key}",
+                    AutoSize = false,
+                    TextAlign = ContentAlignment.MiddleRight,
+                    ForeColor = Color.FromArgb(17, 52, 102),
+                    BackColor = Color.Transparent,
+                    Font = new Font("Segoe UI", 9, FontStyle.Bold),
+                    Height = gridFooterPanel.Height - 4,
+                    ContextMenuStrip = CreateFooterLabelMenu(col.Key)
+                };
+                gridFooterPanel.ClientArea.Controls.Add(lbl);
+                summaryLabels[col.Key] = lbl;
+            }
+            UpdateFooterValues();
+            AlignSummaryLabels();
+            gridFooterPanel.ClientArea.ResumeLayout();
+        }
+
+        private void UpdateFooterValues()
+        {
+            if (ultraGridTransactions == null || ultraGridTransactions.DataSource == null) return;
+            if (ultraGridTransactions.DataSource is List<ItemTransactionModel> list)
+            {
+                foreach (var kvp in summaryLabels)
+                {
+                    string colKey = kvp.Key;
+                    Label lbl = kvp.Value;
+                    string agg = columnAggregations.ContainsKey(colKey) ? columnAggregations[colKey] : "None";
+
+                    var values = new List<double>();
+                    foreach (var item in list)
+                    {
+                        var prop = item.GetType().GetProperty(colKey);
+                        if (prop != null)
+                        {
+                            var val = prop.GetValue(item);
+                            if (val != null) values.Add(Convert.ToDouble(val));
+                        }
+                    }
+
+                    string text = "";
+                    switch (agg)
+                    {
+                        case "Sum":
+                            text = values.Count > 0 ? values.Sum().ToString("N2") : "0.00";
+                            break;
+                        case "Min":
+                            text = values.Count > 0 ? values.Min().ToString("N2") : "-";
+                            break;
+                        case "Max":
+                            text = values.Count > 0 ? values.Max().ToString("N2") : "-";
+                            break;
+                        case "Average":
+                            text = values.Count > 0 ? values.Average().ToString("N2") : "-";
+                            break;
+                        case "Count":
+                            text = values.Count.ToString();
+                            break;
+                    }
+                    lbl.Text = text;
+                }
+            }
+        }
+
+        private void AlignSummaryLabels()
+        {
+            if (gridFooterPanel == null || gridFooterPanel.ClientArea == null || ultraGridTransactions == null || ultraGridTransactions.DisplayLayout == null || ultraGridTransactions.DisplayLayout.Bands.Count == 0)
+                return;
+
+            var band = ultraGridTransactions.DisplayLayout.Bands[0];
+            foreach (var col in band.Columns.Cast<UltraGridColumn>())
+            {
+                if (col.Hidden) continue;
+                if (!summaryLabels.TryGetValue(col.Key, out var lbl)) continue;
+
+                var headerUI = ultraGridTransactions.DisplayLayout.Bands[0].Columns[col.Key].Header?.GetUIElement();
+                if (headerUI != null)
+                {
+                    var headerPoint = headerUI.Control.PointToScreen(headerUI.Rect.Location);
+                    int colLeft = headerPoint.X - gridFooterPanel.PointToScreen(Point.Empty).X;
+                    int colWidth = headerUI.Rect.Width;
+
+                    lbl.Left = colLeft;
+                    lbl.Width = colWidth;
+                    lbl.Visible = true;
+                }
+                else
+                {
+                    lbl.Visible = false;
+                }
+            }
+        }
+
+        private void UltraGridTransactions_InitializeLayout(object sender, InitializeLayoutEventArgs e)
+        {
+            UltraGridBand band = e.Layout.Bands[0];
+
+            // Add or configure "Sl No" Column at VisiblePosition = 0
+            if (!band.Columns.Exists("SlNo"))
+            {
+                UltraGridColumn slCol = band.Columns.Add("SlNo", "Sl No");
+                slCol.DataType = typeof(int);
+                slCol.Header.Caption = "Sl No";
+                slCol.Header.VisiblePosition = 0;
+                slCol.Width = 55;
+                slCol.CellAppearance.TextHAlign = HAlign.Center;
+            }
+            else
+            {
+                band.Columns["SlNo"].Header.Caption = "Sl No";
+                band.Columns["SlNo"].Header.VisiblePosition = 0;
+                band.Columns["SlNo"].Width = 55;
+                band.Columns["SlNo"].CellAppearance.TextHAlign = HAlign.Center;
+            }
+
+            string[] colsToHide = new string[] { "BranchId", "UnitId", "RefId", "IsBaseUnit" };
+            foreach (string col in colsToHide)
+            {
+                if (band.Columns.Exists(col))
+                    band.Columns[col].Hidden = true;
+            }
+
+            if (band.Columns.Exists("DT"))
+            {
+                band.Columns["DT"].Header.Caption = "Date";
+                band.Columns["DT"].Format = "dd-MM-yyyy";
+                band.Columns["DT"].CellAppearance.TextHAlign = HAlign.Center;
+                band.Columns["DT"].Header.VisiblePosition = 1;
+                band.Columns["DT"].Width = 90;
+            }
+
+            if (band.Columns.Exists("Operation"))
+            {
+                band.Columns["Operation"].Header.Caption = "Voucher Type";
+                band.Columns["Operation"].CellAppearance.TextHAlign = HAlign.Left;
+                band.Columns["Operation"].Header.VisiblePosition = 2;
+                band.Columns["Operation"].Width = 110;
+            }
+
+            if (band.Columns.Exists("RefNo"))
+            {
+                band.Columns["RefNo"].Header.Caption = "Ref / Bill No";
+                band.Columns["RefNo"].CellAppearance.TextHAlign = HAlign.Center;
+                band.Columns["RefNo"].Header.VisiblePosition = 3;
+                band.Columns["RefNo"].Width = 95;
+            }
+
+            if (band.Columns.Exists("Account"))
+            {
+                band.Columns["Account"].Header.Caption = "Party / Ledger Account";
+                band.Columns["Account"].CellAppearance.TextHAlign = HAlign.Left;
+                band.Columns["Account"].Header.VisiblePosition = 4;
+                band.Columns["Account"].Width = 160;
+            }
+
+            if (band.Columns.Exists("Way"))
+            {
+                band.Columns["Way"].Header.Caption = "Way";
+                band.Columns["Way"].CellAppearance.TextHAlign = HAlign.Center;
+                band.Columns["Way"].Header.VisiblePosition = 5;
+                band.Columns["Way"].Width = 60;
+            }
+
+            if (band.Columns.Exists("Qty"))
+            {
+                band.Columns["Qty"].Header.Caption = "Qty";
+                band.Columns["Qty"].Format = "#,##0.00";
+                band.Columns["Qty"].CellAppearance.TextHAlign = HAlign.Right;
+                band.Columns["Qty"].Header.VisiblePosition = 6;
+                band.Columns["Qty"].Width = 80;
+            }
+
+            if (band.Columns.Exists("UnitName"))
+            {
+                band.Columns["UnitName"].Header.Caption = "Unit";
+                band.Columns["UnitName"].CellAppearance.TextHAlign = HAlign.Center;
+                band.Columns["UnitName"].Header.VisiblePosition = 7;
+                band.Columns["UnitName"].Width = 70;
+            }
+
+            if (band.Columns.Exists("Packing"))
+            {
+                band.Columns["Packing"].Header.Caption = "Packing";
+                band.Columns["Packing"].Format = "#,##0.##";
+                band.Columns["Packing"].CellAppearance.TextHAlign = HAlign.Center;
+                band.Columns["Packing"].Header.VisiblePosition = 8;
+                band.Columns["Packing"].Width = 70;
+            }
+
+            if (band.Columns.Exists("Cost"))
+            {
+                band.Columns["Cost"].Header.Caption = "Cost Price";
+                band.Columns["Cost"].Format = "₹ #,##0.00";
+                band.Columns["Cost"].CellAppearance.TextHAlign = HAlign.Right;
+                band.Columns["Cost"].Header.VisiblePosition = 9;
+                band.Columns["Cost"].Width = 90;
+            }
+
+            if (band.Columns.Exists("UnitPrice"))
+            {
+                band.Columns["UnitPrice"].Header.Caption = "Sales Price";
+                band.Columns["UnitPrice"].Format = "₹ #,##0.00";
+                band.Columns["UnitPrice"].CellAppearance.TextHAlign = HAlign.Right;
+                band.Columns["UnitPrice"].Header.VisiblePosition = 10;
+                band.Columns["UnitPrice"].Width = 90;
+            }
+
+            if (band.Columns.Exists("Balance"))
+            {
+                band.Columns["Balance"].Header.Caption = "Stock Balance";
+                band.Columns["Balance"].Format = "#,##0.00";
+                band.Columns["Balance"].CellAppearance.TextHAlign = HAlign.Right;
+                band.Columns["Balance"].Header.VisiblePosition = 11;
+                band.Columns["Balance"].Width = 100;
+            }
+
+            if (band.Columns.Exists("BranchName"))
+            {
+                band.Columns["BranchName"].Header.Caption = "Branch";
+                band.Columns["BranchName"].CellAppearance.TextHAlign = HAlign.Left;
+                band.Columns["BranchName"].Header.VisiblePosition = 12;
+                band.Columns["BranchName"].Width = 110;
+            }
+
+            e.Layout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
+        }
+
+        private void UltraGridTransactions_InitializeRow(object sender, InitializeRowEventArgs e)
+        {
+            if (e.Row.Cells.Exists("SlNo"))
+            {
+                e.Row.Cells["SlNo"].Value = e.Row.Index + 1;
+            }
+
+            if (e.Row.Cells.Exists("Way"))
+            {
+                string way = e.Row.Cells["Way"].Value?.ToString();
+                if (string.Equals(way, "IN", StringComparison.OrdinalIgnoreCase))
+                {
+                    e.Row.Cells["Way"].Appearance.ForeColor = Color.FromArgb(46, 125, 50); // Green
+                    e.Row.Cells["Way"].Appearance.FontData.Bold = DefaultableBoolean.True;
+                }
+                else if (string.Equals(way, "OUT", StringComparison.OrdinalIgnoreCase))
+                {
+                    e.Row.Cells["Way"].Appearance.ForeColor = Color.FromArgb(198, 40, 40); // Red
+                    e.Row.Cells["Way"].Appearance.FontData.Bold = DefaultableBoolean.True;
+                }
+            }
+        }
+
         private void ApplyGridStyling(UltraGrid targetGrid)
         {
+            if (targetGrid == null) return;
+
             targetGrid.UseAppStyling = false;
             targetGrid.UseOsThemes = DefaultableBoolean.False;
             targetGrid.DisplayLayout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
@@ -164,6 +578,9 @@ namespace PosBranch_Win.Reports.InventoryReport
             targetGrid.DisplayLayout.CaptionVisible = DefaultableBoolean.False;
             targetGrid.DisplayLayout.GroupByBox.Hidden = true;
             targetGrid.DisplayLayout.GroupByBox.BorderStyle = UIElementBorderStyle.None;
+
+            targetGrid.DisplayLayout.Override.HeaderStyle = HeaderStyle.Standard;
+            targetGrid.DisplayLayout.Override.HeaderClickAction = HeaderClickAction.SortMulti;
             targetGrid.DisplayLayout.Override.AllowAddNew = AllowAddNew.No;
             targetGrid.DisplayLayout.Override.AllowDelete = DefaultableBoolean.False;
             targetGrid.DisplayLayout.Override.AllowUpdate = DefaultableBoolean.False;
@@ -173,23 +590,26 @@ namespace PosBranch_Win.Reports.InventoryReport
             targetGrid.DisplayLayout.Override.FilterUIType = FilterUIType.HeaderIcons;
             targetGrid.DisplayLayout.Override.FilterOperatorLocation = FilterOperatorLocation.Hidden;
             targetGrid.DisplayLayout.Override.CellClickAction = CellClickAction.RowSelect;
-            targetGrid.DisplayLayout.Override.HeaderClickAction = HeaderClickAction.SortMulti;
+
             targetGrid.DisplayLayout.Override.RowSelectors = DefaultableBoolean.True;
             targetGrid.DisplayLayout.Override.RowSelectorWidth = 28;
-            targetGrid.DisplayLayout.Override.MinRowHeight = 24;
-            targetGrid.DisplayLayout.Override.DefaultRowHeight = 24;
+            targetGrid.DisplayLayout.Override.MinRowHeight = 25;
+            targetGrid.DisplayLayout.Override.DefaultRowHeight = 25;
             targetGrid.DisplayLayout.Override.RowAppearance.BackColor = Color.White;
             targetGrid.DisplayLayout.Override.RowAlternateAppearance.BackColor = Color.FromArgb(247, 250, 255);
             targetGrid.DisplayLayout.Override.ActiveRowAppearance.BackColor = Color.FromArgb(120, 116, 235);
             targetGrid.DisplayLayout.Override.ActiveRowAppearance.ForeColor = Color.White;
             targetGrid.DisplayLayout.Override.SelectedRowAppearance.BackColor = Color.FromArgb(120, 116, 235);
             targetGrid.DisplayLayout.Override.SelectedRowAppearance.ForeColor = Color.White;
-            targetGrid.DisplayLayout.Override.HeaderAppearance.BackColor = Color.FromArgb(145, 179, 222);
-            targetGrid.DisplayLayout.Override.HeaderAppearance.BackColor2 = Color.FromArgb(118, 157, 209);
+
+            targetGrid.DisplayLayout.Override.HeaderAppearance.BackColor = Color.FromArgb(55, 71, 79);
+            targetGrid.DisplayLayout.Override.HeaderAppearance.BackColor2 = Color.FromArgb(69, 90, 100);
             targetGrid.DisplayLayout.Override.HeaderAppearance.BackGradientStyle = GradientStyle.Vertical;
-            targetGrid.DisplayLayout.Override.HeaderAppearance.ForeColor = Color.FromArgb(17, 52, 102);
+            targetGrid.DisplayLayout.Override.HeaderAppearance.ForeColor = Color.White;
             targetGrid.DisplayLayout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.True;
-            targetGrid.DisplayLayout.Override.HeaderAppearance.BorderColor = Color.FromArgb(103, 142, 196);
+            targetGrid.DisplayLayout.Override.HeaderAppearance.FontData.SizeInPoints = 9;
+            targetGrid.DisplayLayout.Override.HeaderAppearance.BorderColor = Color.FromArgb(45, 60, 68);
+
             targetGrid.DisplayLayout.Override.FilterCellAppearance.BackColor = Color.White;
             targetGrid.DisplayLayout.Override.FilterCellAppearance.BorderColor = Color.FromArgb(180, 198, 220);
             targetGrid.DisplayLayout.Override.BorderStyleCell = UIElementBorderStyle.Solid;
@@ -207,8 +627,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             ConfigureButton(btnClose, Color.FromArgb(211, 47, 47), Color.FromArgb(244, 67, 54));
             ConfigureButton(btnHideSelection, Color.FromArgb(84, 120, 190), Color.FromArgb(112, 148, 214));
 
-            // Style summary labels
-            StyleSummaryLabels();
+            SetupEnhancedSummaryPanel();
         }
 
         private void ConfigureButton(Infragistics.Win.Misc.UltraButton button, Color startColor, Color endColor)
@@ -229,58 +648,150 @@ namespace PosBranch_Win.Reports.InventoryReport
         {
             ultraPanelControls.Visible = !ultraPanelControls.Visible;
             btnHideSelection.Text = ultraPanelControls.Visible ? "Hide Selection" : "Show Selection";
+            LayoutPanels();
         }
 
-        /// <summary>
-        /// Style summary labels with colors and bold text
-        /// </summary>
-        private void StyleSummaryLabels()
+        protected override void OnResize(EventArgs e)
         {
-            // Caption labels - bold with accent colors
-            ultraLabelTotalInCaption.Appearance.ForeColor = Color.FromArgb(56, 142, 60); // Green
-            ultraLabelTotalInCaption.Appearance.FontData.Bold = DefaultableBoolean.True;
-            ultraLabelTotalInCaption.Appearance.FontData.SizeInPoints = 10;
+            base.OnResize(e);
+            LayoutPanels();
+        }
 
-            ultraLabelTotalOutCaption.Appearance.ForeColor = Color.FromArgb(211, 84, 0); // Orange
-            ultraLabelTotalOutCaption.Appearance.FontData.Bold = DefaultableBoolean.True;
-            ultraLabelTotalOutCaption.Appearance.FontData.SizeInPoints = 10;
+        private void LayoutPanels()
+        {
+            if (ultraPanelActionBar == null || ultraPanelGrid == null || ultraPanelSummary == null || ultraPanelControls == null) return;
 
-            ultraLabelCurrentStockCaption.Appearance.ForeColor = Color.FromArgb(25, 118, 210); // Blue
-            ultraLabelCurrentStockCaption.Appearance.FontData.Bold = DefaultableBoolean.True;
-            ultraLabelCurrentStockCaption.Appearance.FontData.SizeInPoints = 10;
+            if (TopLevel == false)
+            {
+                FormBorderStyle = FormBorderStyle.None;
+                WindowState = FormWindowState.Normal;
+                Dock = DockStyle.Fill;
+            }
 
-            ultraLabelStockValueCaption.Appearance.ForeColor = Color.FromArgb(123, 31, 162); // Purple
-            ultraLabelStockValueCaption.Appearance.FontData.Bold = DefaultableBoolean.True;
-            ultraLabelStockValueCaption.Appearance.FontData.SizeInPoints = 10;
+            SuspendLayout();
 
-            // Value labels - larger, bold
-            ultraLabelTotalInValue.Appearance.ForeColor = Color.FromArgb(27, 94, 32);
-            ultraLabelTotalInValue.Appearance.FontData.Bold = DefaultableBoolean.True;
-            ultraLabelTotalInValue.Appearance.FontData.SizeInPoints = 14;
+            ultraPanelControls.Dock = DockStyle.Top;
+            ultraPanelActionBar.Dock = DockStyle.Top;
+            ultraPanelSummary.Dock = DockStyle.Bottom;
+            ultraPanelSummary.Height = 72;
+            ultraPanelSummary.Visible = true;
+            ultraPanelGrid.Dock = DockStyle.Fill;
 
-            ultraLabelTotalOutValue.Appearance.ForeColor = Color.FromArgb(191, 54, 12);
-            ultraLabelTotalOutValue.Appearance.FontData.Bold = DefaultableBoolean.True;
-            ultraLabelTotalOutValue.Appearance.FontData.SizeInPoints = 14;
+            if (!Controls.Contains(ultraPanelControls)) Controls.Add(ultraPanelControls);
+            if (!Controls.Contains(ultraPanelActionBar)) Controls.Add(ultraPanelActionBar);
+            if (!Controls.Contains(ultraPanelSummary)) Controls.Add(ultraPanelSummary);
+            if (!Controls.Contains(ultraPanelGrid)) Controls.Add(ultraPanelGrid);
 
-            ultraLabelCurrentStockValue.Appearance.ForeColor = Color.FromArgb(13, 71, 161);
-            ultraLabelCurrentStockValue.Appearance.FontData.Bold = DefaultableBoolean.True;
-            ultraLabelCurrentStockValue.Appearance.FontData.SizeInPoints = 16;
+            Controls.SetChildIndex(ultraPanelControls, 3);
+            Controls.SetChildIndex(ultraPanelActionBar, 2);
+            Controls.SetChildIndex(ultraPanelSummary, 1);
+            Controls.SetChildIndex(ultraPanelGrid, 0);
 
-            ultraLabelStockValueValue.Appearance.ForeColor = Color.FromArgb(74, 20, 140);
-            ultraLabelStockValueValue.Appearance.FontData.Bold = DefaultableBoolean.True;
-            ultraLabelStockValueValue.Appearance.FontData.SizeInPoints = 16;
+            if (ultraPanelGrid.ClientArea != null)
+            {
+                ultraPanelGrid.ClientArea.SuspendLayout();
+                gridFooterPanel.Dock = DockStyle.Bottom;
+                gridFooterPanel.Height = 26;
+                ultraGridTransactions.Dock = DockStyle.Fill;
+
+                if (!ultraPanelGrid.ClientArea.Controls.Contains(gridFooterPanel))
+                    ultraPanelGrid.ClientArea.Controls.Add(gridFooterPanel);
+                if (!ultraPanelGrid.ClientArea.Controls.Contains(ultraGridTransactions))
+                    ultraPanelGrid.ClientArea.Controls.Add(ultraGridTransactions);
+
+                ultraPanelGrid.ClientArea.Controls.SetChildIndex(gridFooterPanel, 1);
+                ultraPanelGrid.ClientArea.Controls.SetChildIndex(ultraGridTransactions, 0);
+
+                ultraPanelGrid.ClientArea.ResumeLayout(true);
+                ultraPanelGrid.ClientArea.PerformLayout();
+            }
+
+            ResumeLayout(true);
+            PerformLayout();
+
+            AlignSummaryCards();
+            AlignSummaryLabels();
+        }
+
+        private void AlignSummaryCards()
+        {
+            if (ultraPanelSummary == null || ultraPanelSummary.ClientArea == null) return;
+            int totalWidth = ultraPanelSummary.ClientArea.Width;
+            if (totalWidth <= 0) return;
+
+            UltraLabel[] captions = new UltraLabel[]
+            {
+                ultraLabelSalesCaption, ultraLabelPurchaseCaption, ultraLabelReturnCaption, ultraLabelAdjustCaption,
+                ultraLabelTotalInCaption, ultraLabelTotalOutCaption, ultraLabelCurrentStockCaption, ultraLabelStockValueCaption
+            };
+
+            UltraLabel[] values = new UltraLabel[]
+            {
+                ultraLabelSalesValue, ultraLabelPurchaseValue, ultraLabelReturnValue, ultraLabelAdjustValue,
+                ultraLabelTotalInValue, ultraLabelTotalOutValue, ultraLabelCurrentStockValue, ultraLabelStockValueValue
+            };
+
+            int count = 8;
+            int padding = 12;
+            int baseCardWidth = 140;
+
+            int availableWidth = totalWidth - (padding * 2);
+            if (availableWidth <= 0) return;
+
+            int gap = 10;
+            int computedWidth = (availableWidth - (gap * (count - 1))) / count;
+            int cardWidth = Math.Max(baseCardWidth, Math.Min(220, computedWidth));
+
+            int remainingForGaps = availableWidth - (count * cardWidth);
+            if (count > 1)
+            {
+                gap = Math.Max(4, remainingForGaps / (count - 1));
+            }
+
+            int currentX = padding;
+            for (int i = 0; i < count; i++)
+            {
+                if (captions[i] != null)
+                {
+                    captions[i].Location = new Point(currentX, 2);
+                    captions[i].Size = new Size(cardWidth, 16);
+                }
+                if (values[i] != null)
+                {
+                    values[i].Location = new Point(currentX, 18);
+                    values[i].Size = new Size(cardWidth, 48);
+                }
+                currentX += cardWidth + gap;
+            }
+        }
+
+        private void SetupEnhancedSummaryPanel()
+        {
+            if (ultraPanelSummary == null) return;
+
+            ultraPanelSummary.Dock = DockStyle.Bottom;
+            ultraPanelSummary.Height = 72;
+            ultraPanelSummary.Visible = true;
+
+            gridFooterPanel.Dock = DockStyle.Bottom;
+            gridFooterPanel.Height = 26;
+            ultraGridTransactions.Dock = DockStyle.Fill;
+
+            ultraPanelSummary.ClientArea.AutoScroll = false;
+            ultraPanelSummary.Resize += (s, e) => AlignSummaryCards();
         }
 
         private void frmItemReport_Load(object sender, EventArgs e)
         {
+            LayoutPanels();
         }
 
         private void btnSearch_Click(object sender, EventArgs e)
         {
-            if (ultraComboItem.Value == null)
+            if (selectedItemId <= 0)
             {
                 MessageBox.Show("Please select an item first.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                ultraComboItem.Focus();
+                OpenItemSearchDialog();
                 return;
             }
 
@@ -288,64 +799,110 @@ namespace PosBranch_Win.Reports.InventoryReport
 
             try
             {
-                int itemId = Convert.ToInt32(ultraComboItem.Value);
+                int itemId = selectedItemId;
                 int branchId = ultraComboBranch.Value != null ? Convert.ToInt32(ultraComboBranch.Value) : (int.TryParse(DataBase.BranchId, out int bId) ? bId : 0);
 
                 int finYearId = !string.IsNullOrEmpty(DataBase.FinyearId) ? Convert.ToInt32(DataBase.FinyearId) : 1;
                 int companyId = !string.IsNullOrEmpty(DataBase.CompanyId) ? Convert.ToInt32(DataBase.CompanyId) : 1;
 
-                // Fetch Data
                 var reportData = itemReportRepo.GetItemReport(finYearId, companyId, branchId, itemId);
 
-                // Bind Data
+                if (reportData.Transactions != null && reportData.Transactions.Count > 0)
+                {
+                    string defaultUnit = reportData.PriceSettings?.FirstOrDefault(x => !string.IsNullOrEmpty(x.UnitName))?.UnitName;
+                    if (string.IsNullOrWhiteSpace(defaultUnit)) defaultUnit = "UNIT";
+
+                    decimal runningBalance = 0;
+                    foreach (var t in reportData.Transactions)
+                    {
+                        if (string.IsNullOrWhiteSpace(t.UnitName))
+                        {
+                            t.UnitName = defaultUnit;
+                        }
+
+                        decimal packing = t.Packing > 0 ? t.Packing : 1;
+                        decimal baseQty = t.Qty * packing;
+
+                        if (string.Equals(t.Way, "IN", StringComparison.OrdinalIgnoreCase))
+                        {
+                            runningBalance += baseQty;
+                        }
+                        else if (string.Equals(t.Way, "OUT", StringComparison.OrdinalIgnoreCase))
+                        {
+                            runningBalance -= baseQty;
+                        }
+
+                        t.Balance = runningBalance;
+                    }
+                }
+
                 ultraGridTransactions.DataSource = reportData.Transactions;
-                ultraGridPriceSettings.DataSource = reportData.PriceSettings;
-                ultraGridVendors.DataSource = reportData.Vendors;
-                ultraGridStock.DataSource = reportData.StockSummary;
-                ultraGridPendingOrders.DataSource = reportData.PendingOrders;
+                UpdateSummaryFooter();
 
-                // Update details
-                if (reportData.ItemDetails != null)
+                if (reportData.Transactions != null && reportData.Transactions.Count > 0)
                 {
-                    ultraLabelItemNameValue.Text = reportData.ItemDetails.ItemName;
-                    ultraLabelBrandValue.Text = reportData.ItemDetails.BrandName;
-                    ultraLabelGroupValue.Text = reportData.ItemDetails.GroupName;
-                    ultraLabelCategoryValue.Text = reportData.ItemDetails.CategoryName;
-                    ultraLabelSubCategoryValue.Text = reportData.ItemDetails.SubCategoryName;
-                    ultraLabelLocationValue.Text = $"{reportData.ItemDetails.Row} - {reportData.ItemDetails.RackName}";
+                    Func<ItemTransactionModel, decimal> getBaseQty = x => x.Qty * (x.Packing > 0 ? x.Packing : 1);
+                    Func<ItemTransactionModel, decimal> getUnitCost = x => x.Packing > 1 ? (x.Cost / x.Packing) : x.Cost;
+
+                    var salesTxns = reportData.Transactions.Where(x => x.Operation.Equals("Sales", StringComparison.OrdinalIgnoreCase));
+                    decimal salesQty = salesTxns.Sum(getBaseQty);
+                    decimal salesAmt = salesTxns.Sum(x => x.Qty * x.UnitPrice);
+
+                    var purchaseTxns = reportData.Transactions.Where(x => x.Operation.Equals("Purchase", StringComparison.OrdinalIgnoreCase));
+                    decimal purchaseQty = purchaseTxns.Sum(getBaseQty);
+                    decimal purchaseAmt = purchaseTxns.Sum(x => x.Qty * x.Cost);
+
+                    var returnTxns = reportData.Transactions.Where(x => x.Operation.StartsWith("Sales Return", StringComparison.OrdinalIgnoreCase) || x.Operation.StartsWith("Return", StringComparison.OrdinalIgnoreCase));
+                    decimal returnQty = returnTxns.Sum(getBaseQty);
+                    decimal returnAmt = returnTxns.Sum(x => x.Qty * (x.UnitPrice > 0 ? x.UnitPrice : x.Cost));
+
+                    var adjustTxns = reportData.Transactions.Where(x => x.Operation.StartsWith("Stock Adjust", StringComparison.OrdinalIgnoreCase) || x.Operation.StartsWith("Adjustment", StringComparison.OrdinalIgnoreCase));
+                    decimal adjustQty = adjustTxns.Sum(getBaseQty);
+
+                    decimal totalIn = reportData.Transactions.Where(x => x.Way.Equals("IN", StringComparison.OrdinalIgnoreCase)).Sum(getBaseQty);
+                    decimal totalOut = reportData.Transactions.Where(x => x.Way.Equals("OUT", StringComparison.OrdinalIgnoreCase)).Sum(getBaseQty);
+
+                    decimal currentStock = reportData.StockSummary != null && reportData.StockSummary.Count > 0
+                        ? reportData.StockSummary.Sum(x => x.Stock)
+                        : (totalIn - totalOut);
+
+                    decimal latestCost = reportData.Transactions
+                        .Where(x => x.Cost > 0)
+                        .Select(getUnitCost)
+                        .LastOrDefault();
+
+                    if (latestCost == 0 && reportData.PriceSettings != null && reportData.PriceSettings.Count > 0)
+                    {
+                        var ps = reportData.PriceSettings.FirstOrDefault(x => x.Cost > 0);
+                        if (ps != null)
+                        {
+                            latestCost = ps.Cost;
+                        }
+                    }
+
+                    decimal stockValue = currentStock * latestCost;
+
+                    if (ultraLabelSalesValue != null) ultraLabelSalesValue.Text = $"{salesQty:N2} Qty\n₹ {salesAmt:N2}";
+                    if (ultraLabelPurchaseValue != null) ultraLabelPurchaseValue.Text = $"{purchaseQty:N2} Qty\n₹ {purchaseAmt:N2}";
+                    if (ultraLabelReturnValue != null) ultraLabelReturnValue.Text = $"{returnQty:N2} Qty\n₹ {returnAmt:N2}";
+                    if (ultraLabelAdjustValue != null) ultraLabelAdjustValue.Text = $"{adjustQty:N2} Qty";
+
+                    if (ultraLabelTotalInValue != null) ultraLabelTotalInValue.Text = $"{totalIn:N2} Qty";
+                    if (ultraLabelTotalOutValue != null) ultraLabelTotalOutValue.Text = $"{totalOut:N2} Qty";
+                    if (ultraLabelCurrentStockValue != null) ultraLabelCurrentStockValue.Text = $"{currentStock:N2} Qty";
+                    if (ultraLabelStockValueValue != null) ultraLabelStockValueValue.Text = $"₹ {stockValue:N2}";
                 }
                 else
                 {
-                    ultraLabelItemNameValue.Text = "-";
-                    ultraLabelBrandValue.Text = "-";
-                    ultraLabelGroupValue.Text = "-";
-                    ultraLabelCategoryValue.Text = "-";
-                    ultraLabelSubCategoryValue.Text = "-";
-                    ultraLabelLocationValue.Text = "-";
-                }
+                    if (ultraLabelSalesValue != null) ultraLabelSalesValue.Text = "0.00 Qty\n₹ 0.00";
+                    if (ultraLabelPurchaseValue != null) ultraLabelPurchaseValue.Text = "0.00 Qty\n₹ 0.00";
+                    if (ultraLabelReturnValue != null) ultraLabelReturnValue.Text = "0.00 Qty\n₹ 0.00";
+                    if (ultraLabelAdjustValue != null) ultraLabelAdjustValue.Text = "0.00 Qty";
 
-                // Update Summary
-                if (reportData.Transactions != null)
-                {
-                    decimal totalIn = reportData.Transactions.Where(x => x.Way == "IN").Sum(x => x.Qty);
-                    decimal totalOut = reportData.Transactions.Where(x => x.Way == "OUT").Sum(x => x.Qty);
-
-                    ultraLabelTotalInValue.Text = totalIn.ToString("N2");
-                    ultraLabelTotalOutValue.Text = totalOut.ToString("N2");
-                }
-                else
-                {
-                    ultraLabelTotalInValue.Text = "0.00";
-                    ultraLabelTotalOutValue.Text = "0.00";
-                }
-
-                if (reportData.StockSummary != null && reportData.StockSummary.Count > 0)
-                {
-                    ultraLabelCurrentStockValue.Text = reportData.StockSummary.Sum(x => x.Stock).ToString("N2");
-                }
-                else
-                {
-                    ultraLabelCurrentStockValue.Text = "0.00";
+                    if (ultraLabelTotalInValue != null) ultraLabelTotalInValue.Text = "0.00 Qty";
+                    if (ultraLabelTotalOutValue != null) ultraLabelTotalOutValue.Text = "0.00 Qty";
+                    if (ultraLabelCurrentStockValue != null) ultraLabelCurrentStockValue.Text = "0.00 Qty";
+                    if (ultraLabelStockValueValue != null) ultraLabelStockValueValue.Text = "₹ 0.00";
                 }
             }
             catch (Exception ex)
@@ -370,8 +927,6 @@ namespace PosBranch_Win.Reports.InventoryReport
 
                 if (saveFileDialog.ShowDialog() == DialogResult.OK)
                 {
-                    // Export ultraGridTransactions
-                    // Check if there are rows
                     if (ultraGridTransactions.Rows.Count > 0)
                     {
                         ExportToCSV(ultraGridTransactions, saveFileDialog.FileName);
@@ -393,16 +948,14 @@ namespace PosBranch_Win.Reports.InventoryReport
         {
             StringBuilder sb = new StringBuilder();
 
-            // Header
             foreach (var col in grid.DisplayLayout.Bands[0].Columns)
             {
                 if (!col.Hidden)
                     sb.Append(col.Header.Caption + ",");
             }
-            sb.Length--; // Remove last comma
+            if (sb.Length > 0) sb.Length--;
             sb.AppendLine();
 
-            // Rows
             foreach (var row in grid.Rows)
             {
                 foreach (var col in grid.DisplayLayout.Bands[0].Columns)
@@ -414,7 +967,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                         sb.Append(value + ",");
                     }
                 }
-                sb.Length--;
+                if (sb.Length > 0) sb.Length--;
                 sb.AppendLine();
             }
 

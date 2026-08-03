@@ -1,6 +1,7 @@
 using Infragistics.Win;
 using Infragistics.Win.UltraWinEditors;
 using PosBranch_Win.DialogBox;
+using PosBranch_Win.Master;
 using Repository.SettingsRepo;
 using System;
 using System.Collections.Generic;
@@ -20,6 +21,8 @@ namespace PosBranch_Win.Settings
         private bool applyButtonHot;
         private bool applyButtonPressed;
         private DataTable currentData;
+        private Timer pollTimer;
+        private DateTime lastKnownActivityStamp = DateTime.MinValue;
 
         private UltraComboEditor cmbQuickDate;
         private UltraDateTimeEditor dtpFrom;
@@ -37,6 +40,7 @@ namespace PosBranch_Win.Settings
         private Label lblMonth;
         private Label lblYear;
         private Label lblShowing;
+        private Label lblDedicatedItemSummary;
 
         public ItemHistoryLog()
         {
@@ -51,6 +55,20 @@ namespace PosBranch_Win.Settings
             cmbQuickDate.Text = "Today";
             ApplyQuickDate();
             LoadActivityLog();
+            frmItemMasterNew.OnItemMasterUpdated += OnItemMasterUpdated;
+            StartNetworkRefresh();
+        }
+
+        protected override void OnFormClosed(FormClosedEventArgs e)
+        {
+            frmItemMasterNew.OnItemMasterUpdated -= OnItemMasterUpdated;
+            if (pollTimer != null)
+            {
+                pollTimer.Stop();
+                pollTimer.Dispose();
+                pollTimer = null;
+            }
+            base.OnFormClosed(e);
         }
 
         private void InitializeLogUi()
@@ -143,6 +161,14 @@ namespace PosBranch_Win.Settings
             content.RowStyles.Add(new RowStyle(SizeType.Absolute, 42F));
 
             var titlePanel = new Panel { Dock = DockStyle.Fill, BackColor = Color.Transparent };
+            lblDedicatedItemSummary = new Label
+            {
+                Text = string.Empty,
+                Dock = DockStyle.Bottom,
+                Height = 18,
+                ForeColor = Color.FromArgb(55, 95, 150),
+                TextAlign = ContentAlignment.MiddleLeft
+            };
             titlePanel.Controls.Add(new Label
             {
                 Text = "Track item creation, edits, purchase, sales, returns, and stock adjustments.",
@@ -158,6 +184,7 @@ namespace PosBranch_Win.Settings
                 Font = new Font("Segoe UI Semibold", 13F, FontStyle.Bold),
                 ForeColor = navy
             });
+            titlePanel.Controls.Add(lblDedicatedItemSummary);
 
             var cards = new FlowLayoutPanel { Dock = DockStyle.Fill, BackColor = Color.White, WrapContents = false, FlowDirection = FlowDirection.LeftToRight };
             lblTotal = CreateCard(cards, "Selected Range");
@@ -278,11 +305,14 @@ namespace PosBranch_Win.Settings
                 {
                     currentData = repo.GetItemHistoryLog(GetDateValue(dtpFrom), GetDateValue(dtpTo), userName, action, txtItemSearch.Text.Trim());
                 }
+                ApplyBriefActivityDetails(currentData);
                 gridActivity.DataSource = currentData;
                 ConfigureGridColumns();
                 ApplyActionColors(gridActivity);
+                UpdateDedicatedItemSummary();
                 UpdateSummaryCards();
                 lblShowing.Text = "Showing " + currentData.Rows.Count + " record(s)";
+                UpdateLastKnownActivityStamp();
             }
             catch (Exception ex)
             {
@@ -425,9 +455,11 @@ namespace PosBranch_Win.Settings
             SetColumn("CounterName", "Counter", 130);
             SetColumn("CounterSessionId", "Session", 90);
 
+            EnsureDetailsButtonColumn();
+
             if (gridActivity.Columns.Contains("Action"))
             {
-                gridActivity.Columns["Action"].DisplayIndex = 0;
+                gridActivity.Columns["Action"].DisplayIndex = gridActivity.Columns.Contains("ViewDetails") ? 1 : 0;
                 gridActivity.Columns["Action"].Frozen = true;
             }
 
@@ -444,6 +476,31 @@ namespace PosBranch_Win.Settings
                     gridActivity.Columns[numericColumn].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
                 }
             }
+        }
+
+        private void EnsureDetailsButtonColumn()
+        {
+            const string columnName = "ViewDetails";
+            if (gridActivity.Columns.Contains(columnName))
+            {
+                gridActivity.Columns[columnName].DisplayIndex = 0;
+                gridActivity.Columns[columnName].Frozen = true;
+                return;
+            }
+
+            var buttonColumn = new DataGridViewButtonColumn
+            {
+                Name = columnName,
+                HeaderText = "",
+                Text = "+",
+                UseColumnTextForButtonValue = true,
+                Width = 38,
+                MinimumWidth = 38,
+                AutoSizeMode = DataGridViewAutoSizeColumnMode.None,
+                FlatStyle = FlatStyle.Flat,
+                Frozen = true
+            };
+            gridActivity.Columns.Insert(0, buttonColumn);
         }
 
         private void UpdateSummaryCards()
@@ -503,6 +560,8 @@ namespace PosBranch_Win.Settings
             gridActivity.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(248, 252, 255);
             gridActivity.RowTemplate.Height = 30;
             gridActivity.DataBindingComplete += (s, e) => ApplyActionColors(gridActivity);
+            gridActivity.CellContentClick -= gridActivity_CellContentClick;
+            gridActivity.CellContentClick += gridActivity_CellContentClick;
         }
 
         private void StyleActionButtons()
@@ -605,6 +664,21 @@ namespace PosBranch_Win.Settings
             }
         }
 
+        private void gridActivity_CellContentClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0 || !gridActivity.Columns.Contains("ViewDetails"))
+            {
+                return;
+            }
+
+            if (gridActivity.Columns[e.ColumnIndex].Name != "ViewDetails")
+            {
+                return;
+            }
+
+            MessageBox.Show(BuildBriefActivityDetails(gridActivity.Rows[e.RowIndex]), "Activity Details", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
         private void btnItemSearchBrowse_Click(object sender, EventArgs e)
         {
             try
@@ -620,6 +694,7 @@ namespace PosBranch_Win.Settings
                         if (!string.IsNullOrWhiteSpace(selected))
                         {
                             txtItemSearch.Text = selected;
+                            SetDedicatedQuickDateRange();
                             LoadActivityLog();
                         }
                     }
@@ -804,6 +879,376 @@ namespace PosBranch_Win.Settings
             return string.Equals(value, "UPDATE", StringComparison.OrdinalIgnoreCase) ||
                    string.Equals(value, "EDIT", StringComparison.OrdinalIgnoreCase) ||
                    string.Equals(value, "UPDATED", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void OnItemMasterUpdated(int itemId)
+        {
+            if (IsDisposed || !IsHandleCreated) return;
+            if (InvokeRequired)
+            {
+                BeginInvoke(new Action<int>(OnItemMasterUpdated), itemId);
+                return;
+            }
+            LoadActivityLog();
+        }
+
+        private void StartNetworkRefresh()
+        {
+            pollTimer = new Timer { Interval = 10000 };
+            pollTimer.Tick += PollTimer_Tick;
+            pollTimer.Start();
+        }
+
+        private void PollTimer_Tick(object sender, EventArgs e)
+        {
+            if (IsDisposed || !IsHandleCreated) return;
+            try
+            {
+                using (var repo = new ItemHistoryLogRepository())
+                {
+                    DateTime latest = repo.GetLatestActivityStamp();
+                    if (latest > lastKnownActivityStamp)
+                    {
+                        lastKnownActivityStamp = latest;
+                        LoadActivityLog();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Item history refresh failed: " + ex.Message);
+            }
+        }
+
+        private void UpdateLastKnownActivityStamp()
+        {
+            try
+            {
+                using (var repo = new ItemHistoryLogRepository())
+                {
+                    DateTime latest = repo.GetLatestActivityStamp();
+                    if (latest > lastKnownActivityStamp)
+                    {
+                        lastKnownActivityStamp = latest;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Item history stamp update failed: " + ex.Message);
+            }
+        }
+
+        private void UpdateDedicatedItemSummary()
+        {
+            if (lblDedicatedItemSummary == null) return;
+
+            string searchText = txtItemSearch.Text.Trim();
+            if (string.IsNullOrWhiteSpace(searchText))
+            {
+                lblDedicatedItemSummary.Text = string.Empty;
+                return;
+            }
+
+            try
+            {
+                using (var repo = new ItemHistoryLogRepository())
+                {
+                    DataTable summary = repo.GetItemHistorySummary(searchText);
+                    if (summary == null || summary.Rows.Count == 0)
+                    {
+                        lblDedicatedItemSummary.Text = "Loaded item: " + searchText;
+                        return;
+                    }
+
+                    DataRow row = summary.Rows[0];
+                    string itemName = Convert.ToString(row["ItemName"]);
+                    string barcode = Convert.ToString(row["Barcode"]);
+                    string stock = FormatDecimal(FirstDecimal(row, "CurrentStock"));
+                    DateTime createdOn = FirstDate(row, "CreatedOn");
+                    lblDedicatedItemSummary.Text =
+                        "Loaded item: " + FirstNonEmpty(itemName, searchText) +
+                        (!string.IsNullOrWhiteSpace(barcode) ? " | Barcode: " + barcode : string.Empty) +
+                        " | Current Stock: " + (string.IsNullOrWhiteSpace(stock) ? "0" : stock) +
+                        (createdOn != DateTime.MinValue ? " | Created: " + FormatDate(createdOn) : string.Empty);
+                }
+            }
+            catch (Exception ex)
+            {
+                lblDedicatedItemSummary.Text = "Loaded item: " + searchText;
+                System.Diagnostics.Debug.WriteLine("Item history summary display failed: " + ex.Message);
+            }
+        }
+
+        private void SetDedicatedQuickDateRange()
+        {
+            cmbQuickDate.Text = "Custom";
+            SetDateRange(new DateTime(2000, 1, 1), DateTime.Today.AddYears(5));
+        }
+
+        public static void ApplyBriefActivityDetails(DataTable table)
+        {
+            if (table == null || !table.Columns.Contains("ActivityDetails")) return;
+
+            foreach (DataRow row in table.Rows)
+            {
+                row["ActivityDetails"] = BuildBriefActivityDetails(row);
+            }
+        }
+
+        public static string BuildBriefActivityDetails(DataGridViewRow row)
+        {
+            if (row == null) return "No additional details available for this log entry.";
+
+            string details = BuildBriefActivityDetails(
+                CellText(row, "Action"),
+                CellText(row, "ItemName"),
+                CellText(row, "ItemNo"),
+                CellText(row, "Barcode"),
+                CellText(row, "UOM"),
+                CellText(row, "TransactionNo"),
+                CellText(row, "InvoiceNo"),
+                CellText(row, "PartyName"),
+                CellText(row, "Qty"),
+                CellText(row, "StockIn"),
+                CellText(row, "StockOut"),
+                CellText(row, "QtyDifference"),
+                CellText(row, "UnitCost"),
+                CellText(row, "RetailPrice"),
+                CellText(row, "WalkinPrice"),
+                CellText(row, "UserName"),
+                CellText(row, "CounterName"),
+                CellText(row, "CounterSessionId"),
+                CellText(row, "CreatedOn"),
+                CellText(row, "ActivityDetails"));
+
+            return string.IsNullOrWhiteSpace(details) ? "No additional details available for this log entry." : details;
+        }
+
+        private static string BuildBriefActivityDetails(DataRow row)
+        {
+            if (row == null) return string.Empty;
+
+            return BuildBriefActivityDetails(
+                FirstText(row, "Action"),
+                FirstText(row, "ItemName"),
+                FirstText(row, "ItemNo"),
+                FirstText(row, "Barcode"),
+                FirstText(row, "UOM"),
+                FirstText(row, "TransactionNo"),
+                FirstText(row, "InvoiceNo"),
+                FirstText(row, "PartyName"),
+                FormatDecimal(FirstDecimal(row, "Qty")),
+                FormatDecimal(FirstDecimal(row, "StockIn")),
+                FormatDecimal(FirstDecimal(row, "StockOut")),
+                FormatDecimal(FirstDecimal(row, "QtyDifference")),
+                FormatDecimal(FirstDecimal(row, "UnitCost")),
+                FormatDecimal(FirstDecimal(row, "RetailPrice")),
+                FormatDecimal(FirstDecimal(row, "WalkinPrice")),
+                FirstText(row, "UserName"),
+                FirstText(row, "CounterName"),
+                FirstText(row, "CounterSessionId"),
+                FormatDate(FirstDate(row, "CreatedOn")),
+                FirstText(row, "ActivityDetails"));
+        }
+
+        private static string BuildBriefActivityDetails(
+            string action,
+            string itemName,
+            string itemNo,
+            string barcode,
+            string uom,
+            string transactionNo,
+            string invoiceNo,
+            string partyName,
+            string qty,
+            string stockIn,
+            string stockOut,
+            string qtyDifference,
+            string unitCost,
+            string retailPrice,
+            string walkinPrice,
+            string userName,
+            string counterName,
+            string counterSessionId,
+            string createdOn,
+            string rawDetails)
+        {
+            var builder = new StringBuilder();
+            string displayAction = GetBriefAction(action, stockIn, stockOut, qtyDifference);
+            string itemCaption = FirstNonEmpty(itemName, itemNo, barcode);
+
+            AppendLine(builder, "Action", displayAction);
+            AppendLine(builder, "Item", BuildItemCaption(itemCaption, itemNo, barcode));
+            AppendLine(builder, GetDocumentLabel(displayAction), transactionNo);
+            AppendLine(builder, "Invoice", invoiceNo);
+            AppendLine(builder, GetPartyLabel(displayAction), partyName);
+            AppendLine(builder, "Qty", BuildQtyCaption(qty, uom));
+            AppendLine(builder, "Stock In", stockIn);
+            AppendLine(builder, "Stock Out", stockOut);
+            AppendLine(builder, "Stock Change", qtyDifference);
+            AppendLine(builder, "Unit Cost", unitCost);
+            AppendLine(builder, "Retail Price", retailPrice);
+            AppendLine(builder, "Walkin Price", walkinPrice);
+            AppendLine(builder, "User", userName);
+            AppendLine(builder, "Counter", BuildCounterCaption(counterName, counterSessionId));
+            AppendLine(builder, "Date", createdOn);
+
+            string filteredDetails = FilterActivityDetails(rawDetails);
+            if (!string.IsNullOrWhiteSpace(filteredDetails) && !LooksLikeBriefDetails(filteredDetails))
+            {
+                builder.AppendLine();
+                builder.AppendLine(IsUpdate(action) ? "Updated:" : "Notes:");
+                builder.Append(NormalizeDetailSection(filteredDetails, IsUpdate(action)));
+            }
+
+            return builder.ToString().Trim();
+        }
+
+        private static string GetBriefAction(string action, string stockIn, string stockOut, string qtyDifference)
+        {
+            if (string.IsNullOrWhiteSpace(action)) return "Activity";
+            if (action.IndexOf("Stock", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                decimal stockInQty = ParseDecimal(stockIn);
+                decimal stockOutQty = ParseDecimal(stockOut);
+                decimal movementQty = ParseDecimal(qtyDifference);
+                bool isUpdateAction = action.IndexOf("Updated", StringComparison.OrdinalIgnoreCase) >= 0;
+                if (isUpdateAction) return "Stock Update";
+                if (stockInQty > 0m || movementQty > 0m) return "Stock In";
+                if (stockOutQty > 0m || movementQty < 0m) return "Stock Out";
+            }
+            return action;
+        }
+
+        private static string GetDocumentLabel(string action)
+        {
+            if (action.IndexOf("Purchase", StringComparison.OrdinalIgnoreCase) >= 0) return "Purchase No";
+            if (action.IndexOf("Sales", StringComparison.OrdinalIgnoreCase) >= 0) return "Bill No";
+            if (action.IndexOf("Stock", StringComparison.OrdinalIgnoreCase) >= 0) return "Stock Doc No";
+            return "Doc No";
+        }
+
+        private static string GetPartyLabel(string action)
+        {
+            if (action.IndexOf("Purchase", StringComparison.OrdinalIgnoreCase) >= 0) return "Vendor";
+            if (action.IndexOf("Sales", StringComparison.OrdinalIgnoreCase) >= 0) return "Customer";
+            return "Party";
+        }
+
+        private static string BuildItemCaption(string itemName, string itemNo, string barcode)
+        {
+            var parts = new List<string>();
+            if (!string.IsNullOrWhiteSpace(itemName)) parts.Add(itemName);
+            if (!string.IsNullOrWhiteSpace(itemNo) && !string.Equals(itemNo, itemName, StringComparison.OrdinalIgnoreCase)) parts.Add("Code: " + itemNo);
+            if (!string.IsNullOrWhiteSpace(barcode) && !string.Equals(barcode, itemName, StringComparison.OrdinalIgnoreCase)) parts.Add("Barcode: " + barcode);
+            return string.Join(" | ", parts.ToArray());
+        }
+
+        private static string BuildQtyCaption(string qty, string uom)
+        {
+            if (string.IsNullOrWhiteSpace(qty) || IsZero(qty)) return string.Empty;
+            return string.IsNullOrWhiteSpace(uom) ? qty : qty + " " + uom;
+        }
+
+        private static string BuildCounterCaption(string counterName, string counterSessionId)
+        {
+            if (string.IsNullOrWhiteSpace(counterSessionId) || IsZero(counterSessionId)) return counterName;
+            return string.IsNullOrWhiteSpace(counterName) ? "Session " + counterSessionId : counterName + " | Session " + counterSessionId;
+        }
+
+        private static void AppendLine(StringBuilder builder, string label, string value)
+        {
+            if (string.IsNullOrWhiteSpace(value) || IsZero(value)) return;
+            builder.Append(label);
+            builder.Append(": ");
+            builder.AppendLine(value);
+        }
+
+        private static string FirstNonEmpty(params string[] values)
+        {
+            foreach (string value in values)
+            {
+                if (!string.IsNullOrWhiteSpace(value)) return value;
+            }
+            return string.Empty;
+        }
+
+        private static bool LooksLikeBriefDetails(string details)
+        {
+            return details.StartsWith("Action:", StringComparison.OrdinalIgnoreCase) &&
+                   details.IndexOf(Environment.NewLine + "Item:", StringComparison.OrdinalIgnoreCase) >= 0;
+        }
+
+        private static string FilterActivityDetails(string details)
+        {
+            if (string.IsNullOrWhiteSpace(details)) return details;
+
+            var lines = details.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+            var filtered = new StringBuilder();
+            foreach (var line in lines)
+            {
+                string trimmed = line.TrimStart('-', ' ');
+                if (trimmed.StartsWith("Unit '", StringComparison.OrdinalIgnoreCase) &&
+                    (trimmed.Contains("Retail Price changed") || trimmed.Contains("Walkin Price changed")))
+                {
+                    continue;
+                }
+                filtered.AppendLine(line);
+            }
+            return filtered.ToString().TrimEnd();
+        }
+
+        private static string NormalizeDetailSection(string details, bool isUpdate)
+        {
+            if (string.IsNullOrWhiteSpace(details)) return string.Empty;
+
+            var lines = details.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
+            var normalized = new StringBuilder();
+            foreach (string line in lines)
+            {
+                string trimmed = line.Trim();
+                if (trimmed.Length == 0) continue;
+                if (isUpdate && (trimmed.Equals("Changes:", StringComparison.OrdinalIgnoreCase) ||
+                                 trimmed.Equals("Updated:", StringComparison.OrdinalIgnoreCase)))
+                {
+                    continue;
+                }
+                normalized.AppendLine(trimmed);
+            }
+            return normalized.ToString().TrimEnd();
+        }
+
+        private static string CellText(DataGridViewRow row, string columnName)
+        {
+            if (row.DataGridView == null || !row.DataGridView.Columns.Contains(columnName)) return string.Empty;
+            object value = row.Cells[columnName].Value;
+            if (value == null || value == DBNull.Value) return string.Empty;
+            if (value is DateTime) return FormatDate((DateTime)value);
+            if (value is decimal) return FormatDecimal((decimal)value);
+            return Convert.ToString(value);
+        }
+
+        private static string FormatDate(DateTime value)
+        {
+            return value == DateTime.MinValue ? string.Empty : value.ToString("dd MMM yyyy hh:mm tt");
+        }
+
+        private static string FormatDecimal(decimal value)
+        {
+            return value == 0m ? string.Empty : value.ToString("0.####");
+        }
+
+        private static decimal ParseDecimal(string value)
+        {
+            decimal parsed;
+            return decimal.TryParse(value, out parsed) ? parsed : 0m;
+        }
+
+        private static bool IsZero(string value)
+        {
+            decimal parsed;
+            return decimal.TryParse(value, out parsed) && parsed == 0m;
         }
 
         private static string FirstText(DataRow row, params string[] columnNames)
