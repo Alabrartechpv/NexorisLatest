@@ -117,6 +117,7 @@
     <Compile Include="ReportRepository\VendorOutstandingReportRepository.cs" />
     <Compile Include="ReportRepository\VendorPurchaseReportRepository.cs" />
     <Compile Include="SettingsRepo\ItemStockActivityLogRepository.cs" />
+    <Compile Include="SettingsRepo\ItemHistoryLogRepository.cs" />
     <Compile Include="STOREDPROCEDURE.cs" />
     <Compile Include="TransactionRepository\frmSalesInvoice.cs" />
     <Compile Include="TransactionRepository\PurchaseInvoiceRepository.cs" />

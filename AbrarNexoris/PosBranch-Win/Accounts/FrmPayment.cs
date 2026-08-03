@@ -174,6 +174,24 @@ namespace PosBranch_Win.Accounts
                 band.Columns["AdjustedAmount"].CellActivation = Activation.AllowEdit;
                 band.Columns["AdjustedAmount"].Format = "##,##0.00";
             }
+
+            if (band.Columns.Exists("Paymode")) band.Columns["Paymode"].Hidden = true;
+            if (band.Columns.Exists("PayMode")) band.Columns["PayMode"].Hidden = true;
+            if (band.Columns.Exists("PaymodeID")) band.Columns["PaymodeID"].Hidden = true;
+            if (band.Columns.Exists("PayModeId")) band.Columns["PayModeId"].Hidden = true;
+            if (band.Columns.Exists("PayModeID")) band.Columns["PayModeID"].Hidden = true;
+            if (band.Columns.Exists("PaymodeName")) band.Columns["PaymodeName"].Hidden = true;
+
+            if (radioBtnAllDocument != null && radioBtnAllDocument.Checked)
+            {
+                if (band.Columns.Exists("Select")) band.Columns["Select"].Hidden = true;
+                if (band.Columns.Exists("AdjustedAmount")) band.Columns["AdjustedAmount"].Hidden = true;
+            }
+            else
+            {
+                if (band.Columns.Exists("Select")) band.Columns["Select"].Hidden = false;
+                if (band.Columns.Exists("AdjustedAmount")) band.Columns["AdjustedAmount"].Hidden = false;
+            }
         }
 
         private void LoadPaymentMethods()
@@ -497,6 +515,24 @@ namespace PosBranch_Win.Accounts
                     band.Columns["AdjustedAmount"].CellActivation = Activation.AllowEdit;
                     band.Columns["AdjustedAmount"].Format = "##,##0.00";
                 }
+
+                if (band.Columns.Exists("Paymode")) band.Columns["Paymode"].Hidden = true;
+                if (band.Columns.Exists("PayMode")) band.Columns["PayMode"].Hidden = true;
+                if (band.Columns.Exists("PaymodeID")) band.Columns["PaymodeID"].Hidden = true;
+                if (band.Columns.Exists("PayModeId")) band.Columns["PayModeId"].Hidden = true;
+                if (band.Columns.Exists("PayModeID")) band.Columns["PayModeID"].Hidden = true;
+                if (band.Columns.Exists("PaymodeName")) band.Columns["PaymodeName"].Hidden = true;
+
+                if (radioBtnAllDocument != null && radioBtnAllDocument.Checked)
+                {
+                    if (band.Columns.Exists("Select")) band.Columns["Select"].Hidden = true;
+                    if (band.Columns.Exists("AdjustedAmount")) band.Columns["AdjustedAmount"].Hidden = true;
+                }
+                else
+                {
+                    if (band.Columns.Exists("Select")) band.Columns["Select"].Hidden = false;
+                    if (band.Columns.Exists("AdjustedAmount")) band.Columns["AdjustedAmount"].Hidden = false;
+                }
             }
         }
 
@@ -812,6 +848,27 @@ namespace PosBranch_Win.Accounts
                     decimal paidAmount = Convert.ToDecimal(newRow["PayedAmount"]);
                     decimal returnedAmount = newDt.Columns.Contains("ReturnedAmount") && newRow["ReturnedAmount"] != DBNull.Value ? Convert.ToDecimal(newRow["ReturnedAmount"]) : 0m;
 
+                    // Detect cash purchases where full payment was settled at purchase time
+                    bool isCashPurchase = false;
+                    if (dt.Columns.Contains("Paymode") && row["Paymode"] != DBNull.Value)
+                    {
+                        string pm = row["Paymode"].ToString().Trim().ToLower();
+                        if (pm == "cash" || pm == "2") isCashPurchase = true;
+                    }
+                    if (dt.Columns.Contains("PaymodeID") && row["PaymodeID"] != DBNull.Value)
+                    {
+                        if (Convert.ToInt32(row["PaymodeID"]) == 2) isCashPurchase = true;
+                    }
+                    if (dt.Columns.Contains("PayModeID") && row["PayModeID"] != DBNull.Value)
+                    {
+                        if (Convert.ToInt32(row["PayModeID"]) == 2) isCashPurchase = true;
+                    }
+
+                    if (isCashPurchase)
+                    {
+                        paidAmount = invoiceAmount;
+                    }
+
                     // Clamping logic to prevent over-allocation and negative balances (similar to FrmReceipt)
                     decimal maxPaidAndReturned = paidAmount + returnedAmount;
                     if (invoiceAmount > 0m && maxPaidAndReturned > invoiceAmount)
@@ -1019,6 +1076,13 @@ namespace PosBranch_Win.Accounts
 
         private bool ValidatePayment()
         {
+            if (radioBtnAllDocument != null && radioBtnAllDocument.Checked)
+            {
+                MessageBox.Show("Please switch to Outstanding mode to select invoices and process payments.", "Validation Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
+
             if (string.IsNullOrEmpty(textBox4.Text))
             {
                 MessageBox.Show("Please select a vendor", "Validation Error",

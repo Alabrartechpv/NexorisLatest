@@ -829,6 +829,7 @@ namespace PosBranch_Win.Master
         private int lastLoadedItemNo = 0;
         private readonly Dictionary<int, int> purchasePidCache = new Dictionary<int, int>();
         private string loadedItemMainBarcode = string.Empty;
+        private DateTime lastBarcodeRefreshClickTime = DateTime.MinValue;
         private bool isInitializingItemStatusControls;
         private bool itemStatusTableEnsured;
         private bool itemStatusHandlersWired;
@@ -1867,6 +1868,8 @@ namespace PosBranch_Win.Master
             if (txtBarcodeForNewItem != null)
             {
                 txtBarcodeForNewItem.TextChanged += txt_barcode_TextChanged;
+                WireBarcodeRefreshMouseEvents(txtBarcodeForNewItem);
+                BeginInvoke((MethodInvoker)delegate { WireBarcodeRefreshMouseEvents(txtBarcodeForNewItem); });
             }
 
             // Ensure grid MarginPer reflects master profit margin at startup
@@ -1954,6 +1957,8 @@ namespace PosBranch_Win.Master
                 if (txtBarcodeCtrl != null)
                 {
                     txtBarcodeCtrl.TextChanged += txt_barcode_TextChanged;
+                    WireBarcodeRefreshMouseEvents(txtBarcodeCtrl);
+                    BeginInvoke((MethodInvoker)delegate { WireBarcodeRefreshMouseEvents(txtBarcodeCtrl); });
 
                     // Also sync when barcode text field loses focus to ensure grid is updated
                     txtBarcodeCtrl.LostFocus += txt_barcode_LostFocus;
@@ -3582,6 +3587,8 @@ namespace PosBranch_Win.Master
                 if (txt_TaxType != null) txt_TaxType.Clear();
                 if (txt_TaxPer != null) txt_TaxPer.Clear();
                 if (txt_TaxAmount != null) txt_TaxAmount.Text = "0";
+                if (Txt_UnitCost != null) Txt_UnitCost.Text = "0.000";
+                if (textBox1 != null) textBox1.Text = "0.00";
                 if (txt_qty != null) txt_qty.Clear();
                 if (txt_available != null) txt_available.Clear();
                 if (txt_hold != null) txt_hold.Text = "0.00";
@@ -3766,6 +3773,25 @@ namespace PosBranch_Win.Master
                 .FirstOrDefault();
         }
 
+        private void WireBarcodeRefreshMouseEvents(Control control)
+        {
+            if (control == null)
+            {
+                return;
+            }
+
+            control.Click -= txt_barcode_Click;
+            control.Click += txt_barcode_Click;
+            control.MouseClick -= txt_barcode_MouseClick;
+            control.MouseClick += txt_barcode_MouseClick;
+            control.MouseDown -= txt_barcode_MouseDown;
+            control.MouseDown += txt_barcode_MouseDown;
+
+            foreach (Control child in control.Controls)
+            {
+                WireBarcodeRefreshMouseEvents(child);
+            }
+        }
         private void SetMainBarcodeEditability(bool allowEdit, string barcode = null)
         {
             var txtBarcodeCtrl = GetMainBarcodeEditor();
@@ -7211,6 +7237,122 @@ namespace PosBranch_Win.Master
         // txt_barcode represents the item's main barcode only
         // The BarCode column in ultraGrid1 acts as an independent alias barcode
         // Also auto-generates new item number when user starts typing a barcode for a new item
+        private void txt_barcode_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                RefreshCurrentItemFromBarcodeClick();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error refreshing item from barcode click: {ex.Message}");
+            }
+        }
+
+        private void txt_barcode_MouseClick(object sender, MouseEventArgs e)
+        {
+            try
+            {
+                RefreshCurrentItemFromBarcodeClick();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error refreshing item from barcode mouse click: {ex.Message}");
+            }
+        }
+
+        private void txt_barcode_MouseDown(object sender, MouseEventArgs e)
+        {
+            try
+            {
+                RefreshCurrentItemFromBarcodeClick();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error refreshing item from barcode mouse down: {ex.Message}");
+            }
+        }
+        private void RefreshCurrentItemFromBarcodeClick()
+        {
+            if (isLoadingItem)
+            {
+                return;
+            }
+
+            DateTime now = DateTime.Now;
+            if ((now - lastBarcodeRefreshClickTime).TotalMilliseconds < 300)
+            {
+                return;
+            }
+
+            int itemId = 0;
+            if (ItemMaster != null && ItemMaster.ItemId > 0)
+            {
+                itemId = ItemMaster.ItemId;
+            }
+            else if (CurrentItemId > 0)
+            {
+                itemId = CurrentItemId;
+            }
+
+            var txtBarcodeCtrl = GetMainBarcodeEditor();
+            string barcode = (txtBarcodeCtrl?.Text ?? string.Empty).Trim();
+            if (itemId <= 0 && !string.IsNullOrWhiteSpace(barcode))
+            {
+                itemId = FindItemIdByAnyBarcode(barcode);
+            }
+
+            if (itemId <= 0)
+            {
+                return;
+            }
+
+            lastBarcodeRefreshClickTime = now;
+            LoadItemById(itemId);
+            BeginInvoke((MethodInvoker)delegate
+            {
+                var refreshedBarcodeCtrl = GetMainBarcodeEditor();
+                refreshedBarcodeCtrl?.Focus();
+                refreshedBarcodeCtrl?.SelectAll();
+            });
+        }
+
+        private int FindItemIdByAnyBarcode(string barcode)
+        {
+            if (string.IsNullOrWhiteSpace(barcode))
+            {
+                return 0;
+            }
+
+            ItemMasterRepository itemRepo = new ItemMasterRepository();
+            int itemId = itemRepo.GetItemIdByBarcode(barcode);
+
+            if (itemId <= 0)
+            {
+                try
+                {
+                    itemId = itemRepo.GetItemIdByAliasBarcode(barcode);
+                }
+                catch (MissingMethodException)
+                {
+                    System.Diagnostics.Debug.WriteLine("GetItemIdByAliasBarcode method not found. Rebuild Repository.");
+                }
+            }
+
+            if (itemId <= 0)
+            {
+                try
+                {
+                    itemId = itemRepo.GetItemIdByAlternativeBarcode(barcode);
+                }
+                catch (MissingMethodException)
+                {
+                    System.Diagnostics.Debug.WriteLine("GetItemIdByAlternativeBarcode method not found. Rebuild Repository.");
+                }
+            }
+
+            return itemId;
+        }
         private void txt_barcode_TextChanged(object sender, EventArgs e)
         {
             try
@@ -14995,6 +15137,10 @@ namespace PosBranch_Win.Master
 
         #endregion
 
+        private void ultraTabControl1_SelectedTabChanged(object sender, Infragistics.Win.UltraWinTabControl.SelectedTabChangedEventArgs e)
+        {
+
+        }
     }
 }
 

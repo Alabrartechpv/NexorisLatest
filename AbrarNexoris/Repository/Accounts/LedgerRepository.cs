@@ -65,35 +65,10 @@ namespace Repository.Accounts
 
             try
             {
-                string query = @"
-SELECT
-    l.LedgerID,
-    CASE
-        WHEN ag.GroupType IN ('LIABILITIES', 'INCOME')
-            OR ag.GroupID IN (1, 2, 3, 8, 11, 13, 17, 20, 23, 24, 25, 26, 27, 28, 29)
-            THEN
-                (ISNULL(l.OpnCredit, 0) + ISNULL(SUM(vd.Credit), 0))
-                - (ISNULL(l.OpnDebit, 0) + ISNULL(SUM(vd.Debit), 0))
-        ELSE
-                (ISNULL(l.OpnDebit, 0) + ISNULL(SUM(vd.Debit), 0))
-                - (ISNULL(l.OpnCredit, 0) + ISNULL(SUM(vd.Credit), 0))
-    END AS Balance
-FROM LedgerMaster l
-INNER JOIN AccountGroupMaster ag
-    ON l.GroupID = ag.GroupID
-    AND ag.BranchID = l.BranchID
-LEFT JOIN Vouchers vd
-    ON l.LedgerID = vd.LedgerID
-    AND vd.CompanyID = @CompanyId
-    AND vd.BranchID = @BranchId
-    AND vd.FinYearID = @FinYearId
-    AND vd.VoucherDate <= @ToDate
-    AND ISNULL(vd.CancelFlag, 0) = 0
-WHERE l.BranchID = @BranchId
-GROUP BY l.LedgerID, ag.GroupType, ag.GroupID, l.OpnDebit, l.OpnCredit;";
-
-                using (SqlCommand cmd = new SqlCommand(query, (SqlConnection)DataConnection))
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_Ledger, (SqlConnection)DataConnection))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@_Operation", "GETBALANCES");
                     cmd.Parameters.AddWithValue("@CompanyId", companyId);
                     cmd.Parameters.AddWithValue("@BranchId", branchId);
                     cmd.Parameters.AddWithValue("@FinYearId", finYearId);
@@ -112,7 +87,7 @@ GROUP BY l.LedgerID, ag.GroupType, ag.GroupID, l.OpnDebit, l.OpnCredit;";
             }
             catch (Exception ex)
             {
-                throw ex;
+                System.Diagnostics.Debug.WriteLine("GetLedgerBalances SP error: " + ex.Message);
             }
             finally
             {
@@ -160,6 +135,48 @@ GROUP BY l.LedgerID, ag.GroupType, ag.GroupID, l.OpnDebit, l.OpnCredit;";
 
                     object scalar = cmd.ExecuteScalar();
                     result = scalar != null && Convert.ToInt32(scalar) > 0;
+                }
+            }
+            catch (SqlException sqlEx) when (sqlEx.Number == 2627 || sqlEx.Number == 2601)
+            {
+                // Primary key / Duplicate Key violation fallback:
+                // Auto-generate next free LedgerID and retry insertion
+                try
+                {
+                    int freshId = GetNextLedgerID();
+                    ledger.LedgerID = freshId;
+
+                    if (DataConnection.State != ConnectionState.Open)
+                        DataConnection.Open();
+
+                    using (SqlCommand cmd = new SqlCommand("POS_Ledger", (SqlConnection)DataConnection))
+                    {
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.AddWithValue("@_Operation", "CREATE");
+                        cmd.Parameters.AddWithValue("@CompanyID", ledger.CompanyID);
+                        cmd.Parameters.AddWithValue("@BranchID", ledger.BranchID);
+                        cmd.Parameters.AddWithValue("@LedgerID", ledger.LedgerID);
+                        cmd.Parameters.AddWithValue("@LedgerName", ledger.LedgerName);
+                        cmd.Parameters.AddWithValue("@Alias", string.IsNullOrEmpty(ledger.Alias) ? DBNull.Value : (object)ledger.Alias);
+                        cmd.Parameters.AddWithValue("@Description", string.IsNullOrEmpty(ledger.Description) ? DBNull.Value : (object)ledger.Description);
+                        cmd.Parameters.AddWithValue("@Notes", string.IsNullOrEmpty(ledger.Notes) ? DBNull.Value : (object)ledger.Notes);
+                        cmd.Parameters.AddWithValue("@GroupID", ledger.GroupID);
+                        cmd.Parameters.AddWithValue("@OpnDebit", ledger.OpnDebit);
+                        cmd.Parameters.AddWithValue("@OpnCredit", ledger.OpnCredit);
+                        cmd.Parameters.AddWithValue("@ProvideBankDetails", ledger.ProvideBankDetails ?? false);
+                        cmd.Parameters.AddWithValue("@GstApplicable", ledger.GstApplicable ?? false);
+                        cmd.Parameters.AddWithValue("@VatApplicable", ledger.VatApplicable ?? false);
+                        cmd.Parameters.AddWithValue("@InventoryValuesAffected", ledger.InventoryValuesAffected ?? false);
+                        cmd.Parameters.AddWithValue("@MaintainBillWiseDetails", ledger.MaintainBillWiseDetails ?? false);
+                        cmd.Parameters.AddWithValue("@PriceLevelApplicable", ledger.PriceLevelApplicable ?? false);
+
+                        object scalar = cmd.ExecuteScalar();
+                        result = scalar != null && Convert.ToInt32(scalar) > 0;
+                    }
+                }
+                catch
+                {
+                    throw sqlEx;
                 }
             }
             catch (Exception ex)
@@ -278,46 +295,23 @@ GROUP BY l.LedgerID, ag.GroupType, ag.GroupID, l.OpnDebit, l.OpnCredit;";
 
             try
             {
-                // Try stored procedure first
-                try
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_Ledger, (SqlConnection)DataConnection))
                 {
-                    using (SqlCommand cmd = new SqlCommand("POS_Ledger", (SqlConnection)DataConnection))
-                    {
-                        cmd.CommandType = CommandType.StoredProcedure;
-                        cmd.Parameters.AddWithValue("@_Operation", "GETNEXTID");
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@_Operation", "GETNEXTID");
 
-                        using (SqlDataReader reader = cmd.ExecuteReader())
+                    using (SqlDataReader reader = cmd.ExecuteReader())
+                    {
+                        if (reader.Read() && reader[0] != DBNull.Value)
                         {
-                            if (reader.Read() && reader["NextID"] != DBNull.Value)
-                            {
-                                nextId = Convert.ToInt32(reader["NextID"]);
-                                return nextId;
-                            }
+                            nextId = Convert.ToInt32(reader[0]);
                         }
-                    }
-                }
-                catch
-                {
-                    // Procedure failed, try direct SQL as fallback
-                    Console.WriteLine("Procedure call failed, using direct SQL as fallback");
-                }
-
-                // Fallback to direct SQL query if procedure fails
-                string query = "SELECT ISNULL(MAX(CAST(LedgerID AS INT)), 0) + 1 FROM LedgerMaster";
-
-                using (SqlCommand cmd = new SqlCommand(query, (SqlConnection)DataConnection))
-                {
-                    object result = cmd.ExecuteScalar();
-                    if (result != null && result != DBNull.Value)
-                    {
-                        nextId = Convert.ToInt32(result);
                     }
                 }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in GetNextLedgerID: {ex.Message}");
-                throw ex;
             }
             finally
             {
@@ -381,9 +375,10 @@ GROUP BY l.LedgerID, ag.GroupType, ag.GroupID, l.OpnDebit, l.OpnCredit;";
 
             try
             {
-                string query = "SELECT COUNT(1) FROM LedgerMaster WHERE LedgerName = @LedgerName AND BranchID = @BranchID AND LedgerID != @ExcludeLedgerID";
-                using (SqlCommand cmd = new SqlCommand(query, (SqlConnection)DataConnection))
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_Ledger, (SqlConnection)DataConnection))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@_Operation", "CHECKNAMEEXISTS");
                     cmd.Parameters.AddWithValue("@LedgerName", ledgerName);
                     cmd.Parameters.AddWithValue("@BranchID", branchId);
                     cmd.Parameters.AddWithValue("@ExcludeLedgerID", excludeLedgerId);
@@ -395,7 +390,6 @@ GROUP BY l.LedgerID, ag.GroupType, ag.GroupID, l.OpnDebit, l.OpnCredit;";
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in IsLedgerNameExists: {ex.Message}");
-                throw ex;
             }
             finally
             {
@@ -423,9 +417,10 @@ GROUP BY l.LedgerID, ag.GroupType, ag.GroupID, l.OpnDebit, l.OpnCredit;";
 
             try
             {
-                string query = "SELECT COUNT(1) FROM LedgerMaster WHERE Alias = @Alias AND BranchID = @BranchID AND LedgerID != @ExcludeLedgerID";
-                using (SqlCommand cmd = new SqlCommand(query, (SqlConnection)DataConnection))
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_Ledger, (SqlConnection)DataConnection))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@_Operation", "CHECKALIASEXISTS");
                     cmd.Parameters.AddWithValue("@Alias", alias);
                     cmd.Parameters.AddWithValue("@BranchID", branchId);
                     cmd.Parameters.AddWithValue("@ExcludeLedgerID", excludeLedgerId);
@@ -437,7 +432,6 @@ GROUP BY l.LedgerID, ag.GroupType, ag.GroupID, l.OpnDebit, l.OpnCredit;";
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in IsLedgerAliasExists: {ex.Message}");
-                throw ex;
             }
             finally
             {
@@ -448,7 +442,7 @@ GROUP BY l.LedgerID, ag.GroupType, ag.GroupID, l.OpnDebit, l.OpnCredit;";
             return exists;
         }
 
-        // Method to recursively get the account type (CUSTOMER, SUPPLIER, or OTHER) using CTE
+        // Method to recursively get the account type (CUSTOMER, SUPPLIER, or OTHER) using stored procedure
         public string GetLedgerAccountType(long ledgerId)
         {
             string accountType = "OTHER";
@@ -462,26 +456,12 @@ GROUP BY l.LedgerID, ag.GroupType, ag.GroupID, l.OpnDebit, l.OpnCredit;";
 
             try
             {
-                string query = @"
-WITH GroupHierarchy AS (
-    SELECT GroupID, ParentGroupID
-    FROM AccountGroupMaster
-    WHERE GroupID = (SELECT GroupID FROM LedgerMaster WHERE LedgerID = @LedgerID)
-    UNION ALL
-    SELECT p.GroupID, p.ParentGroupID
-    FROM GroupHierarchy h
-    INNER JOIN AccountGroupMaster p ON h.ParentGroupID = p.GroupID
-)
-SELECT 
-    CASE 
-        WHEN EXISTS (SELECT 1 FROM GroupHierarchy WHERE GroupID = 16) THEN 'CUSTOMER'
-        WHEN EXISTS (SELECT 1 FROM GroupHierarchy WHERE GroupID = 17) THEN 'SUPPLIER'
-        ELSE 'OTHER'
-    END AS AccountType;";
-
-                using (SqlCommand cmd = new SqlCommand(query, (SqlConnection)DataConnection))
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_Ledger, (SqlConnection)DataConnection))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@_Operation", "GETACCOUNTTYPE");
                     cmd.Parameters.AddWithValue("@LedgerID", ledgerId);
+
                     object result = cmd.ExecuteScalar();
                     if (result != null && result != DBNull.Value)
                     {
@@ -491,7 +471,7 @@ SELECT
             }
             catch (Exception ex)
             {
-                throw ex;
+                System.Diagnostics.Debug.WriteLine("Error in GetLedgerAccountType via stored procedure: " + ex.Message);
             }
             finally
             {

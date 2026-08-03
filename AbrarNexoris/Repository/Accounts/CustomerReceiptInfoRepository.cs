@@ -107,6 +107,7 @@ namespace Repository.Accounts
                     {
                         da.Fill(dt);
                     }
+                    EnhanceInvoiceTableWithCashPaymode(dt);
                     NormalizeInvoiceBalances(dt);
                     return dt;
                 }
@@ -142,6 +143,7 @@ namespace Repository.Accounts
                     {
                         da.Fill(dt);
                     }
+                    EnhanceInvoiceTableWithCashPaymode(dt);
                     NormalizeInvoiceBalances(dt);
                     return dt;
                 }
@@ -596,6 +598,27 @@ namespace Repository.Accounts
                 decimal receivedAmount = GetRowDecimal(row, "ReceivedAmount");
                 decimal returnedAmount = invoices.Columns.Contains("ReturnedAmount") ? GetRowDecimal(row, "ReturnedAmount") : 0m;
 
+                // Detect cash sales where full payment was settled at sale time
+                bool isCashSale = false;
+                if (invoices.Columns.Contains("Paymode") && row["Paymode"] != DBNull.Value)
+                {
+                    string pm = row["Paymode"].ToString().Trim().ToLower();
+                    if (pm == "cash" || pm == "2") isCashSale = true;
+                }
+                if (invoices.Columns.Contains("PaymodeID") && row["PaymodeID"] != DBNull.Value)
+                {
+                    if (Convert.ToInt32(row["PaymodeID"]) == 2) isCashSale = true;
+                }
+                if (invoices.Columns.Contains("PayModeID") && row["PayModeID"] != DBNull.Value)
+                {
+                    if (Convert.ToInt32(row["PayModeID"]) == 2) isCashSale = true;
+                }
+
+                if (isCashSale)
+                {
+                    receivedAmount = invoiceAmount;
+                }
+
                 if (invoiceAmount < 0m)
                 {
                     invoiceAmount = 0m;
@@ -641,6 +664,76 @@ namespace Repository.Accounts
                 {
                     row["Balance"] = balance;
                 }
+            }
+        }
+
+        private void EnhanceInvoiceTableWithCashPaymode(DataTable dt)
+        {
+            if (dt == null || dt.Rows.Count == 0) return;
+
+            if (!dt.Columns.Contains("Paymode"))
+                dt.Columns.Add("Paymode", typeof(string));
+            if (!dt.Columns.Contains("PaymodeID"))
+                dt.Columns.Add("PaymodeID", typeof(int));
+
+            try
+            {
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._POS_Sales_Win, (SqlConnection)DataConnection))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
+                    cmd.Parameters.AddWithValue("@CompanyId", SessionContext.CompanyId);
+                    cmd.Parameters.AddWithValue("@FinYearId", SessionContext.FinYearId);
+                    cmd.Parameters.AddWithValue("@_Operation", "GETALL");
+
+                    DataTable salesDt = new DataTable();
+                    using (SqlDataAdapter da = new SqlDataAdapter(cmd))
+                    {
+                        da.Fill(salesDt);
+                    }
+
+                    if (salesDt != null && salesDt.Rows.Count > 0)
+                    {
+                        string paymodeCol = salesDt.Columns.Contains("Paymode") ? "Paymode" :
+                                           salesDt.Columns.Contains("PayMode") ? "PayMode" :
+                                           salesDt.Columns.Contains("PaymodeName") ? "PaymodeName" : null;
+
+                        string paymodeIdCol = salesDt.Columns.Contains("PaymodeID") ? "PaymodeID" :
+                                             salesDt.Columns.Contains("PayModeId") ? "PayModeId" :
+                                             salesDt.Columns.Contains("PayModeID") ? "PayModeID" : null;
+
+                        var pmIdMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                        var pmNameMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+                        foreach (DataRow r in salesDt.Rows)
+                        {
+                            if (r.Table.Columns.Contains("BillNo") && r["BillNo"] != DBNull.Value)
+                            {
+                                string billNo = r["BillNo"].ToString().Trim();
+                                string pm = paymodeCol != null && r[paymodeCol] != DBNull.Value ? r[paymodeCol].ToString().Trim() : "";
+                                int pmId = paymodeIdCol != null && r[paymodeIdCol] != DBNull.Value ? Convert.ToInt32(r[paymodeIdCol]) : 0;
+                                pmNameMap[billNo] = pm;
+                                pmIdMap[billNo] = pmId;
+                            }
+                        }
+
+                        foreach (DataRow row in dt.Rows)
+                        {
+                            string billNo = row["BillNo"]?.ToString()?.Trim();
+                            if (!string.IsNullOrEmpty(billNo))
+                            {
+                                if (pmNameMap.TryGetValue(billNo, out string pmName))
+                                    row["Paymode"] = pmName;
+                                if (pmIdMap.TryGetValue(billNo, out int pmId))
+                                    row["PaymodeID"] = pmId;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error enhancing sales invoice table with paymode via stored procedure: {ex.Message}");
             }
         }
 
