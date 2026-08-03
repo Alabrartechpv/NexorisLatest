@@ -5478,7 +5478,7 @@ namespace PosBranch_Win.Transaction
                 ObjPurchaseMaster.UserID = GetUserId();
                 ObjPurchaseMaster.UserName = GetUserName();
                 ObjPurchaseMaster.TaxType = "I";
-                ObjPurchaseMaster.Remarks = "";
+                ObjPurchaseMaster.Remarks = txtRemark != null ? txtRemark.Text : "";
                 ObjPurchaseMaster.RoundOff = string.IsNullOrWhiteSpace(txtRoundOff.Text) ?
                     0 : (float.TryParse(txtRoundOff.Text, out float roundOff) ? roundOff : 0);
                 ObjPurchaseMaster.CessPer = 0;
@@ -5675,6 +5675,18 @@ namespace PosBranch_Win.Transaction
                 txtBarcode.Clear();
                 txtBilledBy.Clear();
                 textBox1.Clear(); // Clear vendor ID textBox
+
+                if (txtRemark != null)
+                {
+                    txtRemark.Clear();
+                }
+
+                if (CmboVendor != null)
+                {
+                    CmboVendor.Value = null;
+                    CmboVendor.SelectedIndex = -1;
+                    CmboVendor.Text = string.Empty;
+                }
 
                 txtRoundOff.Clear();
 
@@ -10149,6 +10161,46 @@ namespace PosBranch_Win.Transaction
 
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
+            // Handle "q" or "Q" key press in ultraGrid1 to jump to next item's Qty cell
+            if ((keyData & Keys.KeyCode) == Keys.Q && (keyData & Keys.Modifiers) == Keys.None)
+            {
+                bool isGridFocused = ultraGrid1 != null && (ultraGrid1.ContainsFocus ||
+                    (this.ActiveControl != null && (this.ActiveControl == ultraGrid1 || this.ActiveControl.Parent == ultraGrid1)));
+
+                if (isGridFocused && ultraGrid1.Rows.Count > 0)
+                {
+                    try
+                    {
+                        ultraGrid1.PerformAction(Infragistics.Win.UltraWinGrid.UltraGridAction.ExitEditMode);
+
+                        int currentIndex = ultraGrid1.ActiveRow != null ? ultraGrid1.ActiveRow.Index : -1;
+                        int nextIndex = currentIndex + 1;
+                        if (nextIndex >= ultraGrid1.Rows.Count)
+                        {
+                            nextIndex = 0;
+                        }
+
+                        UltraGridRow targetRow = ultraGrid1.Rows[nextIndex];
+                        ultraGrid1.ActiveRow = targetRow;
+                        ultraGrid1.Selected.Rows.Clear();
+                        ultraGrid1.Selected.Rows.Add(targetRow);
+
+                        if (targetRow.Cells.Exists("Qty"))
+                        {
+                            ultraGrid1.ActiveCell = targetRow.Cells["Qty"];
+                            ultraGrid1.Focus();
+                            ultraGrid1.PerformAction(Infragistics.Win.UltraWinGrid.UltraGridAction.EnterEditMode);
+                        }
+
+                        return true;
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Error jumping to next item Qty cell: {ex.Message}");
+                    }
+                }
+            }
+
             // Handle Down arrow on txtBarcode to move focus to ultraGrid1
             if (keyData == Keys.Down && this.ActiveControl == txtBarcode)
             {

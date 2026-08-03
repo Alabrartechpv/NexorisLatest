@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -182,19 +182,31 @@ namespace PosBranch_Win.DialogBox
 
         private void ProcesspaymentPurchaseInvoiceSelection()
         {
+            if (ultraGrid1.ActiveRow == null) return;
             UltraGridCell nameCell = ultraGrid1.ActiveRow.Cells["LedgerName"];
             UltraGridCell idCell = ultraGrid1.ActiveRow.Cells["LedgerID"];
             if (nameCell?.Value != null && idCell?.Value != null)
             {
                 string name = nameCell.Value.ToString();
                 int ledgerId = Convert.ToInt32(idCell.Value);
-               var payment = (FrmPayment)Application.OpenForms["FrmPayment"];
-                if(payment!=null)
+                if (formName == "FrmPayment" || Application.OpenForms["FrmPayment"] != null)
                 {
-                    payment.SetVendorInfo(ledgerId, name);
-                    this.Close();
+                    var payment = (FrmPayment)Application.OpenForms["FrmPayment"];
+                    if (payment != null)
+                    {
+                        payment.SetVendorInfo(ledgerId, name);
+                        this.Close();
+                        return;
+                    }
                 }
-               
+
+                var prForm = (Transaction.frmPurchaseReturn)Application.OpenForms["frmPurchaseReturn"];
+                if (prForm != null)
+                {
+                    prForm.SetVendorInfo(ledgerId, name);
+                    this.Close();
+                    return;
+                }
             }
         }
 
