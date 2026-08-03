@@ -386,6 +386,14 @@ namespace PosBranch_Win.Master
                                 {
                                     changes.Add($"Unit '{unitName}' Cost changed from {FormatPrice(oldCost)} to {FormatPrice(newCost)}");
                                 }
+
+                                AddUnitPriceChange(changes, unitName, "Retail Price", Convert.ToDecimal(oldSetting.WholeSalePrice), newRetail);
+                                AddUnitPriceChange(changes, unitName, "Walkin Price", Convert.ToDecimal(oldSetting.RetailPrice), newWalkin);
+                                AddUnitPriceChange(changes, unitName, "MRP", Convert.ToDecimal(oldSetting.MRP), ParseNullableDecimal(row.Cells["MRP"].Value?.ToString()) ?? 0m);
+                                AddUnitPriceChange(changes, unitName, "Card Price", Convert.ToDecimal(oldSetting.CardPrice), ParseNullableDecimal(row.Cells["CardPrice"].Value?.ToString()) ?? 0m);
+                                AddUnitPriceChange(changes, unitName, "Staff Price", Convert.ToDecimal(oldSetting.StaffPrice), ParseNullableDecimal(row.Cells["StaffPrice"].Value?.ToString()) ?? 0m);
+                                AddUnitPriceChange(changes, unitName, "Min Price", Convert.ToDecimal(oldSetting.MinPrice), ParseNullableDecimal(row.Cells["MinPrice"].Value?.ToString()) ?? 0m);
+                                AddUnitPriceChange(changes, unitName, "Tax %", Convert.ToDecimal(oldSetting.TaxPer), ParseNullableDecimal(row.Cells["TaxPer"].Value?.ToString()) ?? 0m);
                             }
                             else
                             {
@@ -436,7 +444,7 @@ namespace PosBranch_Win.Master
 
             if (changes.Count > 0)
             {
-                sb.AppendLine("Changes:");
+                sb.AppendLine("Updated:");
                 foreach (var change in changes)
                 {
                     sb.AppendLine($"- {change}");
@@ -458,6 +466,16 @@ namespace PosBranch_Win.Master
             }
 
             changes.Add($"{label} changed from {FormatPrice(oldValue.Value)} to {FormatPrice(newValue.Value)}");
+        }
+
+        private static void AddUnitPriceChange(List<string> changes, string unitName, string label, decimal oldValue, decimal newValue)
+        {
+            if (Math.Abs(oldValue - newValue) < 0.0001m)
+            {
+                return;
+            }
+
+            changes.Add($"Unit '{unitName}' {label} changed from {FormatPrice(oldValue)} to {FormatPrice(newValue)}");
         }
 
         private static string FormatPrice(decimal value)
