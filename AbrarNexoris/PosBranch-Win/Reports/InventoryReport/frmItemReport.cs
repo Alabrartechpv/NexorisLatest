@@ -29,10 +29,10 @@ namespace PosBranch_Win.Reports.InventoryReport
         private Dictionary<string, Label> summaryLabels = new Dictionary<string, Label>();
         private Dictionary<string, string> columnAggregations = new Dictionary<string, string>
         {
-            { "Qty", "Sum" },
+            { "Qty", "None" },
             { "Cost", "Average" },
             { "UnitPrice", "Average" },
-            { "Balance", "Sum" }
+            { "Balance", "None" }
         };
         private readonly string[] summaryTypes = new string[] { "None", "Sum", "Average", "Min", "Max", "Count" };
 
@@ -673,7 +673,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             ultraPanelControls.Dock = DockStyle.Top;
             ultraPanelActionBar.Dock = DockStyle.Top;
             ultraPanelSummary.Dock = DockStyle.Bottom;
-            ultraPanelSummary.Height = 65;
+            ultraPanelSummary.Height = 72;
             ultraPanelSummary.Visible = true;
             ultraPanelGrid.Dock = DockStyle.Fill;
 
@@ -753,13 +753,13 @@ namespace PosBranch_Win.Reports.InventoryReport
             {
                 if (captions[i] != null)
                 {
-                    captions[i].Location = new Point(currentX, 4);
+                    captions[i].Location = new Point(currentX, 2);
                     captions[i].Size = new Size(cardWidth, 16);
                 }
                 if (values[i] != null)
                 {
-                    values[i].Location = new Point(currentX, 20);
-                    values[i].Size = new Size(cardWidth, 38);
+                    values[i].Location = new Point(currentX, 18);
+                    values[i].Size = new Size(cardWidth, 48);
                 }
                 currentX += cardWidth + gap;
             }
@@ -770,7 +770,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             if (ultraPanelSummary == null) return;
 
             ultraPanelSummary.Dock = DockStyle.Bottom;
-            ultraPanelSummary.Height = 65;
+            ultraPanelSummary.Height = 72;
             ultraPanelSummary.Visible = true;
 
             gridFooterPanel.Dock = DockStyle.Bottom;
@@ -812,12 +812,27 @@ namespace PosBranch_Win.Reports.InventoryReport
                     string defaultUnit = reportData.PriceSettings?.FirstOrDefault(x => !string.IsNullOrEmpty(x.UnitName))?.UnitName;
                     if (string.IsNullOrWhiteSpace(defaultUnit)) defaultUnit = "UNIT";
 
+                    decimal runningBalance = 0;
                     foreach (var t in reportData.Transactions)
                     {
                         if (string.IsNullOrWhiteSpace(t.UnitName))
                         {
                             t.UnitName = defaultUnit;
                         }
+
+                        decimal packing = t.Packing > 0 ? t.Packing : 1;
+                        decimal baseQty = t.Qty * packing;
+
+                        if (string.Equals(t.Way, "IN", StringComparison.OrdinalIgnoreCase))
+                        {
+                            runningBalance += baseQty;
+                        }
+                        else if (string.Equals(t.Way, "OUT", StringComparison.OrdinalIgnoreCase))
+                        {
+                            runningBalance -= baseQty;
+                        }
+
+                        t.Balance = runningBalance;
                     }
                 }
 
@@ -826,33 +841,45 @@ namespace PosBranch_Win.Reports.InventoryReport
 
                 if (reportData.Transactions != null && reportData.Transactions.Count > 0)
                 {
+                    Func<ItemTransactionModel, decimal> getBaseQty = x => x.Qty * (x.Packing > 0 ? x.Packing : 1);
+                    Func<ItemTransactionModel, decimal> getUnitCost = x => x.Packing > 1 ? (x.Cost / x.Packing) : x.Cost;
+
                     var salesTxns = reportData.Transactions.Where(x => x.Operation.Equals("Sales", StringComparison.OrdinalIgnoreCase));
-                    decimal salesQty = salesTxns.Sum(x => x.Qty);
+                    decimal salesQty = salesTxns.Sum(getBaseQty);
                     decimal salesAmt = salesTxns.Sum(x => x.Qty * x.UnitPrice);
 
                     var purchaseTxns = reportData.Transactions.Where(x => x.Operation.Equals("Purchase", StringComparison.OrdinalIgnoreCase));
-                    decimal purchaseQty = purchaseTxns.Sum(x => x.Qty);
+                    decimal purchaseQty = purchaseTxns.Sum(getBaseQty);
                     decimal purchaseAmt = purchaseTxns.Sum(x => x.Qty * x.Cost);
 
                     var returnTxns = reportData.Transactions.Where(x => x.Operation.StartsWith("Sales Return", StringComparison.OrdinalIgnoreCase) || x.Operation.StartsWith("Return", StringComparison.OrdinalIgnoreCase));
-                    decimal returnQty = returnTxns.Sum(x => x.Qty);
+                    decimal returnQty = returnTxns.Sum(getBaseQty);
                     decimal returnAmt = returnTxns.Sum(x => x.Qty * (x.UnitPrice > 0 ? x.UnitPrice : x.Cost));
 
                     var adjustTxns = reportData.Transactions.Where(x => x.Operation.StartsWith("Stock Adjust", StringComparison.OrdinalIgnoreCase) || x.Operation.StartsWith("Adjustment", StringComparison.OrdinalIgnoreCase));
-                    decimal adjustQty = adjustTxns.Sum(x => x.Qty);
+                    decimal adjustQty = adjustTxns.Sum(getBaseQty);
 
-                    decimal totalIn = reportData.Transactions.Where(x => x.Way.Equals("IN", StringComparison.OrdinalIgnoreCase)).Sum(x => x.Qty);
-                    decimal totalOut = reportData.Transactions.Where(x => x.Way.Equals("OUT", StringComparison.OrdinalIgnoreCase)).Sum(x => x.Qty);
+                    decimal totalIn = reportData.Transactions.Where(x => x.Way.Equals("IN", StringComparison.OrdinalIgnoreCase)).Sum(getBaseQty);
+                    decimal totalOut = reportData.Transactions.Where(x => x.Way.Equals("OUT", StringComparison.OrdinalIgnoreCase)).Sum(getBaseQty);
 
                     decimal currentStock = reportData.StockSummary != null && reportData.StockSummary.Count > 0
                         ? reportData.StockSummary.Sum(x => x.Stock)
                         : (totalIn - totalOut);
 
-                    decimal latestCost = reportData.Transactions.Where(x => x.Cost > 0).Select(x => x.Cost).LastOrDefault();
+                    decimal latestCost = reportData.Transactions
+                        .Where(x => x.Cost > 0)
+                        .Select(getUnitCost)
+                        .LastOrDefault();
+
                     if (latestCost == 0 && reportData.PriceSettings != null && reportData.PriceSettings.Count > 0)
                     {
-                        latestCost = reportData.PriceSettings.FirstOrDefault(x => x.Cost > 0)?.Cost ?? 0;
+                        var ps = reportData.PriceSettings.FirstOrDefault(x => x.Cost > 0);
+                        if (ps != null)
+                        {
+                            latestCost = ps.Cost;
+                        }
                     }
+
                     decimal stockValue = currentStock * latestCost;
 
                     if (ultraLabelSalesValue != null) ultraLabelSalesValue.Text = $"{salesQty:N2} Qty\n₹ {salesAmt:N2}";
