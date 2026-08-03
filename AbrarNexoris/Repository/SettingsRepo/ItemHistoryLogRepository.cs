@@ -70,6 +70,134 @@ namespace Repository.SettingsRepo
             return GetItemHistoryLog(fromDate, toDate, userName, string.Empty, itemSearch).Rows.Count;
         }
 
+        public DataTable GetItemHistorySummary(string itemSearch)
+        {
+            DataTable result = new DataTable();
+            try
+            {
+                if (DataConnection.State != ConnectionState.Open)
+                {
+                    DataConnection.Open();
+                }
+
+                using (SqlCommand cmd = new SqlCommand(@"
+IF OBJECT_ID(N'dbo.ItemMaster', N'U') IS NULL
+BEGIN
+    SELECT
+        CAST(N'' AS NVARCHAR(250)) AS ItemName,
+        CAST(N'' AS NVARCHAR(100)) AS Barcode,
+        CAST(0 AS DECIMAL(18,4)) AS CurrentStock,
+        CAST(NULL AS DATETIME) AS CreatedOn
+    WHERE 1 = 0;
+    RETURN;
+END
+
+;WITH MatchingItemIds AS
+(
+    SELECT ItemId FROM dbo.ItemMaster
+    WHERE @ItemSearch <> N'' AND (ISNULL(Description, N'') LIKE N'%' + @ItemSearch + N'%' OR ISNULL(ItemNo, N'') = @ItemSearch OR ISNULL(Barcode, N'') = @ItemSearch)
+    UNION
+    SELECT ItemId FROM dbo.PriceSettings
+    WHERE @ItemSearch <> N'' AND (ISNULL(BarCode, N'') = @ItemSearch OR ISNULL(AliasBarcode, N'') = @ItemSearch)
+    UNION
+    SELECT ItemId FROM dbo.ItemAlternativeBarcode
+    WHERE @ItemSearch <> N'' AND ISNULL(Barcode, N'') = @ItemSearch
+    UNION
+    SELECT ItemId FROM dbo.ItemActivityLog
+    WHERE @ItemSearch <> N'' AND (ISNULL(ItemName, N'') LIKE N'%' + @ItemSearch + N'%' OR ISNULL(ItemNo, N'') = @ItemSearch OR ISNULL(Barcode, N'') = @ItemSearch)
+),
+PickedItem AS
+(
+    SELECT TOP 1 im.ItemId, im.Description, im.Barcode
+    FROM dbo.ItemMaster im
+    WHERE im.ItemId IN (SELECT ItemId FROM MatchingItemIds)
+    ORDER BY im.ItemId
+)
+SELECT
+    CAST(ISNULL(pi.Description, N'') AS NVARCHAR(250)) AS ItemName,
+    CAST(ISNULL(pi.Barcode, N'') AS NVARCHAR(100)) AS Barcode,
+    CAST(ISNULL(stock.CurrentStock, 0) AS DECIMAL(18,4)) AS CurrentStock,
+    created.CreatedOn
+FROM PickedItem pi
+OUTER APPLY
+(
+    SELECT SUM(ISNULL(ps.Stock, 0)) AS CurrentStock
+    FROM dbo.PriceSettings ps
+    WHERE ps.ItemId = pi.ItemId
+      AND (@CompanyId = 0 OR ISNULL(ps.CompanyId, 0) = @CompanyId)
+      AND (@BranchId = 0 OR ISNULL(ps.BranchId, 0) = @BranchId)
+) stock
+OUTER APPLY
+(
+    SELECT MIN(ial.CreatedOn) AS CreatedOn
+    FROM dbo.ItemActivityLog ial
+    WHERE ial.ItemId = pi.ItemId
+      AND UPPER(ISNULL(ial.ActivityType, N'')) IN (N'SAVE', N'ADD', N'CREATE', N'CREATED')
+) created;", (SqlConnection)DataConnection))
+                using (SqlDataAdapter adapter = new SqlDataAdapter(cmd))
+                {
+                    cmd.Parameters.AddWithValue("@ItemSearch", itemSearch ?? string.Empty);
+                    cmd.Parameters.AddWithValue("@CompanyId", SessionContext.CompanyId);
+                    cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
+                    adapter.Fill(result);
+                }
+            }
+            catch (SqlException ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Item history summary failed: " + ex.Message);
+            }
+            finally
+            {
+                if (DataConnection.State == ConnectionState.Open)
+                {
+                    DataConnection.Close();
+                }
+            }
+
+            return result;
+        }
+
+        public DateTime GetLatestActivityStamp()
+        {
+            DateTime latest = DateTime.MinValue;
+            try
+            {
+                if (DataConnection.State != ConnectionState.Open)
+                {
+                    DataConnection.Open();
+                }
+
+                using (SqlCommand cmd = new SqlCommand(@"
+DECLARE @Latest DATETIME = NULL;
+
+IF OBJECT_ID(N'dbo.ItemActivityLog', N'U') IS NOT NULL
+    SELECT @Latest = MAX(CreatedOn) FROM dbo.ItemActivityLog;
+
+SELECT ISNULL(@Latest, CONVERT(DATETIME, '19000101', 112));", (SqlConnection)DataConnection))
+                {
+                    object value = cmd.ExecuteScalar();
+                    latest = value == null || value == DBNull.Value ? DateTime.MinValue : Convert.ToDateTime(value);
+                }
+            }
+            catch (SqlException ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Item history latest stamp failed: " + ex.Message);
+            }
+            finally
+            {
+                if (DataConnection.State == ConnectionState.Open)
+                {
+                    DataConnection.Close();
+                }
+            }
+
+            using (var stockRepo = new ItemStockActivityLogRepository())
+            {
+                DateTime stockLatest = stockRepo.GetLatestActivityStamp();
+                return stockLatest > latest ? stockLatest : latest;
+            }
+        }
+
         private DataTable ExecuteItemHistoryProcedure(string operation, DateTime fromDate, DateTime toDate, string userName, string actionFilter, string itemSearch)
         {
             DataTable result = CreateCombinedTable();

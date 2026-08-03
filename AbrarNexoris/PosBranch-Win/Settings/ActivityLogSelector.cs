@@ -66,7 +66,7 @@ namespace PosBranch_Win.Settings
                 BackColor = Color.Transparent,
                 Padding = new Padding(0, 8, 0, 0)
             };
-            buttonRow.Controls.Add(CreateLogButton("ItemLog", "Activity Log - Item Master", () => new ActivityLog()));
+            buttonRow.Controls.Add(CreateLogButton("ItemMasterLog", "Activity Log - Item Master", () => new ActivityLog()));
             buttonRow.Controls.Add(CreateLogButton("itemstockactivity", "Activity Log - Item Stock", () => new ItemStockActivity()));
             buttonRow.Controls.Add(CreateLogButton("ItemHistoryLog", "Activity Log - Item History", () => new ItemHistoryLog()));
             buttonRow.Controls.Add(CreateLogButton("PurchaseLog", "Activity Log - Purchase", () => new PurchaseLog()));

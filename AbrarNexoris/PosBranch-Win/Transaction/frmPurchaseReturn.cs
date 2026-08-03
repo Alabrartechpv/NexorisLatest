@@ -315,6 +315,9 @@ namespace PosBranch_Win.Transaction
                 // Apply modern Image 2 light ice-blue theme
                 ApplyImage2Theme();
 
+                // Style date editors to match ActivityLog dtpFrom look
+                StyleDateEditors();
+
                 // Add resize event handler to ensure grid fills available space
                 this.Resize += frmPurchaseReturn_Resize;
 
@@ -331,6 +334,30 @@ namespace PosBranch_Win.Transaction
         }
 
         private bool _isUpdatingModeCheckBoxes = false;
+
+        private void StyleDateEditors()
+        {
+            StyleDateEditor(ultraDateTimeEditor1);
+            StyleDateEditor(ultraDateTimeEditor2);
+        }
+
+        private void StyleDateEditor(Infragistics.Win.UltraWinEditors.UltraDateTimeEditor editor)
+        {
+            if (editor == null) return;
+            editor.UseAppStyling = false;
+            editor.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
+            editor.DisplayStyle = Infragistics.Win.EmbeddableElementDisplayStyle.Office2013;
+            editor.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
+            editor.Appearance.BackColor = Color.White;
+            editor.Appearance.BorderColor = Color.FromArgb(128, 183, 220);
+            editor.Appearance.ForeColor = Color.FromArgb(20, 55, 120);
+            editor.Appearance.FontData.Name = "Segoe UI";
+            editor.Appearance.FontData.SizeInPoints = 8.5F;
+            editor.ButtonStyle = Infragistics.Win.UIElementButtonStyle.Office2003ToolbarButton;
+            editor.DropDownButtonDisplayStyle = Infragistics.Win.ButtonDisplayStyle.Always;
+            editor.FormatString = "dd MMM yyyy";
+            editor.MaskInput = "{date}";
+        }
 
         private void InitializeGRNModeCheckBoxes()
         {

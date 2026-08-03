@@ -2,6 +2,7 @@ using System;
 using System.Data;
 using System.Drawing;
 using System.Windows.Forms;
+using Repository.SettingsRepo;
 
 namespace PosBranch_Win.Settings
 {
@@ -10,6 +11,7 @@ namespace PosBranch_Win.Settings
         private readonly string searchText;
         private DataGridView gridHistory;
         private Label lblHeader;
+        private Label lblSummary;
         private readonly Color navy = Color.FromArgb(20, 55, 120);
         private readonly Color border = Color.FromArgb(190, 226, 250);
 
@@ -41,13 +43,23 @@ namespace PosBranch_Win.Settings
             lblHeader = new Label
             {
                 Text = $"Activity History for: '{searchText}'",
-                Dock = DockStyle.Fill,
+                Dock = DockStyle.Top,
+                Height = 34,
                 Font = new Font("Segoe UI Semibold", 12F, FontStyle.Bold),
                 ForeColor = navy,
                 TextAlign = ContentAlignment.MiddleLeft,
                 Padding = new Padding(15, 0, 0, 0)
             };
+            lblSummary = new Label
+            {
+                Text = string.Empty,
+                Dock = DockStyle.Fill,
+                ForeColor = Color.FromArgb(55, 95, 150),
+                TextAlign = ContentAlignment.MiddleLeft,
+                Padding = new Padding(15, 0, 0, 0)
+            };
             panelTop.Controls.Add(lblHeader);
+            panelTop.Controls.Add(lblSummary);
 
             gridHistory = new DataGridView
             {
@@ -114,9 +126,11 @@ namespace PosBranch_Win.Settings
                 {
                     data = repo.GetItemDedicatedHistory(searchText);
                 }
+                ItemHistoryLog.ApplyBriefActivityDetails(data);
                 gridHistory.DataSource = data;
                 ConfigureGrid();
                 ApplyActionColors();
+                LoadSummary();
             }
             catch (Exception ex)
             {
@@ -177,6 +191,7 @@ namespace PosBranch_Win.Settings
             if (gridHistory.Columns.Contains(colName))
             {
                 gridHistory.Columns[colName].DisplayIndex = 0;
+                gridHistory.Columns[colName].Frozen = true;
                 return;
             }
 
@@ -187,7 +202,8 @@ namespace PosBranch_Win.Settings
                 Text = "+",
                 UseColumnTextForButtonValue = true,
                 Width = 38,
-                FlatStyle = FlatStyle.Flat
+                FlatStyle = FlatStyle.Flat,
+                Frozen = true
             };
             gridHistory.Columns.Insert(0, btn);
         }
@@ -217,16 +233,45 @@ namespace PosBranch_Win.Settings
             if (e.RowIndex < 0 || e.ColumnIndex < 0) return;
             if (gridHistory.Columns[e.ColumnIndex].Name == "ViewDetailsHistory")
             {
-                string details = Convert.ToString(gridHistory.Rows[e.RowIndex].Cells["ActivityDetails"].Value);
-                if (string.IsNullOrWhiteSpace(details))
-                {
-                    details = "No additional details available.";
-                }
-                else
-                {
-                    details = FilterActivityDetails(details);
-                }
+                string details = ItemHistoryLog.BuildBriefActivityDetails(gridHistory.Rows[e.RowIndex]);
                 MessageBox.Show(details, "Activity Details", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
+        private void LoadSummary()
+        {
+            if (lblSummary == null) return;
+
+            try
+            {
+                using (var repo = new ItemHistoryLogRepository())
+                {
+                    DataTable summary = repo.GetItemHistorySummary(searchText);
+                    if (summary == null || summary.Rows.Count == 0)
+                    {
+                        lblSummary.Text = string.Empty;
+                        return;
+                    }
+
+                    DataRow row = summary.Rows[0];
+                    string itemName = Convert.ToString(row["ItemName"]);
+                    string barcode = Convert.ToString(row["Barcode"]);
+                    decimal currentStock = 0m;
+                    decimal.TryParse(Convert.ToString(row["CurrentStock"]), out currentStock);
+                    DateTime createdOn;
+                    bool hasCreatedOn = DateTime.TryParse(Convert.ToString(row["CreatedOn"]), out createdOn);
+
+                    lblSummary.Text =
+                        (!string.IsNullOrWhiteSpace(itemName) ? itemName : searchText) +
+                        (!string.IsNullOrWhiteSpace(barcode) ? " | Barcode: " + barcode : string.Empty) +
+                        " | Current Stock: " + currentStock.ToString("0.####") +
+                        (hasCreatedOn ? " | Created: " + createdOn.ToString("dd MMM yyyy hh:mm tt") : string.Empty);
+                }
+            }
+            catch (Exception ex)
+            {
+                lblSummary.Text = string.Empty;
+                System.Diagnostics.Debug.WriteLine("Unable to load item history summary: " + ex.Message);
             }
         }
 
