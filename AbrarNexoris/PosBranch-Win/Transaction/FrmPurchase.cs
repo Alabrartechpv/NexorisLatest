@@ -5619,6 +5619,38 @@ namespace PosBranch_Win.Transaction
                     ObjPurchaseDetails.TaxType = dt.Rows[0]["TaxType"].ToString();
                 }
 
+                // Check CASH-IN-HAND balance if payment mode is Cash
+                if (ObjPurchaseInviceRepo.IsCashPaymentMode(ObjPurchaseMaster.PaymodeID, ObjPurchaseMaster.Paymode))
+                {
+                    double availableCash = ObjPurchaseInviceRepo.GetAvailableCashBalance(GetBranchId());
+                    double purchaseAmt = ObjPurchaseMaster.GrandTotal;
+                    if (availableCash - purchaseAmt < 0)
+                    {
+                        MessageBox.Show($"Insufficient CASH-IN-HAND balance!\n\nCurrent Cash-In-Hand Balance: {availableCash:N2}\nPurchase Amount: {purchaseAmt:N2}\nAvailable Cash after Purchase: {(availableCash - purchaseAmt):N2}\n\nTransaction cannot be saved because CASH-IN-HAND balance cannot be negative.", "Insufficient Cash Balance", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+                }
+
+                // Check CASH-IN-HAND balance if payment mode is Cash
+                if (ObjPurchaseInviceRepo.IsCashPaymentMode(ObjPurchaseMaster.PaymodeID, ObjPurchaseMaster.Paymode))
+                {
+                    double availableCash = ObjPurchaseInviceRepo.GetAvailableCashBalance(GetBranchId());
+                    double purchaseAmt = ObjPurchaseMaster.GrandTotal;
+                    if (availableCash - purchaseAmt < 0)
+                    {
+                        MessageBox.Show(
+                            $"Insufficient CASH-IN-HAND balance!\n\n" +
+                            $"Current Cash-In-Hand Balance: {availableCash:N2}\n" +
+                            $"Purchase Amount: {purchaseAmt:N2}\n" +
+                            $"Shortfall: {(purchaseAmt - availableCash):N2}\n\n" +
+                            "Transaction cannot be saved — CASH-IN-HAND balance cannot go negative.",
+                            "Insufficient Cash Balance",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Warning);
+                        return;
+                    }
+                }
+
                 // Show confirmation dialog before saving
                 DialogBox.frmSuccesMsg confirmDialog = new DialogBox.frmSuccesMsg(txtPurchaseNo.Text.Replace("GRN-", ""));
                 if (confirmDialog.ShowDialog() != DialogResult.Yes)
@@ -7072,6 +7104,42 @@ namespace PosBranch_Win.Transaction
                 catch (Exception ex)
                 {
                     System.Diagnostics.Debug.WriteLine("Error loading old purchase for log: " + ex.Message);
+                }
+
+                // Check CASH-IN-HAND balance if payment mode is Cash
+                if (ObjPurchaseInviceRepo.IsCashPaymentMode(ObjPurchaseMaster.PaymodeID, ObjPurchaseMaster.Paymode))
+                {
+                    double currentCash = ObjPurchaseInviceRepo.GetAvailableCashBalance(GetBranchId());
+                    double oldCashCredit = ObjPurchaseInviceRepo.GetOldCashVoucherCreditForPurchase(ObjPurchaseMaster.VoucherID, GetBranchId());
+                    double effectiveCash = currentCash + oldCashCredit;
+                    double purchaseAmt = ObjPurchaseMaster.GrandTotal;
+                    if (effectiveCash - purchaseAmt < 0)
+                    {
+                        MessageBox.Show($"Insufficient CASH-IN-HAND balance!\n\nAvailable Cash-In-Hand Balance (before update): {effectiveCash:N2}\nUpdated Purchase Amount: {purchaseAmt:N2}\nAvailable Cash after Update: {(effectiveCash - purchaseAmt):N2}\n\nTransaction cannot be updated because CASH-IN-HAND balance cannot be negative.", "Insufficient Cash Balance", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+                }
+
+                // Check CASH-IN-HAND balance if payment mode is Cash
+                if (ObjPurchaseInviceRepo.IsCashPaymentMode(ObjPurchaseMaster.PaymodeID, ObjPurchaseMaster.Paymode))
+                {
+                    double currentCash = ObjPurchaseInviceRepo.GetAvailableCashBalance(GetBranchId());
+                    double oldCashCredit = ObjPurchaseInviceRepo.GetOldCashVoucherCreditForPurchase(ObjPurchaseMaster.VoucherID, GetBranchId());
+                    double effectiveCash = currentCash + oldCashCredit;
+                    double purchaseAmt = ObjPurchaseMaster.GrandTotal;
+                    if (effectiveCash - purchaseAmt < 0)
+                    {
+                        MessageBox.Show(
+                            $"Insufficient CASH-IN-HAND balance!\n\n" +
+                            $"Available Cash-In-Hand Balance (before update): {effectiveCash:N2}\n" +
+                            $"Updated Purchase Amount: {purchaseAmt:N2}\n" +
+                            $"Shortfall: {(purchaseAmt - effectiveCash):N2}\n\n" +
+                            "Transaction cannot be updated — CASH-IN-HAND balance cannot go negative.",
+                            "Insufficient Cash Balance",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Warning);
+                        return;
+                    }
                 }
 
                 // Show confirmation dialog before updating
