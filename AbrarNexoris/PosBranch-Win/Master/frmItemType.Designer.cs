@@ -86,7 +86,6 @@ namespace PosBranch_Win.Master
             // panelGrid
             // 
             this.panelGrid.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(250)))), ((int)(((byte)(253)))), ((int)(((byte)(255)))));
-            this.panelGrid.Controls.Add(this.gridReport);
             this.panelGrid.Dock = System.Windows.Forms.DockStyle.Fill;
             this.panelGrid.Location = new System.Drawing.Point(0, 8);
             this.panelGrid.Margin = new System.Windows.Forms.Padding(0, 8, 0, 6);
@@ -132,15 +131,6 @@ namespace PosBranch_Win.Master
             // panelFilters
             // 
             this.panelFilters.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(250)))), ((int)(((byte)(253)))), ((int)(((byte)(255)))));
-            this.panelFilters.Controls.Add(this.lblItemType);
-            this.panelFilters.Controls.Add(this.txt_ItemType);
-            this.panelFilters.Controls.Add(this.btnSearchF11);
-            this.panelFilters.Controls.Add(this.btnSave);
-            this.panelFilters.Controls.Add(this.btnUpdate);
-            this.panelFilters.Controls.Add(this.btnSetDefault);
-            this.panelFilters.Controls.Add(this.btnDelete);
-            this.panelFilters.Controls.Add(this.btnClear);
-            this.panelFilters.Controls.Add(this.btnClose);
             this.panelFilters.Dock = System.Windows.Forms.DockStyle.Top;
             this.panelFilters.Location = new System.Drawing.Point(18, 48);
             this.panelFilters.Name = "panelFilters";
@@ -170,7 +160,7 @@ namespace PosBranch_Win.Master
             // 
             this.btnSearchF11.Location = new System.Drawing.Point(352, 17);
             this.btnSearchF11.Name = "btnSearchF11";
-            this.btnSearchF11.Size = new System.Drawing.Size(45, 25);
+            this.btnSearchF11.Size = new System.Drawing.Size(36, 25);
             this.btnSearchF11.TabIndex = 2;
             this.btnSearchF11.Text = "F11";
             // 

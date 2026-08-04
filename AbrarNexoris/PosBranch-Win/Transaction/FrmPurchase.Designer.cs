@@ -167,6 +167,7 @@ namespace PosBranch_Win.Transaction
             this.ultraLabel3 = new Infragistics.Win.Misc.UltraLabel();
             this.pbxSave = new Infragistics.Win.UltraWinEditors.UltraPictureBox();
             this.ultraPictureBox3 = new Infragistics.Win.UltraWinEditors.UltraPictureBox();
+            this.button8 = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.txtPurchaseNo)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.dtpPurchaseDate)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.CmboVendor)).BeginInit();
@@ -670,7 +671,7 @@ namespace PosBranch_Win.Transaction
             this.label4.Font = new System.Drawing.Font("DS-Digital", 36F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.label4.Location = new System.Drawing.Point(0, 0);
             this.label4.Name = "label4";
-            this.label4.Size = new System.Drawing.Size(231, 80);
+            this.label4.Size = new System.Drawing.Size(233, 82);
             this.label4.TabIndex = 0;
             this.label4.Text = "0.00";
             this.label4.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
@@ -1098,6 +1099,7 @@ namespace PosBranch_Win.Transaction
             // 
             // ultraPanel4.ClientArea
             // 
+            this.ultraPanel4.ClientArea.Controls.Add(this.button8);
             this.ultraPanel4.ClientArea.Controls.Add(this.button6);
             this.ultraPanel4.ClientArea.Controls.Add(this.label17);
             this.ultraPanel4.ClientArea.Controls.Add(this.ultraGrid1);
@@ -1509,6 +1511,20 @@ namespace PosBranch_Win.Transaction
             this.ultraPictureBox3.TabIndex = 35;
             this.ultraPictureBox3.Visible = false;
             // 
+            // button8
+            // 
+            this.button8.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(122)))), ((int)(((byte)(204)))));
+            this.button8.FlatAppearance.BorderColor = System.Drawing.Color.Black;
+            this.button8.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.button8.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.button8.ForeColor = System.Drawing.Color.White;
+            this.button8.Location = new System.Drawing.Point(606, 7);
+            this.button8.Name = "button8";
+            this.button8.Size = new System.Drawing.Size(34, 27);
+            this.button8.TabIndex = 128;
+            this.button8.Text = "BQ";
+            this.button8.UseVisualStyleBackColor = false;
+            // 
             // FrmPurchase
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -1660,5 +1676,6 @@ namespace PosBranch_Win.Transaction
         private System.Windows.Forms.Label label13;
         private System.Windows.Forms.Button button7;
         private System.Windows.Forms.Button button6;
+        private System.Windows.Forms.Button button8;
     }
 }

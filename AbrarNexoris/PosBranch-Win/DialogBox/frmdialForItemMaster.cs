@@ -1075,10 +1075,6 @@ namespace PosBranch_Win.DialogBox
             Color borderBase = Color.FromArgb(0, 100, 180);  // Border base color
 
             // Create a gradient from light to dark blue with exact specified colors
-            panel.Appearance.BackColor = lightBlue;
-            panel.Appearance.BackColor2 = darkBlue;
-            panel.Appearance.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
-
             // Set highly rounded border style
             panel.BorderStyle = Infragistics.Win.UIElementBorderStyle.Rounded4;
 
@@ -1104,20 +1100,17 @@ namespace PosBranch_Win.DialogBox
                 }
             }
 
-            // Add hover effect with consistent colors
+            // Add hover effect
             panel.ClientArea.MouseEnter += (sender, e) =>
             {
                 panel.Appearance.BackColor = Color.FromArgb(160, 230, 255);
                 panel.Appearance.BackColor2 = Color.FromArgb(30, 140, 230);
             };
-
             panel.ClientArea.MouseLeave += (sender, e) =>
             {
-                panel.Appearance.BackColor = lightBlue;
-                panel.Appearance.BackColor2 = darkBlue;
+                panel.Appearance.BackColor = Color.FromArgb(127, 219, 255);
+                panel.Appearance.BackColor2 = Color.FromArgb(0, 116, 217);
             };
-
-            // Set cursor to hand to indicate clickable
             panel.ClientArea.Cursor = Cursors.Hand;
         }
 
@@ -1125,67 +1118,49 @@ namespace PosBranch_Win.DialogBox
         {
             try
             {
-                // Reset everything first to ensure clean slate
                 ultraGrid1.DisplayLayout.Reset();
 
-                // Configure the grid appearance
                 ultraGrid1.DisplayLayout.Override.AllowAddNew = Infragistics.Win.UltraWinGrid.AllowAddNew.No;
                 ultraGrid1.DisplayLayout.Override.AllowDelete = Infragistics.Win.DefaultableBoolean.False;
                 ultraGrid1.DisplayLayout.Override.AllowUpdate = Infragistics.Win.DefaultableBoolean.True;
                 ultraGrid1.DisplayLayout.Override.RowSelectors = Infragistics.Win.DefaultableBoolean.True;
-                ultraGrid1.DisplayLayout.Override.SelectTypeRow = Infragistics.Win.UltraWinGrid.SelectType.Single;
+                ultraGrid1.DisplayLayout.Override.SelectTypeRow = Infragistics.Win.UltraWinGrid.SelectType.Extended;
                 ultraGrid1.DisplayLayout.Override.HeaderClickAction = Infragistics.Win.UltraWinGrid.HeaderClickAction.SortSingle;
-
-                // Enable column moving and dragging
+                ultraGrid1.DisplayLayout.Override.CellClickAction = Infragistics.Win.UltraWinGrid.CellClickAction.RowSelect;
                 ultraGrid1.DisplayLayout.Override.AllowColMoving = Infragistics.Win.UltraWinGrid.AllowColMoving.WithinBand;
                 ultraGrid1.DisplayLayout.Override.AllowColSizing = Infragistics.Win.UltraWinGrid.AllowColSizing.Free;
                 ultraGrid1.DisplayLayout.Override.AllowColSwapping = Infragistics.Win.UltraWinGrid.AllowColSwapping.WithinBand;
 
-                // Important: This setting ensures we get only row selection on click, not automatic action
-                ultraGrid1.DisplayLayout.Override.CellClickAction = Infragistics.Win.UltraWinGrid.CellClickAction.RowSelect;
-
-                // Hide the group-by area (gray bar)
                 ultraGrid1.DisplayLayout.GroupByBox.Hidden = true;
                 ultraGrid1.DisplayLayout.GroupByBox.Prompt = string.Empty;
-
-                // Set rounded borders for the entire grid
                 ultraGrid1.DisplayLayout.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
-
-                // Configure grid lines - single line borders for rows and columns
                 ultraGrid1.DisplayLayout.Override.BorderStyleRow = Infragistics.Win.UIElementBorderStyle.Solid;
                 ultraGrid1.DisplayLayout.Override.BorderStyleCell = Infragistics.Win.UIElementBorderStyle.Solid;
                 ultraGrid1.DisplayLayout.Override.BorderStyleHeader = Infragistics.Win.UIElementBorderStyle.Solid;
                 ultraGrid1.DisplayLayout.Override.BorderStyleRowSelector = Infragistics.Win.UIElementBorderStyle.Solid;
-
-                // Set border width to single line
                 ultraGrid1.DisplayLayout.Override.RowAppearance.BorderAlpha = Infragistics.Win.Alpha.Opaque;
                 ultraGrid1.DisplayLayout.Override.CellAppearance.BorderAlpha = Infragistics.Win.Alpha.Opaque;
 
-                // Remove cell padding/spacing
                 ultraGrid1.DisplayLayout.Override.CellPadding = 0;
                 ultraGrid1.DisplayLayout.Override.RowSpacingBefore = 0;
                 ultraGrid1.DisplayLayout.Override.RowSpacingAfter = 0;
                 ultraGrid1.DisplayLayout.Override.CellSpacing = 0;
                 ultraGrid1.DisplayLayout.InterBandSpacing = 0;
 
-                // Define colors
-                Color lightBlue = Color.FromArgb(173, 216, 230); // Light blue for borders
-                Color headerBlue = Color.FromArgb(0, 123, 255); // Slightly darker blue for headers
+                Color lightBlue = Color.FromArgb(173, 216, 230);
+                Color headerBlue = Color.FromArgb(0, 123, 255);
 
-                // Set light blue border color for cells
                 ultraGrid1.DisplayLayout.Override.CellAppearance.BorderColor = lightBlue;
                 ultraGrid1.DisplayLayout.Override.RowAppearance.BorderColor = lightBlue;
                 ultraGrid1.DisplayLayout.Override.HeaderAppearance.BorderColor = headerBlue;
                 ultraGrid1.DisplayLayout.Override.RowSelectorAppearance.BorderColor = headerBlue;
 
-                // Configure row height - increase to match the image (about 26-30 pixels)
                 ultraGrid1.DisplayLayout.Override.MinRowHeight = 30;
                 ultraGrid1.DisplayLayout.Override.DefaultRowHeight = 30;
 
-                // Add header styling - blue headers
                 ultraGrid1.DisplayLayout.Override.HeaderStyle = Infragistics.Win.HeaderStyle.WindowsXPCommand;
                 ultraGrid1.DisplayLayout.Override.HeaderAppearance.BackColor = headerBlue;
-                ultraGrid1.DisplayLayout.Override.HeaderAppearance.BackColor2 = headerBlue; // Same color for no gradient
+                ultraGrid1.DisplayLayout.Override.HeaderAppearance.BackColor2 = headerBlue;
                 ultraGrid1.DisplayLayout.Override.HeaderAppearance.BackGradientStyle = Infragistics.Win.GradientStyle.None;
                 ultraGrid1.DisplayLayout.Override.HeaderAppearance.ForeColor = Color.White;
                 ultraGrid1.DisplayLayout.Override.HeaderAppearance.TextHAlign = Infragistics.Win.HAlign.Center;
@@ -1194,174 +1169,90 @@ namespace PosBranch_Win.DialogBox
                 ultraGrid1.DisplayLayout.Override.HeaderAppearance.FontData.SizeInPoints = 9;
                 ultraGrid1.DisplayLayout.Override.HeaderAppearance.FontData.Name = "Microsoft Sans Serif";
                 ultraGrid1.DisplayLayout.Override.HeaderAppearance.ThemedElementAlpha = Infragistics.Win.Alpha.Transparent;
+                ultraGrid1.DisplayLayout.Override.HeaderAppearance.TextTrimming = Infragistics.Win.TextTrimming.None;
+                ultraGrid1.DisplayLayout.Override.WrapHeaderText = Infragistics.Win.DefaultableBoolean.False;
 
-                // Configure row selector appearance with blue
                 ultraGrid1.DisplayLayout.Override.RowSelectorAppearance.BackColor = headerBlue;
-                ultraGrid1.DisplayLayout.Override.RowSelectorAppearance.BackColor2 = headerBlue; // Same color for no gradient
+                ultraGrid1.DisplayLayout.Override.RowSelectorAppearance.BackColor2 = headerBlue;
                 ultraGrid1.DisplayLayout.Override.RowSelectorAppearance.BackGradientStyle = Infragistics.Win.GradientStyle.None;
                 ultraGrid1.DisplayLayout.Override.RowSelectorAppearance.ForeColor = Color.White;
                 ultraGrid1.DisplayLayout.Override.RowSelectorHeaderStyle = Infragistics.Win.UltraWinGrid.RowSelectorHeaderStyle.Default;
-                ultraGrid1.DisplayLayout.Override.RowSelectorNumberStyle = Infragistics.Win.UltraWinGrid.RowSelectorNumberStyle.None; // Remove numbers
-                ultraGrid1.DisplayLayout.Override.RowSelectorWidth = 15; // Smaller width
+                ultraGrid1.DisplayLayout.Override.RowSelectorNumberStyle = Infragistics.Win.UltraWinGrid.RowSelectorNumberStyle.None;
+                ultraGrid1.DisplayLayout.Override.RowSelectorWidth = 15;
 
-                // Set these properties to completely clean the row headers - remove all indicators
                 ultraGrid1.DisplayLayout.Override.ActiveRowAppearance.Image = null;
                 ultraGrid1.DisplayLayout.Override.SelectedRowAppearance.Image = null;
                 ultraGrid1.DisplayLayout.Override.RowSelectorAppearance.Image = null;
 
-                // Set all cells to have white background (no alternate row coloring)
                 ultraGrid1.DisplayLayout.Override.RowAppearance.BackColor = Color.White;
                 ultraGrid1.DisplayLayout.Override.RowAppearance.BackColor2 = Color.White;
                 ultraGrid1.DisplayLayout.Override.RowAppearance.BackGradientStyle = Infragistics.Win.GradientStyle.None;
-
-                // Remove alternate row appearance (make all rows white)
                 ultraGrid1.DisplayLayout.Override.RowAlternateAppearance.BackColor = Color.White;
                 ultraGrid1.DisplayLayout.Override.RowAlternateAppearance.BackColor2 = Color.White;
                 ultraGrid1.DisplayLayout.Override.RowAlternateAppearance.BackGradientStyle = Infragistics.Win.GradientStyle.None;
 
-                // Configure selected row appearance with light blue highlight - UPDATED to match FrmPurchaseDisplayDialog.cs
-                ultraGrid1.DisplayLayout.Override.SelectedRowAppearance.BackColor = Color.FromArgb(0, 120, 215); // Bright blue from the image
+                ultraGrid1.DisplayLayout.Override.SelectedRowAppearance.BackColor = Color.FromArgb(0, 120, 215);
                 ultraGrid1.DisplayLayout.Override.SelectedRowAppearance.BackColor2 = Color.FromArgb(0, 120, 215);
                 ultraGrid1.DisplayLayout.Override.SelectedRowAppearance.BackGradientStyle = Infragistics.Win.GradientStyle.None;
-                ultraGrid1.DisplayLayout.Override.SelectedRowAppearance.ForeColor = Color.White; // White text for better contrast
+                ultraGrid1.DisplayLayout.Override.SelectedRowAppearance.ForeColor = Color.White;
 
-                // Configure active row appearance - make it same as selected row
                 ultraGrid1.DisplayLayout.Override.ActiveRowAppearance.BackColor = Color.FromArgb(0, 120, 215);
                 ultraGrid1.DisplayLayout.Override.ActiveRowAppearance.BackColor2 = Color.FromArgb(0, 120, 215);
                 ultraGrid1.DisplayLayout.Override.ActiveRowAppearance.BackGradientStyle = Infragistics.Win.GradientStyle.None;
                 ultraGrid1.DisplayLayout.Override.ActiveRowAppearance.ForeColor = Color.White;
 
-                // Set font size for all cells to match the image (standard text size)
                 ultraGrid1.DisplayLayout.Override.CellAppearance.FontData.SizeInPoints = 10;
                 ultraGrid1.DisplayLayout.Override.RowAppearance.FontData.SizeInPoints = 10;
                 ultraGrid1.DisplayLayout.Override.CellAppearance.FontData.Name = "Microsoft Sans Serif";
                 ultraGrid1.DisplayLayout.Override.RowAppearance.FontData.Name = "Microsoft Sans Serif";
 
-                // Configure scrollbar style
                 ultraGrid1.DisplayLayout.ScrollBounds = Infragistics.Win.UltraWinGrid.ScrollBounds.ScrollToFill;
                 ultraGrid1.DisplayLayout.ScrollStyle = Infragistics.Win.UltraWinGrid.ScrollStyle.Immediate;
 
-                // Configure the scrollbar look
-                if (ultraGrid1.DisplayLayout.ScrollBarLook != null)
-                {
-                    // Configure button appearance
-                    ultraGrid1.DisplayLayout.ScrollBarLook.ButtonAppearance.BackColor = headerBlue;
-                    ultraGrid1.DisplayLayout.ScrollBarLook.ButtonAppearance.BackColor2 = headerBlue;
-                    ultraGrid1.DisplayLayout.ScrollBarLook.ButtonAppearance.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
-                    ultraGrid1.DisplayLayout.ScrollBarLook.ButtonAppearance.BorderColor = headerBlue;
-
-                    // Configure track appearance
-                    ultraGrid1.DisplayLayout.ScrollBarLook.TrackAppearance.BackColor = Color.White;
-                    ultraGrid1.DisplayLayout.ScrollBarLook.TrackAppearance.BackColor2 = Color.White;
-                    ultraGrid1.DisplayLayout.ScrollBarLook.TrackAppearance.BackGradientStyle = Infragistics.Win.GradientStyle.None;
-                    ultraGrid1.DisplayLayout.ScrollBarLook.TrackAppearance.BorderColor = lightBlue;
-
-                    // Configure thumb appearance
-                    ultraGrid1.DisplayLayout.ScrollBarLook.ThumbAppearance.BackColor = headerBlue;
-                    ultraGrid1.DisplayLayout.ScrollBarLook.ThumbAppearance.BackColor2 = headerBlue;
-                    ultraGrid1.DisplayLayout.ScrollBarLook.ThumbAppearance.BackGradientStyle = Infragistics.Win.GradientStyle.None;
-                    ultraGrid1.DisplayLayout.ScrollBarLook.ThumbAppearance.BorderColor = headerBlue;
-                }
-
-                // Configure cell appearance to increase vertical content alignment
                 ultraGrid1.DisplayLayout.Override.CellAppearance.TextVAlign = Infragistics.Win.VAlign.Middle;
                 ultraGrid1.DisplayLayout.Override.CellAppearance.TextHAlign = Infragistics.Win.HAlign.Center;
 
-                // Connect events
                 ultraGrid1.DoubleClickCell += new Infragistics.Win.UltraWinGrid.DoubleClickCellEventHandler(ultraGrid1_DoubleClickCell);
                 ultraGrid1.ClickCell += new Infragistics.Win.UltraWinGrid.ClickCellEventHandler(ultraGrid1_ClickCell);
 
-                // Auto-fit settings - DISABLE to prevent column resizing during filtering
                 ultraGrid1.DisplayLayout.AutoFitStyle = Infragistics.Win.UltraWinGrid.AutoFitStyle.None;
-
-                // Disable automatic column sizing
                 ultraGrid1.DisplayLayout.Override.ColumnAutoSizeMode = Infragistics.Win.UltraWinGrid.ColumnAutoSizeMode.None;
+                ultraGrid1.DisplayLayout.Override.AllowRowFiltering = Infragistics.Win.DefaultableBoolean.False;
+                ultraGrid1.DisplayLayout.Override.FilterUIType = Infragistics.Win.UltraWinGrid.FilterUIType.FilterRow;
 
-                // IMPORTANT: Add code to ensure only the specified columns are visible
                 if (ultraGrid1.DisplayLayout.Bands.Count > 0)
                 {
-                    // First, hide all columns
                     foreach (Infragistics.Win.UltraWinGrid.UltraGridColumn col in ultraGrid1.DisplayLayout.Bands[0].Columns)
-                    {
                         col.Hidden = true;
-                    }
 
-                    // Define the columns to show in the specified order
                     List<string> columnsList = new List<string> { "BarCode", "Description", "UnitId", "Unit", "Cost", "RetailPrice", "Stock" };
                     if (FormName == "frmSalesInvoice")
-                    {
                         columnsList.Remove("Cost");
-                    }
-                    string[] columnsToShow = columnsList.ToArray();
 
-                    // Show and configure only the specified columns in the specified order
+                    string[] columnsToShow = columnsList.ToArray();
                     for (int i = 0; i < columnsToShow.Length; i++)
                     {
                         string colKey = columnsToShow[i];
-
                         if (ultraGrid1.DisplayLayout.Bands[0].Columns.Exists(colKey))
                         {
-                            Infragistics.Win.UltraWinGrid.UltraGridColumn col = ultraGrid1.DisplayLayout.Bands[0].Columns[colKey];
+                            var col = ultraGrid1.DisplayLayout.Bands[0].Columns[colKey];
                             col.Hidden = false;
-                            col.Header.VisiblePosition = i; // Set the order
-
-                            // Configure specific columns
+                            col.Header.VisiblePosition = i;
                             switch (colKey)
                             {
-                                case "BarCode":
-                                    col.Header.Caption = "Barcode";
-                                    col.Width = 120;
-                                    break;
-                                case "Description":
-                                    col.Header.Caption = "Item Name";
-                                    col.Width = 250;
-                                    break;
-                                case "UnitId":
-                                    col.Header.Caption = "UnitId";
-                                    col.Width = 80;
-                                    break;
-                                case "Unit":
-                                    col.Header.Caption = "Unit";
-                                    col.Width = 80;
-                                    break;
-                                case "Cost":
-                                    col.Header.Caption = "Cost";
-                                    col.Width = 100;
-                                    col.Format = "N2";
-                                    col.CellAppearance.TextHAlign = Infragistics.Win.HAlign.Right;
-                                    break;
-                                case "RetailPrice":
-                                    col.Header.Caption = "Price";
-                                    col.Width = 100;
-                                    col.Format = "N2";
-                                    col.CellAppearance.TextHAlign = Infragistics.Win.HAlign.Right;
-                                    break;
-                                case "Stock":
-                                    col.Header.Caption = "Stock";
-                                    col.Width = 80;
-                                    col.Format = "N2";
-                                    col.CellAppearance.TextHAlign = Infragistics.Win.HAlign.Right;
-                                    break;
+                                case "BarCode":     col.Header.Caption = "Barcode";   col.Width = 120; break;
+                                case "Description": col.Header.Caption = "Item Name"; col.Width = 250; break;
+                                case "UnitId":      col.Header.Caption = "UnitId";    col.Width = 80;  break;
+                                case "Unit":        col.Header.Caption = "Unit";      col.Width = 80;  break;
+                                case "Cost":        col.Header.Caption = "Cost";      col.Width = 100; col.Format = "N2"; col.CellAppearance.TextHAlign = Infragistics.Win.HAlign.Right; break;
+                                case "RetailPrice": col.Header.Caption = "Price";     col.Width = 100; col.Format = "N2"; col.CellAppearance.TextHAlign = Infragistics.Win.HAlign.Right; break;
+                                case "Stock":       col.Header.Caption = "Stock";     col.Width = 80;  col.Format = "N2"; col.CellAppearance.TextHAlign = Infragistics.Win.HAlign.Right; break;
                             }
                         }
                     }
                 }
 
-                // Enable multi-select for stock transfer and stock adjustment to allow bulk adding
-                if (FormName == "FrmStockTransfer" || FormName == "FrmStockAdjustment")
-                {
-                    ultraGrid1.DisplayLayout.Override.SelectTypeRow = Infragistics.Win.UltraWinGrid.SelectType.Extended;
-                }
-
-                // Refresh the grid to apply all changes
                 ultraGrid1.Refresh();
-
-                // In SetupUltraGridStyle method - add these lines to disable filter indicators
-                ultraGrid1.DisplayLayout.Override.AllowRowFiltering = Infragistics.Win.DefaultableBoolean.False;
-                ultraGrid1.DisplayLayout.Override.FilterUIType = Infragistics.Win.UltraWinGrid.FilterUIType.FilterRow;
-                ultraGrid1.DisplayLayout.Override.HeaderClickAction = Infragistics.Win.UltraWinGrid.HeaderClickAction.SortSingle;
-                ultraGrid1.DisplayLayout.Override.WrapHeaderText = Infragistics.Win.DefaultableBoolean.False;
-                ultraGrid1.DisplayLayout.Override.HeaderAppearance.TextTrimming = Infragistics.Win.TextTrimming.None;
             }
             catch (Exception ex)
             {
@@ -1373,10 +1264,8 @@ namespace PosBranch_Win.DialogBox
         {
             try
             {
-                // Update status
                 UpdateStatus("Form loading...");
 
-                // Verify textbox exists and is properly connected
                 if (textBoxsearch == null)
                 {
                     UpdateStatus("ERROR: textBox1 is null! Creating a new one.");
@@ -1384,41 +1273,31 @@ namespace PosBranch_Win.DialogBox
                 }
                 else
                 {
-                    // Make sure events are connected
-                    textBoxsearch.TextChanged -= textBox1_TextChanged; // Remove to avoid duplicates
-                    textBoxsearch.TextChanged += textBox1_TextChanged; // Add it back
+                    textBoxsearch.TextChanged -= textBox1_TextChanged;
+                    textBoxsearch.TextChanged += textBox1_TextChanged;
                 }
 
-                // Initialize label1 with record count info if it exists
                 if (this.Controls.Find("label1", true).Length > 0)
                 {
                     Label label1 = this.Controls.Find("label1", true)[0] as Label;
                     if (label1 != null)
                     {
-                        // Set initial text with "Loading..."
                         label1.Text = "Loading...";
                         label1.AutoSize = true;
                         label1.Font = new Font("Microsoft Sans Serif", 9F, FontStyle.Regular);
-                        label1.ForeColor = Color.FromArgb(0, 70, 170); // Dark blue color
+                        label1.ForeColor = Color.FromArgb(0, 70, 170);
                     }
                 }
 
-                // Note: Focus is now set in the Shown event for more reliable behavior
-
-                // PERFORMANCE: Load data asynchronously to avoid UI freeze
                 System.Threading.Tasks.Task.Run(() =>
                 {
                     try
                     {
-                        // Open connection on background thread
                         con.DataConnection.Open();
-
-                        // Load all data on background thread
                         LoadAllDataAsync();
                     }
                     catch (Exception ex)
                     {
-                        // Handle errors on UI thread
                         this.BeginInvoke(new Action(() =>
                         {
                             UpdateStatus($"Error loading data: {ex.Message}");
@@ -1427,13 +1306,11 @@ namespace PosBranch_Win.DialogBox
                     }
                     finally
                     {
-                        // Close connection on background thread
                         if (con.DataConnection.State == ConnectionState.Open)
                             con.DataConnection.Close();
                     }
                 });
 
-                // Update status
                 UpdateStatus("Form ready - loading data in background...");
             }
             catch (Exception ex)
@@ -1445,6 +1322,8 @@ namespace PosBranch_Win.DialogBox
         // New async method to load data without blocking UI
         private void LoadAllDataAsync()
         {
+
+
             try
             {
                 using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_ItemDetalisDDL, (SqlConnection)con.DataConnection))
@@ -2755,45 +2634,57 @@ namespace PosBranch_Win.DialogBox
         {
             try
             {
-                if (ultraGrid1.ActiveRow != null)
+                var rowsToSend = ultraGrid1.Selected.Rows.Count > 0 
+                    ? ultraGrid1.Selected.Rows.Cast<UltraGridRow>().ToList() 
+                    : (ultraGrid1.ActiveRow != null ? new List<UltraGridRow> { ultraGrid1.ActiveRow } : null);
+
+                if (rowsToSend != null && rowsToSend.Count > 0)
                 {
-                    if (!EnsureSelectedRowAllowedForCurrentDialog(ultraGrid1.ActiveRow))
+                    bool itemAdded = false;
+                    foreach (var row in rowsToSend)
                     {
-                        return;
-                    }
-
-                    // Handle based on the form type
-                    if (FormName == "frmSalesReturn")
-                    {
-                        frmSalesReturn parentForm = this.Owner as frmSalesReturn;
-                        if (parentForm != null)
+                        if (!EnsureSelectedRowAllowedForCurrentDialog(row))
                         {
-                            string itemId = ultraGrid1.ActiveRow.Cells["ItemId"].Value?.ToString() ?? "";
-                            string itemName = ultraGrid1.ActiveRow.Cells["Description"].Value?.ToString() ?? "";
-                            string barcode = ultraGrid1.ActiveRow.Cells["BarCode"].Value?.ToString() ?? "";
-                            string unit = ultraGrid1.ActiveRow.Cells["Unit"].Value?.ToString() ?? "";
-                            decimal unitPrice = GetSelectedUnitPrice(ultraGrid1.ActiveRow);
+                            continue;
+                        }
 
-                            parentForm.AddItemToGrid(itemId, itemName, barcode, unit, unitPrice, 1, unitPrice);
-                            this.DialogResult = DialogResult.OK;
-                            this.Close();
+                        // Handle based on the form type
+                        if (FormName == "frmSalesReturn")
+                        {
+                            frmSalesReturn parentForm = this.Owner as frmSalesReturn;
+                            if (parentForm != null)
+                            {
+                                string itemId = row.Cells["ItemId"].Value?.ToString() ?? "";
+                                string itemName = row.Cells["Description"].Value?.ToString() ?? "";
+                                string barcode = row.Cells["BarCode"].Value?.ToString() ?? "";
+                                string unit = row.Cells["Unit"].Value?.ToString() ?? "";
+                                decimal unitPrice = GetSelectedUnitPrice(row);
+
+                                parentForm.AddItemToGrid(itemId, itemName, barcode, unit, unitPrice, 1, unitPrice);
+                                itemAdded = true;
+                            }
+                        }
+                        else if (FormName == "frmSalesInvoice")
+                        {
+                            frmSalesInvoice parentForm = this.Owner as frmSalesInvoice;
+                            if (parentForm != null)
+                            {
+                                string itemId = row.Cells["ItemId"].Value?.ToString() ?? "";
+                                string itemName = row.Cells["Description"].Value?.ToString() ?? "";
+                                string barcode = row.Cells["BarCode"].Value?.ToString() ?? "";
+                                string unit = row.Cells["Unit"].Value?.ToString() ?? "";
+                                decimal unitPrice = GetSelectedUnitPrice(row);
+
+                                parentForm.AddItemToGrid(itemId, itemName, barcode, unit, unitPrice, 1, unitPrice);
+                                itemAdded = true;
+                            }
                         }
                     }
-                    else if (FormName == "frmSalesInvoice")
-                    {
-                        frmSalesInvoice parentForm = this.Owner as frmSalesInvoice;
-                        if (parentForm != null)
-                        {
-                            string itemId = ultraGrid1.ActiveRow.Cells["ItemId"].Value?.ToString() ?? "";
-                            string itemName = ultraGrid1.ActiveRow.Cells["Description"].Value?.ToString() ?? "";
-                            string barcode = ultraGrid1.ActiveRow.Cells["BarCode"].Value?.ToString() ?? "";
-                            string unit = ultraGrid1.ActiveRow.Cells["Unit"].Value?.ToString() ?? "";
-                            decimal unitPrice = GetSelectedUnitPrice(ultraGrid1.ActiveRow);
 
-                            parentForm.AddItemToGrid(itemId, itemName, barcode, unit, unitPrice, 1, unitPrice);
-                            this.DialogResult = DialogResult.OK;
-                            this.Close();
-                        }
+                    if (itemAdded)
+                    {
+                        this.DialogResult = DialogResult.OK;
+                        this.Close();
                     }
                 }
             }
@@ -4697,47 +4588,32 @@ namespace PosBranch_Win.DialogBox
         {
             try
             {
-                if (ultraGrid1.ActiveRow != null)
+                var parentForm = this.Owner as PosBranch_Win.Transaction.FrmStockAdjustment;
+                if (parentForm != null)
                 {
-                    // Get the parent form
-                    var parentForm = this.Owner as PosBranch_Win.Transaction.FrmStockAdjustment;
-                    if (parentForm != null)
+                    List<UltraGridRow> rowsToSend = ultraGrid1.Selected.Rows.Count > 0 
+                        ? ultraGrid1.Selected.Rows.Cast<UltraGridRow>().ToList() 
+                        : (ultraGrid1.ActiveRow != null ? new List<UltraGridRow> { ultraGrid1.ActiveRow } : null);
+
+                    if (rowsToSend != null)
                     {
-                        // Get the required values from the selected row
-                        string itemId = ultraGrid1.ActiveRow.Cells["ItemId"].Value?.ToString() ?? "";
-                        string barcode = ultraGrid1.ActiveRow.Cells["BarCode"].Value?.ToString() ?? "";
-                        string description = ultraGrid1.ActiveRow.Cells["Description"].Value?.ToString() ?? "";
-                        string unit = ultraGrid1.ActiveRow.Cells["Unit"].Value?.ToString() ?? "";
-
-                        // Get the stock value if it exists
-                        string stockQty = "0";
-                        if (ultraGrid1.ActiveRow.Cells.Exists("Stock") &&
-                            ultraGrid1.ActiveRow.Cells["Stock"].Value != null)
+                        foreach (var row in rowsToSend)
                         {
-                            stockQty = ultraGrid1.ActiveRow.Cells["Stock"].Value.ToString();
+                            string itemId = row.Cells["ItemId"].Value?.ToString() ?? "";
+                            string barcode = row.Cells["BarCode"].Value?.ToString() ?? "";
+                            string description = row.Cells["Description"].Value?.ToString() ?? "";
+                            string unit = row.Cells["Unit"].Value?.ToString() ?? "";
+                            string stockQty = row.Cells.Exists("Stock") && row.Cells["Stock"].Value != null ? row.Cells["Stock"].Value.ToString() : "0";
+                            parentForm.AddItemToGrid(itemId, barcode, description, unit, stockQty);
                         }
-
-                        // Log what we're sending to the Stock Adjustment form
-                        System.Diagnostics.Debug.WriteLine($"Sending to Stock Adjustment: ItemId={itemId}, Description={description}, Stock={stockQty}");
-
-                        // Add item to the parent form's grid - default adjustment qty is 1
-                        parentForm.AddItemToGrid(itemId, barcode, description, unit, stockQty);
-
-                        // Set dialog result and close
                         this.DialogResult = DialogResult.OK;
                         this.Close();
-                    }
-                    else
-                    {
-                        System.Diagnostics.Debug.WriteLine("Parent form is not FrmStockAdjustment");
                     }
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error sending item to Stock Adjustment: {ex.Message}",
-                    "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                System.Diagnostics.Debug.WriteLine($"Error in SendItemToStockAdjustment: {ex.Message}");
+                MessageBox.Show($"Error sending item to Stock Adjustment: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -4841,70 +4717,34 @@ namespace PosBranch_Win.DialogBox
             }
         }
 
-        // Dedicated method for sending items to Purchase form
         private void SendItemToPurchase()
         {
             try
             {
-                if (ultraGrid1.ActiveRow != null)
+                var parentForm = this.Owner as PosBranch_Win.Transaction.FrmPurchase;
+                if (parentForm != null)
                 {
-                    if (!EnsureSelectedRowAllowedForCurrentDialog(ultraGrid1.ActiveRow))
+                    List<UltraGridRow> rowsToSend = ultraGrid1.Selected.Rows.Count > 0 
+                        ? ultraGrid1.Selected.Rows.Cast<UltraGridRow>().ToList() 
+                        : (ultraGrid1.ActiveRow != null ? new List<UltraGridRow> { ultraGrid1.ActiveRow } : null);
+
+                    if (rowsToSend != null)
                     {
-                        return;
-                    }
-
-                    // Get the parent form
-                    var parentForm = this.Owner as PosBranch_Win.Transaction.FrmPurchase;
-                    if (parentForm != null)
-                    {
-                        // Get the required values from the selected row
-                        string itemId = ultraGrid1.ActiveRow.Cells["ItemId"].Value?.ToString() ?? "";
-                        string itemName = ultraGrid1.ActiveRow.Cells["Description"].Value?.ToString() ?? "";
-                        string barcode = ultraGrid1.ActiveRow.Cells["BarCode"].Value?.ToString() ?? "";
-                        string unit = ultraGrid1.ActiveRow.Cells["Unit"].Value?.ToString() ?? "";
-
-                        decimal retailPrice = 0;
-                        if (ultraGrid1.ActiveRow.Cells["RetailPrice"].Value != null)
+                        foreach (var row in rowsToSend)
                         {
-                            decimal.TryParse(ultraGrid1.ActiveRow.Cells["RetailPrice"].Value.ToString(), out retailPrice);
+                            if (!EnsureSelectedRowAllowedForCurrentDialog(row)) continue;
+                            string itemId = row.Cells["ItemId"].Value?.ToString() ?? "";
+                            string itemName = row.Cells["Description"].Value?.ToString() ?? "";
+                            string barcode = row.Cells["BarCode"].Value?.ToString() ?? "";
+                            string unit = row.Cells["Unit"].Value?.ToString() ?? "";
+                            decimal retailPrice = row.Cells["RetailPrice"].Value != null ? Convert.ToDecimal(row.Cells["RetailPrice"].Value) : 0;
+                            decimal cost = row.Cells["Cost"].Value != null ? Convert.ToDecimal(row.Cells["Cost"].Value) : 0;
+                            int unitId = row.Cells.Exists("UnitId") && row.Cells["UnitId"].Value != null ? Convert.ToInt32(row.Cells["UnitId"].Value) : 0;
+                            float taxPer = row.Cells.Exists("TaxPer") && row.Cells["TaxPer"].Value != null ? Convert.ToSingle(row.Cells["TaxPer"].Value) : 0;
+                            float taxAmt = row.Cells.Exists("TaxAmt") && row.Cells["TaxAmt"].Value != null ? Convert.ToSingle(row.Cells["TaxAmt"].Value) : 0;
+                            string taxType = row.Cells.Exists("TaxType") && row.Cells["TaxType"].Value != null ? row.Cells["TaxType"].Value.ToString() : "";
+                            parentForm.AddItemToGrid(itemId, itemName, barcode, unit, retailPrice, 1, cost, unitId, taxPer, taxAmt, taxType);
                         }
-
-                        decimal cost = 0;
-                        if (ultraGrid1.ActiveRow.Cells["Cost"].Value != null)
-                        {
-                            decimal.TryParse(ultraGrid1.ActiveRow.Cells["Cost"].Value.ToString(), out cost);
-                        }
-
-                        // Get UnitId if available
-                        int unitId = 0;
-                        if (ultraGrid1.ActiveRow.Cells.Exists("UnitId") && ultraGrid1.ActiveRow.Cells["UnitId"].Value != null)
-                        {
-                            int.TryParse(ultraGrid1.ActiveRow.Cells["UnitId"].Value.ToString(), out unitId);
-                        }
-
-                        // Get tax-related values
-                        float taxPer = 0;
-                        if (ultraGrid1.ActiveRow.Cells.Exists("TaxPer") && ultraGrid1.ActiveRow.Cells["TaxPer"].Value != null)
-                        {
-                            float.TryParse(ultraGrid1.ActiveRow.Cells["TaxPer"].Value.ToString(), out taxPer);
-                        }
-
-                        float taxAmt = 0;
-                        if (ultraGrid1.ActiveRow.Cells.Exists("TaxAmt") && ultraGrid1.ActiveRow.Cells["TaxAmt"].Value != null)
-                        {
-                            float.TryParse(ultraGrid1.ActiveRow.Cells["TaxAmt"].Value.ToString(), out taxAmt);
-                        }
-
-                        string taxType = "";
-                        if (ultraGrid1.ActiveRow.Cells.Exists("TaxType") && ultraGrid1.ActiveRow.Cells["TaxType"].Value != null)
-                        {
-                            taxType = ultraGrid1.ActiveRow.Cells["TaxType"].Value.ToString();
-                        }
-
-                        // Add item to the parent form's grid, passing the unitId and tax data
-                        parentForm.AddItemToGrid(itemId, itemName, barcode, unit, retailPrice, 1, cost, unitId, taxPer, taxAmt, taxType);
-
-                        // Set dialog result and close
                         this.DialogResult = DialogResult.OK;
                         this.Close();
                     }
@@ -4913,7 +4753,6 @@ namespace PosBranch_Win.DialogBox
             catch (Exception ex)
             {
                 MessageBox.Show($"Error sending item to Purchase form: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                System.Diagnostics.Debug.WriteLine($"Error in SendItemToPurchase: {ex.Message}");
             }
         }
 

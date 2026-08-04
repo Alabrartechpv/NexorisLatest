@@ -1,4 +1,4 @@
-﻿namespace PosBranch_Win.DialogBox
+namespace PosBranch_Win.DialogBox
 {
     partial class frmdialForItemMaster
     {
