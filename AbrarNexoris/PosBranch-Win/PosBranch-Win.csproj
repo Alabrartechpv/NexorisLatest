@@ -930,6 +930,7 @@
     <Compile Include="Master\FrmPaymodeMaster.Designer.cs">
       <DependentUpon>FrmPaymodeMaster.cs</DependentUpon>
     </Compile>
+
     <Compile Include="Master\FrmCategory.cs">
       <SubType>Form</SubType>
     </Compile>

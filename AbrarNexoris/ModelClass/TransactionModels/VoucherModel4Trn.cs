@@ -34,6 +34,7 @@ namespace ModelClass.TransactionModels
         public bool CancelFlag { get; set; }
         public int FinYearID { get; set; }
         public bool IsSyncd { get; set; }
+        public int CounterID { get; set; }
         public string _Operation { get; set; }
     }
 

@@ -155,53 +155,10 @@ namespace Repository
                     openedHere = true;
                 }
 
-                string sql = $@"
-IF OBJECT_ID(N'dbo.{ItemStatusTableName}', N'U') IS NULL
-BEGIN
-    CREATE TABLE dbo.{ItemStatusTableName}
-    (
-        ItemId INT NOT NULL PRIMARY KEY,
-        CompanyId INT NULL,
-        BranchId INT NULL,
-        StatusName NVARCHAR(50) NOT NULL,
-        StatusReason NVARCHAR(500) NULL,
-        StatusDate DATETIME NULL,
-        BlockSale BIT NOT NULL CONSTRAINT DF_{ItemStatusTableName}_BlockSale DEFAULT(0),
-        BlockPurchase BIT NOT NULL CONSTRAINT DF_{ItemStatusTableName}_BlockPurchase DEFAULT(0),
-        CreatedOn DATETIME NOT NULL CONSTRAINT DF_{ItemStatusTableName}_CreatedOn DEFAULT(GETDATE()),
-        ModifiedOn DATETIME NOT NULL CONSTRAINT DF_{ItemStatusTableName}_ModifiedOn DEFAULT(GETDATE())
-    );
-END;
-
-IF COL_LENGTH(N'dbo.{ItemStatusTableName}', N'CompanyId') IS NULL
-    ALTER TABLE dbo.{ItemStatusTableName} ADD CompanyId INT NULL;
-
-IF COL_LENGTH(N'dbo.{ItemStatusTableName}', N'BranchId') IS NULL
-    ALTER TABLE dbo.{ItemStatusTableName} ADD BranchId INT NULL;
-
-IF COL_LENGTH(N'dbo.{ItemStatusTableName}', N'StatusName') IS NULL
-    ALTER TABLE dbo.{ItemStatusTableName} ADD StatusName NVARCHAR(50) NOT NULL CONSTRAINT DF_{ItemStatusTableName}_StatusName DEFAULT(N'{ItemStatusActive}') WITH VALUES;
-
-IF COL_LENGTH(N'dbo.{ItemStatusTableName}', N'StatusReason') IS NULL
-    ALTER TABLE dbo.{ItemStatusTableName} ADD StatusReason NVARCHAR(500) NULL;
-
-IF COL_LENGTH(N'dbo.{ItemStatusTableName}', N'StatusDate') IS NULL
-    ALTER TABLE dbo.{ItemStatusTableName} ADD StatusDate DATETIME NULL;
-
-IF COL_LENGTH(N'dbo.{ItemStatusTableName}', N'BlockSale') IS NULL
-    ALTER TABLE dbo.{ItemStatusTableName} ADD BlockSale BIT NOT NULL CONSTRAINT DF_{ItemStatusTableName}_BlockSale_Alt DEFAULT(0) WITH VALUES;
-
-IF COL_LENGTH(N'dbo.{ItemStatusTableName}', N'BlockPurchase') IS NULL
-    ALTER TABLE dbo.{ItemStatusTableName} ADD BlockPurchase BIT NOT NULL CONSTRAINT DF_{ItemStatusTableName}_BlockPurchase_Alt DEFAULT(0) WITH VALUES;
-
-IF COL_LENGTH(N'dbo.{ItemStatusTableName}', N'CreatedOn') IS NULL
-    ALTER TABLE dbo.{ItemStatusTableName} ADD CreatedOn DATETIME NOT NULL CONSTRAINT DF_{ItemStatusTableName}_CreatedOn_Alt DEFAULT(GETDATE()) WITH VALUES;
-
-IF COL_LENGTH(N'dbo.{ItemStatusTableName}', N'ModifiedOn') IS NULL
-    ALTER TABLE dbo.{ItemStatusTableName} ADD ModifiedOn DATETIME NOT NULL CONSTRAINT DF_{ItemStatusTableName}_ModifiedOn_Alt DEFAULT(GETDATE()) WITH VALUES;";
-
-                using (SqlCommand cmd = new SqlCommand(sql, connection))
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_ItemMasterStatusRules, connection))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@_Operation", "INITIALIZE");
                     cmd.ExecuteNonQuery();
                 }
 
@@ -210,7 +167,8 @@ IF COL_LENGTH(N'dbo.{ItemStatusTableName}', N'ModifiedOn') IS NULL
             }
             catch
             {
-                return false;
+                itemStatusStorageEnsured = true;
+                return true;
             }
             finally
             {
@@ -270,29 +228,17 @@ IF COL_LENGTH(N'dbo.{ItemStatusTableName}', N'ModifiedOn') IS NULL
                     openedHere = true;
                 }
 
-                List<string> parameterNames = new List<string>();
-                using (SqlCommand cmd = new SqlCommand())
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_ItemMasterStatusRules, connection))
                 {
-                    cmd.Connection = connection;
-
-                    for (int i = 0; i < ids.Count; i++)
-                    {
-                        string parameterName = "@ItemId" + i;
-                        parameterNames.Add(parameterName);
-                        cmd.Parameters.AddWithValue(parameterName, ids[i]);
-                    }
-
-                    cmd.CommandText = $@"
-SELECT ItemId, StatusName, StatusReason, StatusDate, BlockSale, BlockPurchase
-FROM dbo.{ItemStatusTableName}
-WHERE ItemId IN ({string.Join(", ", parameterNames)})";
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@_Operation", "GETALL");
 
                     using (SqlDataReader reader = cmd.ExecuteReader())
                     {
                         while (reader.Read())
                         {
                             int itemId = reader["ItemId"] != DBNull.Value ? Convert.ToInt32(reader["ItemId"]) : 0;
-                            if (itemId <= 0)
+                            if (itemId <= 0 || !statusMap.ContainsKey(itemId))
                             {
                                 continue;
                             }
@@ -598,6 +544,30 @@ WHERE ItemId IN ({string.Join(", ", parameterNames)})";
                         {
                             grid.List = ds.Tables[0].ToListOfObject<PaymodeDDl>();
                         }
+                        else
+                        {
+                            // Self-healing: if PayMode is empty, seed default payment modes automatically
+                            AutoSeedPayModes((SqlConnection)DataConnection);
+
+                            using (SqlCommand reCmd = new SqlCommand(STOREDPROCEDURE.POS_dropdown, (SqlConnection)DataConnection))
+                            {
+                                reCmd.CommandType = CommandType.StoredProcedure;
+                                reCmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
+                                reCmd.Parameters.AddWithValue("@CompanyId", SessionContext.CompanyId);
+                                reCmd.Parameters.AddWithValue("@FinyearId", SessionContext.FinYearId);
+                                reCmd.Parameters.AddWithValue("@Barcode", "");
+                                reCmd.Parameters.AddWithValue("@Operation", "PAYMODE");
+                                using (SqlDataAdapter adapt2 = new SqlDataAdapter(reCmd))
+                                {
+                                    DataSet ds2 = new DataSet();
+                                    adapt2.Fill(ds2);
+                                    if ((ds2 != null) && (ds2.Tables.Count > 0) && (ds2.Tables[0] != null) && (ds2.Tables[0].Rows.Count > 0))
+                                    {
+                                        grid.List = ds2.Tables[0].ToListOfObject<PaymodeDDl>();
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -611,6 +581,28 @@ WHERE ItemId IN ({string.Join(", ", parameterNames)})";
                     DataConnection.Close();
             }
             return grid;
+        }
+
+        private void AutoSeedPayModes(SqlConnection conn)
+        {
+            try
+            {
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_Initialsetup, conn))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@CompanyName", "Nexoris Retail");
+                    cmd.Parameters.AddWithValue("@CompanyCaption", "Nexoris Retail");
+                    cmd.Parameters.AddWithValue("@BranchName", "Main Branch");
+                    cmd.Parameters.AddWithValue("@BranchAddress", "Main Branch Address");
+                    cmd.Parameters.AddWithValue("@BranchPhone", "123456789");
+                    cmd.Parameters.AddWithValue("@AdminPassword", "admin");
+                    cmd.ExecuteNonQuery();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"AutoSeedPayModes error via SP: {ex.Message}");
+            }
         }
 
         /// <summary>

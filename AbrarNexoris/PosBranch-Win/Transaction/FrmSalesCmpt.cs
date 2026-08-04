@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using Infragistics.Win.UltraWinEditors;
 using Infragistics.Win.Misc;
+using ModelClass;
 using ModelClass.TransactionModels;
 using Repository;
 using Repository.TransactionRepository;
@@ -255,15 +256,16 @@ namespace PosBranch_Win.Transaction
             {
                 var dp = new Dropdowns();
                 var pm = dp.PaymodeDDl();
+                var payList = pm?.List ?? new List<PaymodeDDl>();
 
                 // Create DataTable for payment modes (exclude Credit for payment panel)
                 var paymentModesTable = new DataTable();
                 paymentModesTable.Columns.Add("PayModeId", typeof(int));
                 paymentModesTable.Columns.Add("PayModeName", typeof(string));
 
-                foreach (var item in pm.List)
+                foreach (var item in payList)
                 {
-                    if (!item.PayModeName.Equals("Credit", StringComparison.OrdinalIgnoreCase))
+                    if (item.PayModeName != null && !item.PayModeName.Equals("Credit", StringComparison.OrdinalIgnoreCase))
                     {
                         paymentModesTable.Rows.Add(item.PayModeID, item.PayModeName);
                     }
@@ -272,7 +274,10 @@ namespace PosBranch_Win.Transaction
                 cmbPaymodefc.DataSource = paymentModesTable;
                 cmbPaymodefc.DisplayMember = "PayModeName";
                 cmbPaymodefc.ValueMember = "PayModeId";
-                cmbPaymodefc.SelectedIndex = 0;
+                if (paymentModesTable.Rows.Count > 0)
+                {
+                    cmbPaymodefc.SelectedIndex = 0;
+                }
             }
             catch (Exception ex)
             {

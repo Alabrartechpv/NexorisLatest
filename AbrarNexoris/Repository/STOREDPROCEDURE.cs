@@ -9,6 +9,7 @@ namespace Repository
     public static class STOREDPROCEDURE
     {
         public static string POS_Branch = "POS_Branch";
+        public static string POS_Initialsetup = "_POS_Initialsetup";
         public static string POS_Ledger = "POS_Ledger";
         public static string _4Login = "_4Login";
         public static string POS_Login = "POS_Login";

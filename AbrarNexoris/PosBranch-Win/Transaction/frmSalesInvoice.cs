@@ -3063,6 +3063,7 @@ namespace PosBranch_Win.Transaction
             sales.BranchId = SessionContext.BranchId;
             sales.CompanyId = SessionContext.CompanyId;
             sales.FinYearId = SessionContext.FinYearId;
+            sales.CounterId = SessionContext.CounterId;
             System.Diagnostics.Debug.WriteLine($"frmSalesInvoice.SaveMaster: Using SessionContext.FinYearId = {sales.FinYearId}");
 
             // For hold bill updates, preserve the original VoucherID
