@@ -1,4 +1,4 @@
-﻿using Dapper;
+using Dapper;
 using ModelClass;
 using ModelClass.Master;
 using ModelClass.TransactionModels;
@@ -694,7 +694,38 @@ namespace Repository
             return bddlg;
         }
 
+        public string SaveItemType(ItemType itemType)
+        {
+            var repo = new Repository.MasterRepositry.ItemTypeRepository();
+            return repo.SaveItemType(itemType);
+        }
 
+        public ItemType UpdateItemType(ItemType itemType)
+        {
+            var repo = new Repository.MasterRepositry.ItemTypeRepository();
+            return repo.UpdateItemType(itemType);
+        }
+
+        public ItemType DeleteItemType(ItemType itemType)
+        {
+            var repo = new Repository.MasterRepositry.ItemTypeRepository();
+            return repo.DeleteItemType(itemType.Id);
+        }
+
+        public ItemType GetItemTypeId(ItemType itemType)
+        {
+            var repo = new Repository.MasterRepositry.ItemTypeRepository();
+            return repo.GetItemTypeById(itemType.Id);
+        }
+
+        public ItemTypeDDlGrid ItemTypeSearch(ItemType itemType)
+        {
+            var repo = new Repository.MasterRepositry.ItemTypeRepository();
+            var list = repo.SearchItemTypes(itemType.ItemTypeName);
+            var grid = new ItemTypeDDlGrid();
+            grid.List = list.Select(x => new ItemTypeDDL { Id = x.Id, ItemType = x.ItemTypeName }).ToList();
+            return grid;
+        }
     }
 }
 

@@ -22,6 +22,7 @@ namespace Repository
         public static string _POS_SDetails_Win = "_POS_SDetails_Win";
         public static string POS_Group = "_POS_Group";
         public static string POS_Category = "_POS_Category";
+        public static string POS_ItemType = "POS_ItemType";
         public static string POS_ItemMaster = "_POS_ItemMaster";
         public static string POS_ItemMasterStatusRules = "_POS_ItemMasterStatusRules";
         public static string POS_ItemMasterPriceSettings = "_POS_ItemMaster_PriceSettings";

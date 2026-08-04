@@ -344,6 +344,12 @@
     <Compile Include="DialogBox\FrmLedgerSearch.Designer.cs">
       <DependentUpon>FrmLedgerSearch.cs</DependentUpon>
     </Compile>
+    <Compile Include="DialogBox\FrmFormSearch.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="DialogBox\FrmFormSearch.Designer.cs">
+      <DependentUpon>FrmFormSearch.cs</DependentUpon>
+    </Compile>
     <Compile Include="DialogBox\FrmAccountGroupSearch.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -960,6 +966,12 @@
     </Compile>
     <Compile Include="Master\frmItemMasterNew.Designer.cs">
       <DependentUpon>frmItemMasterNew.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Master\frmItemType.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Master\frmItemType.Designer.cs">
+      <DependentUpon>frmItemType.cs</DependentUpon>
     </Compile>
     <Compile Include="Master\frmItemStatusPopup.cs">
       <SubType>Form</SubType>
@@ -1668,6 +1680,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Master\frmItemMasterNew.resx">
       <DependentUpon>frmItemMasterNew.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Master\frmItemType.resx">
+      <DependentUpon>frmItemType.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Master\FrmState.resx">
       <DependentUpon>FrmState.cs</DependentUpon>

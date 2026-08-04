@@ -949,6 +949,11 @@ namespace PosBranch_Win
         private void Home_Load(object sender, EventArgs e)
         {
             this.KeyPreview = true;
+            try
+            {
+                Application.AddMessageFilter(new FormSearchShortcutMessageFilter());
+            }
+            catch { }
 
             toolStripStatusLabel1.Text = DataBase.Branch;
             toolStripStatusUserValLabel3.Text = DataBase.UserName;
@@ -2497,6 +2502,12 @@ namespace PosBranch_Win
             Keys keyCode = keyData & Keys.KeyCode;
             bool ctrl = (keyData & Keys.Control) == Keys.Control;
             bool alt = (keyData & Keys.Alt) == Keys.Alt;
+
+            if (ctrl && keyCode == Keys.S)
+            {
+                PosBranch_Win.DialogBox.FrmFormSearch.ShowFormSearch(this);
+                return true;
+            }
 
             if (ctrl && keyCode == Keys.I)
             {
@@ -4642,6 +4653,82 @@ namespace PosBranch_Win
         private void ultraTabSharedControlsPage1_Paint(object sender, PaintEventArgs e)
         {
 
+        }
+
+        /// <summary>
+        /// Public helper method to open any Form type dynamically in Home tabs or dialogs.
+        /// </summary>
+        public void OpenFormByType(Type formType, string formTitle = null)
+        {
+            if (formType == null || !typeof(Form).IsAssignableFrom(formType))
+                return;
+
+            try
+            {
+                string tabName = string.IsNullOrEmpty(formTitle) 
+                    ? PosBranch_Win.DialogBox.FrmFormSearch.GetFriendlyFormName(formType) 
+                    : formTitle;
+
+                // Ensure single form instance across open tabs
+                foreach (Infragistics.Win.UltraWinTabControl.UltraTab tab in tabControlMain.Tabs)
+                {
+                    if (tab.TabPage.Controls.Count > 0 && formType.IsInstanceOfType(tab.TabPage.Controls[0]))
+                    {
+                        Form existingForm = tab.TabPage.Controls[0] as Form;
+                        if (existingForm != null && !existingForm.IsDisposed)
+                        {
+                            tabControlMain.SelectedTab = tab;
+                            existingForm.BringToFront();
+                            existingForm.Focus();
+                            if (existingForm is PosBranch_Win.Master.frmItemMasterNew itemMaster)
+                            {
+                                itemMaster.FocusBarcodeBox();
+                            }
+                            return;
+                        }
+                    }
+                }
+
+                if (formType.Namespace != null && formType.Namespace.Contains("DialogBox"))
+                {
+                    Form dialogInstance = (Form)Activator.CreateInstance(formType);
+                    dialogInstance.StartPosition = FormStartPosition.CenterScreen;
+                    dialogInstance.ShowDialog(this);
+                }
+                else
+                {
+                    Form formInstance = (Form)Activator.CreateInstance(formType);
+                    OpenFormInTabSafe(formInstance, tabName);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error opening form by type: {ex.Message}");
+                MessageBox.Show($"Error opening form: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private class FormSearchShortcutMessageFilter : IMessageFilter
+        {
+            private const int WM_KEYDOWN = 0x0100;
+
+            public bool PreFilterMessage(ref Message m)
+            {
+                if (m.Msg == WM_KEYDOWN)
+                {
+                    Keys key = (Keys)m.WParam | Control.ModifierKeys;
+                    if (key == (Keys.Control | Keys.S))
+                    {
+                        Home home = Application.OpenForms.OfType<Home>().FirstOrDefault();
+                        if (home != null && !home.IsDisposed)
+                        {
+                            PosBranch_Win.DialogBox.FrmFormSearch.ShowFormSearch(home);
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            }
         }
     }
 }
