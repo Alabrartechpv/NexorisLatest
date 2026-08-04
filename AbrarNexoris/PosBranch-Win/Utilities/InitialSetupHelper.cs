@@ -119,6 +119,9 @@ namespace PosBranch_Win.Utilities
                     branchId = ResolveCreatedBranchId(conn, branchName.Trim());
                 EnsureReturnLedgers(conn, companyId, branchId);
 
+                // Seed default Item Types for a fresh install
+                EnsureItemTypeSeedData();
+
                 return true;
             }
             catch (Exception ex)
@@ -256,6 +259,169 @@ namespace PosBranch_Win.Utilities
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error checking default Master Data on launch: {ex.Message}");
+            }
+            finally
+            {
+                if (repo != null) repo.Dispose();
+            }
+
+            // Ensure Item Types table exists and has seed data (runs on every launch, safe to call multiple times)
+            EnsureItemTypeSeedData();
+        }
+
+        /// <summary>
+        /// Ensures the ItemTypes table exists with the stored procedure and default seed data.
+        /// Safe to call multiple times — only inserts rows that don't already exist.
+        /// Called on every app launch so fresh installs never lack item types.
+        /// </summary>
+        public static void EnsureItemTypeSeedData()
+        {
+            Repository.BaseRepostitory repo = null;
+            try
+            {
+                repo = new Repository.BaseRepostitory();
+                if (repo.DataConnection == null) return;
+                if (repo.DataConnection.State != ConnectionState.Open)
+                    repo.DataConnection.Open();
+
+                SqlConnection conn = (SqlConnection)repo.DataConnection;
+
+                // 1. Ensure table exists with required columns
+                string ensureTable = @"
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ItemTypes') AND EXISTS (SELECT * FROM sys.tables WHERE name = 'ItemType')
+BEGIN
+    EXEC('SELECT Id, ItemType, CAST(0 AS BIT) AS IsDelete, CAST(0 AS BIT) AS IsDefault INTO ItemTypes FROM ItemType');
+END;
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ItemTypes')
+BEGIN
+    CREATE TABLE ItemTypes (
+        Id INT IDENTITY(1,1) PRIMARY KEY,
+        ItemType NVARCHAR(200) NOT NULL,
+        IsDelete BIT NOT NULL DEFAULT 0,
+        IsDefault BIT NOT NULL DEFAULT 0
+    );
+END;
+
+IF EXISTS (SELECT * FROM sys.tables WHERE name = 'ItemTypes')
+BEGIN
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('ItemTypes') AND name = 'IsDelete')
+    BEGIN
+        ALTER TABLE ItemTypes ADD IsDelete BIT NOT NULL DEFAULT 0;
+    END;
+    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('ItemTypes') AND name = 'IsDefault')
+    BEGIN
+        ALTER TABLE ItemTypes ADD IsDefault BIT NOT NULL DEFAULT 0;
+    END;
+END;
+";
+                using (SqlCommand cmd = new SqlCommand(ensureTable, conn))
+                    cmd.ExecuteNonQuery();
+
+                // 2. Insert default item types only if they don't already exist
+                string seedData = @"
+IF NOT EXISTS (SELECT 1 FROM ItemTypes WHERE ItemType = 'Standard' AND ISNULL(IsDelete,0) = 0)
+    INSERT INTO ItemTypes (ItemType, IsDelete, IsDefault) VALUES ('Standard', 0, 1);
+
+IF NOT EXISTS (SELECT 1 FROM ItemTypes WHERE ItemType = 'Services' AND ISNULL(IsDelete,0) = 0)
+    INSERT INTO ItemTypes (ItemType, IsDelete, IsDefault) VALUES ('Services', 0, 0);
+
+IF NOT EXISTS (SELECT 1 FROM ItemTypes WHERE ItemType = 'Inventory' AND ISNULL(IsDelete,0) = 0)
+    INSERT INTO ItemTypes (ItemType, IsDelete, IsDefault) VALUES ('Inventory', 0, 0);
+
+IF NOT EXISTS (SELECT 1 FROM ItemTypes WHERE ItemType = 'Non-Inventory' AND ISNULL(IsDelete,0) = 0)
+    INSERT INTO ItemTypes (ItemType, IsDelete, IsDefault) VALUES ('Non-Inventory', 0, 0);
+
+-- If no default is set at all, set the first active row as default
+IF NOT EXISTS (SELECT 1 FROM ItemTypes WHERE ISNULL(IsDelete,0) = 0 AND ISNULL(IsDefault,0) = 1)
+BEGIN
+    UPDATE ItemTypes SET IsDefault = 1 WHERE Id = (SELECT TOP 1 Id FROM ItemTypes WHERE ISNULL(IsDelete,0) = 0 ORDER BY Id ASC);
+END;
+";
+                using (SqlCommand cmd = new SqlCommand(seedData, conn))
+                    cmd.ExecuteNonQuery();
+
+                // 3. Ensure POS_ItemType stored procedure exists
+                string stubScript = @"
+IF NOT EXISTS (SELECT * FROM sys.procedures WHERE name = 'POS_ItemType')
+BEGIN
+    EXEC('CREATE PROCEDURE POS_ItemType AS BEGIN SET NOCOUNT ON; END');
+END;
+";
+                using (SqlCommand cmd = new SqlCommand(stubScript, conn))
+                    cmd.ExecuteNonQuery();
+
+                string procScript = @"
+ALTER PROCEDURE POS_ItemType
+    @Id INT = 0,
+    @ItemType NVARCHAR(200) = '',
+    @IsDelete BIT = 0,
+    @IsDefault BIT = 0,
+    @_Operation NVARCHAR(50) = 'GETALL'
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF @_Operation = 'CREATE' OR @_Operation = 'INSERT'
+    BEGIN
+        INSERT INTO ItemTypes (ItemType, IsDelete, IsDefault)
+        VALUES (NULLIF(@ItemType, ''), 0, @IsDefault);
+
+        SELECT SCOPE_IDENTITY() AS Id, @ItemType AS ItemTypeName, CAST(0 AS BIT) AS IsDelete, @IsDefault AS IsDefault;
+    END
+    ELSE IF @_Operation = 'UPDATE'
+    BEGIN
+        UPDATE ItemTypes
+        SET ItemType = ISNULL(NULLIF(@ItemType, ''), ItemType)
+        WHERE Id = @Id;
+
+        SELECT Id, ItemType AS ItemTypeName, ISNULL(IsDelete, 0) AS IsDelete, ISNULL(IsDefault, 0) AS IsDefault FROM ItemTypes WHERE Id = @Id;
+    END
+    ELSE IF @_Operation = 'DELETE'
+    BEGIN
+        UPDATE ItemTypes SET IsDelete = 1 WHERE Id = @Id;
+        SELECT Id, ItemType AS ItemTypeName, ISNULL(IsDelete, 0) AS IsDelete, ISNULL(IsDefault, 0) AS IsDefault FROM ItemTypes WHERE Id = @Id;
+    END
+    ELSE IF @_Operation = 'SETDEFAULT'
+    BEGIN
+        UPDATE ItemTypes SET IsDefault = 0;
+        UPDATE ItemTypes SET IsDefault = 1 WHERE Id = @Id;
+        SELECT Id, ItemType AS ItemTypeName, ISNULL(IsDelete, 0) AS IsDelete, ISNULL(IsDefault, 0) AS IsDefault FROM ItemTypes WHERE Id = @Id;
+    END
+    ELSE IF @_Operation = 'GETDEFAULT'
+    BEGIN
+        SELECT TOP 1 Id, ItemType AS ItemTypeName, ISNULL(IsDelete, 0) AS IsDelete, ISNULL(IsDefault, 0) AS IsDefault
+        FROM ItemTypes
+        WHERE ISNULL(IsDelete, 0) = 0 AND ISNULL(IsDefault, 0) = 1;
+    END
+    ELSE IF @_Operation = 'GETBYID'
+    BEGIN
+        SELECT Id, ItemType AS ItemTypeName, ISNULL(IsDelete, 0) AS IsDelete, ISNULL(IsDefault, 0) AS IsDefault
+        FROM ItemTypes WHERE Id = @Id AND ISNULL(IsDelete, 0) = 0;
+    END
+    ELSE IF @_Operation = 'SEARCH'
+    BEGIN
+        SELECT Id, ItemType AS ItemTypeName, ISNULL(IsDelete, 0) AS IsDelete, ISNULL(IsDefault, 0) AS IsDefault
+        FROM ItemTypes
+        WHERE ISNULL(IsDelete, 0) = 0 AND ItemType LIKE '%' + ISNULL(@ItemType, '') + '%'
+        ORDER BY Id ASC;
+    END
+    ELSE
+    BEGIN
+        SELECT Id, ItemType AS ItemTypeName, ISNULL(IsDelete, 0) AS IsDelete, ISNULL(IsDefault, 0) AS IsDefault
+        FROM ItemTypes WHERE ISNULL(IsDelete, 0) = 0
+        ORDER BY Id ASC;
+    END
+END
+";
+                using (SqlCommand cmd = new SqlCommand(procScript, conn))
+                    cmd.ExecuteNonQuery();
+
+                System.Diagnostics.Debug.WriteLine("EnsureItemTypeSeedData: ItemTypes table and seed data verified.");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"EnsureItemTypeSeedData error: {ex.Message}");
             }
             finally
             {
