@@ -2468,6 +2468,7 @@ namespace Repository.TransactionRepository
             voucher.UserName = SessionContext.UserName;
             voucher.UserID = SessionContext.UserId;
             voucher.FinYearID = SessionContext.FinYearId;
+            voucher.CounterID = sales.CounterId > 0 ? sales.CounterId : SessionContext.CounterId;
             voucher.IsSyncd = false;
             voucher._Operation = "CREATE";
         }
