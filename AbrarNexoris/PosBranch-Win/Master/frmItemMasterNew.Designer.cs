@@ -507,7 +507,7 @@ namespace PosBranch_Win.Master
             this.TabControll.Controls.Add(this.textBox1);
             this.TabControll.Controls.Add(this.label7);
             this.TabControll.ImeMode = System.Windows.Forms.ImeMode.Off;
-            this.TabControll.Location = new System.Drawing.Point(-10000, -10000);
+            this.TabControll.Location = new System.Drawing.Point(2, 25);
             this.TabControll.Name = "TabControll";
             this.TabControll.Size = new System.Drawing.Size(1237, 389);
             // 
@@ -2365,7 +2365,7 @@ namespace PosBranch_Win.Master
             this.ultraTabPageControl7.Controls.Add(this.label17);
             this.ultraTabPageControl7.Controls.Add(this.label18);
             this.ultraTabPageControl7.Controls.Add(this.panel1);
-            this.ultraTabPageControl7.Location = new System.Drawing.Point(2, 25);
+            this.ultraTabPageControl7.Location = new System.Drawing.Point(-10000, -10000);
             this.ultraTabPageControl7.Name = "ultraTabPageControl7";
             this.ultraTabPageControl7.Size = new System.Drawing.Size(1237, 389);
             // 
