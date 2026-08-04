@@ -4,6 +4,7 @@ using ModelClass.Master;
 using ModelClass.TransactionModels;
 using PosBranch_Win.DialogBox;
 using Repository;
+using Repository.MasterRepositry;
 using Repository.SettingsRepo;
 using Repository.TransactionRepository;
 using System;
@@ -72,7 +73,7 @@ namespace PosBranch_Win.Transaction
         private const string VOUCHER_TYPE_SALES = "Sales";
         private const string SAVED_VIA_DESKTOP = "DESKTOP";
         private const string DEFAULT_CUSTOMER_NAME = "DEFAULT CUSTOMER";
-        private const string DEFAULT_CURRENCY_SYMBOL = "â‚¹";
+        private const string DEFAULT_CURRENCY_SYMBOL = "₹";
         private const string PAYMENT_MODE_CREDIT = "Credit";
         private const string PAYMENT_MODE_CASH = "Cash";
         private const string PAYMENT_PANEL_PREFIX = "PAYMENT_PANEL";
@@ -6323,6 +6324,7 @@ namespace PosBranch_Win.Transaction
 
         /// <summary>
         /// Loads the default currency from the database and sets it in the sales object
+        /// based on the company's configured currency in SessionContext.
         /// </summary>
         private void LoadDefaultCurrency()
         {
@@ -6330,15 +6332,32 @@ namespace PosBranch_Win.Transaction
             {
                 Dropdowns dp = new Dropdowns();
                 var currencies = dp.getCurrency();
+                
+                int? companyCurrencyId = null;
+                if (SessionContext.CompanyId > 0)
+                {
+                    CompanyRepo companyRepo = new CompanyRepo();
+                    var company = companyRepo.GetCompanyById(SessionContext.CompanyId);
+                    companyCurrencyId = company?.Currency;
+                }
+
                 if (currencies?.List != null && currencies.List.Any())
                 {
-                    var defaultCurrency = currencies.List.FirstOrDefault();
-                    sales.CurrencyId = defaultCurrency?.CurrencyID ?? DEFAULT_CURRENCY_ID;
-                    sales.CurrencySymbol = defaultCurrency?.CurrencySymbol ?? DEFAULT_CURRENCY_SYMBOL;
+                    var selectedCurrency = companyCurrencyId.HasValue
+                        ? currencies.List.FirstOrDefault(c => c.CurrencyID == companyCurrencyId.Value)
+                        : null;
+
+                    if (selectedCurrency == null)
+                    {
+                        selectedCurrency = currencies.List.FirstOrDefault();
+                    }
+
+                    sales.CurrencyId = selectedCurrency?.CurrencyID ?? DEFAULT_CURRENCY_ID;
+                    sales.CurrencySymbol = selectedCurrency?.CurrencySymbol ?? DEFAULT_CURRENCY_SYMBOL;
                 }
                 else
                 {
-                    sales.CurrencyId = DEFAULT_CURRENCY_ID;
+                    sales.CurrencyId = companyCurrencyId ?? DEFAULT_CURRENCY_ID;
                     sales.CurrencySymbol = DEFAULT_CURRENCY_SYMBOL;
                 }
             }
