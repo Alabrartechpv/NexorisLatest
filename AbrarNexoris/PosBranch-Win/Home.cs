@@ -1113,6 +1113,106 @@ namespace PosBranch_Win
 
             // Apply initial theme color
             UpdateHoldToolVisibility();
+
+            // Ensure "Item Type" button exists in the Utilities ribbon
+            EnsureItemTypeRibbonButton();
+        }
+
+        /// <summary>
+        /// Programmatically ensures the "Item Type" button exists in the Utilities ribbon group.
+        /// Scans ALL tabs and groups to find the one that contains UnitMaster/Users/Paymode.
+        /// Safe to call multiple times — never creates duplicates.
+        /// </summary>
+        private void EnsureItemTypeRibbonButton()
+        {
+            try
+            {
+                const string TOOL_KEY = "Item Type";
+
+                // 1. Ensure the shared ButtonTool exists in the manager
+                if (!ultraToolbarsManager1.Tools.Exists(TOOL_KEY))
+                {
+                    var btnTool = new Infragistics.Win.UltraWinToolbars.ButtonTool(TOOL_KEY);
+                    btnTool.SharedProps.Caption = "Item Type";
+                    btnTool.SharedProps.ToolTipText = "Manage Item Types";
+                    btnTool.SharedProps.Enabled = true;
+                    btnTool.SharedProps.Visible = true;
+                    ultraToolbarsManager1.Tools.Add(btnTool);
+                    System.Diagnostics.Debug.WriteLine("EnsureItemTypeRibbonButton: Created new ButtonTool 'Item Type'.");
+                }
+
+                // 2. Scan ALL ribbon tabs and groups to find the one with UnitMaster / Users / Paymode
+                Infragistics.Win.UltraWinToolbars.RibbonGroup targetGroup = null;
+
+                foreach (Infragistics.Win.UltraWinToolbars.RibbonTab tab in ultraToolbarsManager1.Ribbon.Tabs)
+                {
+                    System.Diagnostics.Debug.WriteLine($"  Tab: Key='{tab.Key}' Caption='{tab.Caption}'");
+                    foreach (Infragistics.Win.UltraWinToolbars.RibbonGroup grp in tab.Groups)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"    Group: Key='{grp.Key}' Caption='{grp.Caption}'");
+                        foreach (Infragistics.Win.UltraWinToolbars.ToolBase tool in grp.Tools)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"      Tool: Key='{tool.Key}'");
+                            if (tool.Key == "UnitMaster" || tool.Key == "Users" ||
+                                tool.Key == "PaymodeMaster" || tool.Key == "Paymode" ||
+                                tool.Key == "Paymode Setup")
+                            {
+                                targetGroup = grp;
+                                break;
+                            }
+                        }
+                        if (targetGroup != null) break;
+                    }
+                    if (targetGroup != null) break;
+                }
+
+                if (targetGroup == null)
+                {
+                    System.Diagnostics.Debug.WriteLine("EnsureItemTypeRibbonButton: Could not find target group. Trying Utilities tab by caption...");
+
+                    // Last resort: find tab whose caption contains "Utilities"
+                    foreach (Infragistics.Win.UltraWinToolbars.RibbonTab tab in ultraToolbarsManager1.Ribbon.Tabs)
+                    {
+                        if (tab.Caption != null && tab.Caption.IndexOf("Utilities", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            if (tab.Groups.Count > 0)
+                            {
+                                targetGroup = tab.Groups[tab.Groups.Count - 1]; // use last group
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (targetGroup == null)
+                {
+                    System.Diagnostics.Debug.WriteLine("EnsureItemTypeRibbonButton: No group found. Button cannot be added.");
+                    return;
+                }
+
+                // 3. Check for duplicates
+                foreach (Infragistics.Win.UltraWinToolbars.ToolBase existingTool in targetGroup.Tools)
+                {
+                    if (existingTool.Key == TOOL_KEY)
+                    {
+                        System.Diagnostics.Debug.WriteLine("EnsureItemTypeRibbonButton: Button already exists in group. Nothing to do.");
+                        return;
+                    }
+                }
+
+                // 4. Add to the group
+                targetGroup.Tools.AddTool(TOOL_KEY);
+
+                // 5. Ensure visibility/enabled
+                ultraToolbarsManager1.Tools[TOOL_KEY].SharedProps.Enabled = true;
+                ultraToolbarsManager1.Tools[TOOL_KEY].SharedProps.Visible = true;
+
+                System.Diagnostics.Debug.WriteLine($"EnsureItemTypeRibbonButton: 'Item Type' button added to group '{targetGroup.Key}'/'{targetGroup.Caption}'.");
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"EnsureItemTypeRibbonButton error: {ex.Message}");
+            }
         }
 
         private void ApplyWatermark()
@@ -2316,6 +2416,13 @@ namespace PosBranch_Win
             {
                 Master.FrmUnitMaster unitMasterForm = new Master.FrmUnitMaster();
                 OpenFormInTab(unitMasterForm, "Unit Master");
+            }
+
+            // ADD THIS NEW CONDITION FOR ITEM TYPE
+            if (e.Tool.Key == "Item Type" || e.Tool.Key == "ItemType")
+            {
+                Master.frmItemType itemTypeForm = new Master.frmItemType();
+                OpenFormInTabSafe(itemTypeForm, "Item Type");
             }
 
             // ADD THIS NEW CONDITION FOR TAX MANAGEMENT
