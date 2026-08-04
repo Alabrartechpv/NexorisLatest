@@ -1471,56 +1471,32 @@ namespace PosBranch_Win.DialogBox
 
         public void HideUltraGridColumns()
         {
-            ultraGrid1.DisplayLayout.Bands[0].Columns["CompanyId"].Hidden = true;
-            ultraGrid1.DisplayLayout.Bands[0].Columns["FinYearId"].Hidden = true;
-            ultraGrid1.DisplayLayout.Bands[0].Columns["BranchId"].Hidden = true;
-            ultraGrid1.DisplayLayout.Bands[0].Columns["BranchName"].Hidden = true; // Ensure BranchName is hidden
-            ultraGrid1.DisplayLayout.Bands[0].Columns["InvoiceNo"].Hidden = true;
-            ultraGrid1.DisplayLayout.Bands[0].Columns["InvoiceDate"].Hidden = true;
+            if (ultraGrid1 == null || ultraGrid1.DisplayLayout == null || ultraGrid1.DisplayLayout.Bands.Count == 0)
+                return;
 
-            ultraGrid1.DisplayLayout.Bands[0].Columns["LedgerID"].Hidden = true;
-            ultraGrid1.DisplayLayout.Bands[0].Columns["PaymodeID"].Hidden = true;
-            ultraGrid1.DisplayLayout.Bands[0].Columns["PaymodeLedgerID"].Hidden = true;
-            ultraGrid1.DisplayLayout.Bands[0].Columns["CreditPeriod"].Hidden = true;
-            ultraGrid1.DisplayLayout.Bands[0].Columns["SubTotal"].Hidden = true;
-            ultraGrid1.DisplayLayout.Bands[0].Columns["SpDisPer"].Hidden = true;
+            UltraGridBand band = ultraGrid1.DisplayLayout.Bands[0];
+            string[] columnsToHide = new string[]
+            {
+                "CompanyId", "FinYearId", "BranchId", "BranchName", "InvoiceNo", "InvoiceDate",
+                "LedgerID", "PaymodeID", "PaymodeLedgerID", "CreditPeriod", "SubTotal", "SpDisPer",
+                "SpDsiAmt", "BillDiscountPer", "BillDiscountAmt", "TaxPer", "TaxAmt", "Frieght",
+                "ExpenseAmt", "OtherExpAmt", "CancelFlag", "UserID", "TaxType", "Remarks",
+                "RoundOff", "CessPer", "CessAmt", "CalAfterTax", "CurrencyID", "CurSymbol",
+                "SeriesID", "VoucherID", "IsSyncd", "Paid", "POrderMasterId",
+                "PayedAmount", "BilledBy", "_Operation", "TrnsType", "LastUpdated"
+            };
 
-            ultraGrid1.DisplayLayout.Bands[0].Columns["SpDsiAmt"].Hidden = true;
-            ultraGrid1.DisplayLayout.Bands[0].Columns["BillDiscountPer"].Hidden = true;
-            ultraGrid1.DisplayLayout.Bands[0].Columns["BillDiscountAmt"].Hidden = true;
-            ultraGrid1.DisplayLayout.Bands[0].Columns["TaxPer"].Hidden = true;
-            ultraGrid1.DisplayLayout.Bands[0].Columns["TaxAmt"].Hidden = true;
-            ultraGrid1.DisplayLayout.Bands[0].Columns["Frieght"].Hidden = true;
-
-            ultraGrid1.DisplayLayout.Bands[0].Columns["ExpenseAmt"].Hidden = true;
-            ultraGrid1.DisplayLayout.Bands[0].Columns["OtherExpAmt"].Hidden = true;
-            ultraGrid1.DisplayLayout.Bands[0].Columns["CancelFlag"].Hidden = true;
-            ultraGrid1.DisplayLayout.Bands[0].Columns["UserID"].Hidden = true;
-            ultraGrid1.DisplayLayout.Bands[0].Columns["TaxType"].Hidden = true;
-            ultraGrid1.DisplayLayout.Bands[0].Columns["Remarks"].Hidden = true;
-
-            ultraGrid1.DisplayLayout.Bands[0].Columns["RoundOff"].Hidden = true;
-            ultraGrid1.DisplayLayout.Bands[0].Columns["CessPer"].Hidden = true;
-            ultraGrid1.DisplayLayout.Bands[0].Columns["CessAmt"].Hidden = true;
-            ultraGrid1.DisplayLayout.Bands[0].Columns["CalAfterTax"].Hidden = true;
-            ultraGrid1.DisplayLayout.Bands[0].Columns["CurrencyID"].Hidden = true;
-            ultraGrid1.DisplayLayout.Bands[0].Columns["CurSymbol"].Hidden = true;
-
-            ultraGrid1.DisplayLayout.Bands[0].Columns["SeriesID"].Hidden = true;
-            ultraGrid1.DisplayLayout.Bands[0].Columns["VoucherID"].Hidden = true;
-            ultraGrid1.DisplayLayout.Bands[0].Columns["IsSyncd"].Hidden = true;
-            ultraGrid1.DisplayLayout.Bands[0].Columns["Paid"].Hidden = true;
-
-            ultraGrid1.DisplayLayout.Bands[0].Columns["POrderMasterId"].Hidden = true;
-
-            ultraGrid1.DisplayLayout.Bands[0].Columns["PayedAmount"].Hidden = true;
-            ultraGrid1.DisplayLayout.Bands[0].Columns["BilledBy"].Hidden = true;
-            ultraGrid1.DisplayLayout.Bands[0].Columns["_Operation"].Hidden = true;
-            ultraGrid1.DisplayLayout.Bands[0].Columns["TrnsType"].Hidden = true;
-
-            // Hide LastUpdated column if it exists (it's just for sorting)
-            if (ultraGrid1.DisplayLayout.Bands[0].Columns.Exists("LastUpdated"))
-                ultraGrid1.DisplayLayout.Bands[0].Columns["LastUpdated"].Hidden = true;
+            foreach (string colName in columnsToHide)
+            {
+                try
+                {
+                    if (band.Columns.Exists(colName))
+                    {
+                        band.Columns[colName].Hidden = true;
+                    }
+                }
+                catch { }
+            }
         }
 
         private void ultraGrid1_KeyPress(object sender, KeyPressEventArgs e)
