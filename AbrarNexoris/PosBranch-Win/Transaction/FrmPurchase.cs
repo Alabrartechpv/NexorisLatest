@@ -512,6 +512,7 @@ namespace PosBranch_Win.Transaction
             button2.Click += (s, e) => ShowPurchaseDisplayDialog();
             WireGridClearButton("button6", ClearUltraGrid1Contents);
             WireGridClearButton("button7", ClearUltraGrid2Contents);
+            button8.Click += (s, e) => ShowBatchQtyPopup();
 
             // Add click event for btnFInd (F7)
             btnFInd.Click += btnFInd_Click;
@@ -10246,6 +10247,225 @@ namespace PosBranch_Win.Transaction
             }
 
             return base.ProcessCmdKey(ref msg, keyData);
+        }
+
+        // ─────────────────────────────────────────────────────────────────
+        // Batch Qty Popup
+        // ─────────────────────────────────────────────────────────────────
+        private void ShowBatchQtyPopup()
+        {
+            // Count rows with data in ultraGrid1
+            int rowCount = 0;
+            if (ultraGrid1.Rows != null)
+                foreach (var r in ultraGrid1.Rows)
+                    if (r.Cells.Exists("Qty")) rowCount++;
+
+            if (rowCount == 0)
+            {
+                MessageBox.Show("No items in the grid to update.", "Batch Qty",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            // ── Build the popup form ─────────────────────────────────────
+            using (var popup = new System.Windows.Forms.Form())
+            {
+                popup.Text = "";
+                popup.FormBorderStyle = System.Windows.Forms.FormBorderStyle.None;
+                popup.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
+                popup.Size = new System.Drawing.Size(320, 200);
+                popup.BackColor = System.Drawing.Color.FromArgb(0, 174, 219);   // sky-blue base
+                popup.Opacity = 0.97;
+
+                // ── Gradient background panel ────────────────────────────
+                var bgPanel = new System.Windows.Forms.Panel
+                {
+                    Dock = System.Windows.Forms.DockStyle.Fill,
+                    Padding = new System.Windows.Forms.Padding(2)
+                };
+                bgPanel.Paint += (s, e) =>
+                {
+                    using (var brush = new System.Drawing.Drawing2D.LinearGradientBrush(
+                        bgPanel.ClientRectangle,
+                        System.Drawing.Color.FromArgb(180, 240, 255),
+                        System.Drawing.Color.FromArgb(0, 140, 190),
+                        System.Drawing.Drawing2D.LinearGradientMode.Vertical))
+                    {
+                        e.Graphics.FillRectangle(brush, bgPanel.ClientRectangle);
+                    }
+                    // glossy top highlight
+                    var topRect = new System.Drawing.Rectangle(0, 0, bgPanel.Width, bgPanel.Height / 2);
+                    using (var gloss = new System.Drawing.Drawing2D.LinearGradientBrush(
+                        topRect,
+                        System.Drawing.Color.FromArgb(120, System.Drawing.Color.White),
+                        System.Drawing.Color.FromArgb(0, System.Drawing.Color.White),
+                        System.Drawing.Drawing2D.LinearGradientMode.Vertical))
+                    {
+                        e.Graphics.FillRectangle(gloss, topRect);
+                    }
+                    // border
+                    using (var pen = new System.Drawing.Pen(System.Drawing.Color.FromArgb(0, 100, 160), 2))
+                    {
+                        e.Graphics.DrawRectangle(pen,
+                            new System.Drawing.Rectangle(1, 1, bgPanel.Width - 2, bgPanel.Height - 2));
+                    }
+                };
+                popup.Controls.Add(bgPanel);
+
+                // ── Title bar ────────────────────────────────────────────
+                var titleLbl = new System.Windows.Forms.Label
+                {
+                    Text = $"  ⚡  Set Batch Qty  ({rowCount} items)",
+                    Font = new System.Drawing.Font("Segoe UI", 11f, System.Drawing.FontStyle.Bold),
+                    ForeColor = System.Drawing.Color.FromArgb(0, 40, 80),
+                    AutoSize = false,
+                    Size = new System.Drawing.Size(280, 32),
+                    Location = new System.Drawing.Point(10, 12),
+                    BackColor = System.Drawing.Color.Transparent
+                };
+                bgPanel.Controls.Add(titleLbl);
+
+                // Close [X] button
+                var btnClose = new System.Windows.Forms.Button
+                {
+                    Text = "✕",
+                    FlatStyle = System.Windows.Forms.FlatStyle.Flat,
+                    Size = new System.Drawing.Size(28, 28),
+                    Location = new System.Drawing.Point(284, 8),
+                    BackColor = System.Drawing.Color.Transparent,
+                    ForeColor = System.Drawing.Color.FromArgb(0, 40, 80),
+                    Font = new System.Drawing.Font("Segoe UI", 10f, System.Drawing.FontStyle.Bold),
+                    Cursor = System.Windows.Forms.Cursors.Hand
+                };
+                btnClose.FlatAppearance.BorderSize = 0;
+                btnClose.Click += (s, e) => { popup.DialogResult = System.Windows.Forms.DialogResult.Cancel; popup.Close(); };
+                bgPanel.Controls.Add(btnClose);
+
+                // Divider line
+                var divider = new System.Windows.Forms.Label
+                {
+                    AutoSize = false,
+                    Size = new System.Drawing.Size(296, 1),
+                    Location = new System.Drawing.Point(12, 46),
+                    BackColor = System.Drawing.Color.FromArgb(0, 100, 160)
+                };
+                bgPanel.Controls.Add(divider);
+
+                // ── Qty input label ──────────────────────────────────────
+                var qtyLbl = new System.Windows.Forms.Label
+                {
+                    Text = "Enter Quantity for ALL Items:",
+                    Font = new System.Drawing.Font("Segoe UI", 9f),
+                    ForeColor = System.Drawing.Color.FromArgb(0, 30, 70),
+                    AutoSize = true,
+                    Location = new System.Drawing.Point(20, 62),
+                    BackColor = System.Drawing.Color.Transparent
+                };
+                bgPanel.Controls.Add(qtyLbl);
+
+                // ── Qty input textbox ────────────────────────────────────
+                var txtQty = new System.Windows.Forms.TextBox
+                {
+                    Font = new System.Drawing.Font("Segoe UI", 18f, System.Drawing.FontStyle.Bold),
+                    ForeColor = System.Drawing.Color.FromArgb(0, 40, 90),
+                    BackColor = System.Drawing.Color.FromArgb(220, 245, 255),
+                    BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle,
+                    TextAlign = System.Windows.Forms.HorizontalAlignment.Center,
+                    Text = "1",
+                    Size = new System.Drawing.Size(200, 48),
+                    Location = new System.Drawing.Point(60, 86)
+                };
+                txtQty.KeyPress += (s, e) =>
+                {
+                    // allow digits, one dot, backspace
+                    if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar) && e.KeyChar != '.')
+                        e.Handled = true;
+                    if (e.KeyChar == '.' && ((System.Windows.Forms.TextBox)s).Text.Contains('.'))
+                        e.Handled = true;
+                    // Apply on Enter
+                    if (e.KeyChar == (char)Keys.Return)
+                    {
+                        popup.DialogResult = System.Windows.Forms.DialogResult.OK;
+                        popup.Close();
+                    }
+                };
+                bgPanel.Controls.Add(txtQty);
+
+                // ── Apply button ─────────────────────────────────────────
+                var btnApply = new System.Windows.Forms.Button
+                {
+                    Text = "✔  Apply to All",
+                    Font = new System.Drawing.Font("Segoe UI", 10f, System.Drawing.FontStyle.Bold),
+                    ForeColor = System.Drawing.Color.White,
+                    BackColor = System.Drawing.Color.FromArgb(0, 90, 150),
+                    FlatStyle = System.Windows.Forms.FlatStyle.Flat,
+                    Size = new System.Drawing.Size(140, 34),
+                    Location = new System.Drawing.Point(90, 148),
+                    Cursor = System.Windows.Forms.Cursors.Hand
+                };
+                btnApply.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(0, 60, 120);
+                btnApply.FlatAppearance.BorderSize = 1;
+                // Hover effect
+                btnApply.MouseEnter += (s, e) => btnApply.BackColor = System.Drawing.Color.FromArgb(0, 120, 190);
+                btnApply.MouseLeave += (s, e) => btnApply.BackColor = System.Drawing.Color.FromArgb(0, 90, 150);
+                btnApply.Click += (s, e) => { popup.DialogResult = System.Windows.Forms.DialogResult.OK; popup.Close(); };
+                bgPanel.Controls.Add(btnApply);
+
+                // Allow dragging the borderless popup
+                bool dragging = false;
+                System.Drawing.Point dragStart = System.Drawing.Point.Empty;
+                bgPanel.MouseDown += (s, e) => { if (e.Button == System.Windows.Forms.MouseButtons.Left) { dragging = true; dragStart = e.Location; } };
+                bgPanel.MouseMove += (s, e) => { if (dragging) { var p = popup.PointToScreen(e.Location); popup.Location = new System.Drawing.Point(p.X - dragStart.X, p.Y - dragStart.Y); } };
+                bgPanel.MouseUp   += (s, e) => dragging = false;
+                titleLbl.MouseDown += (s, e) => { if (e.Button == System.Windows.Forms.MouseButtons.Left) { dragging = true; dragStart = e.Location; } };
+                titleLbl.MouseMove += (s, e) => { if (dragging) { var p = popup.PointToScreen(e.Location); popup.Location = new System.Drawing.Point(p.X - dragStart.X, p.Y - dragStart.Y); } };
+                titleLbl.MouseUp   += (s, e) => dragging = false;
+
+                // Focus the qty box on open
+                popup.Shown += (s, e) => { txtQty.SelectAll(); txtQty.Focus(); };
+
+                // ── Show and process result ──────────────────────────────
+                if (popup.ShowDialog(this) == System.Windows.Forms.DialogResult.OK)
+                {
+                    if (!float.TryParse(txtQty.Text.Trim(), out float batchQty) || batchQty <= 0)
+                    {
+                        MessageBox.Show("Please enter a valid positive quantity.", "Batch Qty",
+                            MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+
+                    // ── Apply qty to ALL rows and recalculate ────────────
+                    try
+                    {
+                        ultraGrid1.BeginUpdate();
+                        foreach (var row in ultraGrid1.Rows)
+                        {
+                            if (!row.Cells.Exists("Qty")) continue;
+                            var qtyCell = row.Cells["Qty"];
+                            if (qtyCell.Column.CellActivation == Infragistics.Win.UltraWinGrid.Activation.NoEdit) continue;
+                            if (qtyCell.Column.Hidden) continue;
+
+                            qtyCell.Value = batchQty;
+
+                            // Recalculate tax / totals per row if Cost exists
+                            if (row.Cells.Exists("Cost") && row.Cells["Cost"].Value != null)
+                            {
+                                if (float.TryParse(row.Cells["Cost"].Value.ToString(), out float cost))
+                                {
+                                    RecalculateTaxForRow(row, cost, batchQty);
+                                }
+                            }
+                        }
+                    }
+                    finally
+                    {
+                        ultraGrid1.EndUpdate();
+                    }
+
+                    RecalculateNewBaseCostForAllRows();
+                    CaluateTotals();
+                }
+            }
         }
     };
 }
