@@ -2006,14 +2006,33 @@ namespace PosBranch_Win.Master
             // Setup Enter key focus navigation for specific fields only
             SetupEnterKeyFocusNavigation();
 
-            // Set initial focus on txt_barcode when form loads
-            this.Shown += (s, args) =>
+            // Set initial focus on txt_barcode when form loads or becomes active
+            this.Shown += (s, args) => FocusBarcodeBox();
+            this.Activated += (s, args) => FocusBarcodeBox();
+            this.Enter += (s, args) => FocusBarcodeBox();
+            this.VisibleChanged += (s, args) => { if (this.Visible) FocusBarcodeBox(); };
+        }
+
+        /// <summary>
+        /// Public helper to focus and select all text in txt_barcode
+        /// </summary>
+        public void FocusBarcodeBox()
+        {
+            try
             {
-                if (txt_barcode != null)
+                this.BeginInvoke(new Action(() =>
                 {
-                    txt_barcode.Focus();
-                }
-            };
+                    if (txt_barcode != null)
+                    {
+                        txt_barcode.Focus();
+                        txt_barcode.SelectAll();
+                    }
+                }));
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"FocusBarcodeBox error: {ex.Message}");
+            }
         }
 
         private void FormatPriceToThreeDecimals(object sender, EventArgs e)
@@ -3533,36 +3552,31 @@ namespace PosBranch_Win.Master
         }
 
         // Helper method to load default item type (Stock Item - ID 1)
+        // Helper method to load default item type dynamically from repository
         private void LoadDefaultItemType()
         {
             try
             {
-                Dropdowns drop = new Dropdowns();
-                DataBase.Operations = "Category";
-                ItemTypeDDlGrid itemTypeGrid = drop.getItemTypeDDl();
+                var repo = new Repository.MasterRepositry.ItemTypeRepository();
+                var defaultItem = repo.GetDefaultItemType();
 
-                if (itemTypeGrid != null && itemTypeGrid.List != null)
+                if (defaultItem != null && !string.IsNullOrWhiteSpace(defaultItem.ItemTypeName))
                 {
-                    // Find item with Id = 1
-                    var stockItem = itemTypeGrid.List.FirstOrDefault(x => x.Id == 1);
-
-                    if (stockItem != null)
+                    if (txt_ItemType != null)
                     {
-                        if (txt_ItemType != null)
-                        {
-                            txt_ItemType.Text = stockItem.ItemType;
-                        }
+                        txt_ItemType.Text = defaultItem.ItemTypeName;
                     }
-                    else
+                }
+                else
+                {
+                    Dropdowns drop = new Dropdowns();
+                    var itemTypeGrid = drop.getItemTypeDDl();
+                    if (itemTypeGrid != null && itemTypeGrid.List != null && itemTypeGrid.List.Any())
                     {
-                        // Fallback: try finding by name "STOCK ITEM"
-                        var itemByName = itemTypeGrid.List.FirstOrDefault(x =>
-                             !string.IsNullOrEmpty(x.ItemType) &&
-                             x.ItemType.Equals("STOCK ITEM", StringComparison.OrdinalIgnoreCase));
-
-                        if (itemByName != null && txt_ItemType != null)
+                        var firstItem = itemTypeGrid.List.FirstOrDefault();
+                        if (firstItem != null && txt_ItemType != null)
                         {
-                            txt_ItemType.Text = itemByName.ItemType;
+                            txt_ItemType.Text = firstItem.ItemType;
                         }
                     }
                 }
@@ -5259,6 +5273,26 @@ namespace PosBranch_Win.Master
             }
         }
 
+        private void EnsureDefaultItemType()
+        {
+            try
+            {
+                if (txt_ItemType != null && string.IsNullOrWhiteSpace(txt_ItemType.Text))
+                {
+                    var repo = new Repository.MasterRepositry.ItemTypeRepository();
+                    var defaultType = repo.GetDefaultItemType();
+                    if (defaultType != null && !string.IsNullOrWhiteSpace(defaultType.ItemTypeName))
+                    {
+                        txt_ItemType.Text = defaultType.ItemTypeName;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"EnsureDefaultItemType error: {ex.Message}");
+            }
+        }
+
         // Load an item by its ID
         private void LoadItemById(int itemId)
         {
@@ -5329,6 +5363,7 @@ namespace PosBranch_Win.Master
                     txt_Group.Text = getItem.GroupName;
 
                     txt_ItemType.Text = getItem.ItemType;
+                    EnsureDefaultItemType();
                     SetSmartReorderValues(getItem.Order_Cycle_Days, getItem.Box_Quantity, getItem.Is_Perishable);
 
                     // Load H.S.N code into textBox4 using repository's enriched result (which explicitly fetched HSNCode)

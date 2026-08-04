@@ -74,6 +74,7 @@
     <Compile Include="MasterRepositry\CountryRepository.cs" />
     <Compile Include="MasterRepositry\GroupRepository.cs" />
     <Compile Include="MasterRepositry\ItemMasterRepository.cs" />
+    <Compile Include="MasterRepositry\ItemTypeRepository.cs" />
     <Compile Include="MasterRepositry\ExcelImportRepository.cs" />
     <Compile Include="MasterRepositry\LedgerRepository.cs" />
     <Compile Include="MasterRepositry\PluRepository.cs" />

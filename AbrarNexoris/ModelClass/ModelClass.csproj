@@ -66,6 +66,7 @@
     <Compile Include="Master\CurrencyModel.cs" />
     <Compile Include="Master\GroupModel.cs" />
     <Compile Include="Master\ItemMaster.cs" />
+    <Compile Include="Master\ItemTypeModel.cs" />
     <Compile Include="Master\PluModel.cs" />
     <Compile Include="Master\RolePermission.cs" />
     <Compile Include="Master\StateModel.cs" />
