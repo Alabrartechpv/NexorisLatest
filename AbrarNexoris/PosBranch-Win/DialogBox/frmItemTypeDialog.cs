@@ -20,6 +20,8 @@ namespace PosBranch_Win.DialogBox
         Dropdowns drop = new Dropdowns();
         frmItemMasterNew ItemMaster = new frmItemMasterNew();
 
+        public string SelectedItemType { get; set; }
+
         // Add debounce timer and tracking for textBox3
         private System.Windows.Forms.Timer textBox3DebounceTimer;
         private string lastProcessedTextBox3Value = string.Empty;
@@ -169,31 +171,48 @@ namespace PosBranch_Win.DialogBox
         /// <summary>
         /// OK button click handler - selects the item type and closes
         /// </summary>
+        private void SelectCurrentItemType(UltraGridRow row)
+        {
+            if (row == null || row.IsGroupByRow) return;
+
+            UltraGridCell itemTypeCell = null;
+            if (row.Cells.Exists("ItemType")) itemTypeCell = row.Cells["ItemType"];
+            else if (row.Cells.Exists("ItemTypeName")) itemTypeCell = row.Cells["ItemTypeName"];
+
+            if (itemTypeCell == null || itemTypeCell.Value == DBNull.Value) return;
+
+            string selectedValue = Convert.ToString(itemTypeCell.Value);
+            SelectedItemType = selectedValue;
+            this.DialogResult = DialogResult.OK;
+
+            // Write back to open ItemMaster if available
+            ItemMaster = Application.OpenForms.OfType<frmItemMasterNew>().FirstOrDefault();
+            if (ItemMaster != null && ItemMaster.txt_ItemType != null)
+            {
+                ItemMaster.txt_ItemType.Text = selectedValue;
+            }
+
+            // Write back to open frmItemType if available
+            var openItemTypeForm = Application.OpenForms.OfType<frmItemType>().FirstOrDefault();
+            if (openItemTypeForm != null && openItemTypeForm.Controls.Find("txt_ItemType", true).FirstOrDefault() is Control txtCtrl)
+            {
+                txtCtrl.Text = selectedValue;
+            }
+
+            this.Close();
+        }
+
         private void Panel5_OKClick(object sender, EventArgs e)
         {
             try
             {
-                // Reuse existing grid Enter key logic
                 if (this.ultraGrid1.ActiveRow != null)
                 {
-                    ItemMaster = Application.OpenForms.OfType<frmItemMasterNew>().FirstOrDefault();
-                    if (ItemMaster != null)
-                    {
-                        UltraGridCell ItemType = this.ultraGrid1.ActiveRow.Cells["ItemType"];
-                        if (ItemType != null)
-                        {
-                            ItemMaster.txt_ItemType.Text = Convert.ToString(ItemType.Value);
-                        }
-                    }
-                    this.Close();
+                    SelectCurrentItemType(this.ultraGrid1.ActiveRow);
                 }
                 else if (this.ultraGrid1.Rows != null && this.ultraGrid1.Rows.Count > 0)
                 {
-                    // Select first row if none is selected
-                    this.ultraGrid1.ActiveRow = this.ultraGrid1.Rows[0];
-                    this.ultraGrid1.Selected.Rows.Clear();
-                    this.ultraGrid1.Selected.Rows.Add(this.ultraGrid1.ActiveRow);
-                    Panel5_OKClick(sender, e); // Recursive call with now-selected row
+                    SelectCurrentItemType(this.ultraGrid1.Rows[0]);
                 }
                 else
                 {
@@ -206,14 +225,10 @@ namespace PosBranch_Win.DialogBox
             }
         }
 
-        /// <summary>
-        /// Close button click handler - closes without selecting
-        /// </summary>
         private void Panel6_CloseClick(object sender, EventArgs e)
         {
             try
             {
-                System.Diagnostics.Debug.WriteLine("Close button clicked in frmItemTypeDialog");
                 this.DialogResult = DialogResult.Cancel;
                 this.Close();
             }
@@ -223,48 +238,27 @@ namespace PosBranch_Win.DialogBox
             }
         }
 
-        /// <summary>
-        /// Double-click handler for grid - loads the selected item type (same as Enter key)
-        /// </summary>
+        private Form FindParentHome()
+        {
+            Control current = this.Parent;
+            while (current != null)
+            {
+                if (current is Form form && form.GetType().Name == "Home") return form;
+                current = current.Parent;
+            }
+            foreach (Form form in Application.OpenForms)
+            {
+                if (form.GetType().Name == "Home" && !form.IsDisposed) return form;
+            }
+            return null;
+        }
+
         private void ultraGrid1_DoubleClickRow(object sender, DoubleClickRowEventArgs e)
         {
             try
             {
-                // Skip if it's a group-by row
-                if (e.Row == null || e.Row.IsGroupByRow)
-                    return;
-
-                // Set the active row to the clicked row
-                this.ultraGrid1.ActiveRow = e.Row;
-                this.ultraGrid1.Selected.Rows.Clear();
-                this.ultraGrid1.Selected.Rows.Add(e.Row);
-
-                // Find the open Item Master form safely
-                ItemMaster = Application.OpenForms
-                    .OfType<frmItemMasterNew>()
-                    .FirstOrDefault();
-
-                if (ItemMaster == null)
-                {
-                    // No target form is open; just close the dialog quietly
-                    this.Close();
-                    return;
-                }
-
-                // Safely get cells
-                UltraGridCell ItemType = null;
-                if (e.Row.Cells.Exists("ItemType")) ItemType = e.Row.Cells["ItemType"];
-
-                if (ItemType == null)
-                    return;
-
-                // Write back to target controls if available
-                if (ItemMaster.txt_ItemType != null)
-                {
-                    ItemMaster.txt_ItemType.Text = Convert.ToString(ItemType.Value);
-                }
-
-                this.Close();
+                if (e.Row == null || e.Row.IsGroupByRow) return;
+                SelectCurrentItemType(e.Row);
             }
             catch (Exception ex)
             {
@@ -274,48 +268,18 @@ namespace PosBranch_Win.DialogBox
 
         private void ultraGrid1_KeyPress(object sender, KeyPressEventArgs e)
         {
-            // Only act on Enter; ignore other key presses to avoid firing with no selection
-            if (e.KeyChar != (char)Keys.Enter)
-                return;
+            if (e.KeyChar != (char)Keys.Enter) return;
 
             try
             {
-                // Find the open Item Master form safely
-                ItemMaster = Application.OpenForms
-                    .OfType<frmItemMasterNew>()
-                    .FirstOrDefault();
-
-                if (ItemMaster == null)
+                if (this.ultraGrid1.ActiveRow != null)
                 {
-                    // No target form is open; just close the dialog quietly
-                    this.Close();
-                    return;
+                    SelectCurrentItemType(this.ultraGrid1.ActiveRow);
                 }
-
-                var row = this.ultraGrid1.ActiveRow;
-                if (row == null || row.IsGroupByRow)
-                    return;
-
-                // Safely get cells
-                UltraGridCell ItemType = null;
-                UltraGridCell Id = null;
-                if (row.Cells.Exists("ItemType")) ItemType = row.Cells["ItemType"];
-                if (row.Cells.Exists("Id")) Id = row.Cells["Id"];
-
-                if (ItemType == null)
-                    return;
-
-                // Write back to target controls if available
-                if (ItemMaster.txt_ItemType != null)
-                {
-                    ItemMaster.txt_ItemType.Text = Convert.ToString(ItemType.Value);
-                }
-
-                this.Close();
             }
             catch
             {
-                // Swallow to avoid crashing the app due to unexpected nulls
+                // Swallow
             }
         }
 
@@ -1024,76 +988,59 @@ namespace PosBranch_Win.DialogBox
                 return null;
             }
         }
-
         /// <summary>
-        /// Click handler for Panel4 - Opens ItemMaster in UltraTabControl
+        /// Click handler for Panel4 - Opens frmItemType in UltraTabControl
         /// </summary>
         private void Panel4_Click(object sender, EventArgs e)
         {
             try
             {
-                // Find the main Home form that contains tabControlMain
                 Form homeForm = FindHomeForm();
 
                 if (homeForm != null)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Home form found: {homeForm.Name}");
-
-                    // Get the tabControlMain from the Home form
                     var tabControlMain = GetTabControlFromHome(homeForm);
 
                     if (tabControlMain != null)
                     {
-                        // Check if Item Master tab already exists
+                        // Check if Item Type tab already exists
                         foreach (Infragistics.Win.UltraWinTabControl.UltraTab tab in tabControlMain.Tabs)
                         {
-                            if (tab.Text == "Item Master")
+                            if (tab.Text == "Item Type" || tab.Text == "ItemType")
                             {
                                 tabControlMain.SelectedTab = tab;
-                                System.Diagnostics.Debug.WriteLine("Item Master tab already exists, selected existing tab");
-
-                                // Close the frmItemTypeDialog form
                                 this.DialogResult = DialogResult.OK;
                                 this.Close();
                                 return;
                             }
                         }
 
-                        // Create new tab using the same approach as Home.cs
-                        string uniqueKey = $"Tab_{DateTime.Now.Ticks}_Item Master";
-                        var newTab = tabControlMain.Tabs.Add(uniqueKey, "Item Master");
+                        // Create new tab using Home.cs approach
+                        string uniqueKey = $"Tab_{DateTime.Now.Ticks}_ItemType";
+                        var newTab = tabControlMain.Tabs.Add(uniqueKey, "Item Type");
 
-                        // Create and configure frmItemMasterNew for embedding (same as Home.cs)
-                        frmItemMasterNew itemMasterForm = new frmItemMasterNew();
-                        itemMasterForm.TopLevel = false;
-                        itemMasterForm.FormBorderStyle = FormBorderStyle.None;
-                        itemMasterForm.Dock = DockStyle.Fill;
-                        itemMasterForm.Visible = true;
-                        itemMasterForm.BackColor = SystemColors.Control;
+                        frmItemType itemTypeForm = new frmItemType();
+                        itemTypeForm.TopLevel = false;
+                        itemTypeForm.FormBorderStyle = FormBorderStyle.None;
+                        itemTypeForm.Dock = DockStyle.Fill;
+                        itemTypeForm.Visible = true;
+                        itemTypeForm.BackColor = SystemColors.Control;
 
-                        // Ensure form is properly initialized
-                        if (!itemMasterForm.IsHandleCreated)
+                        if (!itemTypeForm.IsHandleCreated)
                         {
-                            itemMasterForm.CreateControl();
+                            itemTypeForm.CreateControl();
                         }
 
-                        // Add the form to the tab page
-                        newTab.TabPage.Controls.Add(itemMasterForm);
-
-                        // Show the form AFTER adding to tab page
-                        itemMasterForm.Show();
-                        itemMasterForm.BringToFront();
-
-                        // Set the new tab as active/selected
+                        newTab.TabPage.Controls.Add(itemTypeForm);
+                        itemTypeForm.Show();
+                        itemTypeForm.BringToFront();
                         tabControlMain.SelectedTab = newTab;
 
-                        // Force refresh to ensure proper display
                         newTab.TabPage.Refresh();
-                        itemMasterForm.Refresh();
+                        itemTypeForm.Refresh();
                         tabControlMain.Refresh();
 
-                        // Wire up the form's FormClosed event to remove the tab
-                        itemMasterForm.FormClosed += (formSender, formE) =>
+                        itemTypeForm.FormClosed += (formSender, formE) =>
                         {
                             try
                             {
@@ -1108,10 +1055,6 @@ namespace PosBranch_Win.DialogBox
                             }
                         };
 
-                        System.Diagnostics.Debug.WriteLine("frmItemMasterNew opened in UltraTabControl using Home.cs approach");
-
-                        // Close the frmItemTypeDialog form after successfully opening frmItemMasterNew
-                        // Add a small delay to ensure frmItemMasterNew is fully loaded
                         System.Threading.Tasks.Task.Delay(100).ContinueWith(_ =>
                         {
                             this.Invoke(new Action(() =>
@@ -1123,44 +1066,21 @@ namespace PosBranch_Win.DialogBox
                     }
                     else
                     {
-                        // Fallback: show as regular form
-                        frmItemMasterNew itemMasterForm = new frmItemMasterNew();
-                        itemMasterForm.Show();
-                        System.Diagnostics.Debug.WriteLine("frmItemMasterNew opened as regular form (tabControlMain not found)");
-
-                        // Close the frmItemTypeDialog form with delay
-                        System.Threading.Tasks.Task.Delay(100).ContinueWith(_ =>
-                        {
-                            this.Invoke(new Action(() =>
-                            {
-                                this.DialogResult = DialogResult.OK;
-                                this.Close();
-                            }));
-                        });
+                        frmItemType itemTypeForm = new frmItemType();
+                        itemTypeForm.Show();
+                        this.Close();
                     }
                 }
                 else
                 {
-                    // If no Home form found, show as a regular form
-                    frmItemMasterNew itemMasterForm = new frmItemMasterNew();
-                    itemMasterForm.Show();
-                    System.Diagnostics.Debug.WriteLine("frmItemMasterNew opened as regular form (no Home form found)");
-
-                    // Close the frmItemTypeDialog form with delay
-                    System.Threading.Tasks.Task.Delay(100).ContinueWith(_ =>
-                    {
-                        this.Invoke(new Action(() =>
-                        {
-                            this.DialogResult = DialogResult.OK;
-                            this.Close();
-                        }));
-                    });
+                    frmItemType itemTypeForm = new frmItemType();
+                    itemTypeForm.Show();
+                    this.Close();
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine("Error opening frmItemMasterNew: " + ex.Message);
-                MessageBox.Show("Error opening Item Master: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                System.Diagnostics.Debug.WriteLine("Error opening frmItemType: " + ex.Message);
             }
         }
 

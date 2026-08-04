@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -1498,51 +1498,26 @@ namespace PosBranch_Win.DialogBox
         {
             try
             {
-                // Create and show the FrmVendor form
-                PosBranch_Win.Accounts.FrmVendor vendorForm = new PosBranch_Win.Accounts.FrmVendor();
+                // Close vendor dialog first
+                this.DialogResult = DialogResult.OK;
+                this.Close();
 
-                // Set the form to open maximized
-                vendorForm.WindowState = FormWindowState.Maximized;
-
-                // Set the form's position to center screen
-                vendorForm.StartPosition = FormStartPosition.CenterScreen;
-
-                // Set TopMost to ensure it appears in front
-                vendorForm.TopMost = true;
-
-                // Hide current form
-                this.Hide();
-
-                // Show the vendor form
-                vendorForm.Show();
-
-                // After a short delay, reset TopMost to false so other windows can go in front if needed
-                vendorForm.BeginInvoke(new Action(() =>
+                // Open FrmVendor inside the main Home ultraTabControl (single form instance)
+                Home homeInstance = Application.OpenForms.OfType<Home>().FirstOrDefault();
+                if (homeInstance != null && !homeInstance.IsDisposed)
                 {
-                    // Short delay to ensure form is visible on top
-                    System.Threading.Thread.Sleep(100);
-                    vendorForm.TopMost = false;
-
-                    // Make sure it stays active
-                    vendorForm.Activate();
-                    vendorForm.BringToFront();
-                }));
-
-                // Close this form after ensuring the Vendor form is shown
-                this.BeginInvoke(new Action(() =>
+                    homeInstance.OpenFormByType(typeof(PosBranch_Win.Accounts.FrmVendor), "Vendor");
+                }
+                else
                 {
-                    // Process any pending messages
-                    Application.DoEvents();
-
-                    // Close this form
-                    this.Close();
-                }));
+                    PosBranch_Win.Accounts.FrmVendor vendorForm = new PosBranch_Win.Accounts.FrmVendor();
+                    vendorForm.StartPosition = FormStartPosition.CenterScreen;
+                    vendorForm.Show();
+                }
             }
             catch (Exception ex)
             {
-                // If there's an error, make sure this form is visible again
-                this.Show();
-
+                System.Diagnostics.Debug.WriteLine($"Error opening Vendor form: {ex.Message}");
                 MessageBox.Show($"Error opening Vendor form: {ex.Message}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }

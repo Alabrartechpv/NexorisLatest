@@ -977,7 +977,26 @@ WHERE ItemId IN ({string.Join(", ", parameterNames)})";
         public ItemTypeDDlGrid getItemTypeDDl()
         {
             ItemTypeDDlGrid itemtypeddl = new ItemTypeDDlGrid();
-            DataConnection.Open();
+            try
+            {
+                var repo = new MasterRepositry.ItemTypeRepository();
+                var items = repo.GetAllItemTypes();
+                if (items != null && items.Count > 0)
+                {
+                    itemtypeddl.List = items.Select(x => new ItemTypeDDL
+                    {
+                        Id = x.Id,
+                        ItemType = x.ItemTypeName
+                    }).ToList();
+                    return itemtypeddl;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"ItemTypeRepository DDL fallback: {ex.Message}");
+            }
+
+            if (DataConnection.State != ConnectionState.Open) DataConnection.Open();
             try
             {
                 using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_dropdown, (SqlConnection)DataConnection))

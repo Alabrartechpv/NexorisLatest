@@ -4619,73 +4619,30 @@ namespace PosBranch_Win.DialogBox
             }
         }
 
-        // Event handler to open the ItemMaster form
+        // Event handler to open the ItemMaster form inside ultraTabControl
         private void OpenItemMasterForm(object sender, EventArgs e)
         {
             try
             {
-                UpdateStatus("Opening Item Master form...");
+                // Close this dialog first
+                this.DialogResult = DialogResult.OK;
+                this.Close();
 
-                // Create a new instance of the ItemMaster form
-                frmItemMasterNew itemMasterForm = new frmItemMasterNew();
-
-                // Set the form to open maximized
-                itemMasterForm.WindowState = FormWindowState.Maximized;
-
-                // Set the form's position to center screen
-                itemMasterForm.StartPosition = FormStartPosition.CenterScreen;
-
-                // Set TopMost property to ensure it appears in front of all other forms
-                itemMasterForm.TopMost = true;
-
-                // Hide this form first to avoid flickering
-                this.Hide();
-
-                // Process any pending messages
-                Application.DoEvents();
-
-                // Show the form
-                itemMasterForm.Show();
-
-                // Activate the form to ensure it has focus
-                itemMasterForm.Activate();
-
-                // Bring it to the front
-                itemMasterForm.BringToFront();
-
-                // Use BeginInvoke to reset TopMost after a short delay
-                // This ensures the form appears on top initially but doesn't stay permanently on top
-                itemMasterForm.BeginInvoke(new Action(() =>
+                // Open frmItemMasterNew inside Home's ultraTabControl (single form instance)
+                Home homeInstance = Application.OpenForms.OfType<Home>().FirstOrDefault();
+                if (homeInstance != null && !homeInstance.IsDisposed)
                 {
-                    // Process any pending messages
-                    Application.DoEvents();
-
-                    // Short delay to ensure visibility
-                    System.Threading.Thread.Sleep(50);
-
-                    // Reset TopMost
-                    itemMasterForm.TopMost = false;
-
-                    // Ensure it's still active and in front
-                    itemMasterForm.Activate();
-                    itemMasterForm.BringToFront();
-                }));
-
-                // Close this form after ensuring the ItemMaster form is shown
-                this.BeginInvoke(new Action(() =>
+                    homeInstance.OpenFormByType(typeof(PosBranch_Win.Master.frmItemMasterNew), "Item Master");
+                }
+                else
                 {
-                    // Process any pending messages
-                    Application.DoEvents();
-
-                    // Close this form
-                    this.Close();
-                }));
+                    frmItemMasterNew itemMasterForm = new frmItemMasterNew();
+                    itemMasterForm.StartPosition = FormStartPosition.CenterScreen;
+                    itemMasterForm.Show();
+                }
             }
             catch (Exception ex)
             {
-                // If there's an error, make sure this form is visible again
-                this.Show();
-
                 UpdateStatus($"Error opening Item Master form: {ex.Message}");
                 MessageBox.Show($"Error opening Item Master form: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }

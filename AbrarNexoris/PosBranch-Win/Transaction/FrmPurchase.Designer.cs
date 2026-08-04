@@ -670,7 +670,7 @@ namespace PosBranch_Win.Transaction
             this.label4.Font = new System.Drawing.Font("DS-Digital", 36F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.label4.Location = new System.Drawing.Point(0, 0);
             this.label4.Name = "label4";
-            this.label4.Size = new System.Drawing.Size(231, 80);
+            this.label4.Size = new System.Drawing.Size(233, 82);
             this.label4.TabIndex = 0;
             this.label4.Text = "0.00";
             this.label4.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
