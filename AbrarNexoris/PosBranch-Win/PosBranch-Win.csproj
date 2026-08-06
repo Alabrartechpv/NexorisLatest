@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -942,7 +942,18 @@
     <Compile Include="Master\FrmPaymodeMaster.Designer.cs">
       <DependentUpon>FrmPaymodeMaster.cs</DependentUpon>
     </Compile>
-
+    <Compile Include="Master\FrmCurrency.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Master\FrmCurrency.Designer.cs">
+      <DependentUpon>FrmCurrency.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Master\frmGeneralPaymodeSetup.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Master\frmGeneralPaymodeSetup.Designer.cs">
+      <DependentUpon>frmGeneralPaymodeSetup.cs</DependentUpon>
+    </Compile>
     <Compile Include="Master\FrmCategory.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -1692,6 +1703,12 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Master\FrmCountry.resx">
       <DependentUpon>FrmCountry.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Master\FrmCurrency.resx">
+      <DependentUpon>FrmCurrency.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Master\frmGeneralPaymodeSetup.resx">
+      <DependentUpon>frmGeneralPaymodeSetup.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Master\FrmGroup.resx">
       <DependentUpon>FrmGroup.cs</DependentUpon>
