@@ -98,7 +98,7 @@ namespace PosBranch_Win.Master
             AttachCardPaint(panelGrid);
 
             StyleButton(btnSave, true);
-            StyleButton(btnUpdate, false);
+            StyleButton(btnUpdate, true);
             StyleButton(btnDelete, false);
             StyleButton(btnClear, false);
             StyleButton(btnClose, false);
@@ -287,6 +287,14 @@ namespace PosBranch_Win.Master
                 return;
             }
 
+            // If an item record is currently loaded for edit (_currentItemType.Id > 0),
+            // maintain edit mode so btnUpdate stays visible and btnSave stays hidden when user edits/renames the text!
+            if (_currentItemType != null && _currentItemType.Id > 0)
+            {
+                SetButtonMode(true);
+                return;
+            }
+
             var match = _itemTypesList?.FirstOrDefault(x => string.Equals(x.ItemTypeName, text, StringComparison.OrdinalIgnoreCase));
             if (match != null)
             {
@@ -298,10 +306,7 @@ namespace PosBranch_Win.Master
             {
                 _currentItemType = new ItemType();
                 _currentIndex = -1;
-                btnSave.Visible = true;
-                btnUpdate.Visible = false;
-                btnDelete.Enabled = false;
-                btnSetDefault.Enabled = false;
+                SetButtonMode(false);
             }
         }
 

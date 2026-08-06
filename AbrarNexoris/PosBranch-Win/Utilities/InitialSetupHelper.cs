@@ -234,45 +234,13 @@ namespace PosBranch_Win.Utilities
 
         public static void EnsureDefaultPayModesOnLaunch()
         {
-            Repository.BaseRepostitory repo = null;
-            try
-            {
-                repo = new Repository.BaseRepostitory();
-                if (repo.DataConnection != null)
-                {
-                    if (repo.DataConnection.State != ConnectionState.Open)
-                        repo.DataConnection.Open();
-
-                    using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_Initialsetup, (SqlConnection)repo.DataConnection))
-                    {
-                        cmd.CommandType = CommandType.StoredProcedure;
-                        cmd.Parameters.AddWithValue("@CompanyName", "Nexoris Retail");
-                        cmd.Parameters.AddWithValue("@CompanyCaption", "Nexoris Retail");
-                        cmd.Parameters.AddWithValue("@BranchName", "Main Branch");
-                        cmd.Parameters.AddWithValue("@BranchAddress", "Main Branch Address");
-                        cmd.Parameters.AddWithValue("@BranchPhone", "123456789");
-                        cmd.Parameters.AddWithValue("@AdminPassword", "admin");
-                        cmd.ExecuteNonQuery();
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error checking default Master Data on launch: {ex.Message}");
-            }
-            finally
-            {
-                if (repo != null) repo.Dispose();
-            }
-
-            // Ensure Item Types table exists and has seed data (runs on every launch, safe to call multiple times)
+            // Ensure Item Types table exists and cleanup any hardcoded seed data
             EnsureItemTypeSeedData();
         }
 
         /// <summary>
-        /// Ensures the ItemTypes table exists with the stored procedure and default seed data.
-        /// Safe to call multiple times — only inserts rows that don't already exist.
-        /// Called on every app launch so fresh installs never lack item types.
+        /// Ensures the ItemTypes table exists with the stored procedure and cleans up hardcoded data.
+        /// Safe to call multiple times.
         /// </summary>
         public static void EnsureItemTypeSeedData()
         {
@@ -318,27 +286,25 @@ END;
                 using (SqlCommand cmd = new SqlCommand(ensureTable, conn))
                     cmd.ExecuteNonQuery();
 
-                // 2. Insert default item types only if they don't already exist
-                string seedData = @"
-IF NOT EXISTS (SELECT 1 FROM ItemTypes WHERE ItemType = 'Standard' AND ISNULL(IsDelete,0) = 0)
-    INSERT INTO ItemTypes (ItemType, IsDelete, IsDefault) VALUES ('Standard', 0, 1);
+                // 2. Permanently delete hardcoded/auto-seeded item types so they NEVER appear again
+                string cleanupData = @"
+IF EXISTS (SELECT * FROM sys.tables WHERE name = 'ItemTypes')
+BEGIN
+    DELETE FROM ItemTypes WHERE ItemType IN ('Standard', 'Services', 'Inventory', 'Non-Inventory');
+END;
 
-IF NOT EXISTS (SELECT 1 FROM ItemTypes WHERE ItemType = 'Services' AND ISNULL(IsDelete,0) = 0)
-    INSERT INTO ItemTypes (ItemType, IsDelete, IsDefault) VALUES ('Services', 0, 0);
+IF EXISTS (SELECT * FROM sys.tables WHERE name = 'ItemType')
+BEGIN
+    DELETE FROM ItemType WHERE ItemType IN ('Standard', 'Services', 'Inventory', 'Non-Inventory');
+END;
 
-IF NOT EXISTS (SELECT 1 FROM ItemTypes WHERE ItemType = 'Inventory' AND ISNULL(IsDelete,0) = 0)
-    INSERT INTO ItemTypes (ItemType, IsDelete, IsDefault) VALUES ('Inventory', 0, 0);
-
-IF NOT EXISTS (SELECT 1 FROM ItemTypes WHERE ItemType = 'Non-Inventory' AND ISNULL(IsDelete,0) = 0)
-    INSERT INTO ItemTypes (ItemType, IsDelete, IsDefault) VALUES ('Non-Inventory', 0, 0);
-
--- If no default is set at all, set the first active row as default
+-- Ensure at least one active row is marked as default
 IF NOT EXISTS (SELECT 1 FROM ItemTypes WHERE ISNULL(IsDelete,0) = 0 AND ISNULL(IsDefault,0) = 1)
 BEGIN
     UPDATE ItemTypes SET IsDefault = 1 WHERE Id = (SELECT TOP 1 Id FROM ItemTypes WHERE ISNULL(IsDelete,0) = 0 ORDER BY Id ASC);
 END;
 ";
-                using (SqlCommand cmd = new SqlCommand(seedData, conn))
+                using (SqlCommand cmd = new SqlCommand(cleanupData, conn))
                     cmd.ExecuteNonQuery();
 
                 // 3. Ensure POS_ItemType stored procedure exists

@@ -263,64 +263,81 @@ namespace Repository.TransactionRepository
                 float totalTaxAmount = CalculateTotalTaxAmount(dgvItem);
                 float subtotalAmount = (float)ObjPurchaseMaster.GrandTotal - totalTaxAmount;
 
-                objVoucher._Operation = "CREATE";
-                objVoucher.CompanyID = SessionContext.CompanyId;
-                objVoucher.BranchID = SessionContext.BranchId;
-                objVoucher.FinYearID = ObjPurchaseMaster.FinYearId;
-                if (ObjPurchaseMaster.PaymodeID == 2)
+                int targetBranchId = SessionContext.BranchId > 0 ? SessionContext.BranchId : (ObjPurchaseMaster.BranchId > 0 ? ObjPurchaseMaster.BranchId : Convert.ToInt32(DataBase.BranchId));
+                int targetCompanyId = SessionContext.CompanyId > 0 ? SessionContext.CompanyId : (ObjPurchaseMaster.CompanyId > 0 ? ObjPurchaseMaster.CompanyId : Convert.ToInt32(DataBase.CompanyId));
+
+                // Check Cash-In-Hand balance if payment mode is Cash
+                if (IsCashPaymentMode(ObjPurchaseMaster.PaymodeID, ObjPurchaseMaster.Paymode))
                 {
-                    objVoucher.CompanyID = SessionContext.CompanyId;
-                    objVoucher.BranchID = SessionContext.BranchId;
+                    double currentCashBalance = GetAvailableCashBalance(targetBranchId, trans);
+                    if (currentCashBalance - ObjPurchaseMaster.GrandTotal < 0)
+                    {
+                        throw new InvalidOperationException($"Insufficient CASH-IN-HAND balance. Current Cash Balance: {currentCashBalance:N2}, Purchase Amount: {ObjPurchaseMaster.GrandTotal:N2}. Transaction cannot cause a negative cash balance.");
+                    }
+                }
+
+                objVoucher._Operation = "CREATE";
+                objVoucher.CompanyID = targetCompanyId;
+                objVoucher.BranchID = targetBranchId;
+                objVoucher.FinYearID = ObjPurchaseMaster.FinYearId;
+                if (IsCashPaymentMode(ObjPurchaseMaster.PaymodeID, ObjPurchaseMaster.Paymode))
+                {
+                    int cashLedgerId = objLedgerRepository.GetLedgerId(DefaultLedgers.CASH, (int)AccountGroup.CASH_IN_HAND, targetBranchId);
+                    if (cashLedgerId <= 0)
+                        cashLedgerId = objLedgerRepository.GetLedgerId("CASH", (int)AccountGroup.CASH_IN_HAND, targetBranchId);
+
+                    objVoucher.CompanyID = targetCompanyId;
+                    objVoucher.BranchID = targetBranchId;
                     objVoucher.VoucherID = objVoucher.VoucherID;
                     objVoucher.VoucherSeriesID = 0;
                     objVoucher.VoucherDate = DateTime.Now;
                     objVoucher.GroupID = Convert.ToInt32(AccountGroup.CASH_IN_HAND);
-                    objVoucher.LedgerID = objLedgerRepository.GetLedgerId(DefaultLedgers.CASH, (int)AccountGroup.CASH_IN_HAND, Convert.ToInt32(DataBase.BranchId));
+                    objVoucher.LedgerID = cashLedgerId;
                     objVoucher.LedgerName = DefaultLedgers.CASH;
                     objVoucher.VoucherType = "Purchase";
                     objVoucher.Debit = 0;
                     objVoucher.Credit = ObjPurchaseMaster.GrandTotal;
                     objVoucher.Narration = "PURCHASE: #" + Convert.ToString(ObjPurchaseMaster.PurchaseNo) + "| PURCHASE WORTH:" + Convert.ToString(ObjPurchaseMaster.GrandTotal) + "| REMARKS: " + ObjPurchaseMaster.Remarks;
                     objVoucher.SlNo = 1;
-                    objVoucher.Mode = "";
-                    objVoucher.ModeID = 0;
+                    objVoucher.Mode = ObjPurchaseMaster.Paymode ?? "Cash";
+                    objVoucher.ModeID = ObjPurchaseMaster.PaymodeID;
                     objVoucher.UserDate = DateTime.Now;
                     objVoucher.UserName = SessionContext.UserName;
                     objVoucher.UserID = SessionContext.UserId;
                     objVoucher.CancelFlag = false;
                     objVoucher.FinYearID = SessionContext.FinYearId;
+                    objVoucher.CounterID = SessionContext.CounterId;
                     objVoucher.IsSyncd = false;
                     List<Voucher> ObjSaveCreditVocher = DataConnection.Query<Voucher>(STOREDPROCEDURE.POS_Vouchers, objVoucher, trans, commandType: CommandType.StoredProcedure).ToList<Voucher>();
 
-                    objVoucher.CompanyID = Convert.ToInt32(DataBase.CompanyId);
-                    objVoucher.BranchID = Convert.ToInt32(DataBase.BranchId);
+                    objVoucher.CompanyID = targetCompanyId;
+                    objVoucher.BranchID = targetBranchId;
                     objVoucher.VoucherID = objVoucher.VoucherID;
                     objVoucher.VoucherSeriesID = 0;
                     objVoucher.VoucherDate = DateTime.Now;
                     objVoucher.GroupID = Convert.ToInt32(AccountGroup.PURCHASE_ACCOUNT);
-                    objVoucher.LedgerID = objLedgerRepository.GetLedgerId(DefaultLedgers.PURCHASE, (int)AccountGroup.PURCHASE_ACCOUNT, SessionContext.BranchId);
+                    objVoucher.LedgerID = objLedgerRepository.GetLedgerId(DefaultLedgers.PURCHASE, (int)AccountGroup.PURCHASE_ACCOUNT, targetBranchId);
                     objVoucher.LedgerName = DefaultLedgers.PURCHASE;
                     objVoucher.VoucherType = "Purchase";
                     objVoucher.Credit = 0;
-                    objVoucher.Debit = subtotalAmount; // Subtotal amount (GrandTotal - TaxAmount)
+                    objVoucher.Debit = subtotalAmount;
                     objVoucher.Narration = "PURCHASE: #" + Convert.ToString(ObjPurchaseMaster.PurchaseNo) + "| PURCHASE WORTH:" + Convert.ToString(ObjPurchaseMaster.GrandTotal) + "| REMARKS:" + ObjPurchaseMaster.Remarks;
                     objVoucher.SlNo = 2;
-                    objVoucher.Mode = "";
-                    objVoucher.ModeID = 0;
+                    objVoucher.Mode = ObjPurchaseMaster.Paymode ?? "Cash";
+                    objVoucher.ModeID = ObjPurchaseMaster.PaymodeID;
                     objVoucher.UserDate = DateTime.Now;
                     objVoucher.UserName = SessionContext.UserName;
                     objVoucher.UserID = SessionContext.UserId;
                     objVoucher.CancelFlag = false;
                     objVoucher.FinYearID = SessionContext.FinYearId;
+                    objVoucher.CounterID = SessionContext.CounterId;
                     objVoucher.IsSyncd = false;
-
                     List<Voucher> ObjSaveDebitVoucher = DataConnection.Query<Voucher>(STOREDPROCEDURE.POS_Vouchers, objVoucher, trans, commandType: CommandType.StoredProcedure).ToList<Voucher>();
                 }
                 else
                 {
-
-                    objVoucher.CompanyID = Convert.ToInt32(DataBase.CompanyId);
-                    objVoucher.BranchID = Convert.ToInt32(DataBase.BranchId);
+                    objVoucher.CompanyID = targetCompanyId;
+                    objVoucher.BranchID = targetBranchId;
                     objVoucher.VoucherID = objVoucher.VoucherID;
                     objVoucher.VoucherSeriesID = 0;
                     objVoucher.VoucherDate = DateTime.Now;
@@ -332,39 +349,40 @@ namespace Repository.TransactionRepository
                     objVoucher.Credit = ObjPurchaseMaster.GrandTotal;
                     objVoucher.Narration = "PURCHASE: #" + Convert.ToString(ObjPurchaseMaster.PurchaseNo) + "| PURCHASE WORTH:" + Convert.ToString(ObjPurchaseMaster.GrandTotal) + "| REMARKS:" + ObjPurchaseMaster.Remarks;
                     objVoucher.SlNo = 1;
-                    objVoucher.Mode = "";
-                    objVoucher.ModeID = 0;
+                    objVoucher.Mode = ObjPurchaseMaster.Paymode ?? "";
+                    objVoucher.ModeID = ObjPurchaseMaster.PaymodeID;
                     objVoucher.UserDate = DateTime.Now;
                     objVoucher.UserName = SessionContext.UserName;
                     objVoucher.UserID = SessionContext.UserId;
                     objVoucher.CancelFlag = false;
                     objVoucher.FinYearID = SessionContext.FinYearId;
+                    objVoucher.CounterID = SessionContext.CounterId;
                     objVoucher.IsSyncd = false;
                     List<Voucher> ObjSaveDebitVocherCredi = DataConnection.Query<Voucher>(STOREDPROCEDURE.POS_Vouchers, objVoucher, trans, commandType: CommandType.StoredProcedure).ToList<Voucher>();
 
-                    objVoucher.CompanyID = Convert.ToInt32(DataBase.CompanyId);
-                    objVoucher.BranchID = Convert.ToInt32(DataBase.BranchId);
+                    objVoucher.CompanyID = targetCompanyId;
+                    objVoucher.BranchID = targetBranchId;
                     objVoucher.VoucherID = objVoucher.VoucherID;
                     objVoucher.VoucherSeriesID = 0;
                     objVoucher.VoucherDate = DateTime.Now;
                     objVoucher.GroupID = Convert.ToInt32(AccountGroup.PURCHASE_ACCOUNT);
-                    objVoucher.LedgerID = objLedgerRepository.GetLedgerId(DefaultLedgers.PURCHASE, (int)AccountGroup.PURCHASE_ACCOUNT, SessionContext.BranchId);
+                    objVoucher.LedgerID = objLedgerRepository.GetLedgerId(DefaultLedgers.PURCHASE, (int)AccountGroup.PURCHASE_ACCOUNT, targetBranchId);
                     objVoucher.LedgerName = DefaultLedgers.PURCHASE;
                     objVoucher.VoucherType = "Purchase";
-                    objVoucher.Debit = subtotalAmount; // Subtotal amount (GrandTotal - TaxAmount)
+                    objVoucher.Debit = subtotalAmount;
                     objVoucher.Credit = 0;
                     objVoucher.Narration = "PURCHASE: #" + Convert.ToString(ObjPurchaseMaster.PurchaseNo) + "| PURCHASE WORTH:" + Convert.ToString(ObjPurchaseMaster.GrandTotal) + "| REMARKS:" + ObjPurchaseMaster.Remarks;
                     objVoucher.SlNo = 2;
-                    objVoucher.Mode = "";
-                    objVoucher.ModeID = 0;
+                    objVoucher.Mode = ObjPurchaseMaster.Paymode ?? "";
+                    objVoucher.ModeID = ObjPurchaseMaster.PaymodeID;
                     objVoucher.UserDate = DateTime.Now;
                     objVoucher.UserName = SessionContext.UserName;
                     objVoucher.UserID = SessionContext.UserId;
                     objVoucher.CancelFlag = false;
                     objVoucher.FinYearID = SessionContext.FinYearId;
+                    objVoucher.CounterID = SessionContext.CounterId;
                     objVoucher.IsSyncd = false;
                     List<Voucher> ObjSaveCreditVoucherCredit = DataConnection.Query<Voucher>(STOREDPROCEDURE.POS_Vouchers, objVoucher, trans, commandType: CommandType.StoredProcedure).ToList<Voucher>();
-
                 }
 
                 // Create tax voucher entries for CGST and SGST
@@ -676,64 +694,83 @@ namespace Repository.TransactionRepository
                 // Calculate subtotal (GrandTotal - TaxAmount) - reuse totalTaxAmount calculated above
                 float subtotalAmount = (float)ObjPmaster.GrandTotal - totalTaxAmount;
 
-                ObjVoucher._Operation = "CREATE";
-                ObjVoucher.CompanyID = Convert.ToInt32(DataBase.CompanyId);
-                ObjVoucher.BranchID = Convert.ToInt32(DataBase.BranchId);
-                ObjVoucher.FinYearID = originalFinYearId;
-                if (ObjPmaster.PaymodeID == 2)
+                int targetBranchIdUpd = SessionContext.BranchId > 0 ? SessionContext.BranchId : (ObjPmaster.BranchId > 0 ? ObjPmaster.BranchId : Convert.ToInt32(DataBase.BranchId));
+                int targetCompanyIdUpd = SessionContext.CompanyId > 0 ? SessionContext.CompanyId : (ObjPmaster.CompanyId > 0 ? ObjPmaster.CompanyId : Convert.ToInt32(DataBase.CompanyId));
+
+                // Check Cash-In-Hand balance if payment mode is Cash
+                if (IsCashPaymentMode(ObjPmaster.PaymodeID, ObjPmaster.Paymode))
                 {
-                    ObjVoucher.CompanyID = Convert.ToInt32(DataBase.CompanyId);
-                    ObjVoucher.BranchID = Convert.ToInt32(DataBase.BranchId);
+                    double currentCashBalance = GetAvailableCashBalance(targetBranchIdUpd, trans);
+                    double oldCashCredit = GetOldCashVoucherCreditForPurchase(ObjPmaster.VoucherID, targetBranchIdUpd, trans);
+                    double effectiveCashBalance = currentCashBalance + oldCashCredit;
+                    if (effectiveCashBalance - ObjPmaster.GrandTotal < 0)
+                    {
+                        throw new InvalidOperationException($"Insufficient CASH-IN-HAND balance. Available Cash Balance (before update): {effectiveCashBalance:N2}, Updated Purchase Amount: {ObjPmaster.GrandTotal:N2}. Transaction cannot cause a negative cash balance.");
+                    }
+                }
+
+                ObjVoucher._Operation = "CREATE";
+                ObjVoucher.CompanyID = targetCompanyIdUpd;
+                ObjVoucher.BranchID = targetBranchIdUpd;
+                ObjVoucher.FinYearID = originalFinYearId;
+                if (IsCashPaymentMode(ObjPmaster.PaymodeID, ObjPmaster.Paymode))
+                {
+                    int cashLedgerIdUpd = objLedgerRepository.GetLedgerId(DefaultLedgers.CASH, (int)AccountGroup.CASH_IN_HAND, targetBranchIdUpd);
+                    if (cashLedgerIdUpd <= 0)
+                        cashLedgerIdUpd = objLedgerRepository.GetLedgerId("CASH", (int)AccountGroup.CASH_IN_HAND, targetBranchIdUpd);
+
+                    ObjVoucher.CompanyID = targetCompanyIdUpd;
+                    ObjVoucher.BranchID = targetBranchIdUpd;
                     ObjVoucher.VoucherID = ObjVoucher.VoucherID;
                     ObjVoucher.VoucherSeriesID = 0;
                     ObjVoucher.VoucherDate = DateTime.Now;
                     ObjVoucher.GroupID = Convert.ToInt32(AccountGroup.CASH_IN_HAND);
-                    ObjVoucher.LedgerID = objLedgerRepository.GetLedgerId(DefaultLedgers.CASH, (int)AccountGroup.CASH_IN_HAND, SessionContext.BranchId);
+                    ObjVoucher.LedgerID = cashLedgerIdUpd;
                     ObjVoucher.LedgerName = DefaultLedgers.CASH;
                     ObjVoucher.VoucherType = "Purchase";
                     ObjVoucher.Debit = 0;
                     ObjVoucher.Credit = ObjPmaster.GrandTotal;
                     ObjVoucher.Narration = "PURCHASE: #" + Convert.ToString(ObjPmaster.PurchaseNo) + "| PURCHASE WORTH:" + Convert.ToString(ObjPmaster.GrandTotal) + "| REMARKS: " + ObjPmaster.Remarks;
                     ObjVoucher.SlNo = 1;
-                    ObjVoucher.Mode = "";
-                    ObjVoucher.ModeID = 0;
+                    ObjVoucher.Mode = ObjPmaster.Paymode ?? "Cash";
+                    ObjVoucher.ModeID = ObjPmaster.PaymodeID;
                     ObjVoucher.UserDate = DateTime.Now;
                     ObjVoucher.UserName = SessionContext.UserName;
                     ObjVoucher.UserID = SessionContext.UserId;
                     ObjVoucher.CancelFlag = false;
                     ObjVoucher.FinYearID = originalFinYearId;
+                    ObjVoucher.CounterID = SessionContext.CounterId;
                     ObjVoucher.IsSyncd = false;
                     List<Voucher> ObjSaveCreditVocher = DataConnection.Query<Voucher>(STOREDPROCEDURE.POS_Vouchers, ObjVoucher, trans, commandType: CommandType.StoredProcedure).ToList<Voucher>();
 
-                    ObjVoucher.CompanyID = Convert.ToInt32(DataBase.CompanyId);
-                    ObjVoucher.BranchID = Convert.ToInt32(DataBase.BranchId);
+                    ObjVoucher.CompanyID = targetCompanyIdUpd;
+                    ObjVoucher.BranchID = targetBranchIdUpd;
                     ObjVoucher.VoucherID = ObjVoucher.VoucherID;
                     ObjVoucher.VoucherSeriesID = 0;
                     ObjVoucher.VoucherDate = DateTime.Now;
                     ObjVoucher.GroupID = Convert.ToInt32(AccountGroup.PURCHASE_ACCOUNT);
-                    ObjVoucher.LedgerID = objLedgerRepository.GetLedgerId(DefaultLedgers.PURCHASE, (int)AccountGroup.PURCHASE_ACCOUNT, Convert.ToInt32(DataBase.BranchId));
+                    ObjVoucher.LedgerID = objLedgerRepository.GetLedgerId(DefaultLedgers.PURCHASE, (int)AccountGroup.PURCHASE_ACCOUNT, targetBranchIdUpd);
                     ObjVoucher.LedgerName = DefaultLedgers.PURCHASE;
                     ObjVoucher.VoucherType = "Purchase";
                     ObjVoucher.Credit = 0;
-                    ObjVoucher.Debit = subtotalAmount; // Subtotal amount (GrandTotal - TaxAmount)
+                    ObjVoucher.Debit = subtotalAmount;
                     ObjVoucher.Narration = "PURCHASE: #" + Convert.ToString(ObjPmaster.PurchaseNo) + "| PURCHASE WORTH:" + Convert.ToString(ObjPmaster.GrandTotal) + "| REMARKS:" + ObjPmaster.Remarks;
                     ObjVoucher.SlNo = 2;
-                    ObjVoucher.Mode = "";
-                    ObjVoucher.ModeID = 0;
+                    ObjVoucher.Mode = ObjPmaster.Paymode ?? "Cash";
+                    ObjVoucher.ModeID = ObjPmaster.PaymodeID;
                     ObjVoucher.UserDate = DateTime.Now;
                     ObjVoucher.UserName = SessionContext.UserName;
                     ObjVoucher.UserID = SessionContext.UserId;
                     ObjVoucher.CancelFlag = false;
                     ObjVoucher.FinYearID = originalFinYearId;
+                    ObjVoucher.CounterID = SessionContext.CounterId;
                     ObjVoucher.IsSyncd = false;
-
                     List<Voucher> ObjSaveDebitVoucher = DataConnection.Query<Voucher>(STOREDPROCEDURE.POS_Vouchers, ObjVoucher, trans, commandType: CommandType.StoredProcedure).ToList<Voucher>();
                 }
                 else
                 {
-
-                    ObjVoucher.CompanyID = Convert.ToInt32(DataBase.CompanyId);
-                    ObjVoucher.BranchID = Convert.ToInt32(DataBase.BranchId);
+                    ObjVoucher.CompanyID = targetCompanyIdUpd;
+                    ObjVoucher.BranchID = targetBranchIdUpd;
                     ObjVoucher.VoucherID = ObjVoucher.VoucherID;
                     ObjVoucher.VoucherSeriesID = 0;
                     ObjVoucher.VoucherDate = DateTime.Now;
@@ -745,39 +782,40 @@ namespace Repository.TransactionRepository
                     ObjVoucher.Credit = ObjPmaster.GrandTotal;
                     ObjVoucher.Narration = "PURCHASE: #" + Convert.ToString(ObjPmaster.PurchaseNo) + "| PURCHASE WORTH:" + Convert.ToString(ObjPmaster.GrandTotal) + "| REMARKS:" + ObjPmaster.Remarks;
                     ObjVoucher.SlNo = 1;
-                    ObjVoucher.Mode = "";
-                    ObjVoucher.ModeID = 0;
+                    ObjVoucher.Mode = ObjPmaster.Paymode ?? "";
+                    ObjVoucher.ModeID = ObjPmaster.PaymodeID;
                     ObjVoucher.UserDate = DateTime.Now;
                     ObjVoucher.UserName = SessionContext.UserName;
                     ObjVoucher.UserID = SessionContext.UserId;
                     ObjVoucher.CancelFlag = false;
                     ObjVoucher.FinYearID = originalFinYearId;
+                    ObjVoucher.CounterID = SessionContext.CounterId;
                     ObjVoucher.IsSyncd = false;
                     List<Voucher> ObjSaveDebitVocherCredi = DataConnection.Query<Voucher>(STOREDPROCEDURE.POS_Vouchers, ObjVoucher, trans, commandType: CommandType.StoredProcedure).ToList<Voucher>();
 
-                    ObjVoucher.CompanyID = Convert.ToInt32(DataBase.CompanyId);
-                    ObjVoucher.BranchID = Convert.ToInt32(DataBase.BranchId);
+                    ObjVoucher.CompanyID = targetCompanyIdUpd;
+                    ObjVoucher.BranchID = targetBranchIdUpd;
                     ObjVoucher.VoucherID = ObjVoucher.VoucherID;
                     ObjVoucher.VoucherSeriesID = 0;
                     ObjVoucher.VoucherDate = DateTime.Now;
                     ObjVoucher.GroupID = Convert.ToInt32(AccountGroup.PURCHASE_ACCOUNT);
-                    ObjVoucher.LedgerID = objLedgerRepository.GetLedgerId(DefaultLedgers.PURCHASE, (int)AccountGroup.PURCHASE_ACCOUNT, Convert.ToInt32(DataBase.BranchId));
+                    ObjVoucher.LedgerID = objLedgerRepository.GetLedgerId(DefaultLedgers.PURCHASE, (int)AccountGroup.PURCHASE_ACCOUNT, targetBranchIdUpd);
                     ObjVoucher.LedgerName = DefaultLedgers.PURCHASE;
                     ObjVoucher.VoucherType = "Purchase";
-                    ObjVoucher.Debit = subtotalAmount; // Subtotal amount (GrandTotal - TaxAmount)
+                    ObjVoucher.Debit = subtotalAmount;
                     ObjVoucher.Credit = 0;
                     ObjVoucher.Narration = "PURCHASE: #" + Convert.ToString(ObjPmaster.PurchaseNo) + "| PURCHASE WORTH:" + Convert.ToString(ObjPmaster.GrandTotal) + "| REMARKS:" + ObjPmaster.Remarks;
                     ObjVoucher.SlNo = 2;
-                    ObjVoucher.Mode = "";
-                    ObjVoucher.ModeID = 0;
+                    ObjVoucher.Mode = ObjPmaster.Paymode ?? "";
+                    ObjVoucher.ModeID = ObjPmaster.PaymodeID;
                     ObjVoucher.UserDate = DateTime.Now;
                     ObjVoucher.UserName = SessionContext.UserName;
                     ObjVoucher.UserID = SessionContext.UserId;
                     ObjVoucher.CancelFlag = false;
                     ObjVoucher.FinYearID = originalFinYearId;
+                    ObjVoucher.CounterID = SessionContext.CounterId;
                     ObjVoucher.IsSyncd = false;
                     List<Voucher> ObjSaveCreditVoucherCredit = DataConnection.Query<Voucher>(STOREDPROCEDURE.POS_Vouchers, ObjVoucher, trans, commandType: CommandType.StoredProcedure).ToList<Voucher>();
-
                 }
 
                 // Create tax voucher entries for CGST and SGST
@@ -1402,6 +1440,7 @@ namespace Repository.TransactionRepository
                         objVoucher.UserID = Convert.ToInt32(DataBase.UserId);
                         objVoucher.CancelFlag = false;
                         objVoucher.FinYearID = objVoucher.FinYearID;
+                        objVoucher.CounterID = SessionContext.CounterId;
                         objVoucher.IsSyncd = false;
                         objVoucher._Operation = "CREATE";
 
@@ -1413,6 +1452,99 @@ namespace Repository.TransactionRepository
             {
                 System.Diagnostics.Debug.WriteLine($"Error creating tax voucher entries: {ex.Message}");
                 throw; // Re-throw to ensure transaction rollback
+            }
+        }
+
+        /// <summary>Returns true if the given payment mode represents a Cash payment.</summary>
+        public bool IsCashPaymentMode(int paymodeId, string paymodeName)
+        {
+            if (!string.IsNullOrWhiteSpace(paymodeName))
+            {
+                string pName = paymodeName.Trim();
+                if (pName.Equals("Cash", StringComparison.OrdinalIgnoreCase) ||
+                    pName.Equals("CASH-IN-HAND", StringComparison.OrdinalIgnoreCase) ||
+                    pName.Equals("CASH IN HAND", StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            // Fallback: treat PaymodeID == 2 as Cash (most common default)
+            return paymodeId == 2;
+        }
+
+        /// <summary>Returns the current CASH-IN-HAND balance (Debit - Credit) for the given branch.</summary>
+        public double GetAvailableCashBalance(int branchId, IDbTransaction trans = null)
+        {
+            try
+            {
+                int cashLedgerId = objLedgerRepository.GetLedgerId(DefaultLedgers.CASH, (int)AccountGroup.CASH_IN_HAND, branchId);
+                if (cashLedgerId <= 0)
+                    cashLedgerId = objLedgerRepository.GetLedgerId("CASH", (int)AccountGroup.CASH_IN_HAND, branchId);
+
+                string query = @"
+                    SELECT ISNULL(SUM(ISNULL(Debit,0)) - SUM(ISNULL(Credit,0)), 0)
+                    FROM Vouchers
+                    WHERE BranchID = @BranchId
+                      AND ISNULL(CancelFlag,0) = 0
+                      AND (GroupID = @GroupId OR LedgerID = @LedgerId
+                           OR LedgerName = @LedgerName OR LedgerName = 'CASH')";
+
+                var p = new { BranchId = branchId, GroupId = (int)AccountGroup.CASH_IN_HAND,
+                              LedgerId = cashLedgerId, LedgerName = DefaultLedgers.CASH };
+
+                if (trans != null)
+                    return DataConnection.ExecuteScalar<double>(query, p, trans);
+
+                bool wasClosed = DataConnection.State == ConnectionState.Closed;
+                try
+                {
+                    if (wasClosed) DataConnection.Open();
+                    return DataConnection.ExecuteScalar<double>(query, p);
+                }
+                finally
+                {
+                    if (wasClosed && DataConnection.State == ConnectionState.Open) DataConnection.Close();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"GetAvailableCashBalance error: {ex.Message}");
+                return 0;
+            }
+        }
+
+        /// <summary>Returns the cash credit amount recorded for a specific Purchase voucher (used during update to offset existing credit).</summary>
+        public double GetOldCashVoucherCreditForPurchase(long voucherId, int branchId, IDbTransaction trans = null)
+        {
+            if (voucherId <= 0) return 0;
+            try
+            {
+                string query = @"
+                    SELECT ISNULL(SUM(ISNULL(Credit,0)), 0)
+                    FROM Vouchers
+                    WHERE VoucherID = @VoucherId
+                      AND BranchID = @BranchId
+                      AND VoucherType = 'Purchase'
+                      AND ISNULL(CancelFlag,0) = 0
+                      AND (GroupID = @GroupId OR LedgerName = 'CASH-IN-HAND' OR LedgerName = 'CASH')";
+
+                var p = new { VoucherId = voucherId, BranchId = branchId, GroupId = (int)AccountGroup.CASH_IN_HAND };
+
+                if (trans != null)
+                    return DataConnection.ExecuteScalar<double>(query, p, trans);
+
+                bool wasClosed = DataConnection.State == ConnectionState.Closed;
+                try
+                {
+                    if (wasClosed) DataConnection.Open();
+                    return DataConnection.ExecuteScalar<double>(query, p);
+                }
+                finally
+                {
+                    if (wasClosed && DataConnection.State == ConnectionState.Open) DataConnection.Close();
+                }
+            }
+            catch
+            {
+                return 0;
             }
         }
 

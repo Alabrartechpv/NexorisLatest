@@ -46,11 +46,6 @@ BEGIN
         IsDelete BIT NOT NULL DEFAULT 0,
         IsDefault BIT NOT NULL DEFAULT 0
     );
-
-    INSERT INTO ItemTypes (ItemType, IsDelete, IsDefault) VALUES ('Standard', 0, 1);
-    INSERT INTO ItemTypes (ItemType, IsDelete, IsDefault) VALUES ('Services', 0, 0);
-    INSERT INTO ItemTypes (ItemType, IsDelete, IsDefault) VALUES ('Inventory', 0, 0);
-    INSERT INTO ItemTypes (ItemType, IsDelete, IsDefault) VALUES ('Non-Inventory', 0, 0);
 END;
 
 IF EXISTS (SELECT * FROM sys.tables WHERE name = 'ItemTypes')
