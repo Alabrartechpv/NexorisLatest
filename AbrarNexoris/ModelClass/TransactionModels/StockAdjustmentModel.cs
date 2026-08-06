@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -39,6 +39,7 @@ namespace ModelClass.TransactionModels
         public int CancelFlag { get; set; }
         public string VoucherType { get; set; }
         public int CategoryId { get; set; }
+        public int CounterId { get; set; }
         public string _Operation { get; set; }
     }
     public class StockAdjPriceDetails

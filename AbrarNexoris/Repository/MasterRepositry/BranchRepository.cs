@@ -1,4 +1,4 @@
-﻿using Dapper;
+using Dapper;
 using ModelClass;
 using ModelClass.Master;
 using System;
@@ -63,6 +63,12 @@ namespace Repository.MasterRepositry
 
             EnsureReturnLedger(companyId, branchId, DefaultLedgers.SALESRETURN, (int)AccountGroup.SALES_ACCOUNT, trans);
             EnsureReturnLedger(companyId, branchId, DefaultLedgers.PURCHASERETURN, (int)AccountGroup.PURCHASE_ACCOUNT, trans);
+
+            if (GetLedgerId(DefaultLedgers.BEGINSTOCK, (int)AccountGroup.STOCK_IN_HAND, branchId, trans) == 0 &&
+                GetLedgerId("BEGIN STOCK", (int)AccountGroup.STOCK_IN_HAND, branchId, trans) == 0)
+            {
+                EnsureReturnLedger(companyId, branchId, DefaultLedgers.BEGINSTOCK, (int)AccountGroup.STOCK_IN_HAND, trans);
+            }
         }
 
         private void EnsureReturnLedger(int companyId, int branchId, string ledgerName, int groupId, IDbTransaction trans)

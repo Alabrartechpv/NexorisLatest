@@ -571,36 +571,19 @@ namespace PosBranch_Win.DialogBox
         {
             try
             {
-                MessageBox.Show(
-                    "To create a new stock adjustment reason:\n\n" +
-                    "Create a ledger under the 'Indirect Expenses' (or 'Direct Expenses') group with any reason name you prefer.",
-                    "Creating Stock Adjustment Reason",
-                    MessageBoxButtons.OK,
-                    MessageBoxIcon.Information);
-
-                var frmLedgers = new PosBranch_Win.Accounts.FrmLedgers();
-                frmLedgers.SetPreselectedGroupId(12); // Pre-select Group 12 (Indirect Expenses) as the default reason group
-                var homeForm = Application.OpenForms.OfType<Home>().FirstOrDefault();
-                if (homeForm != null)
+                frmReasonMaster master = new frmReasonMaster();
+                if (master.ShowDialog() == DialogResult.OK)
                 {
-                    var openFormInTabMethod = homeForm.GetType().GetMethod("OpenFormInTab",
-                        System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-
-                    if (openFormInTabMethod != null)
+                    LoadAllData();
+                    if (master.ReasonModel != null && !string.IsNullOrWhiteSpace(master.ReasonModel.ReasonName))
                     {
-                        this.Close(); // Close the modal reason dialog first so the UI is not blocked
-                        openFormInTabMethod.Invoke(homeForm, new object[] { frmLedgers, "Ledger" });
-                        return;
+                        ApplyFilter(master.ReasonModel.ReasonName);
                     }
                 }
-
-                // Fallback: show as modal dialog if homeForm is not found
-                this.Close();
-                frmLedgers.ShowDialog();
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Error opening Ledger form: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Error opening Reason Master: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
         

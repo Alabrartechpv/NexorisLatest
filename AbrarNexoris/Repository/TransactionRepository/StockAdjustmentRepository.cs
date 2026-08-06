@@ -104,26 +104,8 @@ namespace Repository.TransactionRepository
             if (itemsGrid == null || itemsGrid.Rows.Count == 0) return "Failed: No items to adjust";
 
             // 1. Pre-fetch ledgers BEFORE opening the connection/transaction to avoid connection/lock issues
-            int stockInHandLedgerId = objLedgerRepository.GetLedgerId(DefaultLedgers.BEGINSTOCK, (int)AccountGroup.STOCK_IN_HAND, SessionContext.BranchId);
-            string stockInHandLedgerName = DefaultLedgers.BEGINSTOCK;
-            if (stockInHandLedgerId == 0)
-            {
-                try
-                {
-                    var ddlRequest = new AccountLedgerDDLRequest { BranchId = SessionContext.BranchId, For = "Stock" };
-                    var ddlResult = objLedgerRepository.getAccountLedgerDDL(ddlRequest);
-                    if (ddlResult != null && ddlResult.List != null && ddlResult.List.Any())
-                    {
-                        var firstLedger = ddlResult.List.FirstOrDefault();
-                        if (firstLedger != null)
-                        {
-                            stockInHandLedgerId = firstLedger.Id;
-                            stockInHandLedgerName = firstLedger.Name;
-                        }
-                    }
-                }
-                catch { }
-            }
+            string stockInHandLedgerName;
+            int stockInHandLedgerId = GetOrEnsureStockInHandLedger(SessionContext.BranchId, out stockInHandLedgerName, null);
 
             if (stockMaster.LedgerId == stockInHandLedgerId && stockInHandLedgerId > 0)
             {
@@ -179,6 +161,7 @@ namespace Repository.TransactionRepository
                 voucher.FinYearID = SessionContext.FinYearId;
                 voucher.VoucherType = "PhysicalStock";
                 voucher.LedgerID = stockMaster.LedgerId;
+                voucher.CounterID = stockMaster.CounterId > 0 ? stockMaster.CounterId : (SessionContext.CounterId > 0 ? SessionContext.CounterId : 1);
 
                 List<Voucher> vouchersList = DataConnection.Query<Voucher>(
                     STOREDPROCEDURE.POS_Vouchers,
@@ -441,6 +424,17 @@ namespace Repository.TransactionRepository
                 }
 
                 // 4. Create accounting voucher entries
+                if (stockInHandLedgerId <= 0)
+                {
+                    stockInHandLedgerId = GetOrEnsureStockInHandLedger(SessionContext.BranchId, out stockInHandLedgerName, transaction);
+                }
+
+                if (stockInHandLedgerId <= 0)
+                {
+                    transaction.Rollback();
+                    return "Failed: Could not locate or create STOCK IN HAND ledger (Group 18) for accounting entries.";
+                }
+
                 voucher._Operation = "CREATE";
                 voucher.VoucherID = voucher.VoucherID;
                 voucher.VoucherSeriesID = 0;
@@ -452,6 +446,7 @@ namespace Repository.TransactionRepository
                 voucher.UserID = SessionContext.UserId;
                 voucher.CancelFlag = false;
                 voucher.IsSyncd = false;
+                voucher.CounterID = stockMaster.CounterId > 0 ? stockMaster.CounterId : (SessionContext.CounterId > 0 ? SessionContext.CounterId : 1);
 
                 // Get values for voucher entries
                 double absAdjustmentValue = Math.Abs(totalAdjustmentValue);
@@ -579,26 +574,8 @@ namespace Repository.TransactionRepository
             if (sk == null) return "Failed: Stock master cannot be null";
 
             // 1. Pre-fetch ledgers BEFORE opening the connection/transaction to avoid connection/lock issues
-            int stockInHandLedgerId = objLedgerRepository.GetLedgerId(DefaultLedgers.BEGINSTOCK, (int)AccountGroup.STOCK_IN_HAND, SessionContext.BranchId);
-            string stockInHandLedgerName = DefaultLedgers.BEGINSTOCK;
-            if (stockInHandLedgerId == 0)
-            {
-                try
-                {
-                    var ddlRequest = new AccountLedgerDDLRequest { BranchId = SessionContext.BranchId, For = "Stock" };
-                    var ddlResult = objLedgerRepository.getAccountLedgerDDL(ddlRequest);
-                    if (ddlResult != null && ddlResult.List != null && ddlResult.List.Any())
-                    {
-                        var firstLedger = ddlResult.List.FirstOrDefault();
-                        if (firstLedger != null)
-                        {
-                            stockInHandLedgerId = firstLedger.Id;
-                            stockInHandLedgerName = firstLedger.Name;
-                        }
-                    }
-                }
-                catch { }
-            }
+            string stockInHandLedgerName;
+            int stockInHandLedgerId = GetOrEnsureStockInHandLedger(SessionContext.BranchId, out stockInHandLedgerName, null);
 
             if (sk.LedgerId == stockInHandLedgerId && stockInHandLedgerId > 0)
             {
@@ -860,6 +837,7 @@ namespace Repository.TransactionRepository
                 objVoucher.CancelFlag = false;
                 objVoucher.FinYearID = SessionContext.FinYearId;
                 objVoucher.IsSyncd = false;
+                objVoucher.CounterID = sk.CounterId > 0 ? sk.CounterId : (SessionContext.CounterId > 0 ? SessionContext.CounterId : 1);
 
                 // Get the absolute value for the voucher entries
                 double absAdjustmentValue = Math.Abs(totalAdjustmentValue);
@@ -900,6 +878,17 @@ namespace Repository.TransactionRepository
                 }
 
                 // --- Resolve STOCK IN HAND ledger (Group 18) for Leg 1 ---
+                if (stockInHandLedgerId <= 0)
+                {
+                    stockInHandLedgerId = GetOrEnsureStockInHandLedger(SessionContext.BranchId, out stockInHandLedgerName, trans);
+                }
+
+                if (stockInHandLedgerId <= 0)
+                {
+                    trans.Rollback();
+                    return "Failed: Could not locate or create STOCK IN HAND ledger (Group 18) for accounting entries.";
+                }
+
                 int stkInHandGroupId = Convert.ToInt32(AccountGroup.STOCK_IN_HAND);
                 int stkInHandLedgerId = stockInHandLedgerId;
                 string stkInHandLedgerName = stockInHandLedgerName;
@@ -1073,5 +1062,281 @@ namespace Repository.TransactionRepository
             return unitName;
         }
 
+        private int GetOrEnsureStockInHandLedger(int branchId, out string ledgerName, SqlTransaction trans = null)
+        {
+            int ledgerId = 0;
+            ledgerName = DefaultLedgers.BEGINSTOCK;
+
+            try
+            {
+                // 1. Try SP _4GetLedgerIdByLedgerNameAndGroupId with DefaultLedgers.BEGINSTOCK ("STOCK IN HAND")
+                ledgerId = objLedgerRepository.GetLedgerId(DefaultLedgers.BEGINSTOCK, (int)AccountGroup.STOCK_IN_HAND, branchId);
+                if (ledgerId > 0)
+                {
+                    return ledgerId;
+                }
+
+                // 1b. Try SP _4GetLedgerIdByLedgerNameAndGroupId with "BEGIN STOCK" (name inserted by POS_Branch SP)
+                ledgerId = objLedgerRepository.GetLedgerId("BEGIN STOCK", (int)AccountGroup.STOCK_IN_HAND, branchId);
+                if (ledgerId > 0)
+                {
+                    ledgerName = "BEGIN STOCK";
+                    return ledgerId;
+                }
+
+                // 2. Query LedgerMaster for ANY ledger under GroupID = 18 (STOCK_IN_HAND) for this branch
+                bool wasClosed = DataConnection.State == ConnectionState.Closed;
+                if (wasClosed && trans == null) DataConnection.Open();
+
+                try
+                {
+                    using (SqlCommand cmd = new SqlCommand("SELECT TOP 1 LedgerID, LedgerName FROM LedgerMaster WHERE BranchID = @BranchId AND GroupID = 18 ORDER BY LedgerID ASC", (SqlConnection)DataConnection, trans))
+                    {
+                        cmd.Parameters.AddWithValue("@BranchId", branchId);
+                        using (SqlDataReader reader = cmd.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                ledgerId = Convert.ToInt32(reader["LedgerID"]);
+                                ledgerName = reader["LedgerName"] != DBNull.Value ? reader["LedgerName"].ToString() : DefaultLedgers.BEGINSTOCK;
+                                return ledgerId;
+                            }
+                        }
+                    }
+
+                    // 3. Fallback: Query LedgerMaster for ANY ledger under GroupID = 18 across any branch
+                    using (SqlCommand cmd = new SqlCommand("SELECT TOP 1 LedgerID, LedgerName FROM LedgerMaster WHERE GroupID = 18 ORDER BY LedgerID ASC", (SqlConnection)DataConnection, trans))
+                    {
+                        using (SqlDataReader reader = cmd.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                ledgerId = Convert.ToInt32(reader["LedgerID"]);
+                                ledgerName = reader["LedgerName"] != DBNull.Value ? reader["LedgerName"].ToString() : DefaultLedgers.BEGINSTOCK;
+                                return ledgerId;
+                            }
+                        }
+                    }
+
+                    // 4. Auto-create default "STOCK IN HAND" ledger under GroupID 18 for this branch if missing
+                    int nextLedgerId = 0;
+                    using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_Ledger, (SqlConnection)DataConnection, trans))
+                    {
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.AddWithValue("@_Operation", "GETNEXTID");
+                        object result = cmd.ExecuteScalar();
+                        if (result != null && result != DBNull.Value)
+                        {
+                            nextLedgerId = Convert.ToInt32(result);
+                        }
+                    }
+
+                    if (nextLedgerId > 0)
+                    {
+                        using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_Ledger, (SqlConnection)DataConnection, trans))
+                        {
+                            cmd.CommandType = CommandType.StoredProcedure;
+                            cmd.Parameters.AddWithValue("@_Operation", "CREATE");
+                            cmd.Parameters.AddWithValue("@CompanyID", SessionContext.CompanyId);
+                            cmd.Parameters.AddWithValue("@BranchID", branchId);
+                            cmd.Parameters.AddWithValue("@LedgerID", nextLedgerId);
+                            cmd.Parameters.AddWithValue("@LedgerName", DefaultLedgers.BEGINSTOCK);
+                            cmd.Parameters.AddWithValue("@Alias", DBNull.Value);
+                            cmd.Parameters.AddWithValue("@Description", DBNull.Value);
+                            cmd.Parameters.AddWithValue("@Notes", DBNull.Value);
+                            cmd.Parameters.AddWithValue("@GroupID", (int)AccountGroup.STOCK_IN_HAND);
+                            cmd.Parameters.AddWithValue("@OpnDebit", 0);
+                            cmd.Parameters.AddWithValue("@OpnCredit", 0);
+                            cmd.Parameters.AddWithValue("@ProvideBankDetails", false);
+                            cmd.Parameters.AddWithValue("@GstApplicable", false);
+                            cmd.Parameters.AddWithValue("@VatApplicable", false);
+                            cmd.Parameters.AddWithValue("@InventoryValuesAffected", false);
+                            cmd.Parameters.AddWithValue("@MaintainBillWiseDetails", false);
+                            cmd.Parameters.AddWithValue("@PriceLevelApplicable", false);
+                            cmd.ExecuteScalar();
+                        }
+                        ledgerName = DefaultLedgers.BEGINSTOCK;
+                        return nextLedgerId;
+                    }
+                }
+                finally
+                {
+                    if (wasClosed && trans == null && DataConnection.State == ConnectionState.Open)
+                    {
+                        DataConnection.Close();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("GetOrEnsureStockInHandLedger error: " + ex.Message);
+            }
+
+            return ledgerId;
+        }
+
+        public List<StockAdjustmentReasonMaster> GetStockAdjustmentReasons(int branchId)
+        {
+            List<StockAdjustmentReasonMaster> list = new List<StockAdjustmentReasonMaster>();
+            bool wasClosed = DataConnection.State == ConnectionState.Closed;
+            if (wasClosed) DataConnection.Open();
+            try
+            {
+                string query = @"
+SELECT rm.Id, rm.CompanyId, rm.BranchId, rm.ReasonName, rm.ReasonType, rm.LedgerId, rm.IsDelete, rm.CreatedDate
+FROM StockAdjustmentReasonMaster rm
+INNER JOIN LedgerMaster lm ON rm.LedgerId = lm.LedgerID AND rm.BranchId = lm.BranchID
+WHERE rm.BranchId = @BranchId AND rm.IsDelete = 0
+ORDER BY rm.ReasonName ASC";
+
+                using (SqlCommand cmd = new SqlCommand(query, (SqlConnection)DataConnection))
+                {
+                    cmd.Parameters.AddWithValue("@BranchId", branchId);
+                    using (SqlDataReader reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            list.Add(new StockAdjustmentReasonMaster
+                            {
+                                Id = Convert.ToInt32(reader["Id"]),
+                                CompanyId = Convert.ToInt32(reader["CompanyId"]),
+                                BranchId = Convert.ToInt32(reader["BranchId"]),
+                                ReasonName = reader["ReasonName"].ToString(),
+                                ReasonType = reader["ReasonType"].ToString(),
+                                LedgerId = Convert.ToInt32(reader["LedgerId"]),
+                                IsDelete = Convert.ToBoolean(reader["IsDelete"]),
+                                CreatedDate = Convert.ToDateTime(reader["CreatedDate"])
+                            });
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                if (wasClosed && DataConnection.State == ConnectionState.Open) DataConnection.Close();
+            }
+            return list;
+        }
+
+        public string SaveStockAdjustmentReason(StockAdjustmentReasonMaster reason)
+        {
+            if (reason == null || string.IsNullOrWhiteSpace(reason.ReasonName))
+                return "Reason Name is required.";
+
+            int groupId = 12; // Indirect Expenses (Loss)
+            if (reason.ReasonType == "Gain") groupId = 13; // Indirect Income
+            else if (reason.ReasonType == "DirectLoss") groupId = 10; // Direct Expenses
+
+            bool wasClosed = DataConnection.State == ConnectionState.Closed;
+            if (wasClosed) DataConnection.Open();
+
+            try
+            {
+                // 1. Ensure Ledger exists in LedgerMaster for this reason
+                int ledgerId = objLedgerRepository.GetLedgerId(reason.ReasonName.Trim(), groupId, reason.BranchId > 0 ? reason.BranchId : SessionContext.BranchId);
+                if (ledgerId <= 0)
+                {
+                    // Get Next LedgerId
+                    int nextLedgerId = 0;
+                    using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_Ledger, (SqlConnection)DataConnection))
+                    {
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.AddWithValue("@_Operation", "GETNEXTID");
+                        object res = cmd.ExecuteScalar();
+                        if (res != null && res != DBNull.Value) nextLedgerId = Convert.ToInt32(res);
+                    }
+
+                    if (nextLedgerId > 0)
+                    {
+                        using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_Ledger, (SqlConnection)DataConnection))
+                        {
+                            cmd.CommandType = CommandType.StoredProcedure;
+                            cmd.Parameters.AddWithValue("@_Operation", "CREATE");
+                            cmd.Parameters.AddWithValue("@CompanyID", reason.CompanyId > 0 ? reason.CompanyId : SessionContext.CompanyId);
+                            cmd.Parameters.AddWithValue("@BranchID", reason.BranchId > 0 ? reason.BranchId : SessionContext.BranchId);
+                            cmd.Parameters.AddWithValue("@LedgerID", nextLedgerId);
+                            cmd.Parameters.AddWithValue("@LedgerName", reason.ReasonName.Trim());
+                            cmd.Parameters.AddWithValue("@Alias", DBNull.Value);
+                            cmd.Parameters.AddWithValue("@Description", "STOCK_ADJUSTMENT_REASON");
+                            cmd.Parameters.AddWithValue("@Notes", DBNull.Value);
+                            cmd.Parameters.AddWithValue("@GroupID", groupId);
+                            cmd.Parameters.AddWithValue("@OpnDebit", 0);
+                            cmd.Parameters.AddWithValue("@OpnCredit", 0);
+                            cmd.Parameters.AddWithValue("@ProvideBankDetails", false);
+                            cmd.Parameters.AddWithValue("@GstApplicable", false);
+                            cmd.Parameters.AddWithValue("@VatApplicable", false);
+                            cmd.Parameters.AddWithValue("@InventoryValuesAffected", false);
+                            cmd.Parameters.AddWithValue("@MaintainBillWiseDetails", false);
+                            cmd.Parameters.AddWithValue("@PriceLevelApplicable", false);
+                            cmd.ExecuteScalar();
+                        }
+                        ledgerId = nextLedgerId;
+                    }
+                }
+
+                reason.LedgerId = ledgerId;
+
+                // 2. Insert or Update in StockAdjustmentReasonMaster
+                if (reason.Id > 0)
+                {
+                    string updateQuery = "UPDATE StockAdjustmentReasonMaster SET ReasonName = @ReasonName, ReasonType = @ReasonType, LedgerId = @LedgerId WHERE Id = @Id";
+                    using (SqlCommand cmd = new SqlCommand(updateQuery, (SqlConnection)DataConnection))
+                    {
+                        cmd.Parameters.AddWithValue("@ReasonName", reason.ReasonName.Trim());
+                        cmd.Parameters.AddWithValue("@ReasonType", reason.ReasonType ?? "Loss");
+                        cmd.Parameters.AddWithValue("@LedgerId", reason.LedgerId);
+                        cmd.Parameters.AddWithValue("@Id", reason.Id);
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+                else
+                {
+                    string insertQuery = "INSERT INTO StockAdjustmentReasonMaster (CompanyId, BranchId, ReasonName, ReasonType, LedgerId, IsDelete) VALUES (@CompanyId, @BranchId, @ReasonName, @ReasonType, @LedgerId, 0)";
+                    using (SqlCommand cmd = new SqlCommand(insertQuery, (SqlConnection)DataConnection))
+                    {
+                        cmd.Parameters.AddWithValue("@CompanyId", reason.CompanyId > 0 ? reason.CompanyId : SessionContext.CompanyId);
+                        cmd.Parameters.AddWithValue("@BranchId", reason.BranchId > 0 ? reason.BranchId : SessionContext.BranchId);
+                        cmd.Parameters.AddWithValue("@ReasonName", reason.ReasonName.Trim());
+                        cmd.Parameters.AddWithValue("@ReasonType", reason.ReasonType ?? "Loss");
+                        cmd.Parameters.AddWithValue("@LedgerId", reason.LedgerId);
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+
+                return "success";
+            }
+            catch (Exception ex)
+            {
+                return "Failed: " + ex.Message;
+            }
+            finally
+            {
+                if (wasClosed && DataConnection.State == ConnectionState.Open) DataConnection.Close();
+            }
+        }
+
+        public string DeleteStockAdjustmentReason(int reasonId)
+        {
+            bool wasClosed = DataConnection.State == ConnectionState.Closed;
+            if (wasClosed) DataConnection.Open();
+            try
+            {
+                string query = "UPDATE StockAdjustmentReasonMaster SET IsDelete = 1 WHERE Id = @Id";
+                using (SqlCommand cmd = new SqlCommand(query, (SqlConnection)DataConnection))
+                {
+                    cmd.Parameters.AddWithValue("@Id", reasonId);
+                    cmd.ExecuteNonQuery();
+                }
+                return "success";
+            }
+            catch (Exception ex)
+            {
+                return "Failed: " + ex.Message;
+            }
+            finally
+            {
+                if (wasClosed && DataConnection.State == ConnectionState.Open) DataConnection.Close();
+            }
+        }
     }
 }
