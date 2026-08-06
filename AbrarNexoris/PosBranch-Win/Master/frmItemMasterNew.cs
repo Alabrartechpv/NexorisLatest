@@ -4060,7 +4060,9 @@ namespace PosBranch_Win.Master
         {
             // List of panel names to style
             string[] panelNames = { "ultraPanel2", "ultraPanel3", "ultraPanel4", "ultraPanel5",
-                                            "ultraPanel8", "ultraPanel9", "ultraPanel10", "ultraPanel11", "ultraPanel12", "ultraPanel13" };
+                                            "ultraPanel8", "ultraPanel9", "ultraPanel10", "ultraPanel11", "ultraPanel12", "ultraPanel13",
+                                            "ultraPanel16", "ultraPanel17", "ultraPanel18", "ultraPanel19", "ultraPanel20",
+                                            "ultraPanel21", "ultraPanel22", "ultraPanel23", "ultraPanel24", "ultraPanel25", "ultraPanel26" };
 
             foreach (string panelName in panelNames)
             {
@@ -4077,108 +4079,80 @@ namespace PosBranch_Win.Master
 
         private void StyleIconPanel(Infragistics.Win.Misc.UltraPanel panel)
         {
-            // Define consistent colors for all panels - match colors from frmdialForItemMaster.cs
-            Color lightBlue = Color.FromArgb(127, 219, 255); // Light blue
-            Color darkBlue = Color.FromArgb(0, 116, 217);    // Darker blue
-            Color borderBlue = Color.FromArgb(0, 150, 220);  // Border blue
-            Color borderBase = Color.FromArgb(0, 100, 180);  // Border base color
+            if (panel == null) return;
 
-            // Create a gradient from light to dark blue with exact specified colors
-            panel.Appearance.BackColor = lightBlue;
-            panel.Appearance.BackColor2 = darkBlue;
+            panel.UseAppStyling = false;
+
+            // ReportFormat button theme colors (matching ultraPanel6 of frmReportFormatDialog.cs)
+            Color topColor = Color.FromArgb(234, 244, 255);       // #EAF4FF
+            Color bottomColor = Color.FromArgb(152, 188, 235);    // #98BCEB
+            Color borderColor = Color.FromArgb(73, 119, 184);     // #4977B8
+            Color textColor = Color.FromArgb(0, 46, 127);         // #002E7F bold dark blue
+
+            Color hoverTop = Color.FromArgb(245, 250, 255);
+            Color hoverBottom = Color.FromArgb(170, 206, 244);
+
+            Color pressedTop = Color.FromArgb(205, 226, 248);
+            Color pressedBottom = Color.FromArgb(128, 170, 224);
+
+            panel.Appearance.BackColor = topColor;
+            panel.Appearance.BackColor2 = bottomColor;
             panel.Appearance.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
 
-            // Set highly rounded border style (Rounded4 for more rounded corners)
-            panel.BorderStyle = Infragistics.Win.UIElementBorderStyle.Rounded4;
+            panel.BorderStyle = Infragistics.Win.UIElementBorderStyle.Rounded1;
+            panel.Appearance.BorderColor = borderColor;
 
-            // Add exact specified border color
-            panel.Appearance.BorderColor = borderBlue;
-            panel.Appearance.BorderColor3DBase = borderBase;
+            Action setHoverState = () =>
+            {
+                panel.Appearance.BackColor = hoverTop;
+                panel.Appearance.BackColor2 = hoverBottom;
+            };
 
-            // Ensure icons and labels inside have transparent background
+            Action setNormalState = () =>
+            {
+                panel.Appearance.BackColor = topColor;
+                panel.Appearance.BackColor2 = bottomColor;
+            };
+
+            Action setPressedState = () =>
+            {
+                panel.Appearance.BackColor = pressedTop;
+                panel.Appearance.BackColor2 = pressedBottom;
+            };
+
             foreach (Control control in panel.ClientArea.Controls)
             {
-                if (control is Infragistics.Win.UltraWinEditors.UltraPictureBox)
+                if (control is Infragistics.Win.UltraWinEditors.UltraPictureBox pic)
                 {
-                    Infragistics.Win.UltraWinEditors.UltraPictureBox pic = (Infragistics.Win.UltraWinEditors.UltraPictureBox)control;
                     pic.BackColor = Color.Transparent;
                     pic.BackColorInternal = Color.Transparent;
                     pic.BorderShadowColor = Color.Transparent;
-
-                    // Add hover effect to picture box
-                    pic.MouseEnter += (sender, e) =>
-                    {
-                        pic.Appearance.BorderColor = Color.White;
-                    };
-
-                    pic.MouseLeave += (sender, e) =>
-                    {
-                        pic.Appearance.BorderColor = Color.Transparent;
-                    };
-
-                    // Set cursor to indicate clickable
                     pic.Cursor = Cursors.Hand;
+
+                    pic.MouseEnter += (s, e) => setHoverState();
+                    pic.MouseLeave += (s, e) => setNormalState();
+                    pic.MouseDown += (s, e) => setPressedState();
+                    pic.MouseUp += (s, e) => setHoverState();
                 }
-                else if (control is Label)
+                else if (control is Label lbl)
                 {
-                    Label lbl = (Label)control;
-
-                    // Ensure labels 29, 30, 31, and 44 have white font in all cases
-                    if (lbl.Name == "label29" || lbl.Name == "label30" || lbl.Name == "label31" || lbl.Name == "label44")
-                    {
-                        lbl.ForeColor = Color.White;
-                        lbl.BackColor = Color.Transparent;
-                        lbl.Cursor = Cursors.Hand;
-                        lbl.MouseEnter += (sender, e) => { lbl.ForeColor = Color.White; };
-                        lbl.MouseLeave += (sender, e) => { lbl.ForeColor = Color.White; };
-                        continue;
-                    }
-
-                    // Special handling for label28 in ultraPanel13
-                    if (lbl.Name == "label28")
-                    {
-                        lbl.ForeColor = Color.White;
-                        lbl.Font = new Font("Microsoft Sans Serif", 12F, FontStyle.Bold);
-                        lbl.BackColor = Color.Transparent;
-                        lbl.TextAlign = ContentAlignment.MiddleCenter;
-                    }
-                    else
-                    {
-                        lbl.ForeColor = Color.White;
-                        lbl.Font = new Font("Microsoft Sans Serif", 12F, FontStyle.Bold);
-                        lbl.BackColor = Color.Transparent;
-
-                        // Add hover effect to regular labels - keep white color
-                        lbl.MouseEnter += (sender, e) =>
-                        {
-                            lbl.ForeColor = Color.White; // Keep white instead of yellow
-                        };
-
-                        lbl.MouseLeave += (sender, e) =>
-                        {
-                            lbl.ForeColor = Color.White;
-                        };
-                    }
-
-                    // Set cursor to indicate clickable
+                    lbl.BackColor = Color.Transparent;
+                    lbl.ForeColor = textColor;
+                    lbl.Font = new Font("Microsoft Sans Serif", lbl.Font.SizeInPoints > 0 ? lbl.Font.SizeInPoints : 9.75F, FontStyle.Regular);
                     lbl.Cursor = Cursors.Hand;
+
+                    lbl.MouseEnter += (s, e) => setHoverState();
+                    lbl.MouseLeave += (s, e) => setNormalState();
+                    lbl.MouseDown += (s, e) => setPressedState();
+                    lbl.MouseUp += (s, e) => setHoverState();
                 }
             }
 
-            // Add hover effect with consistent colors
-            panel.ClientArea.MouseEnter += (sender, e) =>
-            {
-                panel.Appearance.BackColor = Color.FromArgb(160, 230, 255); // Brighter version for hover
-                panel.Appearance.BackColor2 = Color.FromArgb(30, 140, 230); // Slightly brighter dark blue
-            };
+            panel.ClientArea.MouseEnter += (s, e) => setHoverState();
+            panel.ClientArea.MouseLeave += (s, e) => setNormalState();
+            panel.ClientArea.MouseDown += (s, e) => setPressedState();
+            panel.ClientArea.MouseUp += (s, e) => setHoverState();
 
-            panel.ClientArea.MouseLeave += (sender, e) =>
-            {
-                panel.Appearance.BackColor = lightBlue;
-                panel.Appearance.BackColor2 = darkBlue;
-            };
-
-            // Set cursor to hand to indicate clickable
             panel.ClientArea.Cursor = Cursors.Hand;
         }
 
@@ -4187,7 +4161,8 @@ namespace PosBranch_Win.Master
             // Connect click events for panels
             string[] panelNames = { "ultraPanel2", "ultraPanel3", "ultraPanel4", "ultraPanel5",
                                             "ultraPanel8", "ultraPanel9", "ultraPanel10", "ultraPanel11", "ultraPanel12", "ultraPanel13",
-                                            "ultraPanel16", "ultraPanel17", "ultraPanel18" };
+                                            "ultraPanel16", "ultraPanel17", "ultraPanel18", "ultraPanel19", "ultraPanel20",
+                                            "ultraPanel21", "ultraPanel22", "ultraPanel23", "ultraPanel24", "ultraPanel25", "ultraPanel26" };
 
             foreach (string panelName in panelNames)
             {
@@ -4383,6 +4358,30 @@ namespace PosBranch_Win.Master
                 case "ultraPanel10":
                     // Load the last item (the one with the highest item number)
                     NavigateToItem("LAST");
+                    break;
+                case "ultraPanel19":
+                    btn_ItemLoad_Click(sender, e);
+                    break;
+                case "ultraPanel20":
+                    btnIemLoad_ById_Click(sender, e);
+                    break;
+                case "ultraPanel21":
+                    btn_Add_Brand_Click(sender, e);
+                    break;
+                case "ultraPanel22":
+                    btn_unit_Click(sender, e);
+                    break;
+                case "ultraPanel23":
+                    btn_Add_Custm_Click(sender, e);
+                    break;
+                case "ultraPanel24":
+                    btn_Add_ItemIype_Click(sender, e);
+                    break;
+                case "ultraPanel25":
+                    btn_Add_Cate_Click(sender, e);
+                    break;
+                case "ultraPanel26":
+                    btn_Add_Grup_Click(sender, e);
                     break;
                 case "ultraPanel2":
                     OpenPurchaseHistoryForSelectedRow();
@@ -8176,7 +8175,17 @@ namespace PosBranch_Win.Master
                         RaiseItemMasterUpdated(ItemMaster.ItemId);
                     }
 
-                    frmSuccesMsg success = new frmSuccesMsg();
+                    var details = new Dictionary<string, string>
+                    {
+                        { "Barcode", barcode },
+                        { "Item Name", desc },
+                        { "Selling Price", "₹" + (!string.IsNullOrWhiteSpace(retailPriceText) ? retailPriceText : "0.00") }
+                    };
+                    frmSuccesMsg success = new frmSuccesMsg(
+                        "Item saved successfully.",
+                        "The item has been saved in Item Master.",
+                        details
+                    );
                     success.ShowDialog();
                     return true;
                 }
@@ -8726,7 +8735,17 @@ namespace PosBranch_Win.Master
                         RaiseItemMasterUpdated(ItemMaster.ItemId);
                     }
 
-                    frmSuccesMsg success = new frmSuccesMsg();
+                    var details = new Dictionary<string, string>
+                    {
+                        { "Barcode", barcode },
+                        { "Item Name", desc },
+                        { "Selling Price", "₹" + (!string.IsNullOrWhiteSpace(retailPriceText) ? retailPriceText : "0.00") }
+                    };
+                    frmSuccesMsg success = new frmSuccesMsg(
+                        "Item saved successfully.",
+                        "The item has been saved in Item Master.",
+                        details
+                    );
                     success.ShowDialog();
                     // Clear everything after successful save
                     this.clear();
@@ -9108,7 +9127,17 @@ namespace PosBranch_Win.Master
                     RaiseItemMasterUpdated(ItemMaster.ItemId);
                 }
 
-                frmSuccesMsg success = new frmSuccesMsg();
+                var details = new Dictionary<string, string>
+                {
+                    { "Barcode", ItemMaster != null && !string.IsNullOrWhiteSpace(ItemMaster.Barcode) ? ItemMaster.Barcode : (txt_barcode != null ? txt_barcode.Text : "") },
+                    { "Item Name", ItemMaster != null && !string.IsNullOrWhiteSpace(ItemMaster.Description) ? ItemMaster.Description : (txt_description != null ? txt_description.Text : "") },
+                    { "Selling Price", "₹" + (txt_Retail != null && !string.IsNullOrWhiteSpace(txt_Retail.Text) ? txt_Retail.Text : "0.00") }
+                };
+                frmSuccesMsg success = new frmSuccesMsg(
+                    "Item updated successfully.",
+                    "The item details have been updated.",
+                    details
+                );
                 success.ShowDialog();
                 // Clear everything after successful update
                 this.clear();
@@ -13857,7 +13886,8 @@ namespace PosBranch_Win.Master
                         lbl.Name == "label29" || lbl.Name == "label30" || lbl.Name == "label31" || lbl.Name == "label44"))
                     {
                         lbl.BackColor = Color.Transparent;
-                        lbl.ForeColor = Color.White;
+                        lbl.ForeColor = navyText;
+                        lbl.Font = new Font("Microsoft Sans Serif", lbl.Font.SizeInPoints > 0 ? lbl.Font.SizeInPoints : 9.75F, FontStyle.Regular);
                         continue;
                     }
                     lbl.BackColor = Color.Transparent;
