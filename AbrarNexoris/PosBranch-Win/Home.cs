@@ -1799,11 +1799,13 @@ namespace PosBranch_Win
                         saved = true;
                     }
 
-                    // 2. Generic fallback: try public Save() or SaveData() methods FIRST
-                    //    This allows forms to explicitly implement save logic and avoid button name collisions
+                    // 2. Generic fallback: try public Save(), SaveRecord(), or SaveData() methods FIRST
                     if (!saved)
                     {
-                        var saveMethod = activeForm.GetType().GetMethod("Save",
+                        var saveMethod = activeForm.GetType().GetMethod("SaveRecord",
+                            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance,
+                            null, Type.EmptyTypes, null)
+                            ?? activeForm.GetType().GetMethod("Save",
                             System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance,
                             null, Type.EmptyTypes, null)
                             ?? activeForm.GetType().GetMethod("SaveData",
@@ -1818,11 +1820,9 @@ namespace PosBranch_Win
 
                     // 3. Generic handler for all other forms — searches for click handlers by name
                     //    and checks if the associated control is visible to pick save vs update.
-                    //    Covers: frmItemMasterNew (button3/btnUpdate), frmSalesInvoice (ultraPictureBox4/updtbtn),
-                    //    frmSalesReturn/frmPurchaseReturn (pbxSave), and all Master/Accounts/Settings forms (btnSave)
                     if (!saved)
                     {
-                        string[] candidateMethods = { "btnSave_Click", "button3_Click", "ultraPictureBox4_Click",
+                        string[] candidateMethods = { "SaveRecord", "Save", "btnSave_Click", "button3_Click", "ultraPictureBox4_Click",
                             "pbxSave_Click", "btnUpdate_Click", "updtbtn_Click" };
                         foreach (var methodName in candidateMethods)
                         {
@@ -1830,16 +1830,23 @@ namespace PosBranch_Win
                                 System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
                             if (method != null)
                             {
-                                // Derive control name by stripping "_Click" (e.g. "button3_Click" → "button3")
-                                string controlName = methodName.Replace("_Click", "");
-                                var controls = activeForm.Controls.Find(controlName, true);
-                                // If the control exists, only invoke when it's visible (respects save/update mode)
-                                // If no matching control found, invoke anyway (safe fallback)
-                                if (controls.Length == 0 || controls[0].Visible)
+                                var parameters = method.GetParameters();
+                                if (parameters.Length == 0)
                                 {
-                                    method.Invoke(activeForm, new object[] { this, EventArgs.Empty });
+                                    method.Invoke(activeForm, null);
                                     saved = true;
                                     break;
+                                }
+                                else if (parameters.Length == 2)
+                                {
+                                    string controlName = methodName.Replace("_Click", "");
+                                    var controls = activeForm.Controls.Find(controlName, true);
+                                    if (controls.Length == 0 || controls[0].Visible)
+                                    {
+                                        method.Invoke(activeForm, new object[] { this, EventArgs.Empty });
+                                        saved = true;
+                                        break;
+                                    }
                                 }
                             }
                         }
@@ -1874,7 +1881,7 @@ namespace PosBranch_Win
 
                     string[] candidateMethods = new string[0];
                     if (toolKey == "Clear")
-                        candidateMethods = new[] { "RibbonClear", "Clear", "Reset", "ClearForm", "ResetForm", "btnClear_Click", "BtnClear_Click", "brnClear_Click", "btnReset_Click", "BtnNew_Click", "btnNew_Click", "button7_Click", "ultraPictureBox1_Click", "button2_Click", "button4_Click", "btnClear_Click_1", "ultraBtnClear_Click", "btn_clear_Click" };
+                        candidateMethods = new[] { "RibbonClear", "ClearFields", "ClearRecord", "Clear", "Reset", "ClearForm", "ResetForm", "btnClear_Click", "BtnClear_Click", "brnClear_Click", "btnReset_Click", "BtnNew_Click", "btnNew_Click", "button7_Click", "ultraPictureBox1_Click", "button2_Click", "button4_Click", "btnClear_Click_1", "ultraBtnClear_Click", "btn_clear_Click" };
                     else if (toolKey == "Delet")
                         candidateMethods = new[] { "RibbonDeleteInvoice", "Delete", "DeleteRecord", "DeleteItem", "DeletePurchase", "DeletePurchaseReturn", "DeleteReturn", "btnDelete_Click", "BtnDelete_Click", "btn_delete_Click", "ultraPictureBox2_Click", "ultraBtnDelete_Click" };
                     else if (toolKey == "Update")
@@ -2183,6 +2190,11 @@ namespace PosBranch_Win
                 Accounts.FrmBankReconciliation bankRec = new Accounts.FrmBankReconciliation();
                 OpenFormInTab(bankRec, "Bank Reconciliation");
             }
+            if (e.Tool.Key == "General PM setup" || e.Tool.Key == "GeneralPMsetup" || e.Tool.Key == "General Paymode Setup" || e.Tool.Key == "PaymodeSetup")
+            {
+                Master.frmGeneralPaymodeSetup paymodeForm = new Master.frmGeneralPaymodeSetup();
+                OpenFormInTabSafe(paymodeForm, "General PM Setup");
+            }
             if (e.Tool.Key == "PaymodeMaster" || e.Tool.Key == "Paymode")
             {
                 Master.FrmPaymodeMaster paymodeMaster = new Master.FrmPaymodeMaster();
@@ -2258,6 +2270,11 @@ namespace PosBranch_Win
             {
                 FrmCountry country = new FrmCountry();
                 OpenFormInTab(country, "Country");
+            }
+            if (e.Tool.Key == "Currency" || e.Tool.Key == "currency")
+            {
+                FrmCurrency currencyForm = new FrmCurrency();
+                OpenFormInTab(currencyForm, "Currency");
             }
             if (e.Tool.Key == "stockadjustment")
             {

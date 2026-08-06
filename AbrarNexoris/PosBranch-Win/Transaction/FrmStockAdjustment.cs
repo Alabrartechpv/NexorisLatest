@@ -931,6 +931,7 @@ namespace PosBranch_Win.Transaction
                     categoryId = catId;
                 }
                 stockadjsmaster.CategoryId = categoryId;
+                stockadjsmaster.CounterId = SessionContext.CounterId;
 
                 // 3. Show processing indicator
                 Cursor.Current = Cursors.WaitCursor;
@@ -1119,6 +1120,7 @@ namespace PosBranch_Win.Transaction
                 stockadjsmaster.Id = Convert.ToInt32(ultralblId.Text);
                 stockadjsmaster.CategoryId = (ultlbl_catid != null && !string.IsNullOrWhiteSpace(ultlbl_catid.Text))
                     ? Convert.ToInt32(ultlbl_catid.Text) : 0;
+                stockadjsmaster.CounterId = SessionContext.CounterId;
 
                 // 3. Show processing indicator
                 Cursor.Current = Cursors.WaitCursor;

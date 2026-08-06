@@ -118,161 +118,122 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <assembly alias="System.Windows.Forms" name="System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089" />
-  <data name="icons8-roles-96" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\icons8-roles-96.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="uerroles" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\uerroles.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="balance" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\balance.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="scale" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\scale.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="spreadsheet1" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\spreadsheet2.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="rate-of-return" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\rate-of-return.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="bank2" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\bank2.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="ChatGPT Image Feb 3, 2026, 01_50_47 AM" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\ChatGPT Image Feb 3, 2026, 01_50_47 AM.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="splash_logo.png" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\splash_logo.png1.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="heart" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\heart.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="transaction1" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\transaction2.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="bill (1)" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\bill (1).png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="bank" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\bank.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="list" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\list.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="list-items" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\list-items.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="splash_logo1" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\splash_logo.png1.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="commercial (1)" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\commercial (1).png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="languages__2_" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\resources\languages (2).png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="payment-method1" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\payment-method1.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="printer_4259831" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\printer_4259831.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
   <data name="report" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\report.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="chatgpt_year_closing" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\chatgpt_year_closing.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="UnitMasterimg" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\UnitMasterimg.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="profit-and-loss" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\profit-and-loss.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="ClosingSales" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\ClosingSales.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
   <data name="StockReportAdv" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\StockReportAdv.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
-  <data name="market-share" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\market-share.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="color_selection" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\resources\color-selection.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="balance-sheet" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\balance-sheet.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="yearly-report" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\yearly-report.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="appearance11.Image" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\appearance11.Image.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
   <data name="financial-literacy" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\financial-literacy.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="hold (1)" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\hold (1).png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="cashless-payment" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\cashless-payment.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="exchanging" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\exchanging.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="appearance12.Image" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\appearance12.Image.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="revenue" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\revenue.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="exit" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\exit.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="openingStock" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\openingStock.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="book" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\book.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="debit" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\debit.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="report1" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\report1.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="spreadsheet" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\spreadsheet1.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="transaction" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\transaction1.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="bank1" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\bank1.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="splash_logo3" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\splash_logo.png3.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="bill" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\bill.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="capital" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\capital.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="balance1" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\balance1.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
   <data name="waiting" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\waiting.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
-  <data name="icons8-report-50" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\icons8-report-50.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  <data name="balance1" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\balance1.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="revenue" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\revenue.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="cashless-payment" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\cashless-payment.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="spreadsheet" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\spreadsheet1.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="payment-method1" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\payment-method1.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="hold (1)" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\hold (1).png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="cash-on-delivery" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\cash-on-delivery.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="bank1" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\bank1.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="import-export" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\import-export.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="transaction1" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\transaction2.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="list-items" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\list-items.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="debit" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\debit.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="accounting" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\accounting.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="exit" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\exit.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="chatgpt_year_closing" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\chatgpt_year_closing.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
   <data name="splash_logo4" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\splash_logo.png4.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="balance-sheet" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\balance-sheet.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="tax" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\tax.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="openingStock" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\openingStock.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="appearance11.Image" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\appearance11.Image.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="transaction" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\transaction1.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="languages__2_" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\resources\languages (2).png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="UnitMasterimg" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\UnitMasterimg.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="bank2" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\bank2.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="scale" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\scale.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="commercial (1)" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\commercial (1).png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="ChatGPT Image Feb 3, 2026, 01_50_47 AM" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\ChatGPT Image Feb 3, 2026, 01_50_47 AM.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="icons8-report-50" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\icons8-report-50.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="opnstock" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\opnstock.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="profit-and-loss" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\profit-and-loss.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="bank" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\bank.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="book" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\book.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="icons8-roles-96" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\icons8-roles-96.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="color_selection" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\resources\color-selection.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="splash_logo.png" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\splash_logo.png1.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
   <data name="printer_425983" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\printer_425983.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
@@ -280,37 +241,79 @@
   <data name="bank-statement" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\bank-statement.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
-  <data name="cash-on-delivery" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\cash-on-delivery.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="accounting" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\accounting.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="yearly-report1" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\yearly-report1.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="splash_logo2" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\splash_logo.png2.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
-  </data>
-  <data name="opnstock" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\opnstock.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  <data name="cash-on-delivery1" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\cash-on-delivery1.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
   <data name="payment-method" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\payment-method.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
+  <data name="uerroles" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\uerroles.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="printer_4259831" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\printer_4259831.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="heart" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\heart.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="spreadsheet1" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\spreadsheet2.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="splash_logo1" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\splash_logo.png1.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="splash_logo2" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\splash_logo.png2.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="yearly-report1" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\yearly-report1.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="exchanging" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\exchanging.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="report1" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\report1.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="bill" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\bill.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="bill (1)" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\bill (1).png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="list" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\list.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
   <data name="printer" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\printer.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
-  <data name="cash-on-delivery1" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\cash-on-delivery1.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  <data name="rate-of-return" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\rate-of-return.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
-  <data name="tax" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\tax.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  <data name="ClosingSales" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\ClosingSales.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
-  <data name="import-export" type="System.Resources.ResXFileRef, System.Windows.Forms">
-    <value>..\Resources\import-export.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  <data name="market-share" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\market-share.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
   <data name="archive" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\archive.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="balance" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\balance.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="capital" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\capital.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="yearly-report" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\yearly-report.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="splash_logo3" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\splash_logo.png3.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="appearance12.Image" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\appearance12.Image.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
+  </data>
+  <data name="currency" type="System.Resources.ResXFileRef, System.Windows.Forms">
+    <value>..\Resources\currency.png;System.Drawing.Bitmap, System.Drawing, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>
   </data>
 </root>

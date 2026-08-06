@@ -17,6 +17,7 @@ namespace Repository
         public static string POS_CustomerDDl = "POS_CustomerDDl";
         public static string POS_dropdown = "POS_dropdown";
         public static string POS_PayMode = "POS_PayMode";
+        public static string POS_GeneralPaymodeSetup = "_POS_PayMode_Setup";
         public static string POS_ItemDetalisDDL = "POS_ItemDetalisDDL";
         public static string _POS_Sales_Win = "_POS_Sales_Win";
         public static string _POS_SDetails_Win = "_POS_SDetails_Win";
@@ -33,6 +34,7 @@ namespace Repository
         public static string POS_State = "_POS_State";
         public static string _POS_Country = "_POS_Country";
         public static string POS_Country = "_POS_Country";
+        public static string POS_Currency = "_POS_Currency";
         public static string POS_User = "_POS_User";
         public static string POS_Customer = "POS_Customer";
         public static string POS_CustomerReceiptInfo = "POS_CustomerReceiptInfo";
