@@ -122,6 +122,7 @@
     <Compile Include="TransactionModels\SalesRNItem.cs" />
     <Compile Include="TransactionModels\SoldItemHistory.cs" />
     <Compile Include="TransactionModels\StockAdjustmentModel.cs" />
+    <Compile Include="TransactionModels\StockAdjustmentReasonModel.cs" />
     <Compile Include="TransactionModels\StockTransferModel.cs" />
     <Compile Include="TransactionModels\VoucherModel4Trn.cs" />
   </ItemGroup>
