@@ -22,6 +22,7 @@ namespace PosBranch_Win.DialogBox
         private Label lblStatus;
 
         public int SelectedLedgerId { get; private set; } = -1;
+        public string SelectedLedgerName { get; private set; } = string.Empty;
 
         public FrmLedgerSearch()
         {
@@ -770,6 +771,7 @@ namespace PosBranch_Win.DialogBox
             if (cellValue != null && int.TryParse(cellValue.ToString(), out id))
             {
                 SelectedLedgerId = id;
+                SelectedLedgerName = GetActiveLedgerName();
                 DialogResult = DialogResult.OK;
                 Close();
                 return;

@@ -29,6 +29,10 @@ namespace PosBranch_Win.Master
         // The int parameter is the ItemId that was updated
         public static event Action<int> OnItemMasterUpdated;
 
+        private System.Windows.Forms.Timer orderCycleSpinnerTimer;
+        private int orderCycleSpinnerDirection = 0;
+        private bool orderCycleSpinnerIsInitialDelay = true;
+
         // Helper method to raise the item master update event safely
         private static void RaiseItemMasterUpdated(int itemId)
         {
@@ -567,12 +571,12 @@ namespace PosBranch_Win.Master
             {
                 if (ultraOrderCycle != null)
                 {
-                    ultraOrderCycle.Text = orderCycleDays > 0 ? orderCycleDays.ToString() : string.Empty;
+                    ultraOrderCycle.Text = orderCycleDays >= 0 ? orderCycleDays.ToString() : "0";
                 }
 
                 if (ultraBoxQty != null)
                 {
-                    ultraBoxQty.Text = boxQuantity > 0 ? boxQuantity.ToString() : string.Empty;
+                    ultraBoxQty.Text = boxQuantity >= 0 ? boxQuantity.ToString() : "0";
                 }
 
                 if (ultraIsPerishable != null)
@@ -580,8 +584,8 @@ namespace PosBranch_Win.Master
                     ultraIsPerishable.Checked = isPerishable;
                 }
 
-                ItemMaster.Order_Cycle_Days = orderCycleDays > 0 ? orderCycleDays : 0;
-                ItemMaster.Box_Quantity = boxQuantity > 0 ? boxQuantity : 0;
+                ItemMaster.Order_Cycle_Days = orderCycleDays >= 0 ? orderCycleDays : 0;
+                ItemMaster.Box_Quantity = boxQuantity >= 0 ? boxQuantity : 0;
                 ItemMaster.Is_Perishable = isPerishable;
             }
             catch (Exception ex)
@@ -593,13 +597,13 @@ namespace PosBranch_Win.Master
         private int GetSmartReorderOrderCycleDays()
         {
             int orderCycleDays;
-            return int.TryParse(ultraOrderCycle?.Text, out orderCycleDays) && orderCycleDays > 0 ? orderCycleDays : 0;
+            return int.TryParse(ultraOrderCycle?.Text, out orderCycleDays) && orderCycleDays >= 0 ? orderCycleDays : 0;
         }
 
         private int GetSmartReorderBoxQuantity()
         {
             int boxQuantity;
-            return int.TryParse(ultraBoxQty?.Text, out boxQuantity) && boxQuantity > 0 ? boxQuantity : 0;
+            return int.TryParse(ultraBoxQty?.Text, out boxQuantity) && boxQuantity >= 0 ? boxQuantity : 0;
         }
 
         private bool GetSmartReorderIsPerishable()
@@ -1670,6 +1674,15 @@ namespace PosBranch_Win.Master
 
                 var btn12 = this.Controls.Find("button12", true).FirstOrDefault() as System.Windows.Forms.Button;
                 if (btn12 != null) btn12.Click += button12_Click;
+
+                var btn13 = this.Controls.Find("button13", true).FirstOrDefault() as System.Windows.Forms.Button;
+                if (btn13 != null) btn13.Click += button11_Click;
+
+                var btn14 = this.Controls.Find("button14", true).FirstOrDefault() as System.Windows.Forms.Button;
+                if (btn14 != null) btn14.Click += button12_Click;
+
+                if (button13 != null) button13.Click += button11_Click;
+                if (button14 != null) button14.Click += button12_Click;
             }
             catch { }
 
@@ -3629,8 +3642,8 @@ namespace PosBranch_Win.Master
                 if (txt_CEP != null) txt_CEP.Text = "0.000";
                 if (txt_Mrp != null) txt_Mrp.Text = "0.000";
                 if (txt_CardP != null) txt_CardP.Text = "0.000";
-                if (ultraOrderCycle != null) ultraOrderCycle.Text = string.Empty;
-                if (ultraBoxQty != null) ultraBoxQty.Text = string.Empty;
+                if (ultraOrderCycle != null) ultraOrderCycle.Text = "0";
+                if (ultraBoxQty != null) ultraBoxQty.Text = "0";
                 if (ultraIsPerishable != null) ultraIsPerishable.Checked = false;
 
                 // Clear selling price fields (use Control type to match Load event handling)
@@ -4156,6 +4169,87 @@ namespace PosBranch_Win.Master
             panel.ClientArea.Cursor = Cursors.Hand;
         }
 
+        private void StepOrderCycle(int delta)
+        {
+            if (ultraOrderCycle != null)
+            {
+                int val = 0;
+                int.TryParse(ultraOrderCycle.Text, out val);
+                val += delta;
+                if (val < 0) val = 0;
+                ultraOrderCycle.Text = val.ToString();
+            }
+        }
+
+        private void SetupOrderCycleSpinner(Infragistics.Win.Misc.UltraPanel panel, int direction)
+        {
+            if (panel == null) return;
+
+            panel.Cursor = Cursors.Hand;
+            panel.ClientArea.Cursor = Cursors.Hand;
+
+            if (orderCycleSpinnerTimer == null)
+            {
+                orderCycleSpinnerTimer = new System.Windows.Forms.Timer();
+                orderCycleSpinnerTimer.Tick += (s, e) =>
+                {
+                    if (orderCycleSpinnerIsInitialDelay)
+                    {
+                        orderCycleSpinnerIsInitialDelay = false;
+                        orderCycleSpinnerTimer.Interval = 60; // Fast continuous repeat interval after initial delay
+                    }
+                    if (orderCycleSpinnerDirection != 0)
+                    {
+                        StepOrderCycle(orderCycleSpinnerDirection);
+                    }
+                };
+            }
+
+            MouseEventHandler onMouseDown = (s, e) =>
+            {
+                if (e.Button == MouseButtons.Left)
+                {
+                    orderCycleSpinnerDirection = direction;
+                    StepOrderCycle(direction); // Immediate single click effect on 1st click!
+                    orderCycleSpinnerIsInitialDelay = true;
+                    orderCycleSpinnerTimer.Interval = 350; // Initial hold delay before continuous repeat
+                    orderCycleSpinnerTimer.Stop();
+                    orderCycleSpinnerTimer.Start();
+                }
+            };
+
+            MouseEventHandler onMouseUp = (s, e) =>
+            {
+                if (e.Button == MouseButtons.Left)
+                {
+                    orderCycleSpinnerTimer.Stop();
+                    orderCycleSpinnerDirection = 0;
+                }
+            };
+
+            EventHandler onMouseLeave = (s, e) =>
+            {
+                orderCycleSpinnerTimer.Stop();
+                orderCycleSpinnerDirection = 0;
+            };
+
+            panel.MouseDown += onMouseDown;
+            panel.MouseUp += onMouseUp;
+            panel.MouseLeave += onMouseLeave;
+
+            panel.ClientArea.MouseDown += onMouseDown;
+            panel.ClientArea.MouseUp += onMouseUp;
+            panel.ClientArea.MouseLeave += onMouseLeave;
+
+            foreach (Control child in panel.ClientArea.Controls)
+            {
+                child.Cursor = Cursors.Hand;
+                child.MouseDown += onMouseDown;
+                child.MouseUp += onMouseUp;
+                child.MouseLeave += onMouseLeave;
+            }
+        }
+
         private void ConnectPanelClickEvents()
         {
             // Connect click events for panels
@@ -4238,6 +4332,18 @@ namespace PosBranch_Win.Master
                         SetupHoverEffectSync(panel, (Infragistics.Win.UltraWinEditors.UltraPictureBox)this.Controls.Find("ultraPictureBox3", true)[0], label30);
                     }
                 }
+            }
+
+            // Connect dedicated MouseDown + Hold-Repeat Spinners for ultraPanel27 (+) and ultraPanel28 (-)
+            if (this.Controls.Find("ultraPanel27", true).Length > 0)
+            {
+                var p27 = (Infragistics.Win.Misc.UltraPanel)this.Controls.Find("ultraPanel27", true)[0];
+                SetupOrderCycleSpinner(p27, +1);
+            }
+            if (this.Controls.Find("ultraPanel28", true).Length > 0)
+            {
+                var p28 = (Infragistics.Win.Misc.UltraPanel)this.Controls.Find("ultraPanel28", true)[0];
+                SetupOrderCycleSpinner(p28, -1);
             }
         }
 

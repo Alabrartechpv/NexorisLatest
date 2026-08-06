@@ -78,6 +78,7 @@
     <Compile Include="MasterRepositry\ItemTypeRepository.cs" />
     <Compile Include="MasterRepositry\ExcelImportRepository.cs" />
     <Compile Include="MasterRepositry\LedgerRepository.cs" />
+    <Compile Include="MasterRepositry\PaymodeRepository.cs" />
     <Compile Include="MasterRepositry\PluRepository.cs" />
     <Compile Include="MasterRepositry\RolePermissionRepository.cs" />
     <Compile Include="MasterRepositry\StateRepository.cs" />
