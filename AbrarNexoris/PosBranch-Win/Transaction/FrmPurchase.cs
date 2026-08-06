@@ -37,6 +37,8 @@ namespace PosBranch_Win.Transaction
                     RefreshGridColumnTheme(ultraGrid1);
 
                     // Re-apply essential layout configurations specifically overridden by XML structure
+                    ultraGrid1.DisplayLayout.GroupByBox.Hidden = true;
+                    ultraGrid1.DisplayLayout.Override.RowSelectorHeaderStyle = Infragistics.Win.UltraWinGrid.RowSelectorHeaderStyle.Default;
                     ultraGrid1.DisplayLayout.Override.RowAlternateAppearance.BackColor = GridAltRow;
                     ultraGrid1.DisplayLayout.Override.RowAlternateAppearance.BackColor2 = GridAltRow;
                     ultraGrid1.DisplayLayout.Override.RowAlternateAppearance.BackGradientStyle = GradientStyle.None;
@@ -525,8 +527,12 @@ namespace PosBranch_Win.Transaction
             ultraGrid2.InitializeLayout += UltraGrid2_InitializeLayout;
             ultraGrid2.Resize += (s, e) => UpdateUltraGrid2FooterCellPositions();
 
-            // Register for resize events to update footer position & panel layout
+            // Register for scroll and resize events to update footer position & panel layout
             ultraGrid1.Resize += (s, e) => UpdateFooterCellPositions();
+            ultraGrid1.AfterColPosChanged += (s, e) => UpdateFooterCellPositions();
+            ultraGrid1.AfterColRegionScroll += (s, e) => UpdateFooterCellPositions();
+            ultraGrid1.AfterRowRegionScroll += (s, e) => UpdateFooterCellPositions();
+            ultraGrid1.Paint += (s, e) => UpdateFooterCellPositions();
             this.Resize += (s, e) => { SetPurchaseOrderPanelVisibility(_purchaseOrderPanelVisible); UpdateFooterCellPositions(); };
             ultraPanel1.Resize += (s, e) => SetPurchaseOrderPanelVisibility(_purchaseOrderPanelVisible);
 
@@ -983,21 +989,10 @@ namespace PosBranch_Win.Transaction
             UltraGridLayout layout = grid.DisplayLayout;
             layout.BorderStyle = UIElementBorderStyle.Solid;
             layout.CaptionVisible = DefaultableBoolean.False;
-            layout.GroupByBox.Hidden = false;
-            layout.GroupByBox.BandLabelAppearance.BackColor = GridHeaderBlueDark;
-            layout.GroupByBox.BandLabelAppearance.ForeColor = Color.White;
-            layout.GroupByBox.BandLabelAppearance.FontData.Bold = DefaultableBoolean.True;
-            layout.GroupByBox.PromptAppearance.BackColor = GridHeaderBlue;
-            layout.GroupByBox.PromptAppearance.BackColor2 = GridHeaderBlueDark;
-            layout.GroupByBox.PromptAppearance.BackGradientStyle = GradientStyle.Horizontal;
-            layout.GroupByBox.PromptAppearance.ForeColor = Color.White;
-            layout.GroupByBox.Prompt = "Drag a column header here to group by that column";
-            layout.GroupByBox.Appearance.BackColor = Color.FromArgb(109, 167, 226);
-            layout.GroupByBox.Appearance.BackColor2 = Color.FromArgb(69, 125, 190);
-            layout.GroupByBox.Appearance.BackGradientStyle = GradientStyle.Vertical;
+            layout.GroupByBox.Hidden = true;
 
-            layout.Appearance.BackColor = Color.White;
-            layout.Appearance.BackColor2 = FormBackColor;
+            layout.Appearance.BackColor = Color.FromArgb(232, 246, 255);
+            layout.Appearance.BackColor2 = Color.FromArgb(232, 246, 255);
             layout.Appearance.BackGradientStyle = GradientStyle.None;
             layout.Appearance.BorderColor = BorderBlue;
 
@@ -1008,6 +1003,7 @@ namespace PosBranch_Win.Transaction
             layout.Override.HeaderClickAction = HeaderClickAction.SortSingle;
             layout.Override.SelectTypeRow = SelectType.Single;
             layout.Override.RowSelectors = DefaultableBoolean.True;
+            layout.Override.RowSelectorHeaderStyle = RowSelectorHeaderStyle.Default;
             layout.Override.RowSelectorWidth = 20;
             layout.Override.RowSelectorNumberStyle = RowSelectorNumberStyle.RowIndex;
             layout.Override.RowSelectorAppearance.BackColor = GridHeaderBlueDark;
@@ -1018,7 +1014,7 @@ namespace PosBranch_Win.Transaction
             layout.Override.RowSelectorAppearance.FontData.Bold = DefaultableBoolean.True;
             layout.Override.RowSelectorAppearance.TextHAlign = HAlign.Center;
 
-            // Use Standard style so custom BackColor/gradient settings are respected (not overridden by OS theme)
+            // Use Standard style so custom BackColor/gradient settings are respected
             layout.Override.HeaderStyle = HeaderStyle.Standard;
 
             layout.Override.HeaderAppearance.BackColor = GridHeaderBlue;
@@ -1031,24 +1027,44 @@ namespace PosBranch_Win.Transaction
             layout.Override.HeaderAppearance.FontData.SizeInPoints = 8.25F;
 
             layout.Override.RowAppearance.BackColor = Color.White;
-            layout.Override.RowAppearance.BorderColor = GridRowLine;
-            layout.Override.RowAlternateAppearance.BackColor = GridAltRow;
-            layout.Override.RowAlternateAppearance.BorderColor = GridRowLine;
+            layout.Override.RowAppearance.ForeColor = Color.FromArgb(10, 31, 79);
+            layout.Override.RowAppearance.BorderColor = Color.FromArgb(197, 217, 241);
+
+            layout.Override.RowAlternateAppearance.BackColor = Color.FromArgb(245, 250, 255);
+            layout.Override.RowAlternateAppearance.BackColor2 = Color.FromArgb(245, 250, 255);
+            layout.Override.RowAlternateAppearance.BackGradientStyle = GradientStyle.None;
+            layout.Override.RowAlternateAppearance.BorderColor = Color.FromArgb(197, 217, 241);
+
             layout.Override.ActiveRowAppearance.BackColor = GridSelectedBlue;
+            layout.Override.ActiveRowAppearance.BackColor2 = GridSelectedBlue;
+            layout.Override.ActiveRowAppearance.BackGradientStyle = GradientStyle.None;
             layout.Override.ActiveRowAppearance.ForeColor = Color.White;
-            layout.Override.ActiveRowAppearance.BorderColor = BorderBlue;
+            layout.Override.ActiveRowAppearance.BorderColor = Color.FromArgb(197, 217, 241);
+
             layout.Override.SelectedRowAppearance.BackColor = GridSelectedBlue;
+            layout.Override.SelectedRowAppearance.BackColor2 = GridSelectedBlue;
+            layout.Override.SelectedRowAppearance.BackGradientStyle = GradientStyle.None;
             layout.Override.SelectedRowAppearance.ForeColor = Color.White;
+            layout.Override.SelectedRowAppearance.BorderColor = Color.FromArgb(197, 217, 241);
             layout.Override.SelectedRowAppearance.FontData.Bold = DefaultableBoolean.False;
-            layout.Override.CellAppearance.BorderColor = GridRowLine;
+
+            layout.Override.ActiveCellAppearance.BackColor = GridSelectedBlue;
+            layout.Override.ActiveCellAppearance.BackColor2 = GridSelectedBlue;
+            layout.Override.ActiveCellAppearance.BackGradientStyle = GradientStyle.None;
+            layout.Override.ActiveCellAppearance.ForeColor = Color.White;
+            layout.Override.ActiveCellAppearance.BorderColor = Color.FromArgb(197, 217, 241);
+
+            layout.Override.CellAppearance.BorderColor = Color.FromArgb(197, 217, 241);
             layout.Override.CellAppearance.ForeColor = Color.FromArgb(10, 31, 79);
             layout.Override.CellAppearance.FontData.Name = "Microsoft Sans Serif";
             layout.Override.CellAppearance.FontData.SizeInPoints = 8.25F;
+            layout.Override.CellAppearance.TextVAlign = VAlign.Middle;
+
             layout.Override.BorderStyleHeader = UIElementBorderStyle.Solid;
             layout.Override.BorderStyleCell = UIElementBorderStyle.Solid;
             layout.Override.BorderStyleRow = UIElementBorderStyle.Solid;
-            layout.Override.MinRowHeight = 19;
-            layout.Override.DefaultRowHeight = 19;
+            layout.Override.MinRowHeight = 20;
+            layout.Override.DefaultRowHeight = 22;
             layout.RowConnectorStyle = RowConnectorStyle.Solid;
             layout.RowConnectorColor = GridRowLine;
             layout.ScrollBarLook.Appearance.BackColor = ActionPanelBackColor;
@@ -1980,14 +1996,14 @@ namespace PosBranch_Win.Transaction
                 ultraGrid1.DisplayLayout.Override.SelectedRowAppearance.BackColor = selectedRowBlue;
                 ultraGrid1.DisplayLayout.Override.SelectedRowAppearance.BackColor2 = selectedRowBlue;
                 ultraGrid1.DisplayLayout.Override.SelectedRowAppearance.BackGradientStyle = GradientStyle.None;
-                ultraGrid1.DisplayLayout.Override.SelectedRowAppearance.ForeColor = Color.White; // White text for better contrast
+                ultraGrid1.DisplayLayout.Override.SelectedRowAppearance.ForeColor = Color.FromArgb(10, 31, 79);
                 ultraGrid1.DisplayLayout.Override.SelectedRowAppearance.FontData.Bold = DefaultableBoolean.False;
 
                 // Active row appearance - make it same as selected row
                 ultraGrid1.DisplayLayout.Override.ActiveRowAppearance.BackColor = selectedRowBlue;
                 ultraGrid1.DisplayLayout.Override.ActiveRowAppearance.BackColor2 = selectedRowBlue;
                 ultraGrid1.DisplayLayout.Override.ActiveRowAppearance.BackGradientStyle = GradientStyle.None;
-                ultraGrid1.DisplayLayout.Override.ActiveRowAppearance.ForeColor = Color.White;
+                ultraGrid1.DisplayLayout.Override.ActiveRowAppearance.ForeColor = Color.FromArgb(10, 31, 79);
                 ultraGrid1.DisplayLayout.Override.ActiveRowAppearance.FontData.Bold = DefaultableBoolean.False;
 
                 // Configure cell and row borders - change from dotted to solid as requested
@@ -2840,31 +2856,32 @@ namespace PosBranch_Win.Transaction
                 e.Layout.Override.HeaderAppearance.ThemedElementAlpha = Infragistics.Win.Alpha.Transparent;
                 e.Layout.Override.HeaderAppearance.BorderColor = BorderBlue;
 
-                // Configure row selector appearance with solid color matching FrmPurchaseDisplayDialog.cs
+                // Configure row selector appearance matching frmPurchaseReturn.cs
                 e.Layout.Override.RowSelectorAppearance.BackColor = GridHeaderBlueDark;
                 e.Layout.Override.RowSelectorAppearance.BackColor2 = GridHeaderBlue;
                 e.Layout.Override.RowSelectorAppearance.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
                 e.Layout.Override.RowSelectorAppearance.BorderColor = BorderBlue;
-                e.Layout.Override.RowSelectorHeaderStyle = Infragistics.Win.UltraWinGrid.RowSelectorHeaderStyle.ColumnChooserButton;
+                e.Layout.Override.RowSelectorHeaderStyle = Infragistics.Win.UltraWinGrid.RowSelectorHeaderStyle.Default;
                 e.Layout.Override.RowSelectorWidth = 20;
                 e.Layout.Override.RowSelectorNumberStyle = Infragistics.Win.UltraWinGrid.RowSelectorNumberStyle.RowIndex;
                 e.Layout.Override.ExpansionIndicator = Infragistics.Win.UltraWinGrid.ShowExpansionIndicator.Never;
 
-                // Set all cells to have white background (no alternate row coloring)
+                // Set all cells to have white background with alternate row coloring
                 e.Layout.Override.RowAppearance.BackColor = Color.White;
-                e.Layout.Override.RowAppearance.BackColor2 = Color.White;
-                e.Layout.Override.RowAppearance.BackGradientStyle = Infragistics.Win.GradientStyle.None;
+                e.Layout.Override.RowAppearance.ForeColor = Color.FromArgb(10, 31, 79);
+                e.Layout.Override.RowAppearance.BorderColor = Color.FromArgb(197, 217, 241);
 
-                // Remove alternate row appearance (make all rows white)
-                e.Layout.Override.RowAlternateAppearance.BackColor = GridAltRow;
-                e.Layout.Override.RowAlternateAppearance.BackColor2 = GridAltRow;
+                e.Layout.Override.RowAlternateAppearance.BackColor = Color.FromArgb(245, 250, 255);
+                e.Layout.Override.RowAlternateAppearance.BackColor2 = Color.FromArgb(245, 250, 255);
                 e.Layout.Override.RowAlternateAppearance.BackGradientStyle = Infragistics.Win.GradientStyle.None;
+                e.Layout.Override.RowAlternateAppearance.BorderColor = Color.FromArgb(197, 217, 241);
 
-                // Configure selected row appearance with bright blue highlight (matching frmdialForItemMaster)
+                // Configure selected row appearance matching frmvendorpurchasereport.cs (Image 2)
                 e.Layout.Override.SelectedRowAppearance.BackColor = selectedRowBlue;
                 e.Layout.Override.SelectedRowAppearance.BackColor2 = selectedRowBlue;
                 e.Layout.Override.SelectedRowAppearance.BackGradientStyle = Infragistics.Win.GradientStyle.None;
-                e.Layout.Override.SelectedRowAppearance.ForeColor = Color.White; // White text for better contrast
+                e.Layout.Override.SelectedRowAppearance.ForeColor = Color.White;
+                e.Layout.Override.SelectedRowAppearance.BorderColor = Color.FromArgb(197, 217, 241);
                 e.Layout.Override.SelectedRowAppearance.FontData.Bold = Infragistics.Win.DefaultableBoolean.False;
 
                 // Configure active row appearance - make it same as selected row
@@ -2872,11 +2889,21 @@ namespace PosBranch_Win.Transaction
                 e.Layout.Override.ActiveRowAppearance.BackColor2 = selectedRowBlue;
                 e.Layout.Override.ActiveRowAppearance.BackGradientStyle = Infragistics.Win.GradientStyle.None;
                 e.Layout.Override.ActiveRowAppearance.ForeColor = Color.White;
+                e.Layout.Override.ActiveRowAppearance.BorderColor = Color.FromArgb(197, 217, 241);
                 e.Layout.Override.ActiveRowAppearance.FontData.Bold = Infragistics.Win.DefaultableBoolean.False;
+
+                e.Layout.Override.ActiveCellAppearance.BackColor = selectedRowBlue;
+                e.Layout.Override.ActiveCellAppearance.BackColor2 = selectedRowBlue;
+                e.Layout.Override.ActiveCellAppearance.BackGradientStyle = Infragistics.Win.GradientStyle.None;
+                e.Layout.Override.ActiveCellAppearance.ForeColor = Color.White;
+                e.Layout.Override.ActiveCellAppearance.BorderColor = Color.FromArgb(197, 217, 241);
 
                 // Configure cell and row borders - changed to solid as requested with light blue color
                 e.Layout.Override.BorderStyleRow = Infragistics.Win.UIElementBorderStyle.Solid;
                 e.Layout.Override.BorderStyleCell = Infragistics.Win.UIElementBorderStyle.Solid;
+                e.Layout.Override.CellAppearance.BorderColor = Color.FromArgb(197, 217, 241);
+                e.Layout.Override.DefaultRowHeight = 22;
+                e.Layout.Override.MinRowHeight = 20;
 
                 // Configure spacing and expansion behavior
                 e.Layout.InterBandSpacing = 0;
@@ -5672,8 +5699,30 @@ namespace PosBranch_Win.Transaction
 
                     SavePurchaseActivityLog("SAVE", ObjPurchaseMaster.PurchaseNo, ObjPurchaseMaster);
 
-                    // Show a simple success message now instead of the popup
-                    MessageBox.Show("Saved Successfully", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    string grnNo = txtPurchaseNo != null && !string.IsNullOrWhiteSpace(txtPurchaseNo.Text)
+                        ? txtPurchaseNo.Text
+                        : ("GRN-" + ObjPurchaseMaster.PurchaseNo.ToString("D4"));
+                    string supplierName = CmboVendor != null && !string.IsNullOrWhiteSpace(CmboVendor.Text)
+                        ? CmboVendor.Text
+                        : (ObjPurchaseMaster != null && !string.IsNullOrWhiteSpace(ObjPurchaseMaster.VendorName) ? ObjPurchaseMaster.VendorName : "");
+                    string purDate = DtpInoviceDate != null && DtpInoviceDate.Value != null
+                        ? Convert.ToDateTime(DtpInoviceDate.Value).ToString("dd-MMM-yyyy")
+                        : DateTime.Now.ToString("dd-MMM-yyyy");
+                    decimal netAmt = Convert.ToDecimal(ObjPurchaseMaster.NetTotal > 0 ? ObjPurchaseMaster.NetTotal : ObjPurchaseMaster.GrandTotal);
+
+                    var details = new Dictionary<string, string>
+                    {
+                        { "GRN No", grnNo },
+                        { "Date", purDate },
+                        { "Supplier", supplierName },
+                        { "Amount", "₹" + string.Format("{0:N2}", netAmt) }
+                    };
+                    DialogBox.frmSuccesMsg successDialog = new DialogBox.frmSuccesMsg(
+                        "Purchase saved successfully.",
+                        "The purchase invoice has been saved.",
+                        details
+                    );
+                    successDialog.ShowDialog();
 
                     // Clear fields after successful save (this will regenerate the next purchase number)
                     Clear();
@@ -7179,8 +7228,30 @@ namespace PosBranch_Win.Transaction
                         updateActivityDetails, 
                         !string.IsNullOrWhiteSpace(updateActivityDetails));
 
-                    // Show a simple success message now instead of the popup
-                    MessageBox.Show("Updated Successfully", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    string grnNo = txtPurchaseNo != null && !string.IsNullOrWhiteSpace(txtPurchaseNo.Text)
+                        ? txtPurchaseNo.Text
+                        : ("GRN-" + ObjPurchaseMaster.PurchaseNo.ToString("D4"));
+                    string supplierName = CmboVendor != null && !string.IsNullOrWhiteSpace(CmboVendor.Text)
+                        ? CmboVendor.Text
+                        : (ObjPurchaseMaster != null && !string.IsNullOrWhiteSpace(ObjPurchaseMaster.VendorName) ? ObjPurchaseMaster.VendorName : "");
+                    string purDate = DtpInoviceDate != null && DtpInoviceDate.Value != null
+                        ? Convert.ToDateTime(DtpInoviceDate.Value).ToString("dd-MMM-yyyy")
+                        : DateTime.Now.ToString("dd-MMM-yyyy");
+                    decimal netAmt = Convert.ToDecimal(ObjPurchaseMaster.NetTotal > 0 ? ObjPurchaseMaster.NetTotal : ObjPurchaseMaster.GrandTotal);
+
+                    var details = new Dictionary<string, string>
+                    {
+                        { "GRN No", grnNo },
+                        { "Date", purDate },
+                        { "Supplier", supplierName },
+                        { "Amount", "₹" + string.Format("{0:N2}", netAmt) }
+                    };
+                    DialogBox.frmSuccesMsg successDialog = new DialogBox.frmSuccesMsg(
+                        "Purchase updated successfully.",
+                        "The purchase invoice has been updated.",
+                        details
+                    );
+                    successDialog.ShowDialog();
 
                     // Clear fields after successful update
                     Clear();
@@ -8670,71 +8741,52 @@ namespace PosBranch_Win.Transaction
                 gridFooterPanel.ClientArea.Controls.Clear();
                 footerLabels.Clear();
 
-                if (ultraGrid1.DisplayLayout.Bands.Count == 0)
+                if (ultraGrid1.DisplayLayout == null || ultraGrid1.DisplayLayout.Bands.Count == 0)
                     return;
 
                 UltraGridBand band = ultraGrid1.DisplayLayout.Bands[0];
-
-                // Get the row selector width for proper offset
                 int rowSelectorWidth = ultraGrid1.DisplayLayout.Override.RowSelectorWidth;
                 int xOffset = rowSelectorWidth;
 
-                // For each visible column, create a footer cell
-                foreach (UltraGridColumn col in band.Columns)
+                // For each visible column (ordered by VisiblePosition), create a footer cell
+                foreach (UltraGridColumn col in band.Columns.Cast<UltraGridColumn>().OrderBy(c => c.Header.VisiblePosition))
                 {
                     if (col.Hidden)
                         continue;
 
-                    // Create a label for this column's footer
                     Label lblFooter = new Label();
                     lblFooter.Name = "footer_" + col.Key;
-                    lblFooter.Text = ""; // Empty by default
-                    lblFooter.TextAlign = ContentAlignment.MiddleCenter; // Center text horizontally and vertically
-                    lblFooter.BackColor = GridHeaderBlue; // Match column header theme color
-                    lblFooter.BorderStyle = BorderStyle.None; // No borders initially
+                    lblFooter.Text = string.Empty;
+                    lblFooter.TextAlign = ContentAlignment.MiddleCenter;
+                    lblFooter.BackColor = GridHeaderBlue;
+                    lblFooter.BorderStyle = BorderStyle.None;
                     lblFooter.AutoSize = false;
                     lblFooter.Width = col.Width;
-                    lblFooter.Height = gridFooterPanel.Height - 2; // Leave 1px margin top and bottom
+                    lblFooter.Height = Math.Max(gridFooterPanel.Height - 2, 20);
                     lblFooter.Left = xOffset;
-                    lblFooter.Top = 1; // 1px from top
-                    lblFooter.Tag = col.Key; // Store column key for reference
-
-                    // Use white text color for better contrast on blue background
+                    lblFooter.Top = 1;
+                    lblFooter.Tag = Tuple.Create(col.Key, string.Empty);
                     lblFooter.ForeColor = Color.White;
+                    lblFooter.Font = new Font("Microsoft Sans Serif", 8.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
 
-                    // Add custom paint handler for curved box effect
+                    // Add custom paint handler for vertical border separator matching Image 1
                     lblFooter.Paint += FooterLabel_Paint;
 
                     // Add context menu for the footer cell
                     ContextMenuStrip menu = CreateFooterContextMenu(col.Key);
                     lblFooter.ContextMenuStrip = menu;
 
-                    // Add to the panel and dictionary
                     gridFooterPanel.ClientArea.Controls.Add(lblFooter);
                     footerLabels[col.Key] = lblFooter;
 
-                    // Move offset for next column
+                    if (!columnAggregations.ContainsKey(col.Key))
+                    {
+                        columnAggregations[col.Key] = "None";
+                    }
+
                     xOffset += col.Width;
                 }
 
-                // Initialize column aggregations dictionary if needed
-                if (columnAggregations.Count == 0)
-                {
-                    // Initialize default aggregations - numeric columns use Sum, others use Count
-                    foreach (UltraGridColumn col in band.Columns)
-                    {
-                        if (IsNumericColumn(col))
-                        {
-                            columnAggregations[col.Key] = "None"; // Default to None
-                        }
-                        else
-                        {
-                            columnAggregations[col.Key] = "None"; // Default to None
-                        }
-                    }
-                }
-
-                // Update the footer values based on current aggregations
                 UpdateFooterValues();
             }
             catch (Exception ex)
@@ -8747,15 +8799,13 @@ namespace PosBranch_Win.Transaction
         private ContextMenuStrip CreateFooterContextMenu(string columnKey)
         {
             ContextMenuStrip menu = new ContextMenuStrip();
-            menu.Tag = columnKey; // Store the column key for reference
+            menu.Tag = columnKey;
 
-            // Add menu items - check if this column is numeric for Sum/Avg options
             bool isNumeric = IsNumericColumn(ultraGrid1.DisplayLayout.Bands[0].Columns[columnKey]);
 
-            // Create menu items
             ToolStripMenuItem itemSum = new ToolStripMenuItem("Sum");
-            itemSum.Enabled = isNumeric; // Only enable for numeric columns
             itemSum.Tag = "Sum";
+            itemSum.Enabled = isNumeric;
             itemSum.Click += FooterContextMenu_Click;
 
             ToolStripMenuItem itemMin = new ToolStripMenuItem("Min");
@@ -8771,15 +8821,14 @@ namespace PosBranch_Win.Transaction
             itemCount.Click += FooterContextMenu_Click;
 
             ToolStripMenuItem itemAvg = new ToolStripMenuItem("Average");
-            itemAvg.Enabled = isNumeric; // Only enable for numeric columns
             itemAvg.Tag = "Avg";
+            itemAvg.Enabled = isNumeric;
             itemAvg.Click += FooterContextMenu_Click;
 
             ToolStripMenuItem itemNone = new ToolStripMenuItem("None");
             itemNone.Tag = "None";
             itemNone.Click += FooterContextMenu_Click;
 
-            // Add the items to the menu
             menu.Items.Add(itemSum);
             menu.Items.Add(itemMin);
             menu.Items.Add(itemMax);
@@ -8788,19 +8837,14 @@ namespace PosBranch_Win.Transaction
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(itemNone);
 
-            // Add opening event to check the current aggregation
             menu.Opening += (s, e) =>
             {
-                string currentAgg = "None";
-                if (columnAggregations.ContainsKey(columnKey))
-                    currentAgg = columnAggregations[columnKey];
-
-                // Check the current aggregation
+                string currentAgg = columnAggregations.ContainsKey(columnKey) ? columnAggregations[columnKey] : "None";
                 foreach (ToolStripItem item in menu.Items)
                 {
                     if (item is ToolStripMenuItem menuItem && menuItem.Tag != null)
                     {
-                        menuItem.Checked = (menuItem.Tag.ToString() == currentAgg);
+                        menuItem.Checked = string.Equals(menuItem.Tag.ToString(), currentAgg, StringComparison.OrdinalIgnoreCase);
                     }
                 }
             };
@@ -8808,7 +8852,6 @@ namespace PosBranch_Win.Transaction
             return menu;
         }
 
-        // Handle context menu click
         private void FooterContextMenu_Click(object sender, EventArgs e)
         {
             try
@@ -8816,26 +8859,13 @@ namespace PosBranch_Win.Transaction
                 ToolStripMenuItem item = sender as ToolStripMenuItem;
                 if (item == null) return;
 
-                // Get the column key from the parent menu
                 ContextMenuStrip menu = item.Owner as ContextMenuStrip;
-                if (menu == null || menu.Tag == null) return;
+                if (menu == null || menu.Tag == null || item.Tag == null) return;
 
                 string columnKey = menu.Tag.ToString();
                 string aggregation = item.Tag.ToString();
 
-                // Update the aggregation for this column
                 columnAggregations[columnKey] = aggregation;
-
-                // Clear the footer cell immediately if "None" is selected
-                if (aggregation == "None" && footerLabels.ContainsKey(columnKey))
-                {
-                    // Clear the text
-                    footerLabels[columnKey].Text = "";
-                    footerLabels[columnKey].Tag = new Tuple<string, string>(columnKey, "");
-                    footerLabels[columnKey].Invalidate(); // Force redraw
-                }
-
-                // Update footer values for other cells
                 UpdateFooterValues();
             }
             catch (Exception ex)
@@ -8844,110 +8874,51 @@ namespace PosBranch_Win.Transaction
             }
         }
 
-        // Check if a column is numeric
         private bool IsNumericColumn(UltraGridColumn column)
         {
-            if (column == null) return false;
-
-            // Check if the column is one of these numeric types
-            return column.Key == "BaseCost" || column.Key == "Cost" || column.Key == "Qty" ||
-                   column.Key == "Free" || column.Key == "RetailPrice" ||
+            if (column == null || column.DataType == null) return false;
+            Type t = System.Nullable.GetUnderlyingType(column.DataType) ?? column.DataType;
+            return t == typeof(decimal) || t == typeof(double) || t == typeof(float) ||
+                   t == typeof(int) || t == typeof(long) || t == typeof(short) ||
+                   column.Key == "BaseCost" || column.Key == "Cost" || column.Key == "Qty" ||
+                   column.Key == "Free" || column.Key == "RetailPrice" || column.Key == "SellingPrice" ||
                    column.Key == "Packing" || column.Key == "MarginPer" || column.Key == "MarginAmt" ||
                    column.Key == "TaxPer" || column.Key == "TaxAmt" || column.Key == "UnitPrize" ||
-                   column.Key == "WholeSalePrice" || column.Key == "CreditPrice" || column.Key == "CardPrice" ||
-                   column.DataType == typeof(int) || column.DataType == typeof(double) ||
-                   column.DataType == typeof(float) || column.DataType == typeof(decimal) ||
-                   column.DataType == typeof(long);
+                   column.Key == "Gross" || column.Key == "NetAmt";
         }
 
-        // Update the footer values based on the selected aggregations
         private void UpdateFooterValues()
         {
             try
             {
-                // Make sure the gridFooterPanel exists and is visible
-                if (gridFooterPanel == null || !gridFooterPanel.Visible)
+                if (footerLabels.Count == 0 || gridFooterPanel == null || !gridFooterPanel.Visible)
                     return;
 
-                // Check ultraGrid1 and DisplayLayout separately to avoid null reference exceptions
-                if (ultraGrid1 == null || ultraGrid1.DisplayLayout == null)
+                if (ultraGrid1 == null || ultraGrid1.DisplayLayout == null || ultraGrid1.DisplayLayout.Bands.Count == 0)
                     return;
 
-                DataTable dt = ultraGrid1.DataSource as DataTable;
-                if (dt == null || dt.Rows.Count == 0)
+                List<UltraGridRow> visibleRows = GetVisibleDataRows().ToList();
+                foreach (KeyValuePair<string, Label> footerEntry in footerLabels)
                 {
-                    // Clear all footer values if no data
-                    foreach (string key in footerLabels.Keys)
-                    {
-                        if (footerLabels.ContainsKey(key))
-                        {
-                            footerLabels[key].Text = "";
-                            footerLabels[key].Tag = new Tuple<string, string>(key, "");
-                            footerLabels[key].ForeColor = Color.White;
-                            footerLabels[key].Invalidate(); // Force redraw
-                        }
-                    }
-                    return;
-                }
+                    string columnKey = footerEntry.Key;
+                    Label footerLabel = footerEntry.Value;
 
-                // For each column with a footer label
-                foreach (string columnKey in footerLabels.Keys)
-                {
                     if (!columnAggregations.ContainsKey(columnKey) ||
-    columnAggregations[columnKey] == "None" ||
-    !footerLabels.ContainsKey(columnKey))
+                        string.Equals(columnAggregations[columnKey], "None", StringComparison.OrdinalIgnoreCase))
                     {
-                        // No aggregation or "None" selected - clear value
-                        footerLabels[columnKey].Text = "";
-                        footerLabels[columnKey].Tag = new Tuple<string, string>(columnKey, ""); // Clear stored text
-                        footerLabels[columnKey].ForeColor = Color.White;
-                        footerLabels[columnKey].Invalidate(); // Force redraw to clear box
+                        footerLabel.Text = string.Empty;
+                        footerLabel.Tag = Tuple.Create(columnKey, string.Empty);
+                        footerLabel.Invalidate();
                         continue;
                     }
 
-                    string aggregation = columnAggregations[columnKey];
-                    bool isNumeric = IsNumericColumn(ultraGrid1.DisplayLayout.Bands[0].Columns[columnKey]);
+                    object result = CalculateAggregation(columnKey, columnAggregations[columnKey], visibleRows);
+                    string displayValue = FormatAggregationResult(columnKey, columnAggregations[columnKey], result);
 
-                    // Skip inappropriate aggregations
-                    if ((aggregation == "Sum" || aggregation == "Avg") && !isNumeric)
-                    {
-                        footerLabels[columnKey].Text = "";
-                        footerLabels[columnKey].ForeColor = Color.White;
-                        continue;
-                    }
-
-                    // Calculate the aggregation value
-                    object result = null;
-
-                    switch (aggregation)
-                    {
-                        case "Sum":
-                            result = CalculateSum(dt, columnKey);
-                            break;
-                        case "Min":
-                            result = CalculateMin(dt, columnKey);
-                            break;
-                        case "Max":
-                            result = CalculateMax(dt, columnKey);
-                            break;
-                        case "Count":
-                            result = dt.Rows.Count;
-                            break;
-                        case "Avg":
-                            result = CalculateAverage(dt, columnKey);
-                            break;
-                    }
-
-                    // Format and display the result
-                    string displayValue = FormatAggregationResult(result, columnKey, aggregation);
-
-                    // Store both the text and the original column key in the Tag property
-                    footerLabels[columnKey].Tag = new Tuple<string, string>(columnKey, displayValue);
-                    footerLabels[columnKey].Text = displayValue; // Set text (will be drawn by paint handler)
-                    footerLabels[columnKey].ForeColor = Color.White; // Maintain white text color
-
-                    // Force redraw to show the curved box
-                    footerLabels[columnKey].Invalidate();
+                    footerLabel.Text = displayValue;
+                    footerLabel.Tag = Tuple.Create(columnKey, displayValue);
+                    footerLabel.ForeColor = Color.White;
+                    footerLabel.Invalidate();
                 }
             }
             catch (Exception ex)
@@ -8956,237 +8927,181 @@ namespace PosBranch_Win.Transaction
             }
         }
 
-        // Calculate sum for a column
-        private object CalculateSum(DataTable dt, string columnKey)
+        private IEnumerable<UltraGridRow> GetVisibleDataRows()
         {
-            try
+            if (ultraGrid1.Rows == null) yield break;
+            foreach (UltraGridRow row in ultraGrid1.Rows)
             {
-                double sum = 0;
-                foreach (DataRow row in dt.Rows)
-                {
-                    if (row[columnKey] != DBNull.Value)
-                    {
-                        double value;
-                        if (double.TryParse(row[columnKey].ToString(), out value))
-                        {
-                            sum += value;
-                        }
-                    }
-                }
-                return sum;
-            }
-            catch
-            {
-                return 0;
+                if (row != null && row.IsDataRow && !row.IsFilteredOut)
+                    yield return row;
             }
         }
 
-        // Calculate minimum for a column
-        private object CalculateMin(DataTable dt, string columnKey)
+        private object CalculateAggregation(string columnKey, string aggregation, List<UltraGridRow> visibleRows)
         {
-            try
-            {
-                bool hasValue = false;
-                object minVal = null;
-
-                foreach (DataRow row in dt.Rows)
-                {
-                    if (row[columnKey] != DBNull.Value)
-                    {
-                        if (!hasValue)
-                        {
-                            minVal = row[columnKey];
-                            hasValue = true;
-                        }
-                        else
-                        {
-                            // For numeric columns
-                            if (row[columnKey] is IComparable)
-                            {
-                                if (((IComparable)row[columnKey]).CompareTo(minVal) < 0)
-                                {
-                                    minVal = row[columnKey];
-                                }
-                            }
-                            // For string columns
-                            else if (row[columnKey] is string && minVal is string)
-                            {
-                                if (string.Compare(row[columnKey].ToString(), minVal.ToString()) < 0)
-                                {
-                                    minVal = row[columnKey];
-                                }
-                            }
-                        }
-                    }
-                }
-
-                return hasValue ? minVal : null;
-            }
-            catch
-            {
+            if (visibleRows == null || visibleRows.Count == 0)
                 return null;
+
+            switch (aggregation)
+            {
+                case "Sum":
+                    return visibleRows
+                        .Where(row => row.Cells.Exists(columnKey))
+                        .Select(row => GetNumericValue(row.Cells[columnKey].Value))
+                        .Where(value => value.HasValue)
+                        .Sum(value => value.Value);
+                case "Min":
+                    return visibleRows
+                        .Where(row => row.Cells.Exists(columnKey))
+                        .Select(row => row.Cells[columnKey].Value)
+                        .Where(HasCellValue)
+                        .Cast<IComparable>()
+                        .OrderBy(value => value)
+                        .FirstOrDefault();
+                case "Max":
+                    return visibleRows
+                        .Where(row => row.Cells.Exists(columnKey))
+                        .Select(row => row.Cells[columnKey].Value)
+                        .Where(HasCellValue)
+                        .Cast<IComparable>()
+                        .OrderByDescending(value => value)
+                        .FirstOrDefault();
+                case "Count":
+                    return visibleRows.Count(row => row.Cells.Exists(columnKey) && HasCellValue(row.Cells[columnKey].Value));
+                case "Avg":
+                    List<decimal> values = visibleRows
+                        .Where(row => row.Cells.Exists(columnKey))
+                        .Select(row => GetNumericValue(row.Cells[columnKey].Value))
+                        .Where(value => value.HasValue)
+                        .Select(value => value.Value)
+                        .ToList();
+                    return values.Count == 0 ? 0m : values.Average();
+                default:
+                    return null;
             }
         }
 
-        // Calculate maximum for a column
-        private object CalculateMax(DataTable dt, string columnKey)
+        private string FormatAggregationResult(string columnKey, string aggregation, object result)
         {
-            try
-            {
-                bool hasValue = false;
-                object maxVal = null;
+            if (string.Equals(aggregation, "None", StringComparison.OrdinalIgnoreCase))
+                return string.Empty;
 
-                foreach (DataRow row in dt.Rows)
-                {
-                    if (row[columnKey] != DBNull.Value)
-                    {
-                        if (!hasValue)
-                        {
-                            maxVal = row[columnKey];
-                            hasValue = true;
-                        }
-                        else
-                        {
-                            // For numeric columns
-                            if (row[columnKey] is IComparable)
-                            {
-                                if (((IComparable)row[columnKey]).CompareTo(maxVal) > 0)
-                                {
-                                    maxVal = row[columnKey];
-                                }
-                            }
-                            // For string columns
-                            else if (row[columnKey] is string && maxVal is string)
-                            {
-                                if (string.Compare(row[columnKey].ToString(), maxVal.ToString()) > 0)
-                                {
-                                    maxVal = row[columnKey];
-                                }
-                            }
-                        }
-                    }
-                }
-
-                return hasValue ? maxVal : null;
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        // Calculate average for a column
-        private object CalculateAverage(DataTable dt, string columnKey)
-        {
-            try
-            {
-                double sum = 0;
-                int count = 0;
-
-                foreach (DataRow row in dt.Rows)
-                {
-                    if (row[columnKey] != DBNull.Value)
-                    {
-                        double value;
-                        if (double.TryParse(row[columnKey].ToString(), out value))
-                        {
-                            sum += value;
-                            count++;
-                        }
-                    }
-                }
-
-                return count > 0 ? sum / count : 0;
-            }
-            catch
-            {
-                return 0;
-            }
-        }
-
-        // Format the aggregation result based on column type
-        private string FormatAggregationResult(object result, string columnKey, string aggregation)
-        {
             if (result == null)
-                return "";
+            {
+                if (string.Equals(aggregation, "Count", StringComparison.OrdinalIgnoreCase))
+                    return "0";
+                if (string.Equals(aggregation, "Sum", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(aggregation, "Avg", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(aggregation, "Min", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(aggregation, "Max", StringComparison.OrdinalIgnoreCase))
+                    return "0.00";
+                return string.Empty;
+            }
 
-            try
+            if (aggregation == "Count")
+                return Convert.ToString(result);
+
+            if (ultraGrid1.DisplayLayout != null &&
+                ultraGrid1.DisplayLayout.Bands.Count > 0 &&
+                ultraGrid1.DisplayLayout.Bands[0].Columns.Exists(columnKey))
             {
                 UltraGridColumn column = ultraGrid1.DisplayLayout.Bands[0].Columns[columnKey];
-
-                // For Count aggregation
-                if (aggregation == "Count")
-                    return result.ToString();
-
-                // For numeric columns (Sum, Min, Max, Avg)
-                if (IsNumericColumn(column))
+                decimal? numericValue = GetNumericValue(result);
+                if (numericValue.HasValue)
                 {
-                    double value;
-                    if (double.TryParse(result.ToString(), out value))
-                    {
-                        // Use the column's format if available
-                        if (!string.IsNullOrEmpty(column.Format))
-                        {
-                            return value.ToString(column.Format);
-                        }
-                        else
-                        {
-                            // Default format for numeric values
-                            return value.ToString("N2");
-                        }
-                    }
-                }
+                    if (!string.IsNullOrWhiteSpace(column.Format))
+                        return numericValue.Value.ToString(column.Format);
 
-                // For other types, just return the string representation
-                return result.ToString();
+                    return numericValue.Value.ToString("N2");
+                }
             }
-            catch
-            {
-                return result.ToString();
-            }
+
+            return Convert.ToString(result);
         }
 
-        // Update the positions of footer cells when columns are resized
+        private static decimal? GetNumericValue(object rawValue)
+        {
+            if (rawValue == null || rawValue == DBNull.Value)
+                return null;
+
+            if (rawValue is decimal decVal) return decVal;
+            if (rawValue is double dblVal) return Convert.ToDecimal(dblVal);
+            if (rawValue is float fltVal) return Convert.ToDecimal(fltVal);
+            if (rawValue is int intVal) return Convert.ToDecimal(intVal);
+            if (rawValue is long lngVal) return Convert.ToDecimal(lngVal);
+
+            string strVal = Convert.ToString(rawValue);
+            if (decimal.TryParse(strVal, out decimal parsed))
+                return parsed;
+
+            return null;
+        }
+
+        private static bool HasCellValue(object value)
+        {
+            return value != null && value != DBNull.Value && !string.IsNullOrWhiteSpace(value.ToString());
+        }
+
         private void UpdateFooterCellPositions()
         {
             try
             {
-                // Check each object separately to avoid null reference exception
                 if (ultraGrid1 == null || gridFooterPanel == null || !gridFooterPanel.Visible)
                     return;
 
-                // Check DisplayLayout separately
-                if (ultraGrid1.DisplayLayout == null)
-                    return;
-
-                // Check Bands separately
-                if (ultraGrid1.DisplayLayout.Bands == null || ultraGrid1.DisplayLayout.Bands.Count == 0)
+                if (ultraGrid1.DisplayLayout == null || ultraGrid1.DisplayLayout.Bands == null || ultraGrid1.DisplayLayout.Bands.Count == 0)
                     return;
 
                 UltraGridBand band = ultraGrid1.DisplayLayout.Bands[0];
+                int visibleColCount = band.Columns.Cast<UltraGridColumn>().Count(c => !c.Hidden);
 
-                // Get the row selector width for proper offset
-                int rowSelectorWidth = ultraGrid1.DisplayLayout.Override.RowSelectorWidth;
-                int xOffset = rowSelectorWidth;
-
-                // Update position and width of each footer label
-                foreach (UltraGridColumn col in band.Columns)
+                if (footerLabels.Count != visibleColCount)
                 {
-                    if (col.Hidden)
-                        continue;
-
-                    if (footerLabels.ContainsKey(col.Key))
-                    {
-                        Label lblFooter = footerLabels[col.Key];
-                        lblFooter.Left = xOffset;
-                        lblFooter.Width = col.Width;
-                    }
-
-                    xOffset += col.Width;
+                    CreateFooterCells();
+                    return;
                 }
 
-                // Update panel position
+                int rowSelectorWidth = ultraGrid1.DisplayLayout.Override.RowSelectors == Infragistics.Win.DefaultableBoolean.True ? ultraGrid1.DisplayLayout.Override.RowSelectorWidth : 0;
+                int scrollOffset = 0;
+                if (ultraGrid1.ActiveColScrollRegion != null)
+                {
+                    scrollOffset = ultraGrid1.ActiveColScrollRegion.Position;
+                }
+
+                int calculatedX = rowSelectorWidth - scrollOffset;
+
+                foreach (UltraGridColumn column in band.Columns.Cast<UltraGridColumn>().OrderBy(c => c.Header.VisiblePosition))
+                {
+                    if (column.Hidden || !footerLabels.ContainsKey(column.Key))
+                        continue;
+
+                    Label footerLabel = footerLabels[column.Key];
+                    UIElement headerUI = column.Header.GetUIElement();
+                    int left, width;
+
+                    if (headerUI != null && headerUI.Rect.Width > 0)
+                    {
+                        left = headerUI.Rect.Left;
+                        width = headerUI.Rect.Width;
+                    }
+                    else
+                    {
+                        left = calculatedX;
+                        width = column.Width;
+                    }
+
+                    calculatedX += column.Width;
+
+                    footerLabel.Left = left;
+                    footerLabel.Width = width;
+                    footerLabel.Top = 0;
+                    footerLabel.Height = gridFooterPanel.Height;
+                    footerLabel.Visible = (left + width > 0 && left < gridFooterPanel.Width);
+                    footerLabel.Invalidate();
+                }
+
                 gridFooterPanel.Top = ultraGrid1.Bottom;
+                gridFooterPanel.Left = ultraGrid1.Left;
                 gridFooterPanel.Width = ultraGrid1.Width;
             }
             catch (Exception ex)
@@ -9195,97 +9110,20 @@ namespace PosBranch_Win.Transaction
             }
         }
 
-        // Handle grid column resize to update footer cells
         private void UltraGrid1_ColumnSized(object sender, EventArgs e)
         {
             UpdateFooterCellPositions();
         }
 
-        // Paint handler for footer labels to create curved box effect
         private void FooterLabel_Paint(object sender, PaintEventArgs e)
         {
             Label lbl = sender as Label;
-            if (lbl == null)
-                return;
+            if (lbl == null) return;
 
-            // Get the text from the label
-            string displayText = lbl.Text;
-            string columnKey = "";
-
-            // If text is empty, check if we have text stored in the tag property
-            if (lbl.Tag is Tuple<string, string>)
+            using (Pen borderPen = new Pen(Color.FromArgb(118, 154, 198), 1))
             {
-                Tuple<string, string> tagData = (Tuple<string, string>)lbl.Tag;
-                columnKey = tagData.Item1; // Get the column key
-                displayText = tagData.Item2; // Get the display text from the tag
+                e.Graphics.DrawLine(borderPen, lbl.Width - 1, 0, lbl.Width - 1, lbl.Height);
             }
-
-            // If we still don't have text, don't draw anything
-            if (string.IsNullOrEmpty(displayText))
-                return;
-
-            // Check if this column has aggregation set to "None"
-            if (columnAggregations.ContainsKey(columnKey) && columnAggregations[columnKey] == "None")
-                return; // Don't draw anything for "None" aggregation
-
-            // Get the Graphics object and set high quality rendering
-            Graphics g = e.Graphics;
-            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
-
-            // Measure the text to center it properly
-            SizeF textSize = g.MeasureString(displayText, lbl.Font);
-
-            // Calculate the rounded rectangle size to fill most of the cell
-            int padding = 6;
-            int cornerRadius = 6; // Smaller corner radius to better align with cells
-            int margin = 1; // Minimal margin to align with cell borders
-
-            // Make the box fill the width of the cell with small margins
-            int boxWidth = lbl.Width - (margin * 2);
-            int boxHeight = (int)textSize.Height + padding;
-
-            // Align the box with the cell borders
-            int x = margin;
-            int y = (lbl.Height - boxHeight) / 2;
-
-            // Create rectangle and use the consistent header dark blue for the pill/box fill
-            Rectangle rect = new Rectangle(x, y, boxWidth, boxHeight);
-            Color boxColor = GridHeaderBlueDark; // Consistent with column header gradient dark tone
-
-            // Draw the rounded rectangle
-            using (System.Drawing.Drawing2D.GraphicsPath path = new System.Drawing.Drawing2D.GraphicsPath())
-            {
-                // Add arcs for the corners
-                path.AddArc(rect.X, rect.Y, cornerRadius * 2, cornerRadius * 2, 180, 90);
-                path.AddArc(rect.X + rect.Width - cornerRadius * 2, rect.Y, cornerRadius * 2, cornerRadius * 2, 270, 90);
-                path.AddArc(rect.X + rect.Width - cornerRadius * 2, rect.Y + rect.Height - cornerRadius * 2, cornerRadius * 2, cornerRadius * 2, 0, 90);
-                path.AddArc(rect.X, rect.Y + rect.Height - cornerRadius * 2, cornerRadius * 2, cornerRadius * 2, 90, 90);
-
-                // Close the path
-                path.CloseAllFigures();
-
-                // Fill the rounded rectangle
-                using (SolidBrush brush = new SolidBrush(boxColor))
-                {
-                    g.FillPath(brush, path);
-                }
-            }
-
-            // Draw the text centered in the rounded rectangle
-            using (SolidBrush textBrush = new SolidBrush(Color.White))
-            {
-                // Center the text in the box - ensure perfect centering
-                float textX = x + (boxWidth - textSize.Width) / 2;
-                float textY = y + (boxHeight - textSize.Height) / 2;
-
-                // Add slight vertical adjustment for better visual centering
-                textY -= 1;
-
-                g.DrawString(displayText, lbl.Font, textBrush, textX, textY);
-            }
-
-            // Clear the original text to avoid drawing it twice
-            lbl.Text = "";
         }
 
         private void FrmPurchase_KeyDown_ToggleSellingPrice(object sender, KeyEventArgs e)

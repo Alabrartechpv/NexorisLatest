@@ -5756,6 +5756,110 @@ namespace PosBranch_Win.Transaction
             // lblNetAmount.Text = TxtSubTotal.Text;
         }
 
+        private void ShowPlayfulVendorAlert()
+        {
+            try
+            {
+                using (Form alertForm = new Form())
+                {
+                    alertForm.Text = "Oops!";
+                    alertForm.Size = new Size(380, 210);
+                    alertForm.FormBorderStyle = FormBorderStyle.None;
+                    alertForm.StartPosition = FormStartPosition.CenterParent;
+                    alertForm.ShowInTaskbar = false;
+                    alertForm.TopMost = true;
+                    alertForm.BackColor = Color.FromArgb(235, 245, 255);
+
+                    alertForm.Paint += (s, e) =>
+                    {
+                        Graphics g = e.Graphics;
+                        g.SmoothingMode = SmoothingMode.AntiAlias;
+
+                        Rectangle rect = new Rectangle(0, 0, alertForm.Width - 1, alertForm.Height - 1);
+                        using (LinearGradientBrush brush = new LinearGradientBrush(rect, Color.FromArgb(242, 248, 255), Color.FromArgb(215, 235, 255), LinearGradientMode.Vertical))
+                        {
+                            g.FillRectangle(brush, rect);
+                        }
+
+                        using (Pen pen = new Pen(Color.FromArgb(102, 190, 255), 2))
+                        {
+                            g.DrawRectangle(pen, 1, 1, alertForm.Width - 3, alertForm.Height - 3);
+                        }
+
+                        using (Pen topPen = new Pen(Color.FromArgb(67, 118, 184), 3))
+                        {
+                            g.DrawLine(topPen, 10, 2, alertForm.Width - 10, 2);
+                        }
+                    };
+
+                    Label lblBadge = new Label
+                    {
+                        Text = "🛒 OOPS!",
+                        Font = new Font("Segoe UI", 12F, FontStyle.Bold),
+                        ForeColor = Color.FromArgb(20, 55, 120),
+                        BackColor = Color.Transparent,
+                        AutoSize = false,
+                        Size = new Size(340, 30),
+                        Location = new Point(20, 18),
+                        TextAlign = ContentAlignment.MiddleCenter
+                    };
+                    alertForm.Controls.Add(lblBadge);
+
+                    Label lblMessage = new Label
+                    {
+                        Text = "oops select vendor first please.",
+                        Font = new Font("Segoe UI Semibold", 11F, FontStyle.Bold),
+                        ForeColor = Color.FromArgb(10, 31, 79),
+                        BackColor = Color.Transparent,
+                        AutoSize = false,
+                        Size = new Size(340, 50),
+                        Location = new Point(20, 52),
+                        TextAlign = ContentAlignment.MiddleCenter
+                    };
+                    alertForm.Controls.Add(lblMessage);
+
+                    Button btnOk = new Button
+                    {
+                        Text = "Select Vendor 🛒",
+                        Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                        ForeColor = Color.White,
+                        BackColor = Color.FromArgb(93, 151, 214),
+                        FlatStyle = FlatStyle.Flat,
+                        Size = new Size(180, 42),
+                        Location = new Point((alertForm.Width - 180) / 2, 125),
+                        Cursor = Cursors.Hand,
+                        DialogResult = DialogResult.OK
+                    };
+                    btnOk.FlatAppearance.BorderSize = 0;
+
+                    btnOk.Paint += (s, e) =>
+                    {
+                        Graphics g = e.Graphics;
+                        g.SmoothingMode = SmoothingMode.AntiAlias;
+                        Rectangle bRect = new Rectangle(0, 0, btnOk.Width, btnOk.Height);
+                        using (LinearGradientBrush bBrush = new LinearGradientBrush(bRect, Color.FromArgb(93, 151, 214), Color.FromArgb(67, 118, 184), LinearGradientMode.Vertical))
+                        {
+                            g.FillRectangle(bBrush, bRect);
+                        }
+                        using (Pen bPen = new Pen(Color.FromArgb(118, 154, 198), 1))
+                        {
+                            g.DrawRectangle(bPen, 0, 0, btnOk.Width - 1, btnOk.Height - 1);
+                        }
+                        TextRenderer.DrawText(g, btnOk.Text, btnOk.Font, bRect, Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+                    };
+
+                    alertForm.Controls.Add(btnOk);
+                    alertForm.AcceptButton = btnOk;
+
+                    alertForm.ShowDialog(this);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Error displaying playful vendor alert: " + ex.Message);
+            }
+        }
+
         private void btnAddPurchaceList_Click(object sender, EventArgs e)
         {
             try
@@ -5790,17 +5894,21 @@ namespace PosBranch_Win.Transaction
                 pbxSave.Visible = true;
                 ultraPictureBox4.Visible = false;
 
-                // If no vendor is selected, automatically open the vendor dialog
-                if (string.IsNullOrEmpty(vendorid.Text))
+                // Check if a valid vendor is selected (vendorid.Text must be non-empty and > 0)
+                int vendorId = 0;
+                if (vendorid == null || string.IsNullOrWhiteSpace(vendorid.Text) || !int.TryParse(vendorid.Text, out vendorId) || vendorId <= 0)
                 {
-                    // Instead of showing an alert, automatically call button2_Click to open vendor selection
+                    ShowPlayfulVendorAlert();
                     button2_Click(sender, e);
-                    return;
+
+                    // Re-check vendorid after vendor selection dialog closes
+                    if (vendorid == null || string.IsNullOrWhiteSpace(vendorid.Text) || !int.TryParse(vendorid.Text, out vendorId) || vendorId <= 0)
+                    {
+                        return;
+                    }
                 }
 
-                // Get the selected vendor information
-                int vendorId = Convert.ToInt32(vendorid.Text);
-                string vendorName = VendorName.Text;
+                string vendorName = VendorName != null ? VendorName.Text : string.Empty;
 
                 // Open the purchase details dialog for the selected vendor
                 FrmVendorPurchaseDetailsDialog purchaseDialog = new FrmVendorPurchaseDetailsDialog(vendorId, vendorName);

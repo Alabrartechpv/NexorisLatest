@@ -39,6 +39,11 @@ namespace PosBranch_Win.DialogBox
         private Form columnChooserForm = null;
         private ListBox columnChooserListBox = null;
 
+        // Add ultraPanelGridFooter for grid footer matching frmPurchaseReturn.cs
+        private Infragistics.Win.Misc.UltraPanel ultraPanelGridFooter = null;
+        private Dictionary<string, Label> footerLabels = new Dictionary<string, Label>();
+        private Dictionary<string, string> columnAggregations = new Dictionary<string, string>();
+
         // Add this dictionary as a class-level field to store column widths
         private Dictionary<string, int> savedColumnWidths = new Dictionary<string, int>();
 
@@ -183,15 +188,18 @@ namespace PosBranch_Win.DialogBox
             UpdateStatus("Form initialized");
         }
 
-        // Add these event handlers to preserve column widths
+        // Add these event handlers to preserve column widths & sync footer
         private void UltraGrid1_AfterRowsDeleted(object sender, EventArgs e)
         {
             PreserveColumnWidths();
+            UpdateFooterCellValues();
+            SyncGridFooterPositions();
         }
 
         private void UltraGrid1_AfterSortChange(object sender, BandEventArgs e)
         {
             PreserveColumnWidths();
+            SyncGridFooterPositions();
         }
 
         private void UltraGrid1_AfterColPosChanged(object sender, AfterColPosChangedEventArgs e)
@@ -211,6 +219,8 @@ namespace PosBranch_Win.DialogBox
             {
                 PreserveColumnWidths();
             }
+            CreateFooterCells();
+            SyncGridFooterPositions();
         }
 
         // Helper method to preserve column widths
@@ -243,12 +253,16 @@ namespace PosBranch_Win.DialogBox
         {
             // Preserve column widths when form is resized
             PreserveColumnWidths();
+            SetupUltraPanelGridFooter();
+            SyncGridFooterPositions();
         }
 
         private void UltraGrid1_Resize(object sender, EventArgs e)
         {
             // Preserve column widths when grid is resized
             PreserveColumnWidths();
+            SetupUltraPanelGridFooter();
+            SyncGridFooterPositions();
         }
 
         private void FrmDialForItemMaster_FormClosing(object sender, FormClosingEventArgs e)
@@ -939,32 +953,105 @@ namespace PosBranch_Win.DialogBox
             }
         }
 
+        private static readonly Color ReportBtnTopColor = Color.FromArgb(234, 244, 255);
+        private static readonly Color ReportBtnBottomColor = Color.FromArgb(152, 188, 235);
+        private static readonly Color ReportBtnBorderColor = Color.FromArgb(73, 119, 184);
+        private static readonly Color ReportBtnHoverTopColor = Color.FromArgb(245, 250, 255);
+        private static readonly Color ReportBtnHoverBottomColor = Color.FromArgb(170, 206, 244);
+        private static readonly Color ReportBtnPressedTopColor = Color.FromArgb(205, 226, 248);
+        private static readonly Color ReportBtnPressedBottomColor = Color.FromArgb(128, 170, 224);
+
+        private static void ApplyReportFormatButtonStyle(Infragistics.Win.Misc.UltraPanel panel, bool isHover = false, bool isPressed = false)
+        {
+            if (panel == null) return;
+            panel.UseAppStyling = false;
+            panel.BorderStyle = Infragistics.Win.UIElementBorderStyle.Rounded1;
+            panel.Cursor = Cursors.Hand;
+            panel.ClientArea.Cursor = Cursors.Hand;
+
+            Infragistics.Win.Appearance appearance = (Infragistics.Win.Appearance)panel.Appearance;
+            appearance.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
+            appearance.BorderColor = ReportBtnBorderColor;
+
+            if (isPressed)
+            {
+                appearance.BackColor = ReportBtnPressedTopColor;
+                appearance.BackColor2 = ReportBtnPressedBottomColor;
+            }
+            else if (isHover)
+            {
+                appearance.BackColor = ReportBtnHoverTopColor;
+                appearance.BackColor2 = ReportBtnHoverBottomColor;
+            }
+            else
+            {
+                appearance.BackColor = ReportBtnTopColor;
+                appearance.BackColor2 = ReportBtnBottomColor;
+            }
+
+            foreach (Control control in panel.ClientArea.Controls)
+            {
+                control.Cursor = Cursors.Hand;
+                if (control is Label lbl)
+                {
+                    lbl.ForeColor = Color.FromArgb(0, 46, 127);
+                    lbl.Font = new Font("Microsoft Sans Serif", 9.5F, FontStyle.Bold);
+                    lbl.BackColor = Color.Transparent;
+                }
+                else if (control is Infragistics.Win.UltraWinEditors.UltraPictureBox pic)
+                {
+                    pic.BackColor = Color.Transparent;
+                    pic.BackColorInternal = Color.Transparent;
+                    pic.BorderShadowColor = Color.Transparent;
+                }
+            }
+        }
+
+        private void RegisterReportPanelHoverEvents(Infragistics.Win.Misc.UltraPanel panel)
+        {
+            if (panel == null) return;
+
+            panel.MouseEnter += (s, e) => ApplyReportFormatButtonStyle(panel, true, false);
+            panel.MouseLeave += (s, e) => ApplyReportFormatButtonStyle(panel, false, false);
+            panel.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) ApplyReportFormatButtonStyle(panel, true, true); };
+            panel.MouseUp += (s, e) => ApplyReportFormatButtonStyle(panel, true, false);
+
+            panel.ClientArea.MouseEnter += (s, e) => ApplyReportFormatButtonStyle(panel, true, false);
+            panel.ClientArea.MouseLeave += (s, e) => ApplyReportFormatButtonStyle(panel, false, false);
+            panel.ClientArea.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) ApplyReportFormatButtonStyle(panel, true, true); };
+            panel.ClientArea.MouseUp += (s, e) => ApplyReportFormatButtonStyle(panel, true, false);
+
+            foreach (Control child in panel.ClientArea.Controls)
+            {
+                child.MouseEnter += (s, e) => ApplyReportFormatButtonStyle(panel, true, false);
+                child.MouseLeave += (s, e) => ApplyReportFormatButtonStyle(panel, false, false);
+                child.MouseDown += (s, e) => { if (e.Button == MouseButtons.Left) ApplyReportFormatButtonStyle(panel, true, true); };
+                child.MouseUp += (s, e) => ApplyReportFormatButtonStyle(panel, true, false);
+            }
+        }
+
         private void SetupUltraPanelStyle()
         {
-            // First apply the base styling to all panels
-            StyleIconPanel(ultraPanel3);
-            StyleIconPanel(ultraPanel4);
-            StyleIconPanel(ultraPanel5);
-            StyleIconPanel(ultraPanel6);
-            StyleIconPanel(ultraPanel7);
+            Infragistics.Win.Misc.UltraPanel[] targetPanels = new Infragistics.Win.Misc.UltraPanel[]
+            {
+                ultraPanel3, ultraPanel4, ultraPanel5, ultraPanel6, ultraPanel7
+            };
 
-            // Now explicitly set ultraPanel3 and ultraPanel7 to match ultraPanel4's colors
-            // This ensures they have exactly the same appearance
-            ultraPanel3.Appearance.BackColor = ultraPanel4.Appearance.BackColor;
-            ultraPanel3.Appearance.BackColor2 = ultraPanel4.Appearance.BackColor2;
-            ultraPanel3.Appearance.BackGradientStyle = ultraPanel4.Appearance.BackGradientStyle;
-            ultraPanel3.Appearance.BorderColor = ultraPanel4.Appearance.BorderColor;
+            foreach (var panel in targetPanels)
+            {
+                if (panel == null) continue;
+                ApplyReportFormatButtonStyle(panel, false, false);
+                RegisterReportPanelHoverEvents(panel);
+            }
 
-            ultraPanel7.Appearance.BackColor = ultraPanel4.Appearance.BackColor;
-            ultraPanel7.Appearance.BackColor2 = ultraPanel4.Appearance.BackColor2;
-            ultraPanel7.Appearance.BackGradientStyle = ultraPanel4.Appearance.BackGradientStyle;
-            ultraPanel7.Appearance.BorderColor = ultraPanel4.Appearance.BorderColor;
-
-            // Set appearance for the main panel - removed curved border
-            ultPanelPurchaseDisplay.Appearance.BackColor = Color.White;
-            ultPanelPurchaseDisplay.Appearance.BackColor2 = Color.FromArgb(200, 230, 250);
-            ultPanelPurchaseDisplay.Appearance.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
-            ultPanelPurchaseDisplay.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
+            // Set appearance for main panel
+            if (ultPanelPurchaseDisplay != null)
+            {
+                ultPanelPurchaseDisplay.Appearance.BackColor = Color.White;
+                ultPanelPurchaseDisplay.Appearance.BackColor2 = Color.FromArgb(200, 230, 250);
+                ultPanelPurchaseDisplay.Appearance.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
+                ultPanelPurchaseDisplay.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
+            }
         }
 
         private void StyleGlassPanel(Infragistics.Win.Misc.UltraPanel panel)
@@ -1118,6 +1205,9 @@ namespace PosBranch_Win.DialogBox
         {
             try
             {
+                ultraGrid1.UseAppStyling = false;
+                ultraGrid1.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
+
                 ultraGrid1.DisplayLayout.Reset();
 
                 ultraGrid1.DisplayLayout.Override.AllowAddNew = Infragistics.Win.UltraWinGrid.AllowAddNew.No;
@@ -1133,7 +1223,14 @@ namespace PosBranch_Win.DialogBox
 
                 ultraGrid1.DisplayLayout.GroupByBox.Hidden = true;
                 ultraGrid1.DisplayLayout.GroupByBox.Prompt = string.Empty;
+
+                // Grid background matching frmPurchaseReturn.cs
+                ultraGrid1.DisplayLayout.Appearance.BackColor = Color.FromArgb(232, 246, 255);
+                ultraGrid1.DisplayLayout.Appearance.BackColor2 = Color.FromArgb(232, 246, 255);
+                ultraGrid1.DisplayLayout.Appearance.BackGradientStyle = Infragistics.Win.GradientStyle.None;
+                ultraGrid1.DisplayLayout.Appearance.BorderColor = Color.FromArgb(197, 217, 241);
                 ultraGrid1.DisplayLayout.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
+
                 ultraGrid1.DisplayLayout.Override.BorderStyleRow = Infragistics.Win.UIElementBorderStyle.Solid;
                 ultraGrid1.DisplayLayout.Override.BorderStyleCell = Infragistics.Win.UIElementBorderStyle.Solid;
                 ultraGrid1.DisplayLayout.Override.BorderStyleHeader = Infragistics.Win.UIElementBorderStyle.Solid;
@@ -1147,64 +1244,64 @@ namespace PosBranch_Win.DialogBox
                 ultraGrid1.DisplayLayout.Override.CellSpacing = 0;
                 ultraGrid1.DisplayLayout.InterBandSpacing = 0;
 
-                Color lightBlue = Color.FromArgb(173, 216, 230);
-                Color headerBlue = Color.FromArgb(0, 123, 255);
+                ultraGrid1.DisplayLayout.Override.MinRowHeight = 24;
+                ultraGrid1.DisplayLayout.Override.DefaultRowHeight = 24;
 
-                ultraGrid1.DisplayLayout.Override.CellAppearance.BorderColor = lightBlue;
-                ultraGrid1.DisplayLayout.Override.RowAppearance.BorderColor = lightBlue;
-                ultraGrid1.DisplayLayout.Override.HeaderAppearance.BorderColor = headerBlue;
-                ultraGrid1.DisplayLayout.Override.RowSelectorAppearance.BorderColor = headerBlue;
-
-                ultraGrid1.DisplayLayout.Override.MinRowHeight = 30;
-                ultraGrid1.DisplayLayout.Override.DefaultRowHeight = 30;
-
-                ultraGrid1.DisplayLayout.Override.HeaderStyle = Infragistics.Win.HeaderStyle.WindowsXPCommand;
-                ultraGrid1.DisplayLayout.Override.HeaderAppearance.BackColor = headerBlue;
-                ultraGrid1.DisplayLayout.Override.HeaderAppearance.BackColor2 = headerBlue;
-                ultraGrid1.DisplayLayout.Override.HeaderAppearance.BackGradientStyle = Infragistics.Win.GradientStyle.None;
+                // Cell Header appearance matching frmPurchaseReturn.cs (Image 2)
+                ultraGrid1.DisplayLayout.Override.HeaderStyle = Infragistics.Win.HeaderStyle.Standard;
+                ultraGrid1.DisplayLayout.Override.HeaderAppearance.BackColor = Color.FromArgb(93, 151, 214);
+                ultraGrid1.DisplayLayout.Override.HeaderAppearance.BackColor2 = Color.FromArgb(67, 118, 184);
+                ultraGrid1.DisplayLayout.Override.HeaderAppearance.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
                 ultraGrid1.DisplayLayout.Override.HeaderAppearance.ForeColor = Color.White;
+                ultraGrid1.DisplayLayout.Override.HeaderAppearance.BorderColor = Color.FromArgb(118, 154, 198);
                 ultraGrid1.DisplayLayout.Override.HeaderAppearance.TextHAlign = Infragistics.Win.HAlign.Center;
                 ultraGrid1.DisplayLayout.Override.HeaderAppearance.TextVAlign = Infragistics.Win.VAlign.Middle;
-                ultraGrid1.DisplayLayout.Override.HeaderAppearance.FontData.Bold = Infragistics.Win.DefaultableBoolean.True;
-                ultraGrid1.DisplayLayout.Override.HeaderAppearance.FontData.SizeInPoints = 9;
+                ultraGrid1.DisplayLayout.Override.HeaderAppearance.FontData.Bold = Infragistics.Win.DefaultableBoolean.False;
+                ultraGrid1.DisplayLayout.Override.HeaderAppearance.FontData.SizeInPoints = 8.25F;
                 ultraGrid1.DisplayLayout.Override.HeaderAppearance.FontData.Name = "Microsoft Sans Serif";
                 ultraGrid1.DisplayLayout.Override.HeaderAppearance.ThemedElementAlpha = Infragistics.Win.Alpha.Transparent;
-                ultraGrid1.DisplayLayout.Override.HeaderAppearance.TextTrimming = Infragistics.Win.TextTrimming.None;
                 ultraGrid1.DisplayLayout.Override.WrapHeaderText = Infragistics.Win.DefaultableBoolean.False;
 
-                ultraGrid1.DisplayLayout.Override.RowSelectorAppearance.BackColor = headerBlue;
-                ultraGrid1.DisplayLayout.Override.RowSelectorAppearance.BackColor2 = headerBlue;
-                ultraGrid1.DisplayLayout.Override.RowSelectorAppearance.BackGradientStyle = Infragistics.Win.GradientStyle.None;
+                // Row Selector Header styling matching frmPurchaseReturn.cs (Image 2)
+                ultraGrid1.DisplayLayout.Override.RowSelectors = Infragistics.Win.DefaultableBoolean.True;
+                ultraGrid1.DisplayLayout.Override.RowSelectorWidth = 20;
+                ultraGrid1.DisplayLayout.Override.RowSelectorNumberStyle = Infragistics.Win.UltraWinGrid.RowSelectorNumberStyle.RowIndex;
+                ultraGrid1.DisplayLayout.Override.RowSelectorAppearance.BackColor = Color.FromArgb(67, 118, 184);
+                ultraGrid1.DisplayLayout.Override.RowSelectorAppearance.BackColor2 = Color.FromArgb(93, 151, 214);
+                ultraGrid1.DisplayLayout.Override.RowSelectorAppearance.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
+                ultraGrid1.DisplayLayout.Override.RowSelectorAppearance.BorderColor = Color.FromArgb(118, 154, 198);
                 ultraGrid1.DisplayLayout.Override.RowSelectorAppearance.ForeColor = Color.White;
-                ultraGrid1.DisplayLayout.Override.RowSelectorHeaderStyle = Infragistics.Win.UltraWinGrid.RowSelectorHeaderStyle.Default;
-                ultraGrid1.DisplayLayout.Override.RowSelectorNumberStyle = Infragistics.Win.UltraWinGrid.RowSelectorNumberStyle.None;
-                ultraGrid1.DisplayLayout.Override.RowSelectorWidth = 15;
+                ultraGrid1.DisplayLayout.Override.RowSelectorAppearance.TextHAlign = Infragistics.Win.HAlign.Center;
 
                 ultraGrid1.DisplayLayout.Override.ActiveRowAppearance.Image = null;
                 ultraGrid1.DisplayLayout.Override.SelectedRowAppearance.Image = null;
                 ultraGrid1.DisplayLayout.Override.RowSelectorAppearance.Image = null;
 
+                // Normal & Alternate Rows matching frmPurchaseReturn.cs
                 ultraGrid1.DisplayLayout.Override.RowAppearance.BackColor = Color.White;
-                ultraGrid1.DisplayLayout.Override.RowAppearance.BackColor2 = Color.White;
-                ultraGrid1.DisplayLayout.Override.RowAppearance.BackGradientStyle = Infragistics.Win.GradientStyle.None;
-                ultraGrid1.DisplayLayout.Override.RowAlternateAppearance.BackColor = Color.White;
-                ultraGrid1.DisplayLayout.Override.RowAlternateAppearance.BackColor2 = Color.White;
-                ultraGrid1.DisplayLayout.Override.RowAlternateAppearance.BackGradientStyle = Infragistics.Win.GradientStyle.None;
+                ultraGrid1.DisplayLayout.Override.RowAppearance.ForeColor = Color.FromArgb(10, 31, 79);
+                ultraGrid1.DisplayLayout.Override.RowAppearance.BorderColor = Color.FromArgb(197, 217, 241);
+                ultraGrid1.DisplayLayout.Override.RowAlternateAppearance.BackColor = Color.FromArgb(245, 250, 255);
+                ultraGrid1.DisplayLayout.Override.RowAlternateAppearance.BorderColor = Color.FromArgb(197, 217, 241);
 
-                ultraGrid1.DisplayLayout.Override.SelectedRowAppearance.BackColor = Color.FromArgb(0, 120, 215);
-                ultraGrid1.DisplayLayout.Override.SelectedRowAppearance.BackColor2 = Color.FromArgb(0, 120, 215);
+                // Item Highlighter (Selected & Active Row) matching Image 2
+                ultraGrid1.DisplayLayout.Override.SelectedRowAppearance.BackColor = Color.FromArgb(173, 216, 255);
+                ultraGrid1.DisplayLayout.Override.SelectedRowAppearance.BackColor2 = Color.FromArgb(173, 216, 255);
                 ultraGrid1.DisplayLayout.Override.SelectedRowAppearance.BackGradientStyle = Infragistics.Win.GradientStyle.None;
-                ultraGrid1.DisplayLayout.Override.SelectedRowAppearance.ForeColor = Color.White;
+                ultraGrid1.DisplayLayout.Override.SelectedRowAppearance.ForeColor = Color.FromArgb(10, 31, 79);
+                ultraGrid1.DisplayLayout.Override.SelectedRowAppearance.FontData.Bold = Infragistics.Win.DefaultableBoolean.False;
 
-                ultraGrid1.DisplayLayout.Override.ActiveRowAppearance.BackColor = Color.FromArgb(0, 120, 215);
-                ultraGrid1.DisplayLayout.Override.ActiveRowAppearance.BackColor2 = Color.FromArgb(0, 120, 215);
+                ultraGrid1.DisplayLayout.Override.ActiveRowAppearance.BackColor = Color.FromArgb(173, 216, 255);
+                ultraGrid1.DisplayLayout.Override.ActiveRowAppearance.BackColor2 = Color.FromArgb(173, 216, 255);
                 ultraGrid1.DisplayLayout.Override.ActiveRowAppearance.BackGradientStyle = Infragistics.Win.GradientStyle.None;
-                ultraGrid1.DisplayLayout.Override.ActiveRowAppearance.ForeColor = Color.White;
+                ultraGrid1.DisplayLayout.Override.ActiveRowAppearance.ForeColor = Color.FromArgb(10, 31, 79);
+                ultraGrid1.DisplayLayout.Override.ActiveRowAppearance.FontData.Bold = Infragistics.Win.DefaultableBoolean.False;
 
-                ultraGrid1.DisplayLayout.Override.CellAppearance.FontData.SizeInPoints = 10;
-                ultraGrid1.DisplayLayout.Override.RowAppearance.FontData.SizeInPoints = 10;
+                ultraGrid1.DisplayLayout.Override.CellAppearance.BorderColor = Color.FromArgb(197, 217, 241);
+                ultraGrid1.DisplayLayout.Override.CellAppearance.ForeColor = Color.FromArgb(10, 31, 79);
+                ultraGrid1.DisplayLayout.Override.CellAppearance.FontData.SizeInPoints = 8.25F;
                 ultraGrid1.DisplayLayout.Override.CellAppearance.FontData.Name = "Microsoft Sans Serif";
-                ultraGrid1.DisplayLayout.Override.RowAppearance.FontData.Name = "Microsoft Sans Serif";
+                ultraGrid1.DisplayLayout.Override.CellAppearance.TextVAlign = Infragistics.Win.VAlign.Middle;
 
                 ultraGrid1.DisplayLayout.ScrollBounds = Infragistics.Win.UltraWinGrid.ScrollBounds.ScrollToFill;
                 ultraGrid1.DisplayLayout.ScrollStyle = Infragistics.Win.UltraWinGrid.ScrollStyle.Immediate;
@@ -1253,10 +1350,360 @@ namespace PosBranch_Win.DialogBox
                 }
 
                 ultraGrid1.Refresh();
+                SetupUltraPanelGridFooter();
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Error setting up grid style: {ex.Message}");
+            }
+        }
+
+        private void SetupUltraPanelGridFooter()
+        {
+            try
+            {
+                if (ultraGrid1 == null || ultraGrid1.Parent == null) return;
+
+                Control parentControl = ultraGrid1.Parent;
+
+                if (ultraPanelGridFooter == null)
+                {
+                    ultraPanelGridFooter = new Infragistics.Win.Misc.UltraPanel();
+                    ultraPanelGridFooter.Name = "ultraPanelGridFooter";
+                    parentControl.Controls.Add(ultraPanelGridFooter);
+                }
+
+                // Strictly bound ultraGrid1 and ultraPanelGridFooter within upper area
+                // Grid original bounds: Location = (5, 69), Size = (673, 322).
+                // Subtract footerHeight (24) so grid ends at Y=367 and footer ends at Y=391,
+                // leaving label1 at Y=396 and action buttons at Y=440 completely free and unblocked!
+                int originalTop = 69;
+                int originalWidth = 673;
+                int footerHeight = 24;
+                int gridHeight = 322 - footerHeight; // 298px
+
+                ultraGrid1.Location = new Point(5, originalTop);
+                ultraGrid1.Size = new Size(originalWidth, gridHeight);
+
+                ultraPanelGridFooter.Dock = DockStyle.None;
+                ultraPanelGridFooter.Location = new Point(5, originalTop + gridHeight); // Y = 367
+                ultraPanelGridFooter.Size = new Size(originalWidth, footerHeight);
+
+                ultraPanelGridFooter.Appearance.BackColor = Color.FromArgb(93, 151, 214);
+                ultraPanelGridFooter.Appearance.BackColor2 = Color.FromArgb(93, 151, 214);
+                ultraPanelGridFooter.Appearance.BackGradientStyle = Infragistics.Win.GradientStyle.None;
+                ultraPanelGridFooter.Appearance.BorderColor = Color.FromArgb(144, 181, 223);
+                ultraPanelGridFooter.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
+                ultraPanelGridFooter.Visible = true;
+                ultraPanelGridFooter.BringToFront();
+
+                // Position label1 below footer cleanly
+                if (this.Controls.Find("label1", true).Length > 0)
+                {
+                    Label label1 = this.Controls.Find("label1", true)[0] as Label;
+                    if (label1 != null)
+                    {
+                        label1.Location = new Point(6, 396);
+                        label1.BringToFront();
+                    }
+                }
+
+                CreateFooterCells();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Error setting up ultraPanelGridFooter: " + ex.Message);
+            }
+        }
+
+        private void CreateFooterCells()
+        {
+            if (ultraPanelGridFooter == null) return;
+            ultraPanelGridFooter.ClientArea.Controls.Clear();
+            footerLabels.Clear();
+
+            if (ultraGrid1 == null || ultraGrid1.DisplayLayout == null || ultraGrid1.DisplayLayout.Bands.Count == 0)
+                return;
+
+            UltraGridBand band = ultraGrid1.DisplayLayout.Bands[0];
+            int xOffset = ultraGrid1.DisplayLayout.Override.RowSelectorWidth;
+
+            foreach (UltraGridColumn column in band.Columns.Cast<UltraGridColumn>().OrderBy(c => c.Header.VisiblePosition))
+            {
+                if (column.Hidden) continue;
+
+                Label footerLabel = new Label();
+                footerLabel.Name = "footer_" + column.Key;
+                footerLabel.Text = string.Empty;
+                footerLabel.TextAlign = (column.Key == "Cost" || column.Key == "RetailPrice" || column.Key == "Stock") ? ContentAlignment.MiddleRight : ContentAlignment.MiddleLeft;
+                footerLabel.BackColor = Color.FromArgb(93, 151, 214);
+                footerLabel.BorderStyle = BorderStyle.None;
+                footerLabel.AutoSize = false;
+                footerLabel.Width = column.Width;
+                footerLabel.Height = Math.Max(ultraPanelGridFooter.Height - 2, 20);
+                footerLabel.Left = xOffset;
+                footerLabel.Top = 1;
+                footerLabel.Tag = Tuple.Create(column.Key, string.Empty);
+                footerLabel.ForeColor = Color.White;
+                footerLabel.Font = new Font("Microsoft Sans Serif", 8.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
+                footerLabel.Paint += FooterLabel_Paint;
+                footerLabel.ContextMenuStrip = CreateFooterContextMenu(column.Key);
+
+                ultraPanelGridFooter.ClientArea.Controls.Add(footerLabel);
+                footerLabels[column.Key] = footerLabel;
+
+                if (!columnAggregations.ContainsKey(column.Key))
+                {
+                    if (column.Key == "Description")
+                        columnAggregations[column.Key] = "Count";
+                    else
+                        columnAggregations[column.Key] = "None";
+                }
+
+                xOffset += column.Width;
+            }
+
+            UpdateFooterValues();
+        }
+
+        private void FooterLabel_Paint(object sender, PaintEventArgs e)
+        {
+            Label lbl = sender as Label;
+            if (lbl == null) return;
+
+            using (Pen borderPen = new Pen(Color.FromArgb(118, 154, 198), 1))
+            {
+                e.Graphics.DrawLine(borderPen, lbl.Width - 1, 0, lbl.Width - 1, lbl.Height);
+            }
+        }
+
+        private ContextMenuStrip CreateFooterContextMenu(string columnKey)
+        {
+            ContextMenuStrip menu = new ContextMenuStrip();
+            menu.Tag = columnKey;
+
+            bool isNumeric = ultraGrid1.DisplayLayout.Bands.Count > 0 &&
+                             ultraGrid1.DisplayLayout.Bands[0].Columns.Exists(columnKey) &&
+                             IsSummableColumn(ultraGrid1.DisplayLayout.Bands[0].Columns[columnKey]);
+
+            ToolStripMenuItem itemSum = new ToolStripMenuItem("Sum");
+            itemSum.Tag = "Sum";
+            itemSum.Enabled = isNumeric;
+            itemSum.Click += FooterContextMenu_Click;
+
+            ToolStripMenuItem itemMin = new ToolStripMenuItem("Min");
+            itemMin.Tag = "Min";
+            itemMin.Click += FooterContextMenu_Click;
+
+            ToolStripMenuItem itemMax = new ToolStripMenuItem("Max");
+            itemMax.Tag = "Max";
+            itemMax.Click += FooterContextMenu_Click;
+
+            ToolStripMenuItem itemCount = new ToolStripMenuItem("Count");
+            itemCount.Tag = "Count";
+            itemCount.Click += FooterContextMenu_Click;
+
+            ToolStripMenuItem itemAverage = new ToolStripMenuItem("Average");
+            itemAverage.Tag = "Avg";
+            itemAverage.Enabled = isNumeric;
+            itemAverage.Click += FooterContextMenu_Click;
+
+            ToolStripMenuItem itemNone = new ToolStripMenuItem("None");
+            itemNone.Tag = "None";
+            itemNone.Click += FooterContextMenu_Click;
+
+            menu.Items.Add(itemSum);
+            menu.Items.Add(itemMin);
+            menu.Items.Add(itemMax);
+            menu.Items.Add(itemCount);
+            menu.Items.Add(itemAverage);
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add(itemNone);
+
+            menu.Opening += (sender, e) =>
+            {
+                string currentAggregation = columnAggregations.ContainsKey(columnKey)
+                    ? columnAggregations[columnKey]
+                    : "None";
+
+                foreach (ToolStripItem menuItem in menu.Items)
+                {
+                    ToolStripMenuItem toolStripMenuItem = menuItem as ToolStripMenuItem;
+                    if (toolStripMenuItem != null && toolStripMenuItem.Tag != null)
+                    {
+                        toolStripMenuItem.Checked = string.Equals(toolStripMenuItem.Tag.ToString(), currentAggregation, StringComparison.OrdinalIgnoreCase);
+                    }
+                }
+            };
+
+            return menu;
+        }
+
+        private bool IsSummableColumn(UltraGridColumn column)
+        {
+            if (column == null || column.DataType == null) return false;
+            Type t = System.Nullable.GetUnderlyingType(column.DataType) ?? column.DataType;
+            return t == typeof(decimal) || t == typeof(double) || t == typeof(float) ||
+                   t == typeof(int) || t == typeof(long) || t == typeof(short);
+        }
+
+        private void FooterContextMenu_Click(object sender, EventArgs e)
+        {
+            ToolStripMenuItem item = sender as ToolStripMenuItem;
+            if (item == null) return;
+
+            ContextMenuStrip menu = item.Owner as ContextMenuStrip;
+            if (menu == null || menu.Tag == null || item.Tag == null) return;
+
+            string columnKey = menu.Tag.ToString();
+            string aggregation = item.Tag.ToString();
+
+            columnAggregations[columnKey] = aggregation;
+            UpdateFooterValues();
+        }
+
+        public void UpdateFooterCellValues()
+        {
+            UpdateFooterValues();
+        }
+
+        public void UpdateFooterValues()
+        {
+            if (footerLabels.Count == 0) return;
+
+            List<UltraGridRow> visibleRows = GetVisibleDataRows().ToList();
+            foreach (KeyValuePair<string, Label> footerEntry in footerLabels)
+            {
+                string columnKey = footerEntry.Key;
+                Label footerLabel = footerEntry.Value;
+
+                if (!columnAggregations.ContainsKey(columnKey) ||
+                    string.Equals(columnAggregations[columnKey], "None", StringComparison.OrdinalIgnoreCase))
+                {
+                    footerLabel.Text = string.Empty;
+                    footerLabel.Tag = Tuple.Create(columnKey, string.Empty);
+                    footerLabel.Invalidate();
+                    continue;
+                }
+
+                object result = CalculateAggregation(columnKey, columnAggregations[columnKey], visibleRows);
+                string displayValue = FormatAggregationResult(columnKey, columnAggregations[columnKey], result);
+
+                footerLabel.Text = displayValue;
+                footerLabel.Tag = Tuple.Create(columnKey, displayValue);
+                footerLabel.ForeColor = Color.White;
+                footerLabel.Invalidate();
+            }
+        }
+
+        private IEnumerable<UltraGridRow> GetVisibleDataRows()
+        {
+            if (ultraGrid1.Rows == null) yield break;
+            foreach (UltraGridRow row in ultraGrid1.Rows)
+            {
+                if (row != null && row.IsDataRow && !row.IsFilteredOut)
+                    yield return row;
+            }
+        }
+
+        private object CalculateAggregation(string columnKey, string aggregation, List<UltraGridRow> visibleRows)
+        {
+            if (visibleRows == null || visibleRows.Count == 0) return null;
+
+            switch (aggregation)
+            {
+                case "Sum":
+                    return visibleRows
+                        .Where(row => row.Cells.Exists(columnKey))
+                        .Select(row => GetNumericValue(row.Cells[columnKey].Value))
+                        .Where(value => value.HasValue)
+                        .Sum(value => value.Value);
+                case "Min":
+                    return visibleRows
+                        .Where(row => row.Cells.Exists(columnKey))
+                        .Select(row => row.Cells[columnKey].Value)
+                        .Where(HasCellValue)
+                        .Cast<IComparable>()
+                        .OrderBy(value => value)
+                        .FirstOrDefault();
+                case "Max":
+                    return visibleRows
+                        .Where(row => row.Cells.Exists(columnKey))
+                        .Select(row => row.Cells[columnKey].Value)
+                        .Where(HasCellValue)
+                        .Cast<IComparable>()
+                        .OrderByDescending(value => value)
+                        .FirstOrDefault();
+                case "Count":
+                    return visibleRows.Count(row => row.Cells.Exists(columnKey) && HasCellValue(row.Cells[columnKey].Value));
+                case "Avg":
+                    List<decimal> values = visibleRows
+                        .Where(row => row.Cells.Exists(columnKey))
+                        .Select(row => GetNumericValue(row.Cells[columnKey].Value))
+                        .Where(value => value.HasValue)
+                        .Select(value => value.Value)
+                        .ToList();
+                    return values.Count == 0 ? 0m : values.Average();
+                default:
+                    return null;
+            }
+        }
+
+        private decimal? GetNumericValue(object value)
+        {
+            if (value == null || value == DBNull.Value) return null;
+            if (decimal.TryParse(value.ToString(), out decimal result))
+                return result;
+            return null;
+        }
+
+        private bool HasCellValue(object value)
+        {
+            return value != null && value != DBNull.Value && !string.IsNullOrWhiteSpace(value.ToString());
+        }
+
+        private string FormatAggregationResult(string columnKey, string aggregation, object result)
+        {
+            if (string.Equals(aggregation, "None", StringComparison.OrdinalIgnoreCase)) return string.Empty;
+            if (result == null) return string.Empty;
+
+            if (string.Equals(aggregation, "Count", StringComparison.OrdinalIgnoreCase))
+                return $"Total: {result}";
+
+            if (result is decimal dVal)
+                return $"{aggregation}: {dVal:N2}";
+
+            return $"{aggregation}: {result}";
+        }
+
+        private void SyncGridFooterPositions()
+        {
+            if (ultraGrid1 == null || ultraGrid1.DisplayLayout == null || ultraGrid1.DisplayLayout.Bands.Count == 0 || ultraPanelGridFooter == null)
+                return;
+
+            int scrollLeft = 0;
+            try
+            {
+                if (ultraGrid1.ActiveColScrollRegion != null)
+                    scrollLeft = ultraGrid1.ActiveColScrollRegion.Position;
+            }
+            catch { }
+
+            int xOffset = ultraGrid1.DisplayLayout.Override.RowSelectorWidth - scrollLeft;
+            UltraGridBand band = ultraGrid1.DisplayLayout.Bands[0];
+
+            foreach (UltraGridColumn column in band.Columns.Cast<UltraGridColumn>().OrderBy(c => c.Header.VisiblePosition))
+            {
+                if (column.Hidden) continue;
+
+                if (footerLabels.TryGetValue(column.Key, out Label footerLabel))
+                {
+                    footerLabel.Width = column.Width;
+                    footerLabel.Left = xOffset;
+                    footerLabel.Visible = (xOffset + column.Width > 0 && xOffset < ultraPanelGridFooter.Width);
+                }
+
+                xOffset += column.Width;
             }
         }
 

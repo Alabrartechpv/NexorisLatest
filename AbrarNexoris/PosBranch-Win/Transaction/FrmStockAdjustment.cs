@@ -950,7 +950,27 @@ namespace PosBranch_Win.Transaction
                 if (result == "success")
                 {
                     SaveStockAdjustmentActivityLog("SAVE", stockadjsmaster);
-                    frmSuccesMsg success = new frmSuccesMsg();
+
+                    string adjBarcode = txtb_barcode != null && !string.IsNullOrWhiteSpace(txtb_barcode.Text)
+                        ? txtb_barcode.Text.Trim()
+                        : ("ADJ-" + stockadjsmaster.StockAdjustmentNo.ToString("D5"));
+                    int totalAdjQty = ultraGrid1.Rows.Cast<UltraGridRow>()
+                        .Sum(r => r.Cells["Adjustment Qty"].Value != null ? Convert.ToInt32(r.Cells["Adjustment Qty"].Value) : 0);
+
+                    var details = new Dictionary<string, string>
+                    {
+                        { "Barcode", adjBarcode },
+                        { "Reason", txtb_reason != null ? txtb_reason.Text : "" },
+                        { "Remark", txteditor_remark != null ? txteditor_remark.Text : "" },
+                        { "Date", dateTimePicker1 != null ? dateTimePicker1.Value.ToString("dd-MMM-yyyy") : DateTime.Now.ToString("dd-MMM-yyyy") },
+                        { "Adjusted Qty", totalAdjQty.ToString() }
+                    };
+
+                    frmSuccesMsg success = new frmSuccesMsg(
+                        "Stock adjustment saved successfully.",
+                        "The stock adjustment has been saved.",
+                        details
+                    );
                     success.FormClosed += (s, args) =>
                     {
                         // Call clear method when success message is closed
@@ -1119,7 +1139,27 @@ namespace PosBranch_Win.Transaction
                 if (result == "success")
                 {
                     SaveStockAdjustmentActivityLog("UPDATE", stockadjsmaster);
-                    frmSuccesMsg success = new frmSuccesMsg();
+
+                    string adjBarcode = txtb_barcode != null && !string.IsNullOrWhiteSpace(txtb_barcode.Text)
+                        ? txtb_barcode.Text.Trim()
+                        : ("ADJ-" + stockadjsmaster.StockAdjustmentNo.ToString("D5"));
+                    int totalAdjQty = ultraGrid1.Rows.Cast<UltraGridRow>()
+                        .Sum(r => r.Cells["Adjustment Qty"].Value != null ? Convert.ToInt32(r.Cells["Adjustment Qty"].Value) : 0);
+
+                    var details = new Dictionary<string, string>
+                    {
+                        { "Barcode", adjBarcode },
+                        { "Reason", txtb_reason != null ? txtb_reason.Text : "" },
+                        { "Remark", txteditor_remark != null ? txteditor_remark.Text : "" },
+                        { "Date", dateTimePicker1 != null ? dateTimePicker1.Value.ToString("dd-MMM-yyyy") : DateTime.Now.ToString("dd-MMM-yyyy") },
+                        { "Adjusted Qty", totalAdjQty.ToString() }
+                    };
+
+                    frmSuccesMsg success = new frmSuccesMsg(
+                        "Stock adjustment updated successfully.",
+                        "The stock adjustment has been updated.",
+                        details
+                    );
                     success.FormClosed += (s, args) =>
                     {
                         // Call clear method when success message is closed
