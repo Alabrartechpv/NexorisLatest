@@ -1465,9 +1465,25 @@ namespace Repository.TransactionRepository
                     pName.Equals("CASH-IN-HAND", StringComparison.OrdinalIgnoreCase) ||
                     pName.Equals("CASH IN HAND", StringComparison.OrdinalIgnoreCase))
                     return true;
+
+                if (pName.Equals("Credit", StringComparison.OrdinalIgnoreCase))
+                    return false;
             }
-            // Fallback: treat PaymodeID == 2 as Cash (most common default)
-            return paymodeId == 2;
+
+            try
+            {
+                Dropdowns dropdowns = new Dropdowns();
+                PaymodeDDlGrid paymodes = dropdowns.PaymodeDDl();
+                PaymodeDDl paymode = paymodes.List?.FirstOrDefault(p => p.PayModeID == paymodeId);
+                return paymode != null &&
+                       !string.IsNullOrWhiteSpace(paymode.PayModeName) &&
+                       paymode.PayModeName.Trim().Equals("Cash", StringComparison.OrdinalIgnoreCase);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"IsCashPaymentMode lookup failed: {ex.Message}");
+                return false;
+            }
         }
 
         /// <summary>Returns the current CASH-IN-HAND balance (Debit - Credit) for the given branch.</summary>
