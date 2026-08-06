@@ -72,6 +72,7 @@
     <Compile Include="MasterRepositry\CategoryRepository.cs" />
     <Compile Include="MasterRepositry\CompanyRepo.cs" />
     <Compile Include="MasterRepositry\CountryRepository.cs" />
+    <Compile Include="MasterRepositry\CurrencyRepository.cs" />
     <Compile Include="MasterRepositry\GroupRepository.cs" />
     <Compile Include="MasterRepositry\ItemMasterRepository.cs" />
     <Compile Include="MasterRepositry\ItemTypeRepository.cs" />

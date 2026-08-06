@@ -2259,6 +2259,11 @@ namespace PosBranch_Win
                 FrmCountry country = new FrmCountry();
                 OpenFormInTab(country, "Country");
             }
+            if (e.Tool.Key == "Currency" || e.Tool.Key == "currency")
+            {
+                FrmCurrency currencyForm = new FrmCurrency();
+                OpenFormInTab(currencyForm, "Currency");
+            }
             if (e.Tool.Key == "stockadjustment")
             {
                 FrmStockAdjustment stokadj = new FrmStockAdjustment();

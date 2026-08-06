@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -930,7 +930,6 @@
     <Compile Include="Master\FrmPaymodeMaster.Designer.cs">
       <DependentUpon>FrmPaymodeMaster.cs</DependentUpon>
     </Compile>
-
     <Compile Include="Master\FrmCategory.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -948,6 +947,12 @@
     </Compile>
     <Compile Include="Master\FrmCountry.Designer.cs">
       <DependentUpon>FrmCountry.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Master\FrmCurrency.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Master\FrmCurrency.Designer.cs">
+      <DependentUpon>FrmCurrency.cs</DependentUpon>
     </Compile>
     <Compile Include="Master\FrmGroup.cs">
       <SubType>Form</SubType>
@@ -1672,6 +1677,9 @@
     <EmbeddedResource Include="Master\FrmCountry.resx">
       <DependentUpon>FrmCountry.cs</DependentUpon>
     </EmbeddedResource>
+    <EmbeddedResource Include="Master\FrmCurrency.resx">
+      <DependentUpon>FrmCurrency.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="Master\FrmGroup.resx">
       <DependentUpon>FrmGroup.cs</DependentUpon>
     </EmbeddedResource>
@@ -2014,6 +2022,7 @@
     <None Include="Resources\icons8-report-50.png" />
     <None Include="Resources\import-export.png" />
     <None Include="Resources\exchanging.png" />
+    <None Include="Resources\currency.png" />
     <Content Include="Resources\languages %282%29.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

@@ -33,6 +33,7 @@ namespace Repository
         public static string POS_State = "_POS_State";
         public static string _POS_Country = "_POS_Country";
         public static string POS_Country = "_POS_Country";
+        public static string POS_Currency = "_POS_Currency";
         public static string POS_User = "_POS_User";
         public static string POS_Customer = "POS_Customer";
         public static string POS_CustomerReceiptInfo = "POS_CustomerReceiptInfo";

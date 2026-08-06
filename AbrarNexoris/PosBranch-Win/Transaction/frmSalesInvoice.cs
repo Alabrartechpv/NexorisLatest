@@ -1069,7 +1069,14 @@ namespace PosBranch_Win.Transaction
                     }
                 }
 
+                if (dgvitemlist != null)
+                {
+                    dgvitemlist.DoubleClick += dgvitemlist_DoubleClick;
+                }
+
                 ApplyDefaultSaleType();
+                UpdateHoldBillCountBadge();
+                UpdateCustomerBalanceDisplay();
             }
             catch (Exception ex)
             {
@@ -1936,6 +1943,17 @@ namespace PosBranch_Win.Transaction
                 int activeRowIndex = ultraGrid1.ActiveRow.Index;
                 if (activeRowIndex >= 0)
                 {
+                    if (!SessionContext.AllowSaleBelowCost)
+                    {
+                        float cost = ParseFloat(ultraGrid1.Rows[activeRowIndex].Cells["Cost"]?.Value, 0);
+                        if (cost > 0 && newPrice < cost)
+                        {
+                            MessageBox.Show($"Selling price (₹{newPrice:F2}) cannot be less than cost price (₹{cost:F2}).", "Price Below Cost Blocked", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            txtBarcode.Clear();
+                            return;
+                        }
+                    }
+
                     // Update the selling price (Amount column) directly
                     ultraGrid1.Rows[activeRowIndex].Cells["Amount"].Value = newPrice;
                     // Update totals using the method that preserves selling price
@@ -2025,6 +2043,14 @@ namespace PosBranch_Win.Transaction
             string discStr = input.Substring(1);
             if (float.TryParse(discStr, out float discPer) && discPer >= 0 && discPer <= 100)
             {
+                int maxDisc = SessionContext.MaxDiscountPercent > 0 ? SessionContext.MaxDiscountPercent : 100;
+                if (discPer > maxDisc)
+                {
+                    MessageBox.Show($"Discount percentage ({discPer}%) exceeds maximum allowed limit ({maxDisc}%).", "Discount Limit Exceeded", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    txtBarcode.Clear();
+                    return;
+                }
+
                 int activeRowIndex = ultraGrid1.ActiveRow.Index;
                 if (activeRowIndex >= 0)
                 {
@@ -2050,6 +2076,14 @@ namespace PosBranch_Win.Transaction
             string discStr = input.Substring(2);
             if (float.TryParse(discStr, out float discPer) && discPer >= 0 && discPer <= 100)
             {
+                int maxDisc = SessionContext.MaxDiscountPercent > 0 ? SessionContext.MaxDiscountPercent : 100;
+                if (discPer > maxDisc)
+                {
+                    MessageBox.Show($"Discount percentage ({discPer}%) exceeds maximum allowed limit ({maxDisc}%).", "Discount Limit Exceeded", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    txtBarcode.Clear();
+                    return;
+                }
+
                 // Apply discount to all rows
                 foreach (Infragistics.Win.UltraWinGrid.UltraGridRow row in ultraGrid1.Rows)
                 {
@@ -2479,80 +2513,55 @@ namespace PosBranch_Win.Transaction
         {
             if (e.KeyChar == (char)Keys.Enter)
             {
+                SelectItemFromSearchList();
+            }
+        }
 
-                ItemDDl item = new ItemDDl();
-                UltraGridCell ItemId = this.dgvitemlist.ActiveRow.Cells["ItemId"];
-                UltraGridCell BarCode = this.dgvitemlist.ActiveRow.Cells["BarCode"];
-                UltraGridCell ItemName = this.dgvitemlist.ActiveRow.Cells["ItemName"];
-                UltraGridCell Cost = this.dgvitemlist.ActiveRow.Cells["Cost"];
-                UltraGridCell UnitId = this.dgvitemlist.ActiveRow.Cells["UnitId"];
-                UltraGridCell Unit = this.dgvitemlist.ActiveRow.Cells["Unit"];
-                UltraGridCell Packing = this.dgvitemlist.ActiveRow.Cells["Packing"];
-                UltraGridCell Marginper = this.dgvitemlist.ActiveRow.Cells["Marginper"];
-                UltraGridCell MarginAmt = this.dgvitemlist.ActiveRow.Cells["MarginAmt"];
-                UltraGridCell TaxPer = this.dgvitemlist.ActiveRow.Cells["TaxPer"];
-                UltraGridCell TaxAmt = this.dgvitemlist.ActiveRow.Cells["TaxAmt"];
-                UltraGridCell RetailPrice = this.dgvitemlist.ActiveRow.Cells["RetailPrice"];
-                UltraGridCell WholeSalePrice = this.dgvitemlist.ActiveRow.Cells["WholeSalePrice"];
-                UltraGridCell CreditPrice = this.dgvitemlist.ActiveRow.Cells["CreditPrice"];
-                UltraGridCell CardPrice = this.dgvitemlist.ActiveRow.Cells["CardPrice"];
+        private void dgvitemlist_DoubleClick(object sender, EventArgs e)
+        {
+            SelectItemFromSearchList();
+        }
 
-                dgvItems.Focus();
-                this.CheckData(BarCode.Value.ToString());
-                int count;
-                if (CheckExists == false)
+        private void SelectItemFromSearchList()
+        {
+            try
+            {
+                if (dgvitemlist == null || dgvitemlist.ActiveRow == null) return;
+
+                UltraGridRow row = dgvitemlist.ActiveRow;
+                ItemDDl item = new ItemDDl
                 {
-                    count = dgvItems.Rows.Add();
-                    dgvItems.Rows[count].Cells["SlNO"].Value = dgvItems.Rows.Count;
-                    dgvItems.Rows[count].Cells["BarCode"].Value = BarCode.Value.ToString();
-                    dgvItems.Rows[count].Cells["ItemName"].Value = ItemName.Value.ToString();
-                    dgvItems.Rows[count].Cells["Cost"].Value = Cost.Value.ToString();
-                    dgvItems.Rows[count].Cells["UnitId"].Value = UnitId.Value.ToString();
-                    dgvItems.Rows[count].Cells["Qty"].Value = 1;
-                    dgvItems.Rows[count].Cells["Unit"].Value = Unit.Value.ToString();
-                    // FIXED: Corrected reversed price mapping - Item Master saves txt_Retail to WholeSalePrice and txt_Walkin to RetailPrice
-                    if (cmpPrice.SelectedItem.ToString() == "RetailPrice")
-                        dgvItems.Rows[count].Cells["UnitPrice"].Value = WholeSalePrice.Value.ToString(); // Actual Retail Price is stored in WholeSalePrice field
-                    else if (cmpPrice.SelectedItem.ToString() == "WholesalePrice")
-                        dgvItems.Rows[count].Cells["UnitPrice"].Value = RetailPrice.Value.ToString(); // Actual Wholesale (Walking) Price is stored in RetailPrice field
-                    else if (cmpPrice.SelectedItem.ToString() == "CreditPrice")
-                    {
-                        dgvItems.Rows[count].Cells["UnitPrice"].Value = CreditPrice.Value.ToString();
+                    ItemId = ParseInt(row.Cells["ItemId"]?.Value, 0),
+                    BarCode = row.Cells["BarCode"]?.Value?.ToString() ?? "",
+                    Description = row.Cells["ItemName"]?.Value?.ToString() ?? "",
+                    Cost = ParseDouble(row.Cells["Cost"]?.Value, 0),
+                    UnitId = ParseInt(row.Cells["UnitId"]?.Value, 0),
+                    Unit = row.Cells["Unit"]?.Value?.ToString() ?? "",
+                    Packing = ParseDouble(row.Cells["Packing"]?.Value, 0),
+                    MarginPer = ParseDouble(row.Cells["Marginper"]?.Value, 0),
+                    MarginAmt = ParseDouble(row.Cells["MarginAmt"]?.Value, 0),
+                    TaxPer = ParseDouble(row.Cells["TaxPer"]?.Value, 0),
+                    TaxAmt = ParseDouble(row.Cells["TaxAmt"]?.Value, 0),
+                    RetailPrice = ParseDouble(row.Cells["RetailPrice"]?.Value, 0),
+                    WholeSalePrice = ParseDouble(row.Cells["WholeSalePrice"]?.Value, 0),
+                    CreditPrice = ParseDouble(row.Cells["CreditPrice"]?.Value, 0),
+                    CardPrice = ParseDouble(row.Cells["CardPrice"]?.Value, 0),
+                    MRP = row.Cells.Exists("MRP") ? ParseDouble(row.Cells["MRP"]?.Value, 0) : 0,
+                    StaffPrice = row.Cells.Exists("StaffPrice") ? ParseDouble(row.Cells["StaffPrice"]?.Value, 0) : 0,
+                    MinPrice = row.Cells.Exists("MinPrice") ? ParseDouble(row.Cells["MinPrice"]?.Value, 0) : 0
+                };
 
-                    }
-                    else if (cmpPrice.SelectedItem.ToString() == "CardPrice")
-                    {
-                        dgvItems.Rows[count].Cells["UnitPrice"].Value = CardPrice.Value.ToString();
-
-                    }
-
-                    dgvItems.Rows[count].Cells["DiscPer"].Value = 0;
-                    dgvItems.Rows[count].Cells["DiscAmt"].Value = 0;
-                    float qty = float.Parse(dgvItems.Rows[count].Cells["Qty"].Value.ToString());
-                    float UnitPrice = float.Parse(dgvItems.Rows[count].Cells["UnitPrice"].Value.ToString());
-                    float itemCost = float.Parse(dgvItems.Rows[count].Cells["Cost"].Value.ToString());
-
-                    // Calculate margin
-                    float marginAmt = UnitPrice - itemCost;
-                    float marginPer = UnitPrice > 0 ? (marginAmt / UnitPrice) * 100 : 0;
-
-                    dgvItems.Rows[count].Cells["S/Price"].Value = UnitPrice;
-                    dgvItems.Rows[count].Cells["Amount"].Value = UnitPrice;
-                    dgvItems.Rows[count].Cells["Marginper"].Value = marginPer;
-                    dgvItems.Rows[count].Cells["MarginAmt"].Value = marginAmt;
-
-                    this.CalculateTotal();
-                    this.BarcodeFocuse();
-                    pnlItem.Visible = false;
-
-                }
-                else
+                if (item.ItemId > 0 || !string.IsNullOrEmpty(item.BarCode))
                 {
-                    this.BarcodeFocuse();
-                    this.CheckExists = false;
-
-
+                    AddToGrid(item, 1);
                 }
+
+                if (pnlItem != null) pnlItem.Visible = false;
+                BarcodeFocuse();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error selecting item from search list: {ex.Message}");
             }
         }
 
@@ -3022,6 +3031,9 @@ namespace PosBranch_Win.Transaction
                 return false;
             }
 
+            // Check stock availability
+            CheckAndDisplayZeroStockWarning();
+
             // Validate that no items are sold below cost unless allowed
             if (!SessionContext.AllowSaleBelowCost)
             {
@@ -3265,22 +3277,25 @@ namespace PosBranch_Win.Transaction
 
                 foreach (DataRow row in dt.Rows)
                 {
-                    // Get item ID to check stock
                     int itemId = ParseInt(row["ItemId"], 0);
                     if (itemId <= 0) continue;
 
-                    // Get item name
                     string itemName = row["ItemName"]?.ToString() ?? "Unknown Item";
-
-                    // Check stock quantity from database
                     float stockQty = GetItemStockQuantity(itemId);
+                    float requestedQty = ParseFloat(row["Qty"], 1);
 
-                    if (stockQty <= 0)
+                    if (stockQty <= 0 || requestedQty > stockQty)
                     {
-                        zeroStockItems.Add(itemName);
+                        zeroStockItems.Add($"• {itemName} (Available: {stockQty:N0}, Cart: {requestedQty:N0})");
                     }
                 }
 
+                if (zeroStockItems.Count > 0 && !SessionContext.AllowNegativeStock)
+                {
+                    string message = "The following item(s) have insufficient stock:\n\n" +
+                                     string.Join("\n", zeroStockItems);
+                    MessageBox.Show(message, "Stock Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                }
             }
             catch (Exception ex)
             {
@@ -3297,16 +3312,17 @@ namespace PosBranch_Win.Transaction
         {
             try
             {
-                // Use the existing Dropdowns class to get item data
-                DataBase.Operations = "GETALL";
-                ItemDDlGrid items = dp.itemDDlGrid("", "");
+                if (itemId <= 0) return 0;
+
+                // Targeted item query by ItemId instead of loading full catalog (GETALL)
+                DataBase.Operations = "GETITEMBYBARCODE";
+                ItemDDlGrid items = dp.itemDDlGrid(itemId.ToString(), "");
 
                 if (items?.List != null && items.List.Any())
                 {
                     var item = items.List.FirstOrDefault(i => i.ItemId == itemId);
                     if (item != null)
                     {
-                        // Return the stock quantity from the Stock property
                         return (float)item.Stock;
                     }
                 }
@@ -3671,6 +3687,8 @@ namespace PosBranch_Win.Transaction
                 // Clear all footer aggregations and update summary footer
                 columnAggregations.Clear();
                 UpdateSummaryFooter();
+                UpdateHoldBillCountBadge();
+                UpdateCustomerBalanceDisplay();
             }
             catch (Exception ex)
             {
@@ -4054,6 +4072,55 @@ namespace PosBranch_Win.Transaction
         {
             FrmDialogSHold hold = new FrmDialogSHold();
             hold.ShowDialog();
+            UpdateHoldBillCountBadge();
+        }
+
+        private void UpdateHoldBillCountBadge()
+        {
+            try
+            {
+                GetHoldBillGrid holdGrid = operations.GetHolBill();
+                int count = (holdGrid != null && holdGrid.List != null) ? holdGrid.List.Count() : 0;
+
+                string badgeText = count > 0 ? $"F5 Hold Bills ({count})" : "F5 Hold Bills";
+                if (button3 != null)
+                {
+                    button3.Text = badgeText;
+                }
+                if (ultraPictureBox7 != null)
+                {
+                    toolTip1.SetToolTip(ultraPictureBox7, count > 0 ? $"{count} Held Bill(s) Available" : "Hold Bills");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error updating hold bill count badge: {ex.Message}");
+            }
+        }
+
+        private void UpdateCustomerBalanceDisplay()
+        {
+            try
+            {
+                int ledgerId = ParseInt(lblledger.Text, 0);
+                if (ledgerId <= 0) return;
+
+                Repository.Accounts.LedgerRepository ledgerRepo = new Repository.Accounts.LedgerRepository();
+                var balances = ledgerRepo.GetLedgerBalances(SessionContext.CompanyId, SessionContext.BranchId, SessionContext.FinYearId, DateTime.Now);
+
+                if (balances != null && balances.TryGetValue(ledgerId, out decimal balance))
+                {
+                    string balanceText = balance >= 0 ? $"Bal: ₹{balance:N2} (Dr)" : $"Bal: ₹{Math.Abs(balance):N2} (Cr)";
+                    if (toolTip1 != null && txtCustomer != null)
+                    {
+                        toolTip1.SetToolTip(txtCustomer, $"Customer: {txtCustomer.Text}\n{balanceText}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error updating customer balance display: {ex.Message}");
+            }
         }
 
 
@@ -6394,6 +6461,14 @@ namespace PosBranch_Win.Transaction
                 return result;
 
             return defaultValue;
+        }
+
+        private double ParseDouble(object val, double defaultValue = 0)
+        {
+            if (val == null || val == DBNull.Value)
+                return defaultValue;
+
+            return ParseDouble(val.ToString(), defaultValue);
         }
         // Helper method to find the currently focused control
         private Control FindFocusedControl(Control control)
