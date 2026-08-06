@@ -1,6 +1,7 @@
 using ModelClass;
 using ModelClass.Master;
 using ModelClass.TransactionModels;
+using Repository.MasterRepositry;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -1571,37 +1572,14 @@ namespace Repository
         public CurrencyDDLGRID getCurrency()
         {
             CurrencyDDLGRID GridCur = new CurrencyDDLGRID();
-            DataConnection.Open();
             try
             {
-                using (SqlCommand cmdC = new SqlCommand(STOREDPROCEDURE.POS_dropdown, (SqlConnection)DataConnection))
-                {
-                    cmdC.CommandType = CommandType.StoredProcedure;
-                    cmdC.Parameters.AddWithValue("@BranchId", SessionContext.BranchId > 0 ? SessionContext.BranchId : 11);
-                    cmdC.Parameters.AddWithValue("@CompanyId", SessionContext.CompanyId > 0 ? SessionContext.CompanyId : 1);
-                    cmdC.Parameters.AddWithValue("@FinyearId", SessionContext.FinYearId > 0 ? SessionContext.FinYearId : (int.TryParse(DataBase.FinyearId, out var id) ? id : 1));
-                    cmdC.Parameters.AddWithValue("@Operation", "Currency");
-                    using (SqlDataAdapter adaptC = new SqlDataAdapter(cmdC))
-                    {
-                        DataSet dsC = new DataSet();
-                        adaptC.Fill(dsC);
-                        if ((dsC != null) && (dsC.Tables.Count > 0) && (dsC.Tables[0] != null) && (dsC.Tables[0].Rows.Count > 0))
-                        {
-                            GridCur.List = dsC.Tables[0].ToListOfObject<CurrencyModel>();
-                        }
-                    }
-                }
+                CurrencyRepository repo = new CurrencyRepository();
+                GridCur.List = repo.GetAllCurrencies();
             }
-            catch (Exception Ex)
+            catch (Exception ex)
             {
-
-                throw Ex;
-            }
-            finally
-            {
-                if (DataConnection.State == ConnectionState.Open)
-                    DataConnection.Close();
-
+                System.Diagnostics.Debug.WriteLine("getCurrency error: " + ex.Message);
             }
             return GridCur;
         }
