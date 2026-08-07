@@ -68,6 +68,8 @@
     <Compile Include="Master\ItemMaster.cs" />
     <Compile Include="Master\ItemTypeModel.cs" />
     <Compile Include="Master\PaymodeModel.cs" />
+    <Compile Include="Master\QuickPurchasePresetModel.cs" />
+
     <Compile Include="Master\PluModel.cs" />
     <Compile Include="Master\RolePermission.cs" />
     <Compile Include="Master\StateModel.cs" />

@@ -713,6 +713,12 @@
     <Compile Include="DialogBox\FrmGrnPaymentCancel.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="DialogBox\FrmQuickPurchasePresets.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="DialogBox\FrmQuickPurchasePresets.Designer.cs">
+      <DependentUpon>FrmQuickPurchasePresets.cs</DependentUpon>
+    </Compile>
     <Compile Include="DialogBox\FrmPurchaseItemDialog.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -1643,6 +1649,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="DialogBox\FrmUsersList.resx">
       <DependentUpon>FrmUsersList.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="DialogBox\FrmQuickPurchasePresets.resx">
+      <DependentUpon>FrmQuickPurchasePresets.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="DialogBox\FrmVendorDialog.resx">
       <DependentUpon>FrmVendorDialog.cs</DependentUpon>
