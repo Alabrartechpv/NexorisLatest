@@ -27,6 +27,9 @@ namespace PosBranch_Win.Master
 
         private void WireEvents()
         {
+            this.KeyDown -= FrmReason_KeyDown;
+            this.KeyDown += new KeyEventHandler(FrmReason_KeyDown);
+
             if (btnLookupF7 != null) btnLookupF7.Click += new EventHandler(btnF7List_Click);
 
             // Location X = 414: First (|<)
@@ -71,6 +74,7 @@ namespace PosBranch_Win.Master
         private void FrmReason_Load(object sender, EventArgs e)
         {
             LoadAllReasons();
+            ClearRecord();
         }
 
         private void LoadAllReasons()
@@ -78,16 +82,6 @@ namespace PosBranch_Win.Master
             try
             {
                 _reasonList = _repository.GetStockAdjustmentReasons(SessionContext.BranchId);
-                if (_reasonList != null && _reasonList.Count > 0)
-                {
-                    if (_currentIndex < 0 || _currentIndex >= _reasonList.Count)
-                        _currentIndex = 0;
-                    DisplayReasonRecord(_currentIndex);
-                }
-                else
-                {
-                    ClearRecord();
-                }
             }
             catch (Exception ex)
             {
@@ -160,6 +154,7 @@ namespace PosBranch_Win.Master
             {
                 MessageBox.Show("Reason saved successfully.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 LoadAllReasons();
+                ClearRecord();
             }
             else
             {

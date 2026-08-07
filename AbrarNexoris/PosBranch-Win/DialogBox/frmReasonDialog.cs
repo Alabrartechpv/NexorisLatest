@@ -424,7 +424,7 @@ namespace PosBranch_Win.DialogBox
                     fullDataTable.Columns.Add("LedgerID", typeof(int));
                     fullDataTable.Columns.Add("ReasonName", typeof(string));
 
-                    foreach (var item in reas.List)
+                    foreach (var item in reas.List.OrderBy(x => x.ReasonName))
                     {
                         fullDataTable.Rows.Add(item.LedgerID, item.ReasonName);
                     }
@@ -581,14 +581,16 @@ namespace PosBranch_Win.DialogBox
         {
             try
             {
-                frmReasonMaster master = new frmReasonMaster();
-                if (master.ShowDialog() == DialogResult.OK)
+                this.Close();
+                Home mainHome = Application.OpenForms.OfType<Home>().FirstOrDefault();
+                if (mainHome != null)
                 {
-                    LoadAllData();
-                    if (master.ReasonModel != null && !string.IsNullOrWhiteSpace(master.ReasonModel.ReasonName))
-                    {
-                        ApplyFilter(master.ReasonModel.ReasonName);
-                    }
+                    mainHome.OpenReasonMasterTab();
+                }
+                else
+                {
+                    PosBranch_Win.Master.FrmReason reasonForm = new PosBranch_Win.Master.FrmReason();
+                    reasonForm.ShowDialog();
                 }
             }
             catch (Exception ex)

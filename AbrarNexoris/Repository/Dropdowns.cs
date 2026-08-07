@@ -1650,7 +1650,7 @@ namespace Repository
                     }
                 }
 
-                grid.List = reasonList;
+                grid.List = reasonList.OrderBy(r => r.ReasonName).ToList();
             }
             catch (Exception ex)
             {

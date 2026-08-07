@@ -553,9 +553,12 @@ namespace PosBranch_Win
             base.OnFormClosing(e);
         }
 
-        /// <summary>
-        /// Opens a form in a new tab or switches to its tab if already open
-        /// </summary>
+        public void OpenReasonMasterTab()
+        {
+            Master.FrmReason frmReason = new Master.FrmReason();
+            OpenFormInTab(frmReason, "Reason");
+        }
+
         private void OpenFormInTab(Form formToOpen, string tabName)
         {
             try
@@ -2066,8 +2069,7 @@ namespace PosBranch_Win
             }
             if (e.Tool.Key == "Reason")
             {
-                Master.FrmReason frmReason = new Master.FrmReason();
-                OpenFormInTab(frmReason, "Reason");
+                OpenReasonMasterTab();
             }
             if (e.Tool.Key == "Group")
             {
