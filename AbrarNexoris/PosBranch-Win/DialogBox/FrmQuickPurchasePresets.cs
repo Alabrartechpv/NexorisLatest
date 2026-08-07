@@ -18,6 +18,11 @@ namespace PosBranch_Win.DialogBox
     /// Labels styled with Microsoft Sans Serif Regular font.
     /// Grid ID columns hidden. Only Qty cell editable in _gridItems.
     /// Duplicate items prevented. Pressing 'q' moves focus to the next row's Qty cell.
+    /// Search box shortcuts:
+    ///   *<number>  => sets Qty of active row
+    ///   **<number> => sets Qty of ALL rows
+    ///   .<number>  => sets Cost of active row
+    /// Fully functional summary grid footers (hidden when empty).
     /// </summary>
     public partial class FrmQuickPurchasePresets : Form
     {
@@ -52,18 +57,33 @@ namespace PosBranch_Win.DialogBox
         private List<QuickPurchasePreset> _presets = new List<QuickPurchasePreset>();
         private QuickPurchasePreset _activePreset;
 
+        // ── Footer Labels ──────────────────────────────────────────────────────────
+        private Label _lblFooterPresets;
+        private Label _lblFooterItems;
+
         // ── Dragging State ─────────────────────────────────────────────────────────
         private bool _isDragging;
         private Point _dragStart;
 
-        // ── Constructor ────────────────────────────────────────────────────────────
-        public FrmQuickPurchasePresets()
+        private int _initialPresetId;
+
+        // ── Constructors ───────────────────────────────────────────────────────────
+        public FrmQuickPurchasePresets() : this(0)
         {
+        }
+
+        public FrmQuickPurchasePresets(int initialPresetId)
+        {
+            _initialPresetId = initialPresetId;
             InitializeComponent();
             WireEvents();
 
             ApplyUnifiedGridTheme(_gridPresets);
             ApplyUnifiedGridTheme(_gridItems);
+
+            // Default state: footers hidden when starting / empty
+            _footerPanelPresets.Visible = false;
+            _footerPanelItems.Visible = false;
 
             LoadVendors();
             LoadPresets();
@@ -89,9 +109,12 @@ namespace PosBranch_Win.DialogBox
             _gridItems.InitializeLayout += GridItems_InitializeLayout;
             _gridItems.KeyDown += GridItems_KeyDown;
             _gridItems.KeyPress += GridItems_KeyPress;
+            _gridItems.AfterCellUpdate += (s, e) => UpdateGridFooters();
 
             _txtItemSearch.GotFocus += (s, ev) => { if (_txtItemSearch.ForeColor == Color.Gray) { _txtItemSearch.Text = ""; _txtItemSearch.ForeColor = Color.Black; } };
             _txtItemSearch.LostFocus += (s, ev) => { if (string.IsNullOrEmpty(_txtItemSearch.Text)) { _txtItemSearch.Text = "Search items…"; _txtItemSearch.ForeColor = Color.Gray; } };
+            _txtItemSearch.TextChanged += TxtItemSearch_TextChanged;
+            _txtItemSearch.KeyDown += TxtItemSearch_KeyDown;
 
             // Register ultraPanels with the ultraPanel8 button theme and actions
             RegisterActionPanel(ultraPanel1, () => BtnNewPreset_Click(null, EventArgs.Empty));
@@ -105,25 +128,280 @@ namespace PosBranch_Win.DialogBox
 
             _leftPanel.Resize += (s, e) =>
             {
-                int footerH = 24;
+                int footerH = _footerPanelPresets.Visible ? 24 : 0;
                 int bottomBarH = 50;
                 int top = 34;
                 int gridH = Math.Max(50, _leftPanel.Height - top - bottomBarH - footerH - 12);
                 _gridPresets.Size = new Size(_leftPanel.Width - 12, gridH);
-                _footerPanelPresets.Location = new Point(6, top + gridH);
-                _footerPanelPresets.Size = new Size(_leftPanel.Width - 12, footerH);
+                if (_footerPanelPresets.Visible)
+                {
+                    _footerPanelPresets.Location = new Point(6, top + gridH);
+                    _footerPanelPresets.Size = new Size(_leftPanel.Width - 12, footerH);
+                }
             };
 
             _centerPanel.Resize += (s, e) =>
             {
-                int footerH = 24;
+                int footerH = _footerPanelItems.Visible ? 24 : 0;
                 int bottomBarH = 50;
                 int top = 68;
                 int gridH = Math.Max(50, _centerPanel.Height - top - bottomBarH - footerH - 12);
                 _gridItems.Size = new Size(_centerPanel.Width - 12, gridH);
-                _footerPanelItems.Location = new Point(6, top + gridH);
-                _footerPanelItems.Size = new Size(_centerPanel.Width - 12, footerH);
+                if (_footerPanelItems.Visible)
+                {
+                    _footerPanelItems.Location = new Point(6, top + gridH);
+                    _footerPanelItems.Size = new Size(_centerPanel.Width - 12, footerH);
+                }
             };
+        }
+
+        // ── Dynamic Summary Footers ────────────────────────────────────────────────
+        private void UpdateGridFooters()
+        {
+            // Presets Footer
+            if (_gridPresets != null && _gridPresets.Rows.Count > 0)
+            {
+                _footerPanelPresets.Visible = true;
+                if (_lblFooterPresets == null)
+                {
+                    _lblFooterPresets = new Label
+                    {
+                        Dock = DockStyle.Fill,
+                        TextAlign = ContentAlignment.MiddleCenter,
+                        ForeColor = Color.White,
+                        Font = new Font("Microsoft Sans Serif", 8.5F, FontStyle.Bold),
+                        BackColor = Color.Transparent
+                    };
+                    _footerPanelPresets.ClientArea.Controls.Add(_lblFooterPresets);
+                }
+                _lblFooterPresets.Text = $"Total Presets: {_gridPresets.Rows.Count}";
+            }
+            else
+            {
+                _footerPanelPresets.Visible = false;
+            }
+
+            // Items Footer
+            if (_gridItems != null && _gridItems.Rows.Count > 0)
+            {
+                _footerPanelItems.Visible = true;
+                if (_lblFooterItems == null)
+                {
+                    _lblFooterItems = new Label
+                    {
+                        Dock = DockStyle.Fill,
+                        TextAlign = ContentAlignment.MiddleCenter,
+                        ForeColor = Color.White,
+                        Font = new Font("Microsoft Sans Serif", 8.5F, FontStyle.Bold),
+                        BackColor = Color.Transparent
+                    };
+                    _footerPanelItems.ClientArea.Controls.Add(_lblFooterItems);
+                }
+
+                int totalItems = _gridItems.Rows.Count;
+                int totalQty = 0;
+                double totalAmount = 0;
+
+                foreach (UltraGridRow row in _gridItems.Rows)
+                {
+                    int qty = 0;
+                    double cost = 0;
+                    try { qty = Convert.ToInt32(row.Cells["Quantity"].Value ?? 0); } catch { }
+                    try { cost = Convert.ToDouble(row.Cells["Cost"].Value ?? 0); } catch { }
+
+                    totalQty += qty;
+                    totalAmount += (cost * qty);
+                }
+
+                _lblFooterItems.Text = $"Total Items: {totalItems}   |   Total Qty: {totalQty}   |   Total Amount: {totalAmount:N2}";
+            }
+            else
+            {
+                _footerPanelItems.Visible = false;
+            }
+
+            // Refresh layout bounds after footer visibility update
+            _leftPanel.PerformLayout();
+            _centerPanel.PerformLayout();
+        }
+
+        // ── Search & Shortcut Commands (*number, **number, .number) ─────────────────
+        private void TxtItemSearch_TextChanged(object sender, EventArgs e)
+        {
+            string query = _txtItemSearch.Text.Trim();
+            if (query == "Search items…" || string.IsNullOrEmpty(query))
+            {
+                if (_gridItems.DisplayLayout?.Bands?.Count > 0)
+                {
+                    _gridItems.DisplayLayout.Bands[0].ColumnFilters.ClearAllFilters();
+                }
+                return;
+            }
+
+            if (query.StartsWith("*") || query.StartsWith("."))
+            {
+                // Don't filter grid with shortcut commands
+                return;
+            }
+
+            if (_gridItems.DisplayLayout?.Bands?.Count > 0)
+            {
+                UltraGridBand band = _gridItems.DisplayLayout.Bands[0];
+                band.ColumnFilters.ClearAllFilters();
+                if (band.Columns.Exists("ItemName"))
+                {
+                    band.ColumnFilters["ItemName"].FilterConditions.Clear();
+                    band.ColumnFilters["ItemName"].FilterConditions.Add(FilterComparisionOperator.Contains, query);
+                }
+            }
+        }
+
+        private void TxtItemSearch_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                string input = _txtItemSearch.Text.Trim();
+                if (string.IsNullOrEmpty(input) || input == "Search items…") return;
+
+                // **number => Apply quantity to ALL rows
+                if (input.StartsWith("**"))
+                {
+                    string numStr = input.Substring(2).Trim();
+                    if (int.TryParse(numStr, out int qty) && qty > 0)
+                    {
+                        ApplyQuantityToAllRows(qty);
+                        e.Handled = true;
+                        e.SuppressKeyPress = true;
+                        ResetSearchBox();
+                        return;
+                    }
+                }
+                // *number => Apply quantity to HIGHLIGHTED / ACTIVE row
+                else if (input.StartsWith("*"))
+                {
+                    string numStr = input.Substring(1).Trim();
+                    if (int.TryParse(numStr, out int qty) && qty > 0)
+                    {
+                        ApplyQuantityToActiveRow(qty);
+                        e.Handled = true;
+                        e.SuppressKeyPress = true;
+                        ResetSearchBox();
+                        return;
+                    }
+                }
+                // .number => Apply cost to HIGHLIGHTED / ACTIVE row
+                else if (input.StartsWith("."))
+                {
+                    string numStr = input.Substring(1).Trim();
+                    if (double.TryParse(numStr, out double cost) && cost >= 0)
+                    {
+                        ApplyCostToActiveRow(cost);
+                        e.Handled = true;
+                        e.SuppressKeyPress = true;
+                        ResetSearchBox();
+                        return;
+                    }
+                }
+            }
+        }
+
+        private void ApplyQuantityToActiveRow(int qty)
+        {
+            UltraGridRow targetRow = null;
+            if (_gridItems.ActiveRow != null)
+            {
+                targetRow = _gridItems.ActiveRow;
+            }
+            else if (_gridItems.Selected.Rows.Count > 0)
+            {
+                targetRow = _gridItems.Selected.Rows[0];
+            }
+            else if (_gridItems.Rows.Count > 0)
+            {
+                targetRow = _gridItems.Rows[0];
+            }
+
+            if (targetRow != null && targetRow.Cells.Exists("Quantity"))
+            {
+                targetRow.Cells["Quantity"].Value = qty;
+                int presetItemId = 0;
+                try { presetItemId = Convert.ToInt32(targetRow.Cells["PresetItemId"].Value); } catch { }
+                if (presetItemId > 0)
+                {
+                    _repo.UpdateItemQuantity(presetItemId, qty);
+                }
+                UpdateGridFooters();
+            }
+            else
+            {
+                MessageBox.Show("No item selected in grid.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
+        private void ApplyCostToActiveRow(double cost)
+        {
+            UltraGridRow targetRow = null;
+            if (_gridItems.ActiveRow != null)
+            {
+                targetRow = _gridItems.ActiveRow;
+            }
+            else if (_gridItems.Selected.Rows.Count > 0)
+            {
+                targetRow = _gridItems.Selected.Rows[0];
+            }
+            else if (_gridItems.Rows.Count > 0)
+            {
+                targetRow = _gridItems.Rows[0];
+            }
+
+            if (targetRow != null && targetRow.Cells.Exists("Cost"))
+            {
+                targetRow.Cells["Cost"].Value = cost;
+                int presetItemId = 0;
+                try { presetItemId = Convert.ToInt32(targetRow.Cells["PresetItemId"].Value); } catch { }
+                if (presetItemId > 0)
+                {
+                    _repo.UpdateItemCost(presetItemId, cost);
+                }
+                UpdateGridFooters();
+            }
+            else
+            {
+                MessageBox.Show("No item selected in grid.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
+        private void ApplyQuantityToAllRows(int qty)
+        {
+            if (_gridItems.Rows.Count == 0)
+            {
+                MessageBox.Show("No items in preset to update.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            foreach (UltraGridRow row in _gridItems.Rows)
+            {
+                if (row.Cells.Exists("Quantity"))
+                {
+                    row.Cells["Quantity"].Value = qty;
+                    int presetItemId = 0;
+                    try { presetItemId = Convert.ToInt32(row.Cells["PresetItemId"].Value); } catch { }
+                    if (presetItemId > 0)
+                    {
+                        _repo.UpdateItemQuantity(presetItemId, qty);
+                    }
+                }
+            }
+            UpdateGridFooters();
+        }
+
+        private void ResetSearchBox()
+        {
+            _txtItemSearch.Text = "";
+            if (_gridItems.DisplayLayout?.Bands?.Count > 0)
+            {
+                _gridItems.DisplayLayout.Bands[0].ColumnFilters.ClearAllFilters();
+            }
         }
 
         // ── Action Panel Button Theme (Matches ultraPanel8 in FrmPurchase.cs) ─────
@@ -447,15 +725,29 @@ namespace PosBranch_Win.DialogBox
 
             if (_gridPresets.Rows.Count > 0)
             {
-                _gridPresets.ActiveRow = _gridPresets.Rows[0];
+                UltraGridRow targetRow = _gridPresets.Rows[0];
+                if (_initialPresetId > 0)
+                {
+                    foreach (UltraGridRow r in _gridPresets.Rows)
+                    {
+                        if (r.Cells.Exists("PresetId") && Convert.ToInt32(r.Cells["PresetId"].Value) == _initialPresetId)
+                        {
+                            targetRow = r;
+                            break;
+                        }
+                    }
+                }
+
+                _gridPresets.ActiveRow = targetRow;
                 _gridPresets.Selected.Rows.Clear();
-                _gridPresets.Selected.Rows.Add(_gridPresets.Rows[0]);
+                _gridPresets.Selected.Rows.Add(targetRow);
                 GridPresets_SelectionOrRowChanged(null, null);
             }
             else
             {
                 _activePreset = null;
                 _gridItems.DataSource = null;
+                UpdateGridFooters();
             }
         }
 
@@ -482,6 +774,8 @@ namespace PosBranch_Win.DialogBox
                 _gridItems.DataSource = dt;
                 _gridItems.DataBind();
                 _gridItems.Refresh();
+
+                UpdateGridFooters();
 
                 if (_activePreset != null && _activePreset.VendorId > 0)
                 {
@@ -515,6 +809,7 @@ namespace PosBranch_Win.DialogBox
             {
                 _activePreset = null;
                 _gridItems.DataSource = null;
+                UpdateGridFooters();
                 return;
             }
 
@@ -529,6 +824,7 @@ namespace PosBranch_Win.DialogBox
                 else
                 {
                     _gridItems.DataSource = null;
+                    UpdateGridFooters();
                 }
             }
             catch (Exception ex)
@@ -759,7 +1055,7 @@ namespace PosBranch_Win.DialogBox
 
         protected override void OnMouseUp(MouseEventArgs e) { _isDragging = false; base.OnMouseUp(e); }
 
-        private static string ShowInputDialog(string prompt, string title)
+        public static string ShowInputDialog(string prompt, string title)
         {
             using (var frm = new Form { Width = 350, Height = 150, FormBorderStyle = FormBorderStyle.FixedDialog, Text = title, StartPosition = FormStartPosition.CenterParent, MaximizeBox = false, MinimizeBox = false })
             {

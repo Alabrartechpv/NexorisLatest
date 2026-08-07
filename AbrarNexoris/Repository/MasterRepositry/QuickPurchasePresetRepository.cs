@@ -13,7 +13,6 @@ namespace Repository.MasterRepositry
     /// All PKs are non-IDENTITY — uses MAX(id)+1 pattern.
     /// </summary>
     public class QuickPurchasePresetRepository : BaseRepostitory
-
     {
         public QuickPurchasePresetRepository()
         {
@@ -121,7 +120,6 @@ namespace Repository.MasterRepositry
 
                 if (preset.PresetId <= 0)
                 {
-                    // INSERT — compute next ID
                     int nextId;
                     using (var idCmd = new SqlCommand("SELECT ISNULL(MAX(PresetId), 0) + 1 FROM QuickPurchasePreset", conn))
                     {
@@ -144,7 +142,6 @@ namespace Repository.MasterRepositry
                 }
                 else
                 {
-                    // UPDATE
                     const string update = @"
                         UPDATE QuickPurchasePreset
                         SET PresetName = @PresetName, VendorId = @VendorId, VendorName = @VendorName
@@ -186,7 +183,6 @@ namespace Repository.MasterRepositry
                     cmd.Parameters.Add("@PresetId", SqlDbType.Int).Value = presetId;
                     cmd.ExecuteNonQuery();
                 }
-                // Also soft-delete all items of this preset
                 using (var cmd = new SqlCommand("UPDATE QuickPurchasePresetItem SET IsDelete = 1 WHERE PresetId = @PresetId", conn))
                 {
                     cmd.Parameters.Add("@PresetId", SqlDbType.Int).Value = presetId;
@@ -327,6 +323,34 @@ namespace Repository.MasterRepositry
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"UpdateItemQuantity error: {ex.Message}");
+                return false;
+            }
+            finally
+            {
+                if (opened && conn.State == ConnectionState.Open) conn.Close();
+            }
+        }
+
+        public bool UpdateItemCost(int presetItemId, double cost)
+        {
+            SqlConnection conn = DataConnection as SqlConnection;
+            if (conn == null) return false;
+
+            bool opened = false;
+            try
+            {
+                if (conn.State != ConnectionState.Open) { conn.Open(); opened = true; }
+                using (var cmd = new SqlCommand("UPDATE QuickPurchasePresetItem SET Cost = @Cost WHERE PresetItemId = @Id", conn))
+                {
+                    cmd.Parameters.Add("@Cost", SqlDbType.Float).Value = cost;
+                    cmd.Parameters.Add("@Id", SqlDbType.Int).Value = presetItemId;
+                    cmd.ExecuteNonQuery();
+                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"UpdateItemCost error: {ex.Message}");
                 return false;
             }
             finally
