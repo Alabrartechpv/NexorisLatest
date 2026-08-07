@@ -29,17 +29,21 @@ namespace PosBranch_Win.Master
         {
             if (btnLookupF7 != null) btnLookupF7.Click += new EventHandler(btnF7List_Click);
 
+            // Location X = 414: First (|<)
             if (ultraPanel3 != null) ultraPanel3.Click += new EventHandler(btnFirst_Click);
             if (ultraPictureBox2 != null) ultraPictureBox2.Click += new EventHandler(btnFirst_Click);
 
+            // Location X = 447: Prev (<)
             if (ultraPanel9 != null) ultraPanel9.Click += new EventHandler(btnPrev_Click);
             if (ultraPictureBox4 != null) ultraPictureBox4.Click += new EventHandler(btnPrev_Click);
 
-            if (ultraPanel10 != null) ultraPanel10.Click += new EventHandler(btnNext_Click);
-            if (ultraPictureBox5 != null) ultraPictureBox5.Click += new EventHandler(btnNext_Click);
+            // Location X = 480: Next (>)
+            if (ultraPanel8 != null) ultraPanel8.Click += new EventHandler(btnNext_Click);
+            if (ultraPictureBox6 != null) ultraPictureBox6.Click += new EventHandler(btnNext_Click);
 
-            if (ultraPanel8 != null) ultraPanel8.Click += new EventHandler(btnLast_Click);
-            if (ultraPictureBox6 != null) ultraPictureBox6.Click += new EventHandler(btnLast_Click);
+            // Location X = 513: Last (>|)
+            if (ultraPanel10 != null) ultraPanel10.Click += new EventHandler(btnLast_Click);
+            if (ultraPictureBox5 != null) ultraPictureBox5.Click += new EventHandler(btnLast_Click);
         }
 
         private class ReasonTypeItem

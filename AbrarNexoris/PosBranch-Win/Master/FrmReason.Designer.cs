@@ -135,7 +135,7 @@ namespace PosBranch_Win.Master
             this.ultraPanel3.ClientArea.Controls.Add(this.ultraPictureBox2);
             this.ultraPanel3.Cursor = System.Windows.Forms.Cursors.Hand;
             this.ultraPanel3.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(10)))), ((int)(((byte)(35)))), ((int)(((byte)(80)))));
-            this.ultraPanel3.Location = new System.Drawing.Point(419, 42);
+            this.ultraPanel3.Location = new System.Drawing.Point(414, 42);
             this.ultraPanel3.Name = "ultraPanel3";
             this.ultraPanel3.Size = new System.Drawing.Size(32, 29);
             this.ultraPanel3.TabIndex = 53;
@@ -172,7 +172,7 @@ namespace PosBranch_Win.Master
             this.ultraPanel9.ClientArea.Controls.Add(this.ultraPictureBox4);
             this.ultraPanel9.Cursor = System.Windows.Forms.Cursors.Hand;
             this.ultraPanel9.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(10)))), ((int)(((byte)(35)))), ((int)(((byte)(80)))));
-            this.ultraPanel9.Location = new System.Drawing.Point(452, 42);
+            this.ultraPanel9.Location = new System.Drawing.Point(447, 42);
             this.ultraPanel9.Name = "ultraPanel9";
             this.ultraPanel9.Size = new System.Drawing.Size(32, 29);
             this.ultraPanel9.TabIndex = 54;
@@ -209,7 +209,7 @@ namespace PosBranch_Win.Master
             this.ultraPanel10.ClientArea.Controls.Add(this.ultraPictureBox5);
             this.ultraPanel10.Cursor = System.Windows.Forms.Cursors.Hand;
             this.ultraPanel10.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(10)))), ((int)(((byte)(35)))), ((int)(((byte)(80)))));
-            this.ultraPanel10.Location = new System.Drawing.Point(518, 42);
+            this.ultraPanel10.Location = new System.Drawing.Point(513, 42);
             this.ultraPanel10.Name = "ultraPanel10";
             this.ultraPanel10.Size = new System.Drawing.Size(32, 29);
             this.ultraPanel10.TabIndex = 55;
@@ -246,7 +246,7 @@ namespace PosBranch_Win.Master
             this.ultraPanel8.ClientArea.Controls.Add(this.ultraPictureBox6);
             this.ultraPanel8.Cursor = System.Windows.Forms.Cursors.Hand;
             this.ultraPanel8.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(10)))), ((int)(((byte)(35)))), ((int)(((byte)(80)))));
-            this.ultraPanel8.Location = new System.Drawing.Point(485, 42);
+            this.ultraPanel8.Location = new System.Drawing.Point(480, 42);
             this.ultraPanel8.Name = "ultraPanel8";
             this.ultraPanel8.Size = new System.Drawing.Size(32, 29);
             this.ultraPanel8.TabIndex = 56;
