@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -713,6 +713,12 @@
     <Compile Include="DialogBox\FrmGrnPaymentCancel.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="DialogBox\FrmQuickPurchasePresets.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="DialogBox\FrmQuickPurchasePresets.Designer.cs">
+      <DependentUpon>FrmQuickPurchasePresets.cs</DependentUpon>
+    </Compile>
     <Compile Include="DialogBox\FrmPurchaseItemDialog.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -959,6 +965,12 @@
     </Compile>
     <Compile Include="Master\FrmCategory.Designer.cs">
       <DependentUpon>FrmCategory.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Master\FrmReason.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Master\FrmReason.Designer.cs">
+      <DependentUpon>FrmReason.cs</DependentUpon>
     </Compile>
     <Compile Include="Master\frmCompany.cs">
       <SubType>Form</SubType>
@@ -1638,6 +1650,9 @@
     <EmbeddedResource Include="DialogBox\FrmUsersList.resx">
       <DependentUpon>FrmUsersList.cs</DependentUpon>
     </EmbeddedResource>
+    <EmbeddedResource Include="DialogBox\FrmQuickPurchasePresets.resx">
+      <DependentUpon>FrmQuickPurchasePresets.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="DialogBox\FrmVendorDialog.resx">
       <DependentUpon>FrmVendorDialog.cs</DependentUpon>
     </EmbeddedResource>
@@ -1721,6 +1736,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Master\frmItemType.resx">
       <DependentUpon>frmItemType.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Master\FrmReason.resx">
+      <DependentUpon>FrmReason.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Master\FrmState.resx">
       <DependentUpon>FrmState.cs</DependentUpon>
@@ -2062,6 +2080,7 @@
     <None Include="Resources\payment-method.png" />
     <None Include="Resources\payment-method1.png" />
     <None Include="Resources\revenue.png" />
+    <None Include="Resources\settings.png" />
     <Content Include="Resources\splash_logo.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

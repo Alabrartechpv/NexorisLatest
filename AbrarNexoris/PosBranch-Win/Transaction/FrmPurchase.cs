@@ -777,7 +777,73 @@ namespace PosBranch_Win.Transaction
         private void InitializeActionPanels()
         {
             RegisterActionPanel(ultraPanel2, TogglePurchaseOrderPanelVisibility);
+            RegisterActionPanel(ultraPanel8, OpenQuickPurchasePresets);
+
+            if (label14 != null)
+            {
+                label14.Text = "Quick PO";
+                label14.AutoSize = false;
+                label14.Dock = DockStyle.Fill;
+                label14.TextAlign = ContentAlignment.MiddleCenter;
+                label14.Font = new Font("Tahoma", 9F, FontStyle.Bold);
+            }
         }
+
+        private void OpenQuickPurchasePresets()
+        {
+            try
+            {
+                using (var dlg = new PosBranch_Win.DialogBox.FrmQuickPurchasePresets())
+                {
+                    if (dlg.ShowDialog(this) == System.Windows.Forms.DialogResult.OK)
+                    {
+                        // Apply selected vendor if one was chosen in the preset
+                        if (dlg.SelectedVendorId > 0)
+                        {
+                            try
+                            {
+                                CmboVendor.Value = dlg.SelectedVendorId;
+                                textBox1.Text = dlg.SelectedVendorId.ToString();
+                            }
+                            catch (Exception ex)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"OpenQuickPurchasePresets: Could not set vendor: {ex.Message}");
+                            }
+                        }
+
+                        // Push each item from the preset into the purchase grid
+                        if (dlg.ExportedItems != null && dlg.ExportedItems.Count > 0)
+                        {
+                            foreach (var item in dlg.ExportedItems)
+                            {
+                                try
+                                {
+                                    AddItemToGrid(
+                                        item.ItemId.ToString(),
+                                        item.ItemName ?? string.Empty,
+                                        item.Barcode ?? string.Empty,
+                                        item.Unit ?? string.Empty,
+                                        (decimal)item.UnitPrice,
+                                        item.Quantity,
+                                        (decimal)item.Cost,
+                                        item.UnitId);
+                                }
+                                catch (Exception ex)
+                                {
+                                    System.Diagnostics.Debug.WriteLine($"OpenQuickPurchasePresets: Error adding item {item.ItemName}: {ex.Message}");
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error opening Quick Purchase Presets: {ex.Message}", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
 
         private void CapturePurchasePanelLayout()
         {
@@ -4696,6 +4762,7 @@ namespace PosBranch_Win.Transaction
             {
                 bool isModifyingKey = e.KeyCode == Keys.F7   // Item selection
                     || e.KeyCode == Keys.F11  // Vendor dialog
+                    || e.KeyCode == Keys.F6   // Quick Purchase Presets
                     || e.KeyCode == Keys.F2   // Row edit
                     || e.KeyCode == Keys.F8   // Save / Update
                     || e.KeyCode == Keys.F12; // Delete
@@ -4732,7 +4799,8 @@ namespace PosBranch_Win.Transaction
             }
             else if (e.KeyCode == Keys.F6)
             {
-                ShowPurchaseDisplayDialog();
+                OpenQuickPurchasePresets();
+                e.Handled = true;
             }
             else if (e.KeyCode == Keys.F1)
             {

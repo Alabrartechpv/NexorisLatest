@@ -59,6 +59,7 @@ namespace Repository
         public static string _POS_Sales_Win_Hold = "_POS_Sales_Win_Hold";
         public static string _POS_SDetails_Win_Hold = "_POS_SDetails_Win_Hold";
         public static string POS_StockAdjustemnt = "POS_StockAdjustemnt";
+        public static string POS_StockAdjustmentReasonMaster = "POS_StockAdjustmentReasonMaster";
         public static string POS_StockAdjustemntDetails = "POS_StockAdjustment_Details_PriceSettings";
         public static string POS_StockTransfer = "_StockTransfer";
         public static string POS_StockTransferDetails = "_StockTransfer_STDetails_PriceSettings_ItemBatch";
