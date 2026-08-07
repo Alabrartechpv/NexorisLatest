@@ -491,16 +491,26 @@ namespace PosBranch_Win.DialogBox
             {
                 if (ultraGrid1.ActiveRow != null)
                 {
+                    UltraGridCell ledgIdCell = this.ultraGrid1.ActiveRow.Cells["LedgerID"];
+                    UltraGridCell reasNameCell = this.ultraGrid1.ActiveRow.Cells["ReasonName"];
+
+                    string selectedReasonName = reasNameCell.Value != null ? reasNameCell.Value.ToString() : "";
+
                     stockk = Application.OpenForms.OfType<FrmStockAdjustment>().FirstOrDefault();
                     if (stockk != null)
                     {
-                        UltraGridCell ledgIdCell = this.ultraGrid1.ActiveRow.Cells["LedgerID"];
-                        UltraGridCell reasNameCell = this.ultraGrid1.ActiveRow.Cells["ReasonName"];
-
-                        stockk.txtb_reason.Text = reasNameCell.Value.ToString();
-                        stockk.ultlbl_ledgerid.Text = ledgIdCell.Value.ToString();
-                        this.Close();
+                        stockk.txtb_reason.Text = selectedReasonName;
+                        stockk.ultlbl_ledgerid.Text = ledgIdCell.Value != null ? ledgIdCell.Value.ToString() : "";
                     }
+
+                    var reasonMasterForm = Application.OpenForms.OfType<Master.FrmReason>().FirstOrDefault();
+                    if (reasonMasterForm != null)
+                    {
+                        reasonMasterForm.SelectReasonByName(selectedReasonName);
+                    }
+
+                    this.DialogResult = DialogResult.OK;
+                    this.Close();
                 }
             }
             catch (Exception ex)
@@ -1326,6 +1336,9 @@ namespace PosBranch_Win.DialogBox
         private void InitializeComponent()
         {
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(frmReasonDialog));
+            Infragistics.Win.Appearance appearance1 = new Infragistics.Win.Appearance();
+            Infragistics.Win.Appearance appearance2 = new Infragistics.Win.Appearance();
+            Infragistics.Win.Appearance appearance3 = new Infragistics.Win.Appearance();
             this.ultPanelPurchaseDisplay = new Infragistics.Win.Misc.UltraPanel();
             this.label1 = new System.Windows.Forms.Label();
             this.ultraPanel3 = new Infragistics.Win.Misc.UltraPanel();
@@ -1374,6 +1387,9 @@ namespace PosBranch_Win.DialogBox
             // 
             // ultPanelPurchaseDisplay
             // 
+            // 
+            // ultPanelPurchaseDisplay.ClientArea
+            // 
             this.ultPanelPurchaseDisplay.ClientArea.Controls.Add(this.label1);
             this.ultPanelPurchaseDisplay.ClientArea.Controls.Add(this.ultraPanel3);
             this.ultPanelPurchaseDisplay.ClientArea.Controls.Add(this.ultraPanel7);
@@ -1397,11 +1413,14 @@ namespace PosBranch_Win.DialogBox
             this.label1.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.label1.Location = new System.Drawing.Point(6, 414);
             this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(161, 16);
+            this.label1.Size = new System.Drawing.Size(164, 16);
             this.label1.TabIndex = 54;
             this.label1.Text = "Showing 0 of 0 records";
             // 
             // ultraPanel3
+            // 
+            // 
+            // ultraPanel3.ClientArea
             // 
             this.ultraPanel3.ClientArea.Controls.Add(this.ultraPictureBox5);
             this.ultraPanel3.Location = new System.Drawing.Point(684, 71);
@@ -1412,6 +1431,7 @@ namespace PosBranch_Win.DialogBox
             // ultraPictureBox5
             // 
             this.ultraPictureBox5.BackColor = System.Drawing.Color.Transparent;
+            this.ultraPictureBox5.BackColorInternal = System.Drawing.Color.Transparent;
             this.ultraPictureBox5.BorderShadowColor = System.Drawing.Color.Transparent;
             this.ultraPictureBox5.Cursor = System.Windows.Forms.Cursors.Hand;
             this.ultraPictureBox5.Image = ((object)(resources.GetObject("ultraPictureBox5.Image")));
@@ -1422,6 +1442,9 @@ namespace PosBranch_Win.DialogBox
             // 
             // ultraPanel7
             // 
+            // 
+            // ultraPanel7.ClientArea
+            // 
             this.ultraPanel7.ClientArea.Controls.Add(this.ultraPictureBox6);
             this.ultraPanel7.Location = new System.Drawing.Point(684, 135);
             this.ultraPanel7.Name = "ultraPanel7";
@@ -1431,6 +1454,7 @@ namespace PosBranch_Win.DialogBox
             // ultraPictureBox6
             // 
             this.ultraPictureBox6.BackColor = System.Drawing.Color.Transparent;
+            this.ultraPictureBox6.BackColorInternal = System.Drawing.Color.Transparent;
             this.ultraPictureBox6.BorderShadowColor = System.Drawing.Color.Transparent;
             this.ultraPictureBox6.Cursor = System.Windows.Forms.Cursors.Hand;
             this.ultraPictureBox6.Image = ((object)(resources.GetObject("ultraPictureBox6.Image")));
@@ -1449,7 +1473,11 @@ namespace PosBranch_Win.DialogBox
             // 
             // ultraPanel2
             // 
-            this.ultraPanel2.Appearance.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(46)))), ((int)(((byte)(93)))), ((int)(((byte)(144)))));
+            appearance1.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(46)))), ((int)(((byte)(93)))), ((int)(((byte)(144)))));
+            this.ultraPanel2.Appearance = appearance1;
+            // 
+            // ultraPanel2.ClientArea
+            // 
             this.ultraPanel2.ClientArea.Controls.Add(this.ultraPanel9);
             this.ultraPanel2.ClientArea.Controls.Add(this.comboBox2);
             this.ultraPanel2.ClientArea.Controls.Add(this.comboBox1);
@@ -1462,8 +1490,12 @@ namespace PosBranch_Win.DialogBox
             // 
             // ultraPanel9
             // 
-            this.ultraPanel9.Appearance.BackColor = System.Drawing.Color.White;
+            appearance2.BackColor = System.Drawing.Color.White;
+            this.ultraPanel9.Appearance = appearance2;
             this.ultraPanel9.BorderStyle = Infragistics.Win.UIElementBorderStyle.WindowsVista;
+            // 
+            // ultraPanel9.ClientArea
+            // 
             this.ultraPanel9.ClientArea.Controls.Add(this.ultraPictureBox4);
             this.ultraPanel9.Font = new System.Drawing.Font("Microsoft Sans Serif", 15.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.ultraPanel9.Location = new System.Drawing.Point(685, 2);
@@ -1474,6 +1506,7 @@ namespace PosBranch_Win.DialogBox
             // ultraPictureBox4
             // 
             this.ultraPictureBox4.BackColor = System.Drawing.Color.Transparent;
+            this.ultraPictureBox4.BackColorInternal = System.Drawing.Color.Transparent;
             this.ultraPictureBox4.BorderShadowColor = System.Drawing.Color.Transparent;
             this.ultraPictureBox4.Cursor = System.Windows.Forms.Cursors.Hand;
             this.ultraPictureBox4.Image = ((object)(resources.GetObject("ultraPictureBox4.Image")));
@@ -1535,6 +1568,9 @@ namespace PosBranch_Win.DialogBox
             // 
             // ultraPanel4
             // 
+            // 
+            // ultraPanel4.ClientArea
+            // 
             this.ultraPanel4.ClientArea.Controls.Add(this.label4);
             this.ultraPanel4.ClientArea.Controls.Add(this.ultraPictureBox3);
             this.ultraPanel4.Location = new System.Drawing.Point(261, 440);
@@ -1557,6 +1593,7 @@ namespace PosBranch_Win.DialogBox
             // ultraPictureBox3
             // 
             this.ultraPictureBox3.BackColor = System.Drawing.Color.Transparent;
+            this.ultraPictureBox3.BackColorInternal = System.Drawing.Color.Transparent;
             this.ultraPictureBox3.BorderShadowColor = System.Drawing.Color.Transparent;
             this.ultraPictureBox3.Cursor = System.Windows.Forms.Cursors.Hand;
             this.ultraPictureBox3.Image = ((object)(resources.GetObject("ultraPictureBox3.Image")));
@@ -1567,9 +1604,10 @@ namespace PosBranch_Win.DialogBox
             // 
             // ultraPanel8
             // 
-            this.ultraPanel8.Appearance.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(116)))), ((int)(((byte)(217)))));
-            this.ultraPanel8.Appearance.BackColor2 = System.Drawing.Color.FromArgb(((int)(((byte)(127)))), ((int)(((byte)(219)))), ((int)(((byte)(255)))));
-            this.ultraPanel8.Appearance.BackGradientStyle = Infragistics.Win.GradientStyle.GlassTop37;
+            appearance3.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(116)))), ((int)(((byte)(217)))));
+            appearance3.BackColor2 = System.Drawing.Color.FromArgb(((int)(((byte)(127)))), ((int)(((byte)(219)))), ((int)(((byte)(255)))));
+            appearance3.BackGradientStyle = Infragistics.Win.GradientStyle.GlassTop37;
+            this.ultraPanel8.Appearance = appearance3;
             this.ultraPanel8.BorderStyle = Infragistics.Win.UIElementBorderStyle.Rounded1;
             this.ultraPanel8.ForeColor = System.Drawing.Color.White;
             this.ultraPanel8.Location = new System.Drawing.Point(5, 388);
@@ -1578,6 +1616,9 @@ namespace PosBranch_Win.DialogBox
             this.ultraPanel8.TabIndex = 47;
             // 
             // ultraPanel6
+            // 
+            // 
+            // ultraPanel6.ClientArea
             // 
             this.ultraPanel6.ClientArea.Controls.Add(this.label3);
             this.ultraPanel6.ClientArea.Controls.Add(this.ultraPictureBox2);
@@ -1601,6 +1642,7 @@ namespace PosBranch_Win.DialogBox
             // ultraPictureBox2
             // 
             this.ultraPictureBox2.BackColor = System.Drawing.Color.Transparent;
+            this.ultraPictureBox2.BackColorInternal = System.Drawing.Color.Transparent;
             this.ultraPictureBox2.BorderShadowColor = System.Drawing.Color.Transparent;
             this.ultraPictureBox2.Cursor = System.Windows.Forms.Cursors.Hand;
             this.ultraPictureBox2.Image = ((object)(resources.GetObject("ultraPictureBox2.Image")));
@@ -1610,6 +1652,9 @@ namespace PosBranch_Win.DialogBox
             this.ultraPictureBox2.TabIndex = 42;
             // 
             // ultraPanel5
+            // 
+            // 
+            // ultraPanel5.ClientArea
             // 
             this.ultraPanel5.ClientArea.Controls.Add(this.label5);
             this.ultraPanel5.ClientArea.Controls.Add(this.ultraPictureBox1);
@@ -1633,6 +1678,7 @@ namespace PosBranch_Win.DialogBox
             // ultraPictureBox1
             // 
             this.ultraPictureBox1.BackColor = System.Drawing.Color.Transparent;
+            this.ultraPictureBox1.BackColorInternal = System.Drawing.Color.Transparent;
             this.ultraPictureBox1.BorderShadowColor = System.Drawing.Color.Transparent;
             this.ultraPictureBox1.Cursor = System.Windows.Forms.Cursors.Hand;
             this.ultraPictureBox1.Image = ((object)(resources.GetObject("ultraPictureBox1.Image")));
@@ -1655,7 +1701,7 @@ namespace PosBranch_Win.DialogBox
             this.ClientSize = new System.Drawing.Size(786, 505);
             this.Controls.Add(this.ultPanelPurchaseDisplay);
             this.Name = "frmReasonDialog";
-            this.Text = "Reason Selection";
+            this.Text = "          ";
             this.ultPanelPurchaseDisplay.ClientArea.ResumeLayout(false);
             this.ultPanelPurchaseDisplay.ClientArea.PerformLayout();
             this.ultPanelPurchaseDisplay.ResumeLayout(false);

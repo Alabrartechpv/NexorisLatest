@@ -1631,132 +1631,23 @@ namespace Repository
 
             try
             {
-                // 0. Primary: Query StockAdjustmentReasonMaster for dedicated stock adjustment reasons
-                try
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_StockAdjustmentReasonMaster, (SqlConnection)DataConnection))
                 {
-                    using (SqlCommand cmd = new SqlCommand("SELECT rm.LedgerId, rm.ReasonName FROM StockAdjustmentReasonMaster rm INNER JOIN LedgerMaster lm ON rm.LedgerId = lm.LedgerID AND rm.BranchId = lm.BranchID WHERE rm.BranchId = @BranchId AND rm.IsDelete = 0 ORDER BY rm.ReasonName ASC", (SqlConnection)DataConnection))
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@Operations", "GET_REASONS");
+                    cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
+                    using (SqlDataReader reader = cmd.ExecuteReader())
                     {
-                        cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
-                        using (SqlDataReader reader = cmd.ExecuteReader())
+                        while (reader.Read())
                         {
-                            while (reader.Read())
+                            int ledgerId = Convert.ToInt32(reader["LedgerId"]);
+                            string reasonName = reader["ReasonName"].ToString();
+                            if (addedLedgerIds.Add(ledgerId))
                             {
-                                int ledgerId = Convert.ToInt32(reader["LedgerId"]);
-                                string reasonName = reader["ReasonName"].ToString();
-                                if (addedLedgerIds.Add(ledgerId))
-                                {
-                                    reasonList.Add(new Reason { LedgerID = ledgerId, ReasonName = reasonName });
-                                }
+                                reasonList.Add(new Reason { LedgerID = ledgerId, ReasonName = reasonName });
                             }
                         }
                     }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine("StockAdjustmentReasonMaster query error: " + ex.Message);
-                }
-
-                // 1. Try stored procedure POS_dropdown
-                try
-                {
-                    using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_dropdown, (SqlConnection)DataConnection))
-                    {
-                        cmd.CommandType = CommandType.StoredProcedure;
-                        cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
-                        cmd.Parameters.AddWithValue("@CompanyId", SessionContext.CompanyId);
-                        cmd.Parameters.AddWithValue("@Operation", string.IsNullOrEmpty(DataBase.Operations) ? "Reason" : DataBase.Operations);
-                        using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
-                        {
-                            DataSet ds = new DataSet();
-                            adapt.Fill(ds);
-                            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0] != null && ds.Tables[0].Rows.Count > 0)
-                            {
-                                var spList = ds.Tables[0].ToListOfObject<Reason>();
-                                if (spList != null)
-                                {
-                                    foreach (var r in spList)
-                                    {
-                                        if (r != null && addedLedgerIds.Add(r.LedgerID))
-                                        {
-                                            reasonList.Add(r);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine("POS_dropdown Reason SP error: " + ex.Message);
-                }
-
-                // 2. Fetch ledgers under Expense / Stock Adjustment Groups via stored procedure
-                try
-                {
-                    using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._4GetAccountLedgerDDL, (SqlConnection)DataConnection))
-                    {
-                        cmd.CommandType = CommandType.StoredProcedure;
-                        cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
-                        cmd.Parameters.AddWithValue("@For", "StockAdjustment");
-                        using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
-                        {
-                            DataSet ds = new DataSet();
-                            adapt.Fill(ds);
-                            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0] != null && ds.Tables[0].Rows.Count > 0)
-                            {
-                                foreach (DataRow row in ds.Tables[0].Rows)
-                                {
-                                    string idCol = row.Table.Columns.Contains("Id") ? "Id" :
-                                                   row.Table.Columns.Contains("ID") ? "ID" :
-                                                   row.Table.Columns.Contains("LedgerID") ? "LedgerID" : null;
-
-                                    string nameCol = row.Table.Columns.Contains("Name") ? "Name" :
-                                                     row.Table.Columns.Contains("LedgerName") ? "LedgerName" :
-                                                     row.Table.Columns.Contains("ReasonName") ? "ReasonName" : null;
-
-                                    if (idCol != null && row[idCol] != DBNull.Value)
-                                    {
-                                        int ledgerId = Convert.ToInt32(row[idCol]);
-                                        string reasonName = nameCol != null && row[nameCol] != DBNull.Value ? row[nameCol].ToString() : "";
-                                        if (addedLedgerIds.Add(ledgerId))
-                                        {
-                                            reasonList.Add(new Reason { LedgerID = ledgerId, ReasonName = reasonName });
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine("Stored procedure for reason ledgers error: " + ex.Message);
-                }
-
-                // 3. Fallback direct SQL query for expense/income/stock ledgers
-                try
-                {
-                    using (SqlCommand cmd = new SqlCommand("SELECT LedgerID, LedgerName FROM LedgerMaster WHERE BranchID = @BranchId AND GroupID IN (9, 10, 12, 13, 18) AND UPPER(LedgerName) <> 'STOCK IN HAND'", (SqlConnection)DataConnection))
-                    {
-                        cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
-                        using (SqlDataReader reader = cmd.ExecuteReader())
-                        {
-                            while (reader.Read())
-                            {
-                                int ledgerId = Convert.ToInt32(reader["LedgerID"]);
-                                string reasonName = reader["LedgerName"].ToString();
-                                if (addedLedgerIds.Add(ledgerId))
-                                {
-                                    reasonList.Add(new Reason { LedgerID = ledgerId, ReasonName = reasonName });
-                                }
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine("Direct SQL fallback for reason ledgers error: " + ex.Message);
                 }
 
                 grid.List = reasonList;
@@ -1767,7 +1658,7 @@ namespace Repository
             }
             finally
             {
-                if (DataConnection.State == ConnectionState.Open)
+                if (wasClosed && DataConnection.State == ConnectionState.Open)
                     DataConnection.Close();
             }
             return grid;

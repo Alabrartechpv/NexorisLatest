@@ -463,11 +463,10 @@ namespace Repository.TransactionRepository
                     contraGroupId = Convert.ToInt32(AccountGroup.SUNDRY_CREDITORS); // Default fallback group
                     try
                     {
-                        using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_Ledger, (SqlConnection)DataConnection, (SqlTransaction)transaction))
+                        using (SqlCommand cmd = new SqlCommand("SELECT TOP 1 GroupID FROM LedgerMaster WHERE LedgerID = @LedgerID AND BranchID = @BranchId", (SqlConnection)DataConnection, (SqlTransaction)transaction))
                         {
-                            cmd.CommandType = CommandType.StoredProcedure;
-                            cmd.Parameters.AddWithValue("@_Operation", "GETBYID");
                             cmd.Parameters.AddWithValue("@LedgerID", stockMaster.LedgerId);
+                            cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
                             object result = cmd.ExecuteScalar();
                             if (result != null && result != DBNull.Value)
                             {
@@ -853,11 +852,10 @@ namespace Repository.TransactionRepository
                     contraGroupId = Convert.ToInt32(AccountGroup.SUNDRY_CREDITORS); // Default fallback group
                     try
                     {
-                        using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_Ledger, (SqlConnection)DataConnection, (SqlTransaction)trans))
+                        using (SqlCommand cmd = new SqlCommand("SELECT TOP 1 GroupID FROM LedgerMaster WHERE LedgerID = @LedgerID AND BranchID = @BranchId", (SqlConnection)DataConnection, (SqlTransaction)trans))
                         {
-                            cmd.CommandType = CommandType.StoredProcedure;
-                            cmd.Parameters.AddWithValue("@_Operation", "GETBYID");
                             cmd.Parameters.AddWithValue("@LedgerID", sk.LedgerId);
+                            cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
                             object result = cmd.ExecuteScalar();
                             if (result != null && result != DBNull.Value)
                             {
@@ -1182,16 +1180,12 @@ namespace Repository.TransactionRepository
             if (wasClosed) DataConnection.Open();
             try
             {
-                string query = @"
-SELECT rm.Id, rm.CompanyId, rm.BranchId, rm.ReasonName, rm.ReasonType, rm.LedgerId, rm.IsDelete, rm.CreatedDate
-FROM StockAdjustmentReasonMaster rm
-INNER JOIN LedgerMaster lm ON rm.LedgerId = lm.LedgerID AND rm.BranchId = lm.BranchID
-WHERE rm.BranchId = @BranchId AND rm.IsDelete = 0
-ORDER BY rm.ReasonName ASC";
-
-                using (SqlCommand cmd = new SqlCommand(query, (SqlConnection)DataConnection))
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_StockAdjustmentReasonMaster, (SqlConnection)DataConnection))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@Operations", "GET_REASONS");
                     cmd.Parameters.AddWithValue("@BranchId", branchId);
+
                     using (SqlDataReader reader = cmd.ExecuteReader())
                     {
                         while (reader.Read())
@@ -1276,31 +1270,18 @@ ORDER BY rm.ReasonName ASC";
 
                 reason.LedgerId = ledgerId;
 
-                // 2. Insert or Update in StockAdjustmentReasonMaster
-                if (reason.Id > 0)
+                // 2. Save via Stored Procedure POS_StockAdjustmentReasonMaster
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_StockAdjustmentReasonMaster, (SqlConnection)DataConnection))
                 {
-                    string updateQuery = "UPDATE StockAdjustmentReasonMaster SET ReasonName = @ReasonName, ReasonType = @ReasonType, LedgerId = @LedgerId WHERE Id = @Id";
-                    using (SqlCommand cmd = new SqlCommand(updateQuery, (SqlConnection)DataConnection))
-                    {
-                        cmd.Parameters.AddWithValue("@ReasonName", reason.ReasonName.Trim());
-                        cmd.Parameters.AddWithValue("@ReasonType", reason.ReasonType ?? "Loss");
-                        cmd.Parameters.AddWithValue("@LedgerId", reason.LedgerId);
-                        cmd.Parameters.AddWithValue("@Id", reason.Id);
-                        cmd.ExecuteNonQuery();
-                    }
-                }
-                else
-                {
-                    string insertQuery = "INSERT INTO StockAdjustmentReasonMaster (CompanyId, BranchId, ReasonName, ReasonType, LedgerId, IsDelete) VALUES (@CompanyId, @BranchId, @ReasonName, @ReasonType, @LedgerId, 0)";
-                    using (SqlCommand cmd = new SqlCommand(insertQuery, (SqlConnection)DataConnection))
-                    {
-                        cmd.Parameters.AddWithValue("@CompanyId", reason.CompanyId > 0 ? reason.CompanyId : SessionContext.CompanyId);
-                        cmd.Parameters.AddWithValue("@BranchId", reason.BranchId > 0 ? reason.BranchId : SessionContext.BranchId);
-                        cmd.Parameters.AddWithValue("@ReasonName", reason.ReasonName.Trim());
-                        cmd.Parameters.AddWithValue("@ReasonType", reason.ReasonType ?? "Loss");
-                        cmd.Parameters.AddWithValue("@LedgerId", reason.LedgerId);
-                        cmd.ExecuteNonQuery();
-                    }
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@Operations", "SAVE");
+                    cmd.Parameters.AddWithValue("@Id", reason.Id);
+                    cmd.Parameters.AddWithValue("@CompanyId", reason.CompanyId > 0 ? reason.CompanyId : SessionContext.CompanyId);
+                    cmd.Parameters.AddWithValue("@BranchId", reason.BranchId > 0 ? reason.BranchId : SessionContext.BranchId);
+                    cmd.Parameters.AddWithValue("@ReasonName", reason.ReasonName.Trim());
+                    cmd.Parameters.AddWithValue("@ReasonType", reason.ReasonType ?? "Loss");
+                    cmd.Parameters.AddWithValue("@LedgerId", reason.LedgerId);
+                    cmd.ExecuteNonQuery();
                 }
 
                 return "success";
@@ -1321,9 +1302,10 @@ ORDER BY rm.ReasonName ASC";
             if (wasClosed) DataConnection.Open();
             try
             {
-                string query = "UPDATE StockAdjustmentReasonMaster SET IsDelete = 1 WHERE Id = @Id";
-                using (SqlCommand cmd = new SqlCommand(query, (SqlConnection)DataConnection))
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_StockAdjustmentReasonMaster, (SqlConnection)DataConnection))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@Operations", "DELETE");
                     cmd.Parameters.AddWithValue("@Id", reasonId);
                     cmd.ExecuteNonQuery();
                 }

@@ -2064,6 +2064,11 @@ namespace PosBranch_Win
                 Master.FrmCategory frmcategory = new Master.FrmCategory();
                 OpenFormInTab(frmcategory, "Category");
             }
+            if (e.Tool.Key == "Reason")
+            {
+                Master.FrmReason frmReason = new Master.FrmReason();
+                OpenFormInTab(frmReason, "Reason");
+            }
             if (e.Tool.Key == "Group")
             {
                 Master.FrmGroup frmcategory = new Master.FrmGroup();

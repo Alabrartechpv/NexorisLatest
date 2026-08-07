@@ -88,6 +88,7 @@ namespace PosBranch_Win
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonTool52 = new Infragistics.Win.UltraWinToolbars.ButtonTool("Rack");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonTool53 = new Infragistics.Win.UltraWinToolbars.ButtonTool("Row");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonTool80 = new Infragistics.Win.UltraWinToolbars.ButtonTool("UnitMaster");
+            Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolReasonMaster = new Infragistics.Win.UltraWinToolbars.ButtonTool("Reason");
             Infragistics.Win.UltraWinToolbars.RibbonGroup ribbonGroup15 = new Infragistics.Win.UltraWinToolbars.RibbonGroup("ribbonGroup2");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonTool45 = new Infragistics.Win.UltraWinToolbars.ButtonTool("Users");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolPaymode = new Infragistics.Win.UltraWinToolbars.ButtonTool("PaymodeMaster");
@@ -370,6 +371,7 @@ namespace PosBranch_Win
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonTool134 = new Infragistics.Win.UltraWinToolbars.ButtonTool("Item Type");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonTool135 = new Infragistics.Win.UltraWinToolbars.ButtonTool("ButtonTool7");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonTool136 = new Infragistics.Win.UltraWinToolbars.ButtonTool("General PM setup");
+            Infragistics.Win.UltraWinToolbars.ButtonTool buttonTool138 = new Infragistics.Win.UltraWinToolbars.ButtonTool("Reason");
             Infragistics.Win.Appearance appearance3 = new Infragistics.Win.Appearance();
             Infragistics.Win.UltraWinExplorerBar.UltraExplorerBarGroup ultraExplorerBarGroup1 = new Infragistics.Win.UltraWinExplorerBar.UltraExplorerBarGroup();
             Infragistics.Win.UltraWinExplorerBar.UltraExplorerBarItem ultraExplorerBarItem1 = new Infragistics.Win.UltraWinExplorerBar.UltraExplorerBarItem();
@@ -632,6 +634,8 @@ namespace PosBranch_Win
             buttonToolStockTransferMaster.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
             buttonTool51.InstanceProps.IsFirstInGroup = true;
             buttonTool80.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
+            buttonToolReasonMaster.InstanceProps.MinimumSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
+            buttonToolReasonMaster.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
             ribbonGroup14.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
             buttonTool50,
             buttonTool25,
@@ -642,7 +646,8 @@ namespace PosBranch_Win
             buttonTool51,
             buttonTool52,
             buttonTool53,
-            buttonTool80});
+            buttonTool80,
+            buttonToolReasonMaster});
             ribbonGroup15.Caption = "Utilities";
             buttonTool45.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
             buttonToolPaymode.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
@@ -1215,6 +1220,7 @@ namespace PosBranch_Win
             buttonTool134.SharedPropsInternal.Caption = "Item Type";
             buttonTool135.SharedPropsInternal.Caption = "ButtonTool7";
             buttonTool136.SharedPropsInternal.Caption = "General PM setup";
+            buttonTool138.SharedPropsInternal.Caption = "Reason";
             this.ultraToolbarsManager1.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
             buttonTool11,
             buttonTool12,
@@ -1318,7 +1324,8 @@ namespace PosBranch_Win
             buttonTool56,
             buttonTool134,
             buttonTool135,
-            buttonTool136});
+            buttonTool136,
+            buttonTool138});
             this.ultraToolbarsManager1.ToolClick += new Infragistics.Win.UltraWinToolbars.ToolClickEventHandler(this.ultraToolbarsManager1_ToolClick_1);
             // 
             // _Home_Toolbars_Dock_Area_Left
