@@ -16,7 +16,8 @@ namespace PosBranch_Win.DialogBox
     /// Quick Purchase Presets popup.
     /// Uses FrmQuickPurchasePresets.Designer.cs for Visual Studio Form Designer compatibility.
     /// Labels styled with Microsoft Sans Serif Regular font.
-    /// Preset row selection immediately refreshes _gridItems.
+    /// Grid ID columns hidden. Only Qty cell editable in _gridItems.
+    /// Duplicate items prevented. Pressing 'q' moves focus to the next row's Qty cell.
     /// </summary>
     public partial class FrmQuickPurchasePresets : Form
     {
@@ -86,6 +87,8 @@ namespace PosBranch_Win.DialogBox
             _gridPresets.ClickCell += (s, e) => GridPresets_SelectionOrRowChanged(s, null);
 
             _gridItems.InitializeLayout += GridItems_InitializeLayout;
+            _gridItems.KeyDown += GridItems_KeyDown;
+            _gridItems.KeyPress += GridItems_KeyPress;
 
             _txtItemSearch.GotFocus += (s, ev) => { if (_txtItemSearch.ForeColor == Color.Gray) { _txtItemSearch.Text = ""; _txtItemSearch.ForeColor = Color.Black; } };
             _txtItemSearch.LostFocus += (s, ev) => { if (string.IsNullOrEmpty(_txtItemSearch.Text)) { _txtItemSearch.Text = "Search items…"; _txtItemSearch.ForeColor = Color.Gray; } };
@@ -297,18 +300,14 @@ namespace PosBranch_Win.DialogBox
             var band = e.Layout.Bands[0];
             if (band.Columns.Exists("PresetId"))
             {
-                var col = band.Columns["PresetId"];
-                col.Header.Caption = "ID";
-                col.Width = 45;
-                col.Header.VisiblePosition = 0;
-                col.CellAppearance.TextHAlign = HAlign.Center;
+                band.Columns["PresetId"].Hidden = true; // Hide ID cell
             }
             if (band.Columns.Exists("PresetName"))
             {
                 var col = band.Columns["PresetName"];
                 col.Header.Caption = "Preset Name";
-                col.Width = 145;
-                col.Header.VisiblePosition = 1;
+                col.Width = 200;
+                col.Header.VisiblePosition = 0;
             }
 
             e.Layout.Override.SelectTypeRow = SelectType.Single;
@@ -318,36 +317,93 @@ namespace PosBranch_Win.DialogBox
         private void GridItems_InitializeLayout(object sender, InitializeLayoutEventArgs e)
         {
             var band = e.Layout.Bands[0];
-            string[] hidden = { "PresetItemId", "PresetId", "UnitId" };
+            string[] hidden = { "PresetItemId", "PresetId", "ItemId", "UnitId" };
             foreach (string h in hidden)
-                if (band.Columns.Exists(h)) band.Columns[h].Hidden = true;
+            {
+                if (band.Columns.Exists(h))
+                    band.Columns[h].Hidden = true; // Hide ID cells
+            }
 
             var captions = new Dictionary<string, (string Caption, int Width, HAlign Align)>
             {
-                ["ItemId"]    = ("ID", 48, HAlign.Center),
-                ["ItemName"]  = ("Item Name", 180, HAlign.Left),
+                ["ItemName"]  = ("Item Name", 200, HAlign.Left),
                 ["Barcode"]   = ("Barcode", 110, HAlign.Center),
                 ["Unit"]      = ("Unit", 65, HAlign.Center),
-                ["UnitPrice"] = ("Price", 70, HAlign.Right),
-                ["Cost"]      = ("Cost", 70, HAlign.Right),
-                ["Quantity"]  = ("Qty", 55, HAlign.Center)
+                ["UnitPrice"] = ("Price", 75, HAlign.Right),
+                ["Cost"]      = ("Cost", 75, HAlign.Right),
+                ["Quantity"]  = ("Qty", 60, HAlign.Center)
             };
 
             int pos = 0;
-            foreach (var kv in captions)
+            foreach (var col in band.Columns)
             {
-                if (!band.Columns.Exists(kv.Key)) continue;
-                var col = band.Columns[kv.Key];
-                col.Hidden = false;
-                col.Header.Caption = kv.Value.Caption;
-                col.Header.VisiblePosition = pos++;
-                col.Width = kv.Value.Width;
-                col.CellAppearance.TextHAlign = kv.Value.Align;
-                if (kv.Key == "UnitPrice" || kv.Key == "Cost") col.Format = "N2";
+                if (captions.TryGetValue(col.Key, out var info))
+                {
+                    col.Hidden = false;
+                    col.Header.Caption = info.Caption;
+                    col.Header.VisiblePosition = pos++;
+                    col.Width = info.Width;
+                    col.CellAppearance.TextHAlign = info.Align;
+                    if (col.Key == "UnitPrice" || col.Key == "Cost") col.Format = "N2";
+
+                    // Allow editing ONLY for Quantity cell
+                    if (col.Key == "Quantity")
+                    {
+                        col.CellActivation = Activation.AllowEdit;
+                    }
+                    else
+                    {
+                        col.CellActivation = Activation.NoEdit;
+                    }
+                }
+                else
+                {
+                    col.Hidden = true;
+                }
             }
 
-            if (band.Columns.Exists("Quantity"))
-                band.Columns["Quantity"].CellActivation = Activation.AllowEdit;
+            e.Layout.Override.AllowUpdate = DefaultableBoolean.True;
+            e.Layout.Override.CellClickAction = CellClickAction.EditAndSelectText;
+        }
+
+        // ── 'q' Key Navigation Handler ─────────────────────────────────────────────
+        private void GridItems_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Q)
+            {
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+                _gridItems.PerformAction(UltraGridAction.ExitEditMode);
+                MoveToNextRowQuantityCell();
+            }
+        }
+
+        private void GridItems_KeyPress(object sender, KeyPressEventArgs e)
+        {
+            if (e.KeyChar == 'q' || e.KeyChar == 'Q')
+            {
+                e.Handled = true;
+            }
+        }
+
+        private void MoveToNextRowQuantityCell()
+        {
+            if (_gridItems.ActiveRow == null) return;
+
+            int nextIndex = _gridItems.ActiveRow.Index + 1;
+            if (nextIndex < _gridItems.Rows.Count)
+            {
+                UltraGridRow nextRow = _gridItems.Rows[nextIndex];
+                _gridItems.ActiveRow = nextRow;
+                _gridItems.Selected.Rows.Clear();
+                _gridItems.Selected.Rows.Add(nextRow);
+
+                if (nextRow.Cells.Exists("Quantity"))
+                {
+                    _gridItems.ActiveCell = nextRow.Cells["Quantity"];
+                    _gridItems.PerformAction(UltraGridAction.EnterEditMode);
+                }
+            }
         }
 
         // ── Data Loading ───────────────────────────────────────────────────────────
@@ -538,16 +594,24 @@ namespace PosBranch_Win.DialogBox
                         string itemName = dlg.SelectedItemName ?? string.Empty;
                         string barcode = dlg.SelectedBarcode ?? string.Empty;
 
-                        string unit = GetDictVal<string>(data, "UnitName", "Unit", "unit") ?? string.Empty;
-                        int unitId = GetDictVal<int>(data, "UnitId", "unitId");
-                        double unitPrice = GetDictDouble(data, "RetailPrice", "CostPrice", "UnitPrice", "Price");
-                        double cost = GetDictDouble(data, "CostPrice", "Cost", "RetailPrice");
-
                         if (itemId <= 0)
                         {
                             MessageBox.Show("Could not read item ID.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                             return;
                         }
+
+                        // Prevent adding duplicate items
+                        var currentItems = _repo.GetPresetItems(_activePreset.PresetId);
+                        if (currentItems != null && currentItems.Any(i => i.ItemId == itemId))
+                        {
+                            MessageBox.Show($"Item '{itemName}' is already added to this preset.", "Duplicate Item", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            return;
+                        }
+
+                        string unit = GetDictVal<string>(data, "UnitName", "Unit", "unit") ?? string.Empty;
+                        int unitId = GetDictVal<int>(data, "UnitId", "unitId");
+                        double unitPrice = GetDictDouble(data, "RetailPrice", "CostPrice", "UnitPrice", "Price");
+                        double cost = GetDictDouble(data, "CostPrice", "Cost", "RetailPrice");
 
                         var item = new QuickPurchasePresetItem
                         {
