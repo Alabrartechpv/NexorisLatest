@@ -2080,6 +2080,7 @@
     <None Include="Resources\payment-method.png" />
     <None Include="Resources\payment-method1.png" />
     <None Include="Resources\revenue.png" />
+    <None Include="Resources\settings.png" />
     <Content Include="Resources\splash_logo.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
