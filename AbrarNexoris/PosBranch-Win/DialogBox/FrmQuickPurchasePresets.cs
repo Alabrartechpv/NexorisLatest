@@ -18,6 +18,7 @@ namespace PosBranch_Win.DialogBox
     /// Labels styled with Microsoft Sans Serif Regular font.
     /// Grid ID columns hidden. Only Qty cell editable in _gridItems.
     /// Duplicate items prevented. Pressing 'q' moves focus to the next row's Qty cell.
+    /// Search box shortcuts: *<number> sets Qty of active row, **<number> sets Qty of ALL rows.
     /// </summary>
     public partial class FrmQuickPurchasePresets : Form
     {
@@ -92,6 +93,8 @@ namespace PosBranch_Win.DialogBox
 
             _txtItemSearch.GotFocus += (s, ev) => { if (_txtItemSearch.ForeColor == Color.Gray) { _txtItemSearch.Text = ""; _txtItemSearch.ForeColor = Color.Black; } };
             _txtItemSearch.LostFocus += (s, ev) => { if (string.IsNullOrEmpty(_txtItemSearch.Text)) { _txtItemSearch.Text = "Search items…"; _txtItemSearch.ForeColor = Color.Gray; } };
+            _txtItemSearch.TextChanged += TxtItemSearch_TextChanged;
+            _txtItemSearch.KeyDown += TxtItemSearch_KeyDown;
 
             // Register ultraPanels with the ultraPanel8 button theme and actions
             RegisterActionPanel(ultraPanel1, () => BtnNewPreset_Click(null, EventArgs.Empty));
@@ -124,6 +127,137 @@ namespace PosBranch_Win.DialogBox
                 _footerPanelItems.Location = new Point(6, top + gridH);
                 _footerPanelItems.Size = new Size(_centerPanel.Width - 12, footerH);
             };
+        }
+
+        // ── Search & Shortcut Commands (*number and **number) ───────────────────────
+        private void TxtItemSearch_TextChanged(object sender, EventArgs e)
+        {
+            string query = _txtItemSearch.Text.Trim();
+            if (query == "Search items…" || string.IsNullOrEmpty(query))
+            {
+                if (_gridItems.DisplayLayout?.Bands?.Count > 0)
+                {
+                    _gridItems.DisplayLayout.Bands[0].ColumnFilters.ClearAllFilters();
+                }
+                return;
+            }
+
+            if (query.StartsWith("*"))
+            {
+                // Don't filter grid with asterisk shortcut command
+                return;
+            }
+
+            if (_gridItems.DisplayLayout?.Bands?.Count > 0)
+            {
+                UltraGridBand band = _gridItems.DisplayLayout.Bands[0];
+                band.ColumnFilters.ClearAllFilters();
+                if (band.Columns.Exists("ItemName"))
+                {
+                    band.ColumnFilters["ItemName"].FilterConditions.Clear();
+                    band.ColumnFilters["ItemName"].FilterConditions.Add(FilterComparisionOperator.Contains, query);
+                }
+            }
+        }
+
+        private void TxtItemSearch_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                string input = _txtItemSearch.Text.Trim();
+                if (string.IsNullOrEmpty(input) || input == "Search items…") return;
+
+                // **number => Apply quantity to ALL rows
+                if (input.StartsWith("**"))
+                {
+                    string numStr = input.Substring(2).Trim();
+                    if (int.TryParse(numStr, out int qty) && qty > 0)
+                    {
+                        ApplyQuantityToAllRows(qty);
+                        e.Handled = true;
+                        e.SuppressKeyPress = true;
+                        ResetSearchBox();
+                        return;
+                    }
+                }
+                // *number => Apply quantity to HIGHLIGHTED / ACTIVE row
+                else if (input.StartsWith("*"))
+                {
+                    string numStr = input.Substring(1).Trim();
+                    if (int.TryParse(numStr, out int qty) && qty > 0)
+                    {
+                        ApplyQuantityToActiveRow(qty);
+                        e.Handled = true;
+                        e.SuppressKeyPress = true;
+                        ResetSearchBox();
+                        return;
+                    }
+                }
+            }
+        }
+
+        private void ApplyQuantityToActiveRow(int qty)
+        {
+            UltraGridRow targetRow = null;
+            if (_gridItems.ActiveRow != null)
+            {
+                targetRow = _gridItems.ActiveRow;
+            }
+            else if (_gridItems.Selected.Rows.Count > 0)
+            {
+                targetRow = _gridItems.Selected.Rows[0];
+            }
+            else if (_gridItems.Rows.Count > 0)
+            {
+                targetRow = _gridItems.Rows[0];
+            }
+
+            if (targetRow != null && targetRow.Cells.Exists("Quantity"))
+            {
+                targetRow.Cells["Quantity"].Value = qty;
+                int presetItemId = 0;
+                try { presetItemId = Convert.ToInt32(targetRow.Cells["PresetItemId"].Value); } catch { }
+                if (presetItemId > 0)
+                {
+                    _repo.UpdateItemQuantity(presetItemId, qty);
+                }
+            }
+            else
+            {
+                MessageBox.Show("No item selected in grid.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
+        private void ApplyQuantityToAllRows(int qty)
+        {
+            if (_gridItems.Rows.Count == 0)
+            {
+                MessageBox.Show("No items in preset to update.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            foreach (UltraGridRow row in _gridItems.Rows)
+            {
+                if (row.Cells.Exists("Quantity"))
+                {
+                    row.Cells["Quantity"].Value = qty;
+                    int presetItemId = 0;
+                    try { presetItemId = Convert.ToInt32(row.Cells["PresetItemId"].Value); } catch { }
+                    if (presetItemId > 0)
+                    {
+                        _repo.UpdateItemQuantity(presetItemId, qty);
+                    }
+                }
+            }
+        }
+
+        private void ResetSearchBox()
+        {
+            _txtItemSearch.Text = "";
+            if (_gridItems.DisplayLayout?.Bands?.Count > 0)
+            {
+                _gridItems.DisplayLayout.Bands[0].ColumnFilters.ClearAllFilters();
+            }
         }
 
         // ── Action Panel Button Theme (Matches ultraPanel8 in FrmPurchase.cs) ─────
