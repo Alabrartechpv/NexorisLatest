@@ -15,7 +15,8 @@ namespace PosBranch_Win.DialogBox
     /// <summary>
     /// Quick Purchase Presets popup.
     /// Uses FrmQuickPurchasePresets.Designer.cs for Visual Studio Form Designer compatibility.
-    /// Action panels ultraPanel1, ultraPanel3, ultraPanel7, ultraPanel6, ultraPanel4, ultraPanel5 are styled with the exact ultraPanel8 button theme.
+    /// Labels styled with Microsoft Sans Serif Regular font.
+    /// Preset row selection immediately refreshes _gridItems.
     /// </summary>
     public partial class FrmQuickPurchasePresets : Form
     {
@@ -25,8 +26,6 @@ namespace PosBranch_Win.DialogBox
         private static readonly Color HeaderBg2 = Color.FromArgb(67, 118, 184);
         private static readonly Color BorderColor = Color.FromArgb(118, 154, 198);
         private static readonly Color TextDark = Color.FromArgb(10, 31, 79);
-        private static readonly Color ExportBg1 = Color.FromArgb(0, 130, 210);
-        private static readonly Color ExportBg2 = Color.FromArgb(0, 90, 160);
         private static readonly Color AltRow = Color.FromArgb(245, 250, 255);
         private static readonly Color CellBorder = Color.FromArgb(197, 217, 241);
 
@@ -82,7 +81,9 @@ namespace PosBranch_Win.DialogBox
             _rightPanel.Paint += PanelPaint;
 
             _gridPresets.InitializeLayout += GridPresets_InitializeLayout;
-            _gridPresets.AfterSelectChange += GridPresets_AfterSelectChange;
+            _gridPresets.AfterSelectChange += GridPresets_SelectionOrRowChanged;
+            _gridPresets.AfterRowActivate += GridPresets_SelectionOrRowChanged;
+            _gridPresets.ClickCell += (s, e) => GridPresets_SelectionOrRowChanged(s, null);
 
             _gridItems.InitializeLayout += GridItems_InitializeLayout;
 
@@ -183,7 +184,7 @@ namespace PosBranch_Win.DialogBox
                 if (child is Label label)
                 {
                     label.ForeColor = ButtonTextBlue;
-                    label.Font = new Font("Tahoma", 9F, FontStyle.Bold, GraphicsUnit.Point, 0);
+                    label.Font = new Font("Microsoft Sans Serif", 9F, FontStyle.Regular, GraphicsUnit.Point, 0);
                     label.BackColor = Color.Transparent;
                 }
             }
@@ -309,6 +310,9 @@ namespace PosBranch_Win.DialogBox
                 col.Width = 145;
                 col.Header.VisiblePosition = 1;
             }
+
+            e.Layout.Override.SelectTypeRow = SelectType.Single;
+            e.Layout.Override.CellClickAction = CellClickAction.RowSelect;
         }
 
         private void GridItems_InitializeLayout(object sender, InitializeLayoutEventArgs e)
@@ -382,6 +386,7 @@ namespace PosBranch_Win.DialogBox
                 dt.Rows.Add(p.PresetId, p.PresetName);
 
             _gridPresets.DataSource = dt;
+            _gridPresets.DataBind();
             _gridPresets.Refresh();
 
             if (_gridPresets.Rows.Count > 0)
@@ -389,6 +394,12 @@ namespace PosBranch_Win.DialogBox
                 _gridPresets.ActiveRow = _gridPresets.Rows[0];
                 _gridPresets.Selected.Rows.Clear();
                 _gridPresets.Selected.Rows.Add(_gridPresets.Rows[0]);
+                GridPresets_SelectionOrRowChanged(null, null);
+            }
+            else
+            {
+                _activePreset = null;
+                _gridItems.DataSource = null;
             }
         }
 
@@ -413,6 +424,7 @@ namespace PosBranch_Win.DialogBox
                     dt.Rows.Add(it.PresetItemId, it.PresetId, it.ItemId, it.ItemName, it.Barcode, it.Unit, it.UnitId, it.UnitPrice, it.Cost, it.Quantity);
 
                 _gridItems.DataSource = dt;
+                _gridItems.DataBind();
                 _gridItems.Refresh();
 
                 if (_activePreset != null && _activePreset.VendorId > 0)
@@ -431,18 +443,41 @@ namespace PosBranch_Win.DialogBox
         }
 
         // ── Event Handlers ─────────────────────────────────────────────────────────
-        private void GridPresets_AfterSelectChange(object sender, AfterSelectChangeEventArgs e)
+        private void GridPresets_SelectionOrRowChanged(object sender, EventArgs e)
         {
-            if (_gridPresets.ActiveRow == null) { _activePreset = null; return; }
+            UltraGridRow selectedRow = null;
+            if (_gridPresets.Selected.Rows.Count > 0)
+            {
+                selectedRow = _gridPresets.Selected.Rows[0];
+            }
+            else if (_gridPresets.ActiveRow != null)
+            {
+                selectedRow = _gridPresets.ActiveRow;
+            }
+
+            if (selectedRow == null || !selectedRow.Cells.Exists("PresetId") || selectedRow.Cells["PresetId"].Value == DBNull.Value || selectedRow.Cells["PresetId"].Value == null)
+            {
+                _activePreset = null;
+                _gridItems.DataSource = null;
+                return;
+            }
+
             try
             {
-                int presetId = Convert.ToInt32(_gridPresets.ActiveRow.Cells["PresetId"].Value ?? 0);
+                int presetId = Convert.ToInt32(selectedRow.Cells["PresetId"].Value);
                 _activePreset = _presets.FirstOrDefault(p => p.PresetId == presetId);
-                if (_activePreset != null) LoadPresetItems(_activePreset.PresetId);
+                if (_activePreset != null)
+                {
+                    LoadPresetItems(_activePreset.PresetId);
+                }
+                else
+                {
+                    _gridItems.DataSource = null;
+                }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"GridPresets_AfterSelectChange error: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"GridPresets_SelectionOrRowChanged error: {ex.Message}");
             }
         }
 
@@ -463,6 +498,7 @@ namespace PosBranch_Win.DialogBox
                         _gridPresets.ActiveRow = row;
                         _gridPresets.Selected.Rows.Clear();
                         _gridPresets.Selected.Rows.Add(row);
+                        GridPresets_SelectionOrRowChanged(null, null);
                         break;
                     }
                 }
@@ -663,10 +699,10 @@ namespace PosBranch_Win.DialogBox
         {
             using (var frm = new Form { Width = 350, Height = 150, FormBorderStyle = FormBorderStyle.FixedDialog, Text = title, StartPosition = FormStartPosition.CenterParent, MaximizeBox = false, MinimizeBox = false })
             {
-                var lbl = new Label { Text = prompt, Left = 12, Top = 16, Width = 310, Font = new Font("Segoe UI", 9F) };
-                var txt = new TextBox { Left = 12, Top = 38, Width = 310, Font = new Font("Segoe UI", 9F) };
-                var ok = new Button { Text = "OK", DialogResult = DialogResult.OK, Left = 145, Top = 70, Width = 80, Font = new Font("Segoe UI", 9F) };
-                var cancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, Left = 232, Top = 70, Width = 80, Font = new Font("Segoe UI", 9F) };
+                var lbl = new Label { Text = prompt, Left = 12, Top = 16, Width = 310, Font = new Font("Microsoft Sans Serif", 9F, FontStyle.Regular) };
+                var txt = new TextBox { Left = 12, Top = 38, Width = 310, Font = new Font("Microsoft Sans Serif", 9F, FontStyle.Regular) };
+                var ok = new Button { Text = "OK", DialogResult = DialogResult.OK, Left = 145, Top = 70, Width = 80, Font = new Font("Microsoft Sans Serif", 9F, FontStyle.Regular) };
+                var cancel = new Button { Text = "Cancel", DialogResult = DialogResult.Cancel, Left = 232, Top = 70, Width = 80, Font = new Font("Microsoft Sans Serif", 9F, FontStyle.Regular) };
                 frm.Controls.AddRange(new Control[] { lbl, txt, ok, cancel });
                 frm.AcceptButton = ok;
                 frm.CancelButton = cancel;
