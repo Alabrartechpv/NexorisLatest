@@ -1377,9 +1377,10 @@ namespace PosBranch_Win.Reports.InventoryReport
 
             try
             {
+                // Delete stale runtime XML layout file if it exists so code layout always applies
                 if (File.Exists(GridLayoutPath))
                 {
-                    ultraGridMaster.DisplayLayout.LoadFromXml(GridLayoutPath);
+                    File.Delete(GridLayoutPath);
                 }
             }
             catch
@@ -1391,13 +1392,7 @@ namespace PosBranch_Win.Reports.InventoryReport
 
         private void SaveGridLayout()
         {
-            try
-            {
-                ultraGridMaster.DisplayLayout.SaveAsXml(GridLayoutPath);
-            }
-            catch
-            {
-            }
+            // Disabled runtime XML grid layout saving so the clean design and column order remains consistent across all computers
         }
 
         private void FrmSmartReorderDashboard_FormClosing(object sender, FormClosingEventArgs e)

@@ -121,6 +121,7 @@ namespace PosBranch_Win.DialogBox
             RegisterActionPanel(ultraPanel3, () => BtnDeletePreset_Click(null, EventArgs.Empty));
             RegisterActionPanel(ultraPanel7, () => BtnAddItem_Click(null, EventArgs.Empty));
             RegisterActionPanel(ultraPanel6, () => BtnRemoveItem_Click(null, EventArgs.Empty));
+            RegisterActionPanel(ultraPanel11, () => BtnExportGridFile_Click(null, EventArgs.Empty));
             RegisterActionPanel(ultraPanel4, () => { _cmbVendor.Value = null; SelectedVendorId = 0; SelectedVendorName = string.Empty; });
             RegisterActionPanel(ultraPanel5, () => BtnExport_Click(null, EventArgs.Empty));
 
@@ -947,6 +948,60 @@ namespace PosBranch_Win.DialogBox
                 _repo.RemoveItemFromPreset(presetItemId);
                 if (_activePreset != null) LoadPresetItems(_activePreset.PresetId);
             }
+        }
+
+        private void BtnExportGridFile_Click(object sender, EventArgs e)
+        {
+            if (_gridItems == null || _gridItems.Rows.Count == 0)
+            {
+                MessageBox.Show("There are no items in the preset to export.", "Export Grid", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            using (SaveFileDialog dialog = new SaveFileDialog())
+            {
+                string safePresetName = _activePreset != null ? _activePreset.PresetName.Replace(" ", "_") : "PresetItems";
+                dialog.Filter = "CSV files (*.csv)|*.csv|Text files (*.txt)|*.txt";
+                dialog.FileName = $"{safePresetName}_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+                dialog.Title = "Export Preset Items Grid";
+
+                if (dialog.ShowDialog(this) == DialogResult.OK)
+                {
+                    try
+                    {
+                        SaveGridQuantities();
+                        System.Text.StringBuilder sb = new System.Text.StringBuilder();
+                        sb.AppendLine("Item Name,Barcode,Unit,Price,Cost,Quantity,Total Amount");
+
+                        foreach (UltraGridRow row in _gridItems.Rows)
+                        {
+                            string itemName = EscapeCsv(Convert.ToString(row.Cells["ItemName"].Value));
+                            string barcode  = EscapeCsv(Convert.ToString(row.Cells["Barcode"].Value));
+                            string unit     = EscapeCsv(Convert.ToString(row.Cells["Unit"].Value));
+                            double price    = Convert.ToDouble(row.Cells["UnitPrice"].Value ?? 0);
+                            double cost     = Convert.ToDouble(row.Cells["Cost"].Value ?? 0);
+                            int qty         = Convert.ToInt32(row.Cells["Quantity"].Value ?? 0);
+                            double total    = cost * qty;
+
+                            sb.AppendLine($"{itemName},{barcode},{unit},{price:F2},{cost:F2},{qty},{total:F2}");
+                        }
+
+                        System.IO.File.WriteAllText(dialog.FileName, sb.ToString(), System.Text.Encoding.UTF8);
+                        MessageBox.Show($"Preset grid items exported successfully to:\n{dialog.FileName}", "Export Successful", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Error exporting grid items:\n{ex.Message}", "Export Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
+            }
+        }
+
+        private static string EscapeCsv(string val)
+        {
+            string s = val ?? string.Empty;
+            if (!s.Contains(",") && !s.Contains("\"") && !s.Contains("\n")) return s;
+            return "\"" + s.Replace("\"", "\"\"") + "\"";
         }
 
         private void CmbVendor_ValueChanged(object sender, EventArgs e)

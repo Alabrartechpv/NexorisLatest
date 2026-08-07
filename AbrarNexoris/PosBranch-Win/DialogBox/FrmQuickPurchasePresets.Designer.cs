@@ -28,8 +28,8 @@ namespace PosBranch_Win.DialogBox
         /// </summary>
         private void InitializeComponent()
         {
-            Infragistics.Win.Appearance appearanceFooterLeft = new Infragistics.Win.Appearance();
-            Infragistics.Win.Appearance appearanceFooterCenter = new Infragistics.Win.Appearance();
+            Infragistics.Win.Appearance appearance1 = new Infragistics.Win.Appearance();
+            Infragistics.Win.Appearance appearance2 = new Infragistics.Win.Appearance();
             this._titleBar = new System.Windows.Forms.Panel();
             this._lblTitle = new System.Windows.Forms.Label();
             this._btnClose = new System.Windows.Forms.Button();
@@ -53,6 +53,8 @@ namespace PosBranch_Win.DialogBox
             this._btnFlowCenter = new System.Windows.Forms.FlowLayoutPanel();
             this.ultraPanel6 = new Infragistics.Win.Misc.UltraPanel();
             this.lblRemoveItem = new System.Windows.Forms.Label();
+            this.ultraPanel11 = new Infragistics.Win.Misc.UltraPanel();
+            this.lblExportGridFile = new System.Windows.Forms.Label();
             this._rightPanel = new System.Windows.Forms.Panel();
             this._lblVendorHeader = new System.Windows.Forms.Label();
             this._lblVendor = new System.Windows.Forms.Label();
@@ -80,6 +82,8 @@ namespace PosBranch_Win.DialogBox
             this._btnFlowCenter.SuspendLayout();
             this.ultraPanel6.ClientArea.SuspendLayout();
             this.ultraPanel6.SuspendLayout();
+            this.ultraPanel11.ClientArea.SuspendLayout();
+            this.ultraPanel11.SuspendLayout();
             this._rightPanel.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this._cmbVendor)).BeginInit();
             this.ultraPanel4.ClientArea.SuspendLayout();
@@ -102,11 +106,11 @@ namespace PosBranch_Win.DialogBox
             // _lblTitle
             // 
             this._lblTitle.AutoSize = true;
-            this._lblTitle.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular);
+            this._lblTitle.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F);
             this._lblTitle.ForeColor = System.Drawing.Color.White;
             this._lblTitle.Location = new System.Drawing.Point(14, 10);
             this._lblTitle.Name = "_lblTitle";
-            this._lblTitle.Size = new System.Drawing.Size(215, 20);
+            this._lblTitle.Size = new System.Drawing.Size(202, 20);
             this._lblTitle.TabIndex = 0;
             this._lblTitle.Text = "⚡  Quick Purchase Presets";
             // 
@@ -118,7 +122,7 @@ namespace PosBranch_Win.DialogBox
             this._btnClose.FlatAppearance.BorderSize = 0;
             this._btnClose.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(200)))), ((int)(((byte)(50)))), ((int)(((byte)(50)))));
             this._btnClose.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this._btnClose.Font = new System.Drawing.Font("Microsoft Sans Serif", 11F, System.Drawing.FontStyle.Regular);
+            this._btnClose.Font = new System.Drawing.Font("Microsoft Sans Serif", 11F);
             this._btnClose.ForeColor = System.Drawing.Color.White;
             this._btnClose.Location = new System.Drawing.Point(1016, 5);
             this._btnClose.Name = "_btnClose";
@@ -161,7 +165,7 @@ namespace PosBranch_Win.DialogBox
             // 
             // _lblPresetsHeader
             // 
-            this._lblPresetsHeader.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular);
+            this._lblPresetsHeader.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F);
             this._lblPresetsHeader.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(10)))), ((int)(((byte)(31)))), ((int)(((byte)(79)))));
             this._lblPresetsHeader.Location = new System.Drawing.Point(6, 8);
             this._lblPresetsHeader.Name = "_lblPresetsHeader";
@@ -180,10 +184,10 @@ namespace PosBranch_Win.DialogBox
             // 
             // _footerPanelPresets
             // 
-            appearanceFooterLeft.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(93)))), ((int)(((byte)(151)))), ((int)(((byte)(214)))));
-            appearanceFooterLeft.BackColor2 = System.Drawing.Color.FromArgb(((int)(((byte)(93)))), ((int)(((byte)(151)))), ((int)(((byte)(214)))));
-            appearanceFooterLeft.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(118)))), ((int)(((byte)(154)))), ((int)(((byte)(198)))));
-            this._footerPanelPresets.Appearance = appearanceFooterLeft;
+            appearance1.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(93)))), ((int)(((byte)(151)))), ((int)(((byte)(214)))));
+            appearance1.BackColor2 = System.Drawing.Color.FromArgb(((int)(((byte)(93)))), ((int)(((byte)(151)))), ((int)(((byte)(214)))));
+            appearance1.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(118)))), ((int)(((byte)(154)))), ((int)(((byte)(198)))));
+            this._footerPanelPresets.Appearance = appearance1;
             this._footerPanelPresets.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
             this._footerPanelPresets.Location = new System.Drawing.Point(6, 416);
             this._footerPanelPresets.Name = "_footerPanelPresets";
@@ -216,7 +220,7 @@ namespace PosBranch_Win.DialogBox
             // lblNewPreset
             // 
             this.lblNewPreset.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.lblNewPreset.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular);
+            this.lblNewPreset.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
             this.lblNewPreset.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(14)))), ((int)(((byte)(47)))), ((int)(((byte)(108)))));
             this.lblNewPreset.Location = new System.Drawing.Point(0, 0);
             this.lblNewPreset.Name = "lblNewPreset";
@@ -239,7 +243,7 @@ namespace PosBranch_Win.DialogBox
             // lblDeletePreset
             // 
             this.lblDeletePreset.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.lblDeletePreset.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular);
+            this.lblDeletePreset.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
             this.lblDeletePreset.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(14)))), ((int)(((byte)(47)))), ((int)(((byte)(108)))));
             this.lblDeletePreset.Location = new System.Drawing.Point(0, 0);
             this.lblDeletePreset.Name = "lblDeletePreset";
@@ -266,7 +270,7 @@ namespace PosBranch_Win.DialogBox
             // 
             // _lblItemsHeader
             // 
-            this._lblItemsHeader.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular);
+            this._lblItemsHeader.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F);
             this._lblItemsHeader.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(10)))), ((int)(((byte)(31)))), ((int)(((byte)(79)))));
             this._lblItemsHeader.Location = new System.Drawing.Point(6, 8);
             this._lblItemsHeader.Name = "_lblItemsHeader";
@@ -277,11 +281,11 @@ namespace PosBranch_Win.DialogBox
             // _txtItemSearch
             // 
             this._txtItemSearch.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this._txtItemSearch.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular);
+            this._txtItemSearch.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
             this._txtItemSearch.ForeColor = System.Drawing.Color.Gray;
             this._txtItemSearch.Location = new System.Drawing.Point(6, 36);
             this._txtItemSearch.Name = "_txtItemSearch";
-            this._txtItemSearch.Size = new System.Drawing.Size(240, 23);
+            this._txtItemSearch.Size = new System.Drawing.Size(240, 21);
             this._txtItemSearch.TabIndex = 1;
             this._txtItemSearch.Text = "Search items…";
             // 
@@ -299,7 +303,7 @@ namespace PosBranch_Win.DialogBox
             // lblAddItem
             // 
             this.lblAddItem.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.lblAddItem.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.5F, System.Drawing.FontStyle.Regular);
+            this.lblAddItem.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.5F);
             this.lblAddItem.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(14)))), ((int)(((byte)(47)))), ((int)(((byte)(108)))));
             this.lblAddItem.Location = new System.Drawing.Point(0, 0);
             this.lblAddItem.Name = "lblAddItem";
@@ -319,10 +323,10 @@ namespace PosBranch_Win.DialogBox
             // 
             // _footerPanelItems
             // 
-            appearanceFooterCenter.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(93)))), ((int)(((byte)(151)))), ((int)(((byte)(214)))));
-            appearanceFooterCenter.BackColor2 = System.Drawing.Color.FromArgb(((int)(((byte)(93)))), ((int)(((byte)(151)))), ((int)(((byte)(214)))));
-            appearanceFooterCenter.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(118)))), ((int)(((byte)(154)))), ((int)(((byte)(198)))));
-            this._footerPanelItems.Appearance = appearanceFooterCenter;
+            appearance2.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(93)))), ((int)(((byte)(151)))), ((int)(((byte)(214)))));
+            appearance2.BackColor2 = System.Drawing.Color.FromArgb(((int)(((byte)(93)))), ((int)(((byte)(151)))), ((int)(((byte)(214)))));
+            appearance2.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(118)))), ((int)(((byte)(154)))), ((int)(((byte)(198)))));
+            this._footerPanelItems.Appearance = appearance2;
             this._footerPanelItems.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
             this._footerPanelItems.Location = new System.Drawing.Point(6, 416);
             this._footerPanelItems.Name = "_footerPanelItems";
@@ -333,6 +337,7 @@ namespace PosBranch_Win.DialogBox
             // _btnFlowCenter
             // 
             this._btnFlowCenter.Controls.Add(this.ultraPanel6);
+            this._btnFlowCenter.Controls.Add(this.ultraPanel11);
             this._btnFlowCenter.Dock = System.Windows.Forms.DockStyle.Bottom;
             this._btnFlowCenter.Location = new System.Drawing.Point(0, 470);
             this._btnFlowCenter.Name = "_btnFlowCenter";
@@ -354,7 +359,7 @@ namespace PosBranch_Win.DialogBox
             // lblRemoveItem
             // 
             this.lblRemoveItem.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.lblRemoveItem.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular);
+            this.lblRemoveItem.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
             this.lblRemoveItem.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(14)))), ((int)(((byte)(47)))), ((int)(((byte)(108)))));
             this.lblRemoveItem.Location = new System.Drawing.Point(0, 0);
             this.lblRemoveItem.Name = "lblRemoveItem";
@@ -362,6 +367,29 @@ namespace PosBranch_Win.DialogBox
             this.lblRemoveItem.TabIndex = 0;
             this.lblRemoveItem.Text = "✖ Remove Selected";
             this.lblRemoveItem.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            // 
+            // ultraPanel11
+            // 
+            // 
+            // ultraPanel11.ClientArea
+            // 
+            this.ultraPanel11.ClientArea.Controls.Add(this.lblExportGridFile);
+            this.ultraPanel11.Location = new System.Drawing.Point(173, 5);
+            this.ultraPanel11.Name = "ultraPanel11";
+            this.ultraPanel11.Size = new System.Drawing.Size(150, 38);
+            this.ultraPanel11.TabIndex = 1;
+            // 
+            // lblExportGridFile
+            // 
+            this.lblExportGridFile.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.lblExportGridFile.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
+            this.lblExportGridFile.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(14)))), ((int)(((byte)(47)))), ((int)(((byte)(108)))));
+            this.lblExportGridFile.Location = new System.Drawing.Point(0, 0);
+            this.lblExportGridFile.Name = "lblExportGridFile";
+            this.lblExportGridFile.Size = new System.Drawing.Size(150, 38);
+            this.lblExportGridFile.TabIndex = 0;
+            this.lblExportGridFile.Text = "💾 Export Grid";
+            this.lblExportGridFile.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
             // 
             // _rightPanel
             // 
@@ -381,7 +409,7 @@ namespace PosBranch_Win.DialogBox
             // 
             // _lblVendorHeader
             // 
-            this._lblVendorHeader.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular);
+            this._lblVendorHeader.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F);
             this._lblVendorHeader.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(10)))), ((int)(((byte)(31)))), ((int)(((byte)(79)))));
             this._lblVendorHeader.Location = new System.Drawing.Point(8, 8);
             this._lblVendorHeader.Name = "_lblVendorHeader";
@@ -392,11 +420,11 @@ namespace PosBranch_Win.DialogBox
             // _lblVendor
             // 
             this._lblVendor.AutoSize = true;
-            this._lblVendor.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular);
+            this._lblVendor.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F);
             this._lblVendor.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(10)))), ((int)(((byte)(31)))), ((int)(((byte)(79)))));
             this._lblVendor.Location = new System.Drawing.Point(8, 38);
             this._lblVendor.Name = "_lblVendor";
-            this._lblVendor.Size = new System.Drawing.Size(76, 13);
+            this._lblVendor.Size = new System.Drawing.Size(77, 13);
             this._lblVendor.TabIndex = 1;
             this._lblVendor.Text = "Select Vendor:";
             // 
@@ -406,10 +434,10 @@ namespace PosBranch_Win.DialogBox
             this._cmbVendor.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
             this._cmbVendor.DisplayStyle = Infragistics.Win.EmbeddableElementDisplayStyle.Office2013;
             this._cmbVendor.DropDownStyle = Infragistics.Win.DropDownStyle.DropDownList;
-            this._cmbVendor.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular);
+            this._cmbVendor.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F);
             this._cmbVendor.Location = new System.Drawing.Point(8, 58);
             this._cmbVendor.Name = "_cmbVendor";
-            this._cmbVendor.Size = new System.Drawing.Size(200, 23);
+            this._cmbVendor.Size = new System.Drawing.Size(200, 21);
             this._cmbVendor.TabIndex = 2;
             this._cmbVendor.UseAppStyling = false;
             this._cmbVendor.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
@@ -428,7 +456,7 @@ namespace PosBranch_Win.DialogBox
             // lblClearVendor
             // 
             this.lblClearVendor.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.lblClearVendor.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.5F, System.Drawing.FontStyle.Regular);
+            this.lblClearVendor.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.5F);
             this.lblClearVendor.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(14)))), ((int)(((byte)(47)))), ((int)(((byte)(108)))));
             this.lblClearVendor.Location = new System.Drawing.Point(0, 0);
             this.lblClearVendor.Name = "lblClearVendor";
@@ -440,7 +468,7 @@ namespace PosBranch_Win.DialogBox
             // _lblVendorHint
             // 
             this._lblVendorHint.BackColor = System.Drawing.Color.Transparent;
-            this._lblVendorHint.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular);
+            this._lblVendorHint.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F);
             this._lblVendorHint.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(60)))), ((int)(((byte)(100)))), ((int)(((byte)(160)))));
             this._lblVendorHint.Location = new System.Drawing.Point(8, 136);
             this._lblVendorHint.Name = "_lblVendorHint";
@@ -464,7 +492,7 @@ namespace PosBranch_Win.DialogBox
             // lblExport
             // 
             this.lblExport.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.lblExport.Font = new System.Drawing.Font("Microsoft Sans Serif", 10F, System.Drawing.FontStyle.Regular);
+            this.lblExport.Font = new System.Drawing.Font("Microsoft Sans Serif", 10F);
             this.lblExport.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(14)))), ((int)(((byte)(47)))), ((int)(((byte)(108)))));
             this.lblExport.Location = new System.Drawing.Point(0, 0);
             this.lblExport.Name = "lblExport";
@@ -506,6 +534,8 @@ namespace PosBranch_Win.DialogBox
             this._btnFlowCenter.ResumeLayout(false);
             this.ultraPanel6.ClientArea.ResumeLayout(false);
             this.ultraPanel6.ResumeLayout(false);
+            this.ultraPanel11.ClientArea.ResumeLayout(false);
+            this.ultraPanel11.ResumeLayout(false);
             this._rightPanel.ResumeLayout(false);
             this._rightPanel.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this._cmbVendor)).EndInit();
@@ -542,6 +572,8 @@ namespace PosBranch_Win.DialogBox
         private System.Windows.Forms.FlowLayoutPanel _btnFlowCenter;
         private Infragistics.Win.Misc.UltraPanel ultraPanel6;
         private System.Windows.Forms.Label lblRemoveItem;
+        private Infragistics.Win.Misc.UltraPanel ultraPanel11;
+        private System.Windows.Forms.Label lblExportGridFile;
         private System.Windows.Forms.Panel _rightPanel;
         private System.Windows.Forms.Label _lblVendorHeader;
         private System.Windows.Forms.Label _lblVendor;
