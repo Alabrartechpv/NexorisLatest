@@ -102,11 +102,11 @@ namespace PosBranch_Win.DialogBox
             // _lblTitle
             // 
             this._lblTitle.AutoSize = true;
-            this._lblTitle.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold);
+            this._lblTitle.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular);
             this._lblTitle.ForeColor = System.Drawing.Color.White;
             this._lblTitle.Location = new System.Drawing.Point(14, 10);
             this._lblTitle.Name = "_lblTitle";
-            this._lblTitle.Size = new System.Drawing.Size(215, 21);
+            this._lblTitle.Size = new System.Drawing.Size(215, 20);
             this._lblTitle.TabIndex = 0;
             this._lblTitle.Text = "⚡  Quick Purchase Presets";
             // 
@@ -118,7 +118,7 @@ namespace PosBranch_Win.DialogBox
             this._btnClose.FlatAppearance.BorderSize = 0;
             this._btnClose.FlatAppearance.MouseOverBackColor = System.Drawing.Color.FromArgb(((int)(((byte)(200)))), ((int)(((byte)(50)))), ((int)(((byte)(50)))));
             this._btnClose.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this._btnClose.Font = new System.Drawing.Font("Segoe UI", 11F, System.Drawing.FontStyle.Bold);
+            this._btnClose.Font = new System.Drawing.Font("Microsoft Sans Serif", 11F, System.Drawing.FontStyle.Regular);
             this._btnClose.ForeColor = System.Drawing.Color.White;
             this._btnClose.Location = new System.Drawing.Point(1016, 5);
             this._btnClose.Name = "_btnClose";
@@ -161,7 +161,7 @@ namespace PosBranch_Win.DialogBox
             // 
             // _lblPresetsHeader
             // 
-            this._lblPresetsHeader.Font = new System.Drawing.Font("Segoe UI", 9.5F, System.Drawing.FontStyle.Bold);
+            this._lblPresetsHeader.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular);
             this._lblPresetsHeader.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(10)))), ((int)(((byte)(31)))), ((int)(((byte)(79)))));
             this._lblPresetsHeader.Location = new System.Drawing.Point(6, 8);
             this._lblPresetsHeader.Name = "_lblPresetsHeader";
@@ -216,7 +216,7 @@ namespace PosBranch_Win.DialogBox
             // lblNewPreset
             // 
             this.lblNewPreset.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.lblNewPreset.Font = new System.Drawing.Font("Tahoma", 9F, System.Drawing.FontStyle.Bold);
+            this.lblNewPreset.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular);
             this.lblNewPreset.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(14)))), ((int)(((byte)(47)))), ((int)(((byte)(108)))));
             this.lblNewPreset.Location = new System.Drawing.Point(0, 0);
             this.lblNewPreset.Name = "lblNewPreset";
@@ -239,7 +239,7 @@ namespace PosBranch_Win.DialogBox
             // lblDeletePreset
             // 
             this.lblDeletePreset.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.lblDeletePreset.Font = new System.Drawing.Font("Tahoma", 9F, System.Drawing.FontStyle.Bold);
+            this.lblDeletePreset.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular);
             this.lblDeletePreset.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(14)))), ((int)(((byte)(47)))), ((int)(((byte)(108)))));
             this.lblDeletePreset.Location = new System.Drawing.Point(0, 0);
             this.lblDeletePreset.Name = "lblDeletePreset";
@@ -266,7 +266,7 @@ namespace PosBranch_Win.DialogBox
             // 
             // _lblItemsHeader
             // 
-            this._lblItemsHeader.Font = new System.Drawing.Font("Segoe UI", 9.5F, System.Drawing.FontStyle.Bold);
+            this._lblItemsHeader.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular);
             this._lblItemsHeader.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(10)))), ((int)(((byte)(31)))), ((int)(((byte)(79)))));
             this._lblItemsHeader.Location = new System.Drawing.Point(6, 8);
             this._lblItemsHeader.Name = "_lblItemsHeader";
@@ -277,7 +277,7 @@ namespace PosBranch_Win.DialogBox
             // _txtItemSearch
             // 
             this._txtItemSearch.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-            this._txtItemSearch.Font = new System.Drawing.Font("Segoe UI", 9F);
+            this._txtItemSearch.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular);
             this._txtItemSearch.ForeColor = System.Drawing.Color.Gray;
             this._txtItemSearch.Location = new System.Drawing.Point(6, 36);
             this._txtItemSearch.Name = "_txtItemSearch";
@@ -299,7 +299,7 @@ namespace PosBranch_Win.DialogBox
             // lblAddItem
             // 
             this.lblAddItem.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.lblAddItem.Font = new System.Drawing.Font("Tahoma", 8.5F, System.Drawing.FontStyle.Bold);
+            this.lblAddItem.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.5F, System.Drawing.FontStyle.Regular);
             this.lblAddItem.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(14)))), ((int)(((byte)(47)))), ((int)(((byte)(108)))));
             this.lblAddItem.Location = new System.Drawing.Point(0, 0);
             this.lblAddItem.Name = "lblAddItem";
@@ -354,7 +354,7 @@ namespace PosBranch_Win.DialogBox
             // lblRemoveItem
             // 
             this.lblRemoveItem.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.lblRemoveItem.Font = new System.Drawing.Font("Tahoma", 9F, System.Drawing.FontStyle.Bold);
+            this.lblRemoveItem.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular);
             this.lblRemoveItem.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(14)))), ((int)(((byte)(47)))), ((int)(((byte)(108)))));
             this.lblRemoveItem.Location = new System.Drawing.Point(0, 0);
             this.lblRemoveItem.Name = "lblRemoveItem";
@@ -381,7 +381,7 @@ namespace PosBranch_Win.DialogBox
             // 
             // _lblVendorHeader
             // 
-            this._lblVendorHeader.Font = new System.Drawing.Font("Segoe UI", 9.5F, System.Drawing.FontStyle.Bold);
+            this._lblVendorHeader.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular);
             this._lblVendorHeader.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(10)))), ((int)(((byte)(31)))), ((int)(((byte)(79)))));
             this._lblVendorHeader.Location = new System.Drawing.Point(8, 8);
             this._lblVendorHeader.Name = "_lblVendorHeader";
@@ -392,11 +392,11 @@ namespace PosBranch_Win.DialogBox
             // _lblVendor
             // 
             this._lblVendor.AutoSize = true;
-            this._lblVendor.Font = new System.Drawing.Font("Segoe UI", 8.5F);
+            this._lblVendor.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular);
             this._lblVendor.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(10)))), ((int)(((byte)(31)))), ((int)(((byte)(79)))));
             this._lblVendor.Location = new System.Drawing.Point(8, 38);
             this._lblVendor.Name = "_lblVendor";
-            this._lblVendor.Size = new System.Drawing.Size(81, 15);
+            this._lblVendor.Size = new System.Drawing.Size(76, 13);
             this._lblVendor.TabIndex = 1;
             this._lblVendor.Text = "Select Vendor:";
             // 
@@ -406,7 +406,7 @@ namespace PosBranch_Win.DialogBox
             this._cmbVendor.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
             this._cmbVendor.DisplayStyle = Infragistics.Win.EmbeddableElementDisplayStyle.Office2013;
             this._cmbVendor.DropDownStyle = Infragistics.Win.DropDownStyle.DropDownList;
-            this._cmbVendor.Font = new System.Drawing.Font("Segoe UI", 9F);
+            this._cmbVendor.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular);
             this._cmbVendor.Location = new System.Drawing.Point(8, 58);
             this._cmbVendor.Name = "_cmbVendor";
             this._cmbVendor.Size = new System.Drawing.Size(200, 23);
@@ -428,7 +428,7 @@ namespace PosBranch_Win.DialogBox
             // lblClearVendor
             // 
             this.lblClearVendor.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.lblClearVendor.Font = new System.Drawing.Font("Tahoma", 8.5F, System.Drawing.FontStyle.Bold);
+            this.lblClearVendor.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.5F, System.Drawing.FontStyle.Regular);
             this.lblClearVendor.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(14)))), ((int)(((byte)(47)))), ((int)(((byte)(108)))));
             this.lblClearVendor.Location = new System.Drawing.Point(0, 0);
             this.lblClearVendor.Name = "lblClearVendor";
@@ -440,7 +440,7 @@ namespace PosBranch_Win.DialogBox
             // _lblVendorHint
             // 
             this._lblVendorHint.BackColor = System.Drawing.Color.Transparent;
-            this._lblVendorHint.Font = new System.Drawing.Font("Segoe UI", 7.5F, System.Drawing.FontStyle.Italic);
+            this._lblVendorHint.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular);
             this._lblVendorHint.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(60)))), ((int)(((byte)(100)))), ((int)(((byte)(160)))));
             this._lblVendorHint.Location = new System.Drawing.Point(8, 136);
             this._lblVendorHint.Name = "_lblVendorHint";
@@ -464,7 +464,7 @@ namespace PosBranch_Win.DialogBox
             // lblExport
             // 
             this.lblExport.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.lblExport.Font = new System.Drawing.Font("Segoe UI", 10.5F, System.Drawing.FontStyle.Bold);
+            this.lblExport.Font = new System.Drawing.Font("Microsoft Sans Serif", 10F, System.Drawing.FontStyle.Regular);
             this.lblExport.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(14)))), ((int)(((byte)(47)))), ((int)(((byte)(108)))));
             this.lblExport.Location = new System.Drawing.Point(0, 0);
             this.lblExport.Name = "lblExport";
