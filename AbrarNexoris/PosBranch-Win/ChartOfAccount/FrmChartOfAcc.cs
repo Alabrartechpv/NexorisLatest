@@ -50,6 +50,9 @@ namespace PosBranch_Win.ChartOfAccount
         public FrmChartOfAcc()
         {
             InitializeComponent();
+            this.KeyPreview = true;
+            this.DoubleBuffered = true;
+            this.SetStyle(ControlStyles.OptimizedDoubleBuffer | ControlStyles.AllPaintingInWmPaint, true);
 
             // Initialize repositories
             accountGroupRepo = new AccountGroupRepository();
@@ -110,6 +113,41 @@ namespace PosBranch_Win.ChartOfAccount
 
             // Enable drag and drop functionality
             EnableDragAndDrop();
+        }
+
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            if (keyData == Keys.F5 || keyData == (Keys.Control | Keys.R))
+            {
+                LoadChartOfAccountsTreeSimple();
+                return true;
+            }
+            if (keyData == Keys.F3 || keyData == (Keys.Control | Keys.F))
+            {
+                if (txtSearchBox != null)
+                {
+                    txtSearchBox.Focus();
+                    txtSearchBox.SelectAll();
+                }
+                return true;
+            }
+            if (keyData == Keys.F8 || keyData == (Keys.Control | Keys.E))
+            {
+                BtnEdit_Click(null, null);
+                return true;
+            }
+            if (keyData == Keys.F4 || keyData == Keys.Delete)
+            {
+                MenuDelete_Click(null, null);
+                return true;
+            }
+            if (keyData == Keys.Escape)
+            {
+                this.Close();
+                return true;
+            }
+
+            return base.ProcessCmdKey(ref msg, keyData);
         }
 
         private void InitializeContextMenu()
@@ -487,6 +525,20 @@ namespace PosBranch_Win.ChartOfAccount
             txtSearchBox.BorderStyle = BorderStyle.FixedSingle;
             txtSearchBox.Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right;
             txtSearchBox.KeyDown += TxtSearchBox_KeyDown;
+            txtSearchBox.TextChanged += (s, ev) =>
+            {
+                if (searchDebounceTimer == null)
+                {
+                    searchDebounceTimer = new Timer { Interval = 250 };
+                    searchDebounceTimer.Tick += (st, args) =>
+                    {
+                        searchDebounceTimer.Stop();
+                        SearchNodes();
+                    };
+                }
+                searchDebounceTimer.Stop();
+                searchDebounceTimer.Start();
+            };
             searchCard.Controls.Add(txtSearchBox);
 
             btnSearch = new Button();
@@ -705,6 +757,7 @@ namespace PosBranch_Win.ChartOfAccount
 
         private void LoadChartOfAccountsTreeSimple()
         {
+            ultraTree1.BeginUpdate();
             try
             {
                 // Clear the tree
@@ -797,8 +850,6 @@ namespace PosBranch_Win.ChartOfAccount
                     else
                     {
                         // Fallback for groups that don't match a main category and have no parent
-                        // You might want an "UNCATEGORIZED" root node for these.
-                        // For now, let's add them to the tree root if they don't fit elsewhere.
                         if (!categories.ContainsKey("UNCATEGORIZED"))
                         {
                             Infragistics.Win.UltraWinTree.UltraTreeNode uncategorizedNode = new Infragistics.Win.UltraWinTree.UltraTreeNode();
@@ -854,6 +905,10 @@ namespace PosBranch_Win.ChartOfAccount
             {
                 MessageBox.Show("Error loading chart of accounts: " + ex.Message + "\nStackTrace: " + ex.StackTrace, "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                ultraTree1.EndUpdate();
             }
         }
 
@@ -979,6 +1034,8 @@ namespace PosBranch_Win.ChartOfAccount
                 // 2. Format breadcrumb path
                 lblBreadcrumb.Text = GetNodeBreadcrumbPath(selectedNode);
 
+                string formattedBalance = totalBalance != 0 ? FormatBalanceInBrackets(totalBalance) : "(0.00 Dr)";
+
                 // 3. Determine the type of node selected
                 // Case A: Root category node (string tag)
                 if (selectedNode.Tag is string catName)
@@ -989,7 +1046,7 @@ namespace PosBranch_Win.ChartOfAccount
                     txtParentGroup.Text = "None (Root)";
                     txtLedgerCount.Text = ledgerCount.ToString();
                     txtDescription.Text = $"System account classification for {catName}.";
-                    txtBalance.Text = totalBalance.ToString("C2");
+                    txtBalance.Text = formattedBalance;
                 }
                 // Case B: Group or Ledger node (DataRow tag)
                 else if (selectedNode.Tag is DataRow row)
@@ -1012,7 +1069,7 @@ namespace PosBranch_Win.ChartOfAccount
                             txtParentGroup.Text = "Unknown Group";
                         }
 
-                        txtBalance.Text = totalBalance.ToString("C2");
+                        txtBalance.Text = formattedBalance;
                     }
                     else if (row.Table.Columns.Contains("GroupName"))
                     {
@@ -1039,7 +1096,7 @@ namespace PosBranch_Win.ChartOfAccount
                             txtParentGroup.Text = "None";
                         }
 
-                        txtBalance.Text = totalBalance.ToString("C2");
+                        txtBalance.Text = formattedBalance;
                     }
                 }
             }
@@ -1103,6 +1160,13 @@ namespace PosBranch_Win.ChartOfAccount
             return string.Join("  >  ", pathParts);
         }
 
+        private string FormatBalanceInBrackets(decimal balance)
+        {
+            if (balance == 0) return string.Empty;
+            string drCr = balance >= 0 ? "Dr" : "Cr";
+            return $"({Math.Abs(balance):N2} {drCr})";
+        }
+
         private decimal FormatNodeBalancesRecursive(Infragistics.Win.UltraWinTree.UltraTreeNode node)
         {
             if (node == null) return 0;
@@ -1113,7 +1177,7 @@ namespace PosBranch_Win.ChartOfAccount
                 string ledgerName = row["LedgerName"].ToString();
                 decimal ledgerBalance = row["Balance"] != DBNull.Value ? Convert.ToDecimal(row["Balance"]) : 0;
                 node.Text = ledgerBalance != 0
-                    ? $"{ledgerName} [Balance: {ledgerBalance:C2}]"
+                    ? $"{ledgerName} {FormatBalanceInBrackets(ledgerBalance)}"
                     : ledgerName;
 
                 return ledgerBalance;
@@ -1130,25 +1194,15 @@ namespace PosBranch_Win.ChartOfAccount
             if (node.Tag is DataRow groupRow && groupRow.Table.Columns.Contains("GroupName"))
             {
                 string groupName = groupRow["GroupName"].ToString();
-                if (totalBalance != 0)
-                {
-                    node.Text = $"{groupName} [Balance: {totalBalance:C2}]";
-                }
-                else
-                {
-                    node.Text = groupName;
-                }
+                node.Text = totalBalance != 0
+                    ? $"{groupName} {FormatBalanceInBrackets(totalBalance)}"
+                    : groupName;
             }
             else if (node.Tag is string catName && catName != "UNCATEGORIZED_TAG")
             {
-                if (totalBalance != 0)
-                {
-                    node.Text = $"{catName} [Balance: {totalBalance:C2}]";
-                }
-                else
-                {
-                    node.Text = catName;
-                }
+                node.Text = totalBalance != 0
+                    ? $"{catName} {FormatBalanceInBrackets(totalBalance)}"
+                    : catName;
             }
 
             return totalBalance;
@@ -1243,12 +1297,28 @@ namespace PosBranch_Win.ChartOfAccount
 
         private void BtnExpandAll_Click(object sender, EventArgs e)
         {
-            ultraTree1.ExpandAll();
+            ultraTree1.BeginUpdate();
+            try
+            {
+                ultraTree1.ExpandAll();
+            }
+            finally
+            {
+                ultraTree1.EndUpdate();
+            }
         }
 
         private void BtnCollapseAll_Click(object sender, EventArgs e)
         {
-            ultraTree1.CollapseAll();
+            ultraTree1.BeginUpdate();
+            try
+            {
+                ultraTree1.CollapseAll();
+            }
+            finally
+            {
+                ultraTree1.EndUpdate();
+            }
         }
 
         private void BtnEdit_Click(object sender, EventArgs e)
@@ -1435,6 +1505,8 @@ namespace PosBranch_Win.ChartOfAccount
             }
         }
 
+        private Timer searchDebounceTimer;
+
         private void TxtSearchBox_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.KeyCode == Keys.Enter)
@@ -1454,45 +1526,79 @@ namespace PosBranch_Win.ChartOfAccount
         {
             string searchText = txtSearchBox.Text.ToLower().Trim();
 
-            if (string.IsNullOrEmpty(searchText))
+            ultraTree1.BeginUpdate();
+            try
             {
-                // If search text is empty, reload the full tree
-                LoadChartOfAccountsTreeSimple();
-                return;
+                if (string.IsNullOrEmpty(searchText))
+                {
+                    // Reset highlights and expand all
+                    foreach (Infragistics.Win.UltraWinTree.UltraTreeNode node in ultraTree1.Nodes)
+                    {
+                        ResetNodeStylesRecursive(node);
+                    }
+                    ultraTree1.SelectedNodes.Clear();
+                    ultraTree1.ExpandAll();
+                    return;
+                }
+
+                ultraTree1.SelectedNodes.Clear();
+                ultraTree1.CollapseAll();
+
+                foreach (Infragistics.Win.UltraWinTree.UltraTreeNode node in ultraTree1.Nodes)
+                {
+                    SearchNodeRecursive(node, searchText);
+                }
+
+                if (ultraTree1.SelectedNodes.Count > 0)
+                {
+                    ultraTree1.SelectedNodes[0].BringIntoView();
+                }
             }
-
-            // Clear previous selection and collapse all nodes
-            ultraTree1.SelectedNodes.Clear();
-            ultraTree1.CollapseAll();
-
-            // Search through the nodes
-            foreach (Infragistics.Win.UltraWinTree.UltraTreeNode node in ultraTree1.Nodes)
+            finally
             {
-                SearchNodeRecursive(node, searchText);
+                ultraTree1.EndUpdate();
             }
         }
 
-        private void SearchNodeRecursive(Infragistics.Win.UltraWinTree.UltraTreeNode node, string searchText)
+        private bool SearchNodeRecursive(Infragistics.Win.UltraWinTree.UltraTreeNode node, string searchText)
         {
-            // Check if the current node matches the search text
-            if (node.Text.ToLower().Contains(searchText))
+            bool matchInSelf = node.Text != null && node.Text.ToLower().Contains(searchText);
+
+            if (matchInSelf)
             {
                 node.Selected = true;
-
-                // Expand all parent nodes to make the selected node visible
-                Infragistics.Win.UltraWinTree.UltraTreeNode parent = node.Parent;
-                while (parent != null)
-                {
-                    parent.Expanded = true;
-                    parent = parent.Parent;
-                }
-                node.BringIntoView(); // Scrolls the tree to make the node visible
+                node.Override.NodeAppearance.BackColor = Color.FromArgb(254, 240, 138); // Yellow highlight
+                node.Override.NodeAppearance.FontData.Bold = Infragistics.Win.DefaultableBoolean.True;
+            }
+            else
+            {
+                node.Override.NodeAppearance.ResetBackColor();
             }
 
-            // Recursively search child nodes
+            bool childMatch = false;
             foreach (Infragistics.Win.UltraWinTree.UltraTreeNode childNode in node.Nodes)
             {
-                SearchNodeRecursive(childNode, searchText);
+                if (SearchNodeRecursive(childNode, searchText))
+                {
+                    childMatch = true;
+                }
+            }
+
+            if (matchInSelf || childMatch)
+            {
+                node.Expanded = true;
+                return true;
+            }
+
+            return false;
+        }
+
+        private void ResetNodeStylesRecursive(Infragistics.Win.UltraWinTree.UltraTreeNode node)
+        {
+            node.Override.NodeAppearance.ResetBackColor();
+            foreach (Infragistics.Win.UltraWinTree.UltraTreeNode childNode in node.Nodes)
+            {
+                ResetNodeStylesRecursive(childNode);
             }
         }
     }

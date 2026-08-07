@@ -40,8 +40,11 @@ namespace PosBranch_Win.Master
             // Apply modern UI styles consistently
             ApplyModernStyles();
 
-            // Wire up button click events
+            // Wire up form events
             this.Load += FrmCompany_Load;
+            this.Resize += FrmCompany_Resize;
+            this.KeyPreview = true;
+            this.KeyDown += FrmCompany_KeyDown;
         }
 
         private void ApplyModernStyles()
@@ -51,11 +54,11 @@ namespace PosBranch_Win.Master
                 // Base font
                 this.Font = new Font("Segoe UI", 10F, FontStyle.Regular);
 
-                // Style buttons with flat modern look (designer covers most, ensure here too)
-                foreach (var ctrl in new[] { btnSave, btnNew, btnDelete, btnBrowse })
+                // Style buttons with flat modern look
+                if (btnBrowse != null)
                 {
-                    ctrl.FlatStyle = FlatStyle.Flat;
-                    ctrl.FlatAppearance.BorderSize = 1;
+                    btnBrowse.FlatStyle = FlatStyle.Flat;
+                    btnBrowse.FlatAppearance.BorderSize = 1;
                 }
 
                 // Style text editors
@@ -93,6 +96,7 @@ namespace PosBranch_Win.Master
 
         private void FrmCompany_Load(object sender, EventArgs e)
         {
+            PerformResponsiveLayout();
             // Try to load the latest company or first one in the list
             try
             {
@@ -112,6 +116,310 @@ namespace PosBranch_Win.Master
             catch (Exception ex)
             {
                 MessageBox.Show($"Error loading company data: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        public void Save()
+        {
+            SaveRecord();
+        }
+
+        public void SaveRecord()
+        {
+            btnSave_Click(this, EventArgs.Empty);
+        }
+
+        public void Clear()
+        {
+            ClearRecord();
+        }
+
+        public void ClearRecord()
+        {
+            BtnNew_Click(this, EventArgs.Empty);
+        }
+
+        public void Delete()
+        {
+            DeleteRecord();
+        }
+
+        public void DeleteRecord()
+        {
+            BtnDelete_Click(this, EventArgs.Empty);
+        }
+
+        public void New()
+        {
+            BtnNew_Click(this, EventArgs.Empty);
+        }
+
+        private void FrmCompany_Resize(object sender, EventArgs e)
+        {
+            PerformResponsiveLayout();
+        }
+
+        private void FrmCompany_KeyDown(object sender, KeyEventArgs e)
+        {
+            try
+            {
+                switch (e.KeyCode)
+                {
+                    case Keys.F8:
+                        SaveRecord();
+                        break;
+                    case Keys.F1:
+                        ClearRecord();
+                        break;
+                    case Keys.F4:
+                        this.Close();
+                        break;
+                }
+            }
+            catch { }
+        }
+
+        private void PerformResponsiveLayout()
+        {
+            try
+            {
+                if (ultraPanel1 == null || ultraPanel1.ClientArea == null)
+                    return;
+
+                // Disable scrollbars when fitting screen cleanly
+                ultraPanel1.AutoScroll = false;
+
+                int clientWidth = ultraPanel1.ClientArea.Width;
+                int clientHeight = ultraPanel1.ClientArea.Height;
+
+                if (clientWidth <= 300 || clientHeight <= 300)
+                    return;
+
+                int padding = 12;
+                int gap = 12;
+                int topY = ultraLabelTitle != null ? ultraLabelTitle.Height + padding : 54;
+
+                int availableHeight = clientHeight - topY - padding;
+                if (availableHeight < 400)
+                {
+                    ultraPanel1.AutoScroll = true;
+                    availableHeight = 460;
+                }
+
+                // Calculate row heights to fill 100% of available screen height
+                int topRowHeight = Math.Max(220, (availableHeight - gap) * 52 / 100);
+                int row2Height = Math.Max(210, availableHeight - topRowHeight - gap);
+
+                // --- TOP ROW: 3 Columns ---
+                int colWidth = (clientWidth - (padding * 2) - (gap * 2)) / 3;
+                if (colWidth < 280) colWidth = 280;
+
+                // 1. Basic Information
+                if (ultraGroupBoxBasicInfo != null)
+                {
+                    ultraGroupBoxBasicInfo.SetBounds(padding, topY, colWidth, topRowHeight);
+                    int innerW = colWidth - 140;
+                    if (innerW > 60)
+                    {
+                        if (txtCompanyName != null)
+                        {
+                            txtCompanyName.Width = Math.Max(60, innerW - 30);
+                            if (button4 != null)
+                                button4.Location = new Point(txtCompanyName.Right + 6, txtCompanyName.Top + 2);
+                        }
+                        if (txtCompanyCaption != null) txtCompanyCaption.Width = innerW;
+                        if (txtBusinessType != null) txtBusinessType.Width = innerW;
+                    }
+                }
+
+                // 2. Address Information (Scaling all address textboxes & state/country line)
+                if (ultraGroupBoxAddress != null)
+                {
+                    int left2 = padding + colWidth + gap;
+                    ultraGroupBoxAddress.SetBounds(left2, topY, colWidth, topRowHeight);
+                    int innerW = colWidth - 110;
+                    if (innerW > 80)
+                    {
+                        if (txtAddress1 != null) txtAddress1.Width = innerW;
+                        if (txtAddress2 != null) txtAddress2.Width = innerW;
+                        if (txtAddress3 != null) txtAddress3.Width = innerW;
+                        if (txtAddress4 != null) txtAddress4.Width = innerW;
+                        if (txtZipcode != null) txtZipcode.Width = Math.Max(70, innerW / 2);
+
+                        // State & Country line layout - fit without overlap
+                        int stateLabelW = label6 != null ? label6.Width : 42;
+                        int stateInputW = Math.Max(50, (innerW - 135) / 2);
+
+                        if (ultraTextEditor1 != null)
+                        {
+                            ultraTextEditor1.Location = new Point(label6 != null ? label6.Left + stateLabelW + 4 : 60, 180);
+                            ultraTextEditor1.Width = stateInputW;
+                        }
+                        if (btn_Add_ItemIype != null && ultraTextEditor1 != null)
+                            btn_Add_ItemIype.Location = new Point(ultraTextEditor1.Right + 3, ultraTextEditor1.Top + 2);
+
+                        int countryLabelX = btn_Add_ItemIype != null ? btn_Add_ItemIype.Right + 8 : (ultraTextEditor1 != null ? ultraTextEditor1.Right + 8 : 200);
+                        if (label7 != null) label7.Location = new Point(countryLabelX, 183);
+
+                        int countryInputX = label7 != null ? label7.Right + 4 : countryLabelX + 58;
+                        if (ultraTextEditor2 != null)
+                        {
+                            ultraTextEditor2.Location = new Point(countryInputX, 180);
+                            ultraTextEditor2.Width = stateInputW;
+                            if (button1 != null)
+                                button1.Location = new Point(ultraTextEditor2.Right + 3, ultraTextEditor2.Top + 2);
+                        }
+                    }
+                }
+
+                // 3. Contact Information
+                if (ultraGroupBoxContact != null)
+                {
+                    int left3 = padding + (colWidth + gap) * 2;
+                    ultraGroupBoxContact.SetBounds(left3, topY, colWidth, topRowHeight);
+                    int innerW = colWidth - 90;
+                    if (innerW > 80)
+                    {
+                        if (txtEmail != null) txtEmail.Width = innerW;
+                        if (txtWebsite != null) txtWebsite.Width = innerW;
+
+                        // Phone & Mobile in 2 sub-columns
+                        int phoneW = Math.Max(60, (innerW - 70) / 2);
+                        if (txtPhone != null) txtPhone.Width = phoneW;
+                        int mobLabelX = txtPhone != null ? txtPhone.Right + 8 : 220;
+                        if (ultraLabel6 != null) ultraLabel6.Location = new Point(mobLabelX, 33);
+                        int mobInputX = ultraLabel6 != null ? ultraLabel6.Right + 4 : mobLabelX + 55;
+                        if (txtMobile != null)
+                        {
+                            txtMobile.Location = new Point(mobInputX, 30);
+                            txtMobile.Width = phoneW;
+                        }
+                    }
+                }
+
+                // --- BOTTOM ROW ---
+                int row2Y = topY + topRowHeight + gap;
+
+                // 4. Legal & Tax Information (~64% width)
+                int legalWidth = (clientWidth - (padding * 2) - gap) * 64 / 100;
+                if (legalWidth < 480) legalWidth = 480;
+
+                if (ultraGroupBoxLegal != null)
+                {
+                    ultraGroupBoxLegal.SetBounds(padding, row2Y, legalWidth, row2Height);
+
+                    int col1InputW = Math.Max(80, (legalWidth - 360) / 3);
+
+                    // Line 1: Tax Sys | Currency | Phone No
+                    if (ultraTextEditor3 != null)
+                    {
+                        ultraTextEditor3.Width = col1InputW;
+                        if (button2 != null) button2.Location = new Point(ultraTextEditor3.Right + 3, ultraTextEditor3.Top + 2);
+                    }
+
+                    int curLabelX = button2 != null ? button2.Right + 10 : 220;
+                    if (ultraLabel1 != null) ultraLabel1.Location = new Point(curLabelX, 33);
+                    int curInputX = ultraLabel1 != null ? ultraLabel1.Right + 4 : curLabelX + 70;
+                    if (ultraTextEditor4 != null)
+                    {
+                        ultraTextEditor4.Location = new Point(curInputX, 30);
+                        ultraTextEditor4.Width = col1InputW;
+                        if (button3 != null) button3.Location = new Point(ultraTextEditor4.Right + 3, ultraTextEditor4.Top + 2);
+                    }
+
+                    int phoneLabelX = button3 != null ? button3.Right + 10 : 450;
+                    if (label10 != null) label10.Location = new Point(phoneLabelX, 33);
+                    int phoneInputX = label10 != null ? label10.Right + 4 : phoneLabelX + 75;
+                    if (txtTaxNo != null)
+                    {
+                        txtTaxNo.Location = new Point(phoneInputX, 30);
+                        txtTaxNo.Width = col1InputW;
+                    }
+
+                    // Line 2: GST NO | Reg. No | Company Code (Ensure no truncation on label13)
+                    if (txtLicenseNo != null) txtLicenseNo.Width = col1InputW;
+
+                    if (label12 != null) label12.Location = new Point(curLabelX, 68);
+                    if (txtDLNo1 != null)
+                    {
+                        txtDLNo1.Location = new Point(curInputX, 65);
+                        txtDLNo1.Width = col1InputW;
+                    }
+
+                    if (label13 != null)
+                    {
+                        label13.Text = "Company Code:";
+                        label13.AutoSize = true;
+                        label13.Location = new Point(phoneLabelX, 68);
+                    }
+                    if (txtDLNo2 != null)
+                    {
+                        int codeInputX = label13 != null ? label13.Right + 4 : phoneInputX;
+                        txtDLNo2.Location = new Point(codeInputX, 65);
+                        txtDLNo2.Width = col1InputW;
+                    }
+
+                    // Line 3: FSSAI No
+                    if (txtFSSAINo != null) txtFSSAINo.Width = col1InputW;
+                }
+
+                // Right Column (~36% width): Dates box + Logo box
+                int rightX = padding + legalWidth + gap;
+                int rightWidth = clientWidth - padding - rightX;
+                if (rightWidth < 280) rightWidth = 280;
+
+                int datesHeight = (row2Height - gap) / 2;
+                if (datesHeight < 105) datesHeight = 105;
+
+                // 5. Financial Year & Book Period
+                if (ultraGroupBoxDates != null)
+                {
+                    ultraGroupBoxDates.SetBounds(rightX, row2Y, rightWidth, datesHeight);
+                    int dtpW = Math.Max(75, (rightWidth - 180) / 2);
+                    if (dtpFinYearFrom != null) dtpFinYearFrom.Width = dtpW;
+                    int to1LabelX = dtpFinYearFrom != null ? dtpFinYearFrom.Right + 6 : 240;
+                    if (FinYearTo != null) FinYearTo.Location = new Point(to1LabelX, 33);
+                    int to1InputX = FinYearTo != null ? FinYearTo.Right + 4 : to1LabelX + 30;
+                    if (dtpFinYearTo != null)
+                    {
+                        dtpFinYearTo.Location = new Point(to1InputX, 30);
+                        dtpFinYearTo.Width = dtpW;
+                    }
+
+                    if (dtpBookFrom != null) dtpBookFrom.Width = dtpW;
+                    if (ultraLabel5 != null) ultraLabel5.Location = new Point(to1LabelX, 68);
+                    if (dtpBookTo != null)
+                    {
+                        dtpBookTo.Location = new Point(to1InputX, 65);
+                        dtpBookTo.Width = dtpW;
+                    }
+                }
+
+                // 6. Logo & Backup Settings (Fills bottom right area cleanly)
+                int logoY = row2Y + datesHeight + gap;
+                int logoHeight = row2Height - datesHeight - gap;
+                if (logoHeight < 110) logoHeight = 110;
+
+                if (ultraGroupBoxLogo != null)
+                {
+                    ultraGroupBoxLogo.SetBounds(rightX, logoY, rightWidth, logoHeight);
+                    int backupW = Math.Max(90, rightWidth - 260);
+                    if (txtBackupPath != null) txtBackupPath.Width = backupW;
+                    if (picLogo != null)
+                    {
+                        picLogo.Location = new Point(rightWidth - 145, 20);
+                        picLogo.Size = new Size(135, Math.Max(60, logoHeight - 32));
+                    }
+                    if (btnBrowse != null)
+                    {
+                        int browseX = txtBackupPath != null ? Math.Max(105, txtBackupPath.Left + (backupW - 120) / 2) : 105;
+                        btnBrowse.Location = new Point(browseX, logoHeight - 42);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error in PerformResponsiveLayout: {ex.Message}");
             }
         }
 

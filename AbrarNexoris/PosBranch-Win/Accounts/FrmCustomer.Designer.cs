@@ -63,8 +63,6 @@ namespace PosBranch_Win.Accounts
             this.ultraLabelTitle = new Infragistics.Win.Misc.UltraLabel();
             this.ultraGroupBoxBasicInfo = new Infragistics.Win.Misc.UltraGroupBox();
             this.button4 = new System.Windows.Forms.Button();
-            this.ultraComboBranch = new Infragistics.Win.UltraWinEditors.UltraComboEditor();
-            this.ultraLabelBranch = new Infragistics.Win.Misc.UltraLabel();
             this.ultraTextCustomer = new Infragistics.Win.UltraWinEditors.UltraTextEditor();
             this.ultraLabelCustomer = new Infragistics.Win.Misc.UltraLabel();
             this.ultraTextAliasName = new Infragistics.Win.UltraWinEditors.UltraTextEditor();
@@ -94,16 +92,11 @@ namespace PosBranch_Win.Accounts
             this.ultraLabelCompanyMSIC = new Infragistics.Win.Misc.UltraLabel();
             this.ultraTextCompanyEmail = new Infragistics.Win.UltraWinEditors.UltraTextEditor();
             this.ultraLabelCompanyEmail = new Infragistics.Win.Misc.UltraLabel();
-            this.ultraPanelButtons = new Infragistics.Win.Misc.UltraPanel();
-            this.btnSave = new Infragistics.Win.Misc.UltraButton();
-            this.btnUpdate = new Infragistics.Win.Misc.UltraButton();
-            this.btnClear = new Infragistics.Win.Misc.UltraButton();
-            this.btnDelete = new Infragistics.Win.Misc.UltraButton();
+
             this.ultraPanel1.ClientArea.SuspendLayout();
             this.ultraPanel1.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.ultraGroupBoxBasicInfo)).BeginInit();
             this.ultraGroupBoxBasicInfo.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.ultraComboBranch)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.ultraTextCustomer)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.ultraTextAliasName)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.ultraComboPriceLevel)).BeginInit();
@@ -123,8 +116,7 @@ namespace PosBranch_Win.Accounts
             ((System.ComponentModel.ISupportInitialize)(this.ultraTextCompanyTIN)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.ultraTextCompanyMSIC)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.ultraTextCompanyEmail)).BeginInit();
-            this.ultraPanelButtons.ClientArea.SuspendLayout();
-            this.ultraPanelButtons.SuspendLayout();
+
             this.SuspendLayout();
             // 
             // ultraPanel1
@@ -141,7 +133,6 @@ namespace PosBranch_Win.Accounts
             this.ultraPanel1.ClientArea.Controls.Add(this.ultraGroupBoxContact);
             this.ultraPanel1.ClientArea.Controls.Add(this.ultraGroupBoxFinancial);
             this.ultraPanel1.ClientArea.Controls.Add(this.ultraGroupBoxCompany);
-            this.ultraPanel1.ClientArea.Controls.Add(this.ultraPanelButtons);
             this.ultraPanel1.Dock = System.Windows.Forms.DockStyle.Fill;
             this.ultraPanel1.Location = new System.Drawing.Point(0, 0);
             this.ultraPanel1.Name = "ultraPanel1";
@@ -171,8 +162,6 @@ namespace PosBranch_Win.Accounts
             appearance3.BackColor = System.Drawing.Color.Transparent;
             this.ultraGroupBoxBasicInfo.Appearance = appearance3;
             this.ultraGroupBoxBasicInfo.Controls.Add(this.button4);
-            this.ultraGroupBoxBasicInfo.Controls.Add(this.ultraComboBranch);
-            this.ultraGroupBoxBasicInfo.Controls.Add(this.ultraLabelBranch);
             this.ultraGroupBoxBasicInfo.Controls.Add(this.ultraTextCustomer);
             this.ultraGroupBoxBasicInfo.Controls.Add(this.ultraLabelCustomer);
             this.ultraGroupBoxBasicInfo.Controls.Add(this.ultraTextAliasName);
@@ -182,7 +171,7 @@ namespace PosBranch_Win.Accounts
             this.ultraGroupBoxBasicInfo.HeaderBorderStyle = Infragistics.Win.UIElementBorderStyle.Rounded1;
             this.ultraGroupBoxBasicInfo.Location = new System.Drawing.Point(11, 60);
             this.ultraGroupBoxBasicInfo.Name = "ultraGroupBoxBasicInfo";
-            this.ultraGroupBoxBasicInfo.Size = new System.Drawing.Size(440, 180);
+            this.ultraGroupBoxBasicInfo.Size = new System.Drawing.Size(440, 145);
             this.ultraGroupBoxBasicInfo.TabIndex = 1;
             this.ultraGroupBoxBasicInfo.Text = "Basic Information";
             // 
@@ -191,37 +180,12 @@ namespace PosBranch_Win.Accounts
             this.button4.BackColor = System.Drawing.Color.Transparent;
             this.button4.BackgroundImage = ((System.Drawing.Image)(resources.GetObject("button4.BackgroundImage")));
             this.button4.BackgroundImageLayout = System.Windows.Forms.ImageLayout.Stretch;
-            this.button4.Location = new System.Drawing.Point(396, 67);
+            this.button4.Location = new System.Drawing.Point(396, 32);
             this.button4.Name = "button4";
             this.button4.Size = new System.Drawing.Size(22, 22);
             this.button4.TabIndex = 12;
             this.button4.UseVisualStyleBackColor = false;
             this.button4.Click += new System.EventHandler(this.button4_Click);
-            // 
-            // ultraComboBranch
-            // 
-            appearance4.BackColor = System.Drawing.Color.White;
-            appearance4.BorderColor = System.Drawing.SystemColors.Highlight;
-            this.ultraComboBranch.Appearance = appearance4;
-            this.ultraComboBranch.BackColor = System.Drawing.Color.White;
-            this.ultraComboBranch.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
-            this.ultraComboBranch.Font = new System.Drawing.Font("Segoe UI", 11F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.ultraComboBranch.Location = new System.Drawing.Point(100, 30);
-            this.ultraComboBranch.Name = "ultraComboBranch";
-            this.ultraComboBranch.Size = new System.Drawing.Size(320, 27);
-            this.ultraComboBranch.TabIndex = 1;
-            this.ultraComboBranch.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
-            // 
-            // ultraLabelBranch
-            // 
-            this.ultraLabelBranch.AutoSize = true;
-            this.ultraLabelBranch.Font = new System.Drawing.Font("Segoe UI", 11F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.ultraLabelBranch.ForeColor = System.Drawing.Color.Black;
-            this.ultraLabelBranch.Location = new System.Drawing.Point(20, 33);
-            this.ultraLabelBranch.Name = "ultraLabelBranch";
-            this.ultraLabelBranch.Size = new System.Drawing.Size(59, 22);
-            this.ultraLabelBranch.TabIndex = 0;
-            this.ultraLabelBranch.Text = "Branch:";
             // 
             // ultraTextCustomer
             // 
@@ -231,7 +195,7 @@ namespace PosBranch_Win.Accounts
             this.ultraTextCustomer.BackColor = System.Drawing.Color.White;
             this.ultraTextCustomer.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
             this.ultraTextCustomer.Font = new System.Drawing.Font("Segoe UI", 11F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.ultraTextCustomer.Location = new System.Drawing.Point(100, 65);
+            this.ultraTextCustomer.Location = new System.Drawing.Point(100, 30);
             this.ultraTextCustomer.Name = "ultraTextCustomer";
             this.ultraTextCustomer.Size = new System.Drawing.Size(320, 27);
             this.ultraTextCustomer.TabIndex = 3;
@@ -242,7 +206,7 @@ namespace PosBranch_Win.Accounts
             this.ultraLabelCustomer.AutoSize = true;
             this.ultraLabelCustomer.Font = new System.Drawing.Font("Segoe UI", 11F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.ultraLabelCustomer.ForeColor = System.Drawing.Color.Black;
-            this.ultraLabelCustomer.Location = new System.Drawing.Point(20, 68);
+            this.ultraLabelCustomer.Location = new System.Drawing.Point(20, 33);
             this.ultraLabelCustomer.Name = "ultraLabelCustomer";
             this.ultraLabelCustomer.Size = new System.Drawing.Size(78, 22);
             this.ultraLabelCustomer.TabIndex = 2;
@@ -256,7 +220,7 @@ namespace PosBranch_Win.Accounts
             this.ultraTextAliasName.BackColor = System.Drawing.Color.White;
             this.ultraTextAliasName.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
             this.ultraTextAliasName.Font = new System.Drawing.Font("Segoe UI", 11F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.ultraTextAliasName.Location = new System.Drawing.Point(100, 100);
+            this.ultraTextAliasName.Location = new System.Drawing.Point(100, 65);
             this.ultraTextAliasName.Name = "ultraTextAliasName";
             this.ultraTextAliasName.Size = new System.Drawing.Size(320, 27);
             this.ultraTextAliasName.TabIndex = 5;
@@ -267,7 +231,7 @@ namespace PosBranch_Win.Accounts
             this.ultraLabelAlias.AutoSize = true;
             this.ultraLabelAlias.Font = new System.Drawing.Font("Segoe UI", 11F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.ultraLabelAlias.ForeColor = System.Drawing.Color.Black;
-            this.ultraLabelAlias.Location = new System.Drawing.Point(20, 103);
+            this.ultraLabelAlias.Location = new System.Drawing.Point(20, 68);
             this.ultraLabelAlias.Name = "ultraLabelAlias";
             this.ultraLabelAlias.Size = new System.Drawing.Size(43, 22);
             this.ultraLabelAlias.TabIndex = 4;
@@ -281,7 +245,7 @@ namespace PosBranch_Win.Accounts
             this.ultraComboPriceLevel.BackColor = System.Drawing.Color.White;
             this.ultraComboPriceLevel.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
             this.ultraComboPriceLevel.Font = new System.Drawing.Font("Segoe UI", 11F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.ultraComboPriceLevel.Location = new System.Drawing.Point(100, 135);
+            this.ultraComboPriceLevel.Location = new System.Drawing.Point(100, 100);
             this.ultraComboPriceLevel.Name = "ultraComboPriceLevel";
             this.ultraComboPriceLevel.Size = new System.Drawing.Size(320, 27);
             this.ultraComboPriceLevel.TabIndex = 11;
@@ -292,7 +256,7 @@ namespace PosBranch_Win.Accounts
             this.ultraLabelPriceLevel.AutoSize = true;
             this.ultraLabelPriceLevel.Font = new System.Drawing.Font("Segoe UI", 11F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.ultraLabelPriceLevel.ForeColor = System.Drawing.Color.Black;
-            this.ultraLabelPriceLevel.Location = new System.Drawing.Point(20, 138);
+            this.ultraLabelPriceLevel.Location = new System.Drawing.Point(20, 103);
             this.ultraLabelPriceLevel.Name = "ultraLabelPriceLevel";
             this.ultraLabelPriceLevel.Size = new System.Drawing.Size(85, 22);
             this.ultraLabelPriceLevel.TabIndex = 10;
@@ -597,84 +561,7 @@ namespace PosBranch_Win.Accounts
             this.ultraLabelCompanyEmail.Size = new System.Drawing.Size(48, 22);
             this.ultraLabelCompanyEmail.TabIndex = 18;
             this.ultraLabelCompanyEmail.Text = "Email:";
-            // 
-            // ultraPanelButtons
-            // 
-            appearance18.BackColor = System.Drawing.Color.Transparent;
-            this.ultraPanelButtons.Appearance = appearance18;
-            // 
-            // ultraPanelButtons.ClientArea
-            // 
-            this.ultraPanelButtons.ClientArea.Controls.Add(this.btnSave);
-            this.ultraPanelButtons.ClientArea.Controls.Add(this.btnUpdate);
-            this.ultraPanelButtons.ClientArea.Controls.Add(this.btnClear);
-            this.ultraPanelButtons.ClientArea.Controls.Add(this.btnDelete);
-            this.ultraPanelButtons.Location = new System.Drawing.Point(11, 380);
-            this.ultraPanelButtons.Name = "ultraPanelButtons";
-            this.ultraPanelButtons.Size = new System.Drawing.Size(1335, 80);
-            this.ultraPanelButtons.TabIndex = 5;
-            // 
-            // btnSave
-            // 
-            appearance19.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(40)))), ((int)(((byte)(167)))), ((int)(((byte)(69)))));
-            appearance19.BackColor2 = System.Drawing.Color.FromArgb(((int)(((byte)(34)))), ((int)(((byte)(139)))), ((int)(((byte)(58)))));
-            appearance19.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
-            appearance19.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(34)))), ((int)(((byte)(139)))), ((int)(((byte)(58)))));
-            appearance19.BorderColor3DBase = System.Drawing.Color.Transparent;
-            appearance19.FontData.BoldAsString = "True";
-            appearance19.FontData.Name = "Segoe UI";
-            appearance19.FontData.SizeInPoints = 12F;
-            appearance19.ForeColor = System.Drawing.Color.White;
-            this.btnSave.Appearance = appearance19;
-            this.btnSave.Location = new System.Drawing.Point(93, 10);
-            this.btnSave.Name = "btnSave";
-            this.btnSave.Size = new System.Drawing.Size(140, 45);
-            this.btnSave.TabIndex = 0;
-            this.btnSave.Text = "Save";
-            this.btnSave.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
-            this.btnSave.Click += new System.EventHandler(this.BtnSave_Click_1);
-            // 
-            // btnUpdate
-            // 
-            appearance20.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(108)))), ((int)(((byte)(117)))), ((int)(((byte)(125)))));
-            appearance20.BackColor2 = System.Drawing.Color.FromArgb(((int)(((byte)(73)))), ((int)(((byte)(80)))), ((int)(((byte)(87)))));
-            appearance20.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
-            appearance20.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(73)))), ((int)(((byte)(80)))), ((int)(((byte)(87)))));
-            appearance20.BorderColor3DBase = System.Drawing.Color.Transparent;
-            appearance20.FontData.BoldAsString = "True";
-            appearance20.FontData.Name = "Segoe UI";
-            appearance20.FontData.SizeInPoints = 12F;
-            appearance20.ForeColor = System.Drawing.Color.White;
-            this.btnUpdate.Appearance = appearance20;
-            this.btnUpdate.Location = new System.Drawing.Point(93, 10);
-            this.btnUpdate.Name = "btnUpdate";
-            this.btnUpdate.Size = new System.Drawing.Size(140, 45);
-            this.btnUpdate.TabIndex = 1;
-            this.btnUpdate.Text = "✏️ Update";
-            this.btnUpdate.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
-            this.btnUpdate.Click += new System.EventHandler(this.btnUpdate_Click);
-            // 
-            // btnClear
-            // 
-            this.btnClear.Appearance = appearance19;
-            this.btnClear.Location = new System.Drawing.Point(255, 10);
-            this.btnClear.Name = "btnClear";
-            this.btnClear.Size = new System.Drawing.Size(140, 45);
-            this.btnClear.TabIndex = 2;
-            this.btnClear.Text = "Clear";
-            this.btnClear.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
-            this.btnClear.Click += new System.EventHandler(this.btnClear_Click);
-            // 
-            // btnDelete
-            // 
-            this.btnDelete.Appearance = appearance20;
-            this.btnDelete.Location = new System.Drawing.Point(413, 10);
-            this.btnDelete.Name = "btnDelete";
-            this.btnDelete.Size = new System.Drawing.Size(140, 45);
-            this.btnDelete.TabIndex = 3;
-            this.btnDelete.Text = "🗑️ Delete";
-            this.btnDelete.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
-            this.btnDelete.Click += new System.EventHandler(this.btnDelete_Click);
+
             // 
             // FrmCustomer
             // 
@@ -694,7 +581,7 @@ namespace PosBranch_Win.Accounts
             ((System.ComponentModel.ISupportInitialize)(this.ultraGroupBoxBasicInfo)).EndInit();
             this.ultraGroupBoxBasicInfo.ResumeLayout(false);
             this.ultraGroupBoxBasicInfo.PerformLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.ultraComboBranch)).EndInit();
+
             ((System.ComponentModel.ISupportInitialize)(this.ultraTextCustomer)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.ultraTextAliasName)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.ultraComboPriceLevel)).EndInit();
@@ -717,8 +604,7 @@ namespace PosBranch_Win.Accounts
             ((System.ComponentModel.ISupportInitialize)(this.ultraTextCompanyTIN)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.ultraTextCompanyMSIC)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.ultraTextCompanyEmail)).EndInit();
-            this.ultraPanelButtons.ClientArea.ResumeLayout(false);
-            this.ultraPanelButtons.ResumeLayout(false);
+
             this.ResumeLayout(false);
 
         }
@@ -730,13 +616,8 @@ namespace PosBranch_Win.Accounts
         private Infragistics.Win.Misc.UltraGroupBox ultraGroupBoxContact;
         private Infragistics.Win.Misc.UltraGroupBox ultraGroupBoxFinancial;
         private Infragistics.Win.Misc.UltraGroupBox ultraGroupBoxCompany;
-        private Infragistics.Win.Misc.UltraPanel ultraPanelButtons;
-        private Infragistics.Win.Misc.UltraButton btnSave;
-        private Infragistics.Win.Misc.UltraButton btnUpdate;
-        private Infragistics.Win.Misc.UltraButton btnClear;
-        private Infragistics.Win.Misc.UltraButton btnDelete;
-        private Infragistics.Win.Misc.UltraLabel ultraLabelBranch;
-        private Infragistics.Win.UltraWinEditors.UltraComboEditor ultraComboBranch;
+
+
         private Infragistics.Win.Misc.UltraLabel ultraLabelCustomer;
         private Infragistics.Win.UltraWinEditors.UltraTextEditor ultraTextCustomer;
         private Infragistics.Win.Misc.UltraLabel ultraLabelAlias;

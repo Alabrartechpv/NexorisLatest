@@ -43,8 +43,7 @@ namespace PosBranch_Win.Master
             this.button4 = new System.Windows.Forms.Button();
             this.txtBusinessType = new Infragistics.Win.UltraWinEditors.UltraTextEditor();
             this.label5 = new Infragistics.Win.Misc.UltraLabel();
-            this.btnSave = new System.Windows.Forms.Button();
-            this.btnNew = new System.Windows.Forms.Button();
+
             this.ultraGroupBoxAddress = new Infragistics.Win.Misc.UltraGroupBox();
             this.button1 = new System.Windows.Forms.Button();
             this.txtAddress1 = new Infragistics.Win.UltraWinEditors.UltraTextEditor();
@@ -68,7 +67,7 @@ namespace PosBranch_Win.Master
             this.label8 = new Infragistics.Win.Misc.UltraLabel();
             this.txtWebsite = new Infragistics.Win.UltraWinEditors.UltraTextEditor();
             this.label9 = new Infragistics.Win.Misc.UltraLabel();
-            this.btnDelete = new System.Windows.Forms.Button();
+
             this.ultraGroupBoxDates = new Infragistics.Win.Misc.UltraGroupBox();
             this.dtpFinYearFrom = new System.Windows.Forms.DateTimePicker();
             this.ultraLabel2 = new Infragistics.Win.Misc.UltraLabel();
@@ -155,11 +154,8 @@ namespace PosBranch_Win.Master
             // 
             this.ultraPanel1.ClientArea.Controls.Add(this.ultraLabelTitle);
             this.ultraPanel1.ClientArea.Controls.Add(this.ultraGroupBoxBasicInfo);
-            this.ultraPanel1.ClientArea.Controls.Add(this.btnSave);
-            this.ultraPanel1.ClientArea.Controls.Add(this.btnNew);
             this.ultraPanel1.ClientArea.Controls.Add(this.ultraGroupBoxAddress);
             this.ultraPanel1.ClientArea.Controls.Add(this.ultraGroupBoxContact);
-            this.ultraPanel1.ClientArea.Controls.Add(this.btnDelete);
             this.ultraPanel1.ClientArea.Controls.Add(this.ultraGroupBoxDates);
             this.ultraPanel1.ClientArea.Controls.Add(this.ultraGroupBoxLegal);
             this.ultraPanel1.ClientArea.Controls.Add(this.ultraGroupBoxLogo);
@@ -273,38 +269,7 @@ namespace PosBranch_Win.Master
             this.label5.Size = new System.Drawing.Size(101, 22);
             this.label5.TabIndex = 4;
             this.label5.Text = "Business Type:";
-            // 
-            // btnSave
-            // 
-            this.btnSave.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(40)))), ((int)(((byte)(167)))), ((int)(((byte)(69)))));
-            this.btnSave.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(34)))), ((int)(((byte)(139)))), ((int)(((byte)(58)))));
-            this.btnSave.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnSave.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold);
-            this.btnSave.ForeColor = System.Drawing.Color.White;
-            this.btnSave.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-            this.btnSave.Location = new System.Drawing.Point(255, 448);
-            this.btnSave.Name = "btnSave";
-            this.btnSave.Size = new System.Drawing.Size(140, 45);
-            this.btnSave.TabIndex = 0;
-            this.btnSave.Text = "Save";
-            this.btnSave.UseVisualStyleBackColor = false;
-            this.btnSave.Click += new System.EventHandler(this.btnSave_Click);
-            // 
-            // btnNew
-            // 
-            this.btnNew.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(123)))), ((int)(((byte)(255)))));
-            this.btnNew.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(86)))), ((int)(((byte)(179)))));
-            this.btnNew.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnNew.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold);
-            this.btnNew.ForeColor = System.Drawing.Color.White;
-            this.btnNew.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-            this.btnNew.Location = new System.Drawing.Point(93, 448);
-            this.btnNew.Name = "btnNew";
-            this.btnNew.Size = new System.Drawing.Size(140, 45);
-            this.btnNew.TabIndex = 1;
-            this.btnNew.Text = "New";
-            this.btnNew.UseVisualStyleBackColor = false;
-            this.btnNew.Click += new System.EventHandler(this.BtnNew_Click);
+
             // 
             // ultraGroupBoxAddress
             // 
@@ -573,22 +538,7 @@ namespace PosBranch_Win.Master
             this.label9.Size = new System.Drawing.Size(63, 22);
             this.label9.TabIndex = 6;
             this.label9.Text = "Website:";
-            // 
-            // btnDelete
-            // 
-            this.btnDelete.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(220)))), ((int)(((byte)(53)))), ((int)(((byte)(69)))));
-            this.btnDelete.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(200)))), ((int)(((byte)(35)))), ((int)(((byte)(51)))));
-            this.btnDelete.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
-            this.btnDelete.Font = new System.Drawing.Font("Segoe UI", 12F, System.Drawing.FontStyle.Bold);
-            this.btnDelete.ForeColor = System.Drawing.Color.White;
-            this.btnDelete.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)));
-            this.btnDelete.Location = new System.Drawing.Point(413, 448);
-            this.btnDelete.Name = "btnDelete";
-            this.btnDelete.Size = new System.Drawing.Size(140, 45);
-            this.btnDelete.TabIndex = 2;
-            this.btnDelete.Text = "Delete";
-            this.btnDelete.UseVisualStyleBackColor = false;
-            this.btnDelete.Click += new System.EventHandler(this.BtnDelete_Click);
+
             // 
             // ultraGroupBoxDates
             // 
@@ -1131,9 +1081,6 @@ namespace PosBranch_Win.Master
         private Infragistics.Win.UltraWinEditors.UltraTextEditor txtBackupPath;
         private Infragistics.Win.Misc.UltraLabel ultraLabelBackup;
         private System.Windows.Forms.Button button4;
-        private System.Windows.Forms.Button btnSave;
-        private System.Windows.Forms.Button btnNew;
-        private System.Windows.Forms.Button btnDelete;
         private Infragistics.Win.Misc.UltraLabel ultraLblStateId;
         private Infragistics.Win.Misc.UltraLabel ultralblCountryId;
         private Infragistics.Win.Misc.UltraLabel ultralblTaxId;

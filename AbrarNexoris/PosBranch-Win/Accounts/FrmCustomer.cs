@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -36,6 +36,11 @@ namespace PosBranch_Win.Accounts
             {
                 // Set up form properties
                 this.KeyPreview = true;
+                this.Resize += FrmCustomer_Resize;
+                if (ultraPanel1 != null)
+                {
+                    ultraPanel1.AutoScroll = true;
+                }
 
                 // Initialize controls
                 InitializeControls();
@@ -45,6 +50,9 @@ namespace PosBranch_Win.Accounts
 
                 // Set initial button states
                 SetButtonStates(false);
+
+                // Initial layout adjustment
+                PerformResponsiveLayout();
             }
             catch (Exception ex)
             {
@@ -123,52 +131,40 @@ namespace PosBranch_Win.Accounts
             }
         }
 
+        private int GetBranchId()
+        {
+            try
+            {
+                if (SessionContext.IsInitialized && SessionContext.BranchId > 0)
+                {
+                    return SessionContext.BranchId;
+                }
+                else if (SessionContext.BranchId > 0)
+                {
+                    return SessionContext.BranchId;
+                }
+                else if (!string.IsNullOrEmpty(DataBase.BranchId) && int.TryParse(DataBase.BranchId, out int branchId) && branchId > 0)
+                {
+                    return branchId;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error getting BranchId: {ex.Message}");
+            }
+            return SessionContext.BranchId > 0 ? SessionContext.BranchId : 0;
+        }
+
         private void LoadInitialData()
         {
             try
             {
-                // Load branch data
-                LoadBranchData();
-
                 // Load price level data
                 LoadPriceLevelData();
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Error loading initial data: {ex.Message}", "Data Load Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        private void LoadBranchData()
-        {
-            try
-            {
-                BranchDDlGrid branchDDL = drop.getBanchDDl();
-                ultraComboBranch.DataSource = branchDDL.List;
-                ultraComboBranch.DisplayMember = "BranchName";
-                ultraComboBranch.ValueMember = "Id";
-
-                // Debug: Log branch data loading
-                System.Diagnostics.Debug.WriteLine($"Branch data loaded: {branchDDL.List?.Count() ?? 0} branches");
-
-                // Log first few branches for debugging
-                if (branchDDL.List != null && branchDDL.List.Any())
-                {
-                    foreach (var branch in branchDDL.List.Take(3))
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Branch: ID={branch.Id}, Name={branch.BranchName}");
-                    }
-                }
-                else
-                {
-                    System.Diagnostics.Debug.WriteLine("Warning: No branch data loaded or branch list is empty");
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error loading branch data: {ex.Message}");
-                MessageBox.Show($"Error loading branch data: {ex.Message}", "Branch Load Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
@@ -196,22 +192,138 @@ namespace PosBranch_Win.Accounts
 
         private void SetButtonStates(bool isEditMode)
         {
-            try
-            {
-                btnSave.Visible = !isEditMode;
-                btnUpdate.Visible = isEditMode;
-                btnDelete.Visible = isEditMode;
-                btnClear.Visible = true;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error setting button states: {ex.Message}");
-            }
+            // State tracking when customer is selected or form cleared
         }
 
         private void FrmCustomer_Load(object sender, EventArgs e)
         {
-            // Form is already initialized in constructor
+            PerformResponsiveLayout();
+        }
+
+        private void FrmCustomer_Resize(object sender, EventArgs e)
+        {
+            PerformResponsiveLayout();
+        }
+
+        private void PerformResponsiveLayout()
+        {
+            try
+            {
+                if (ultraPanel1 == null || ultraPanel1.ClientArea == null)
+                    return;
+
+                ultraPanel1.AutoScroll = false;
+
+                int clientWidth = ultraPanel1.ClientArea.Width;
+                int clientHeight = ultraPanel1.ClientArea.Height;
+
+                if (clientWidth <= 300 || clientHeight <= 300)
+                    return;
+
+                int padding = 14;
+                int gap = 14;
+                int topY = ultraLabelTitle != null ? ultraLabelTitle.Height + padding : 56;
+
+                int availableHeight = clientHeight - topY - padding;
+                if (availableHeight < 360)
+                {
+                    ultraPanel1.AutoScroll = true;
+                    availableHeight = 380;
+                }
+
+                int topRowHeight = Math.Max(180, (availableHeight - gap) * 58 / 100);
+                int companyHeight = Math.Max(115, availableHeight - topRowHeight - gap);
+
+                // Calculate columns for top 3 group boxes
+                int colWidth = (clientWidth - (padding * 2) - (gap * 2)) / 3;
+                if (colWidth < 280)
+                    colWidth = 280;
+
+                // Position Top 3 Group Boxes
+                if (ultraGroupBoxBasicInfo != null)
+                {
+                    ultraGroupBoxBasicInfo.SetBounds(padding, topY, colWidth, topRowHeight);
+
+                    int innerW = colWidth - 155;
+                    if (innerW > 80 && ultraTextCustomer != null)
+                    {
+                        ultraTextCustomer.Width = innerW;
+                        if (button4 != null)
+                            button4.Location = new Point(ultraTextCustomer.Right + 6, ultraTextCustomer.Top + 2);
+                    }
+                    if (innerW > 80 && ultraTextAliasName != null)
+                        ultraTextAliasName.Width = innerW;
+                    if (innerW > 80 && ultraComboPriceLevel != null)
+                        ultraComboPriceLevel.Width = innerW;
+                }
+
+                if (ultraGroupBoxContact != null)
+                {
+                    int left2 = padding + colWidth + gap;
+                    ultraGroupBoxContact.SetBounds(left2, topY, colWidth, topRowHeight);
+
+                    int innerW = colWidth - 100;
+                    if (innerW > 80)
+                    {
+                        if (ultraTextEmail != null) ultraTextEmail.Width = innerW;
+                        if (ultraTextPhone != null) ultraTextPhone.Width = innerW;
+                    }
+                }
+
+                if (ultraGroupBoxFinancial != null)
+                {
+                    int left3 = padding + (colWidth + gap) * 2;
+                    ultraGroupBoxFinancial.SetBounds(left3, topY, colWidth, topRowHeight);
+
+                    int innerW = colWidth - 135;
+                    if (innerW > 80)
+                    {
+                        if (ultraTextOpenDebit != null) ultraTextOpenDebit.Width = innerW;
+                        if (ultraTextSSMNumber != null) ultraTextSSMNumber.Width = innerW;
+                        if (ultraTextOpenCredit != null) ultraTextOpenCredit.Width = innerW;
+                        if (ultraTextTINNumber != null) ultraTextTINNumber.Width = innerW;
+                    }
+                }
+
+                // Position Company Group Box
+                int companyY = topY + topRowHeight + gap;
+                int companyWidth = clientWidth - (padding * 2);
+
+                if (ultraGroupBoxCompany != null)
+                {
+                    ultraGroupBoxCompany.SetBounds(padding, companyY, companyWidth, companyHeight);
+
+                    int halfCompW = (companyWidth - 60) / 2;
+                    if (halfCompW > 200)
+                    {
+                        int leftCompInputW = halfCompW - 140;
+                        if (leftCompInputW > 80)
+                        {
+                            if (ultraTextCompanyName != null) ultraTextCompanyName.Width = leftCompInputW;
+                            if (ultraTextCompanyTIN != null) ultraTextCompanyTIN.Width = leftCompInputW;
+                        }
+
+                        int rightCompX = halfCompW + 30;
+                        if (ultraLabelCompanyMSIC != null) ultraLabelCompanyMSIC.Location = new Point(rightCompX, 33);
+                        if (ultraTextCompanyMSIC != null)
+                        {
+                            ultraTextCompanyMSIC.Location = new Point(rightCompX + 125, 30);
+                            ultraTextCompanyMSIC.Width = leftCompInputW;
+                        }
+
+                        if (ultraLabelCompanyEmail != null) ultraLabelCompanyEmail.Location = new Point(rightCompX, 68);
+                        if (ultraTextCompanyEmail != null)
+                        {
+                            ultraTextCompanyEmail.Location = new Point(rightCompX + 125, 65);
+                            ultraTextCompanyEmail.Width = leftCompInputW;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error in PerformResponsiveLayout: {ex.Message}");
+            }
         }
 
         private void FrmCustomer_KeyDown(object sender, KeyEventArgs e)
@@ -228,10 +340,7 @@ namespace PosBranch_Win.Accounts
 
                             if (result == DialogResult.Yes)
                             {
-                                if (btnUpdate.Visible)
-                                    btnUpdate_Click(sender, e);
-                                else
-                                    BtnSave_Click_1(sender, e);
+                                SaveRecord();
                             }
                             else if (result == DialogResult.Cancel)
                             {
@@ -241,10 +350,7 @@ namespace PosBranch_Win.Accounts
                         this.Close();
                         break;
                     case Keys.F8:
-                        if (btnSave.Visible)
-                            BtnSave_Click_1(sender, e);
-                        else
-                            btnUpdate_Click(sender, e);
+                        SaveRecord();
                         break;
                     case Keys.F4:
                         this.Close();
@@ -369,11 +475,39 @@ namespace PosBranch_Win.Accounts
 
         public void Save()
         {
-            // Delegate to the actual visible/enabled button — no hardcoded handler names
-            if (btnSave.Visible && btnSave.Enabled)
-                btnSave.PerformClick();
-            else if (btnUpdate.Visible && btnUpdate.Enabled)
-                btnUpdate.PerformClick();
+            SaveRecord();
+        }
+
+        public void SaveRecord()
+        {
+            if (Ledgerid > 0)
+            {
+                btnUpdate_Click(this, EventArgs.Empty);
+            }
+            else
+            {
+                BtnSave_Click_1(this, EventArgs.Empty);
+            }
+        }
+
+        public void Clear()
+        {
+            ClearForm();
+        }
+
+        public void ClearRecord()
+        {
+            ClearForm();
+        }
+
+        public void Delete()
+        {
+            DeleteRecord();
+        }
+
+        public void DeleteRecord()
+        {
+            btnDelete_Click(this, EventArgs.Empty);
         }
 
         private void BtnSave_Click_1(object sender, EventArgs e)
@@ -452,13 +586,7 @@ namespace PosBranch_Win.Accounts
                     return false;
                 }
 
-                if (ultraComboBranch.Value == null)
-                {
-                    MessageBox.Show("Please select a Branch.", "Validation",
-                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    ultraComboBranch.Focus();
-                    return false;
-                }
+
 
                 if (ultraComboPriceLevel.Value == null && string.IsNullOrWhiteSpace(ultraComboPriceLevel.Text))
                 {
@@ -500,7 +628,7 @@ namespace PosBranch_Win.Accounts
             return new ClsCustomers
             {
                 CompanyId = SessionContext.CompanyId,
-                BranchId = Convert.ToInt32(ultraComboBranch.Value ?? SessionContext.BranchId),
+                BranchId = GetBranchId(),
                 LedgerId = Ledgerid,
                 LedgerName = ultraTextCustomer.Text.Trim(),
                 AliasName = ultraTextAliasName.Text.Trim(),
@@ -551,7 +679,7 @@ namespace PosBranch_Win.Accounts
                 ultraTextCompanyTIN.Text = "";
                 ultraTextCompanyMSIC.Text = "";
                 ultraTextCompanyEmail.Text = "";
-                ultraComboBranch.Value = null;
+
                 ultraComboPriceLevel.Value = null;
                 ultraComboPriceLevel.Text = "";
 
@@ -666,11 +794,7 @@ namespace PosBranch_Win.Accounts
                         ultraTextCompanyEmail.Text = "";
                     }
 
-                    // Set the branch if available
-                    if (customer.BranchId > 0)
-                    {
-                        ultraComboBranch.Value = customer.BranchId;
-                    }
+
 
                     // Set the price level if available
                     if (!string.IsNullOrEmpty(customer.PriceLevel))
@@ -699,59 +823,7 @@ namespace PosBranch_Win.Accounts
 
 
 
-        // Test method to debug branch binding
-        public void TestBranchBinding()
-        {
-            try
-            {
-                System.Diagnostics.Debug.WriteLine("=== TESTING BRANCH BINDING ===");
 
-                // Test 1: Check if branch combo has data
-                if (ultraComboBranch.DataSource != null)
-                {
-                    var branchDataSource = ultraComboBranch.DataSource;
-                    System.Diagnostics.Debug.WriteLine($"Branch combo data source type: {branchDataSource.GetType().Name}");
-
-                    if (branchDataSource is System.Collections.IList branchList)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Branch list count: {branchList.Count}");
-                        if (branchList.Count > 0)
-                        {
-                            var firstBranch = branchList[0];
-                            System.Diagnostics.Debug.WriteLine($"First branch type: {firstBranch.GetType().Name}");
-
-                            // Try to get branch properties
-                            var branchType = firstBranch.GetType();
-                            foreach (var prop in branchType.GetProperties())
-                            {
-                                try
-                                {
-                                    var value = prop.GetValue(firstBranch);
-                                    System.Diagnostics.Debug.WriteLine($"  Branch.{prop.Name}: {value}");
-                                }
-                                catch { }
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    System.Diagnostics.Debug.WriteLine("Branch combo has no data source!");
-                }
-
-                // Test 2: Check current branch value
-                System.Diagnostics.Debug.WriteLine($"Current branch combo value: {ultraComboBranch.Value}");
-                System.Diagnostics.Debug.WriteLine($"Current branch combo text: {ultraComboBranch.Text}");
-
-
-
-                System.Diagnostics.Debug.WriteLine("=== END BRANCH BINDING TEST ===");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error in TestBranchBinding: {ex.Message}");
-            }
-        }
 
 
     }

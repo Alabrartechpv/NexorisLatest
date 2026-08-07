@@ -20,6 +20,7 @@ namespace PosBranch_Win.Accounts
         {
             InitializeComponent();
             accountGroupRepo = new AccountGroupRepository();
+            this.KeyPreview = true;
 
             this.Load += FrmAccountGroup_Load;
             btnSearchGroup.Click += BtnSearchGroup_Click;
@@ -31,6 +32,37 @@ namespace PosBranch_Win.Accounts
             // Hover effects
             btnSearchGroup.ButtonStyle = Infragistics.Win.UIElementButtonStyle.Flat;
             btnSearchGroup.HotTrackAppearance.BackColor = Color.FromArgb(206, 231, 247);
+        }
+
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            if (keyData == Keys.F8 || keyData == (Keys.Control | Keys.S))
+            {
+                Save();
+                return true;
+            }
+            if (keyData == Keys.F1 || keyData == (Keys.Control | Keys.N))
+            {
+                Clear();
+                return true;
+            }
+            if (keyData == Keys.F3 || keyData == (Keys.Control | Keys.F))
+            {
+                BtnSearchGroup_Click(null, null);
+                return true;
+            }
+            if (keyData == Keys.F4 || keyData == (Keys.Control | Keys.D))
+            {
+                Delete();
+                return true;
+            }
+            if (keyData == Keys.Escape)
+            {
+                this.Close();
+                return true;
+            }
+
+            return base.ProcessCmdKey(ref msg, keyData);
         }
 
         private void FrmAccountGroup_Load(object sender, EventArgs e)
@@ -305,13 +337,43 @@ namespace PosBranch_Win.Accounts
                     ultratxtAccDescription.Text = (row.Table.Columns.Contains("Description") && row["Description"] != DBNull.Value) ? row["Description"].ToString() : string.Empty;
                     ultratxtAccCode.ReadOnly = true;
 
-                    if (row.Table.Columns.Contains("ParentGroupID") && row["ParentGroupID"] != DBNull.Value)
-                        ultraDrpParentGroup.Value = Convert.ToInt32(row["ParentGroupID"]);
+                    // Set Parent Group
+                    int parentId = 0;
+                    if (row.Table.Columns.Contains("ParentGroupId") && row["ParentGroupId"] != DBNull.Value)
+                        parentId = Convert.ToInt32(row["ParentGroupId"]);
+                    else if (row.Table.Columns.Contains("ParentGroupID") && row["ParentGroupID"] != DBNull.Value)
+                        parentId = Convert.ToInt32(row["ParentGroupID"]);
 
-                    if (row.Table.Columns.Contains("AccountCategory") && row["AccountCategory"] != DBNull.Value)
-                        SelectComboItemByText(ultraDrpAccCategory, row["AccountCategory"].ToString());
-                    else if (row.Table.Columns.Contains("GroupType") && row["GroupType"] != DBNull.Value)
-                        SelectComboItemByText(ultraDrpAccCategory, row["GroupType"].ToString());
+                    ultraDrpParentGroup.Value = parentId;
+
+                    // Set Account Category - First try by GroupCategoryID ID directly
+                    bool categorySet = false;
+                    if (row.Table.Columns.Contains("GroupCategoryID") && row["GroupCategoryID"] != DBNull.Value)
+                    {
+                        int catId = Convert.ToInt32(row["GroupCategoryID"]);
+                        if (catId > 0)
+                        {
+                            ultraDrpAccCategory.Value = catId;
+                            categorySet = (ultraDrpAccCategory.Value != null && Convert.ToInt32(ultraDrpAccCategory.Value) == catId);
+                        }
+                    }
+
+                    // Fallback to text matching if ID matching did not set the category
+                    if (!categorySet)
+                    {
+                        string catName = string.Empty;
+                        if (row.Table.Columns.Contains("GroupCategoryName") && row["GroupCategoryName"] != DBNull.Value)
+                            catName = row["GroupCategoryName"].ToString();
+                        else if (row.Table.Columns.Contains("AccountCategory") && row["AccountCategory"] != DBNull.Value)
+                            catName = row["AccountCategory"].ToString();
+                        else if (row.Table.Columns.Contains("GroupType") && row["GroupType"] != DBNull.Value)
+                            catName = row["GroupType"].ToString();
+
+                        if (!string.IsNullOrWhiteSpace(catName))
+                        {
+                            SelectComboItemByText(ultraDrpAccCategory, catName);
+                        }
+                    }
 
                     ultratxtAccCode.Tag = groupId;
                 }
@@ -324,14 +386,42 @@ namespace PosBranch_Win.Accounts
 
         private void SelectComboItemByText(Infragistics.Win.UltraWinEditors.UltraComboEditor combo, string text)
         {
+            if (string.IsNullOrWhiteSpace(text)) return;
+            string target = text.Trim();
+
+            // Try matching ValueListItem DisplayText (case-insensitive)
             foreach (Infragistics.Win.ValueListItem item in combo.Items)
             {
-                if (item.DisplayText == text)
+                if (string.Equals(item.DisplayText?.Trim(), target, StringComparison.OrdinalIgnoreCase))
                 {
                     combo.SelectedItem = item;
-                    break;
+                    return;
                 }
             }
+
+            // Fallback for DataBound UltraComboEditor: iterate rows in DataSource if DataTable
+            if (combo.DataSource is DataTable dt)
+            {
+                string displayCol = string.IsNullOrEmpty(combo.DisplayMember) ? dt.Columns[1].ColumnName : combo.DisplayMember;
+                string valueCol = string.IsNullOrEmpty(combo.ValueMember) ? dt.Columns[0].ColumnName : combo.ValueMember;
+
+                foreach (DataRow dr in dt.Rows)
+                {
+                    string dispText = dr[displayCol]?.ToString()?.Trim();
+                    if (string.Equals(dispText, target, StringComparison.OrdinalIgnoreCase))
+                    {
+                        combo.Value = dr[valueCol];
+                        return;
+                    }
+                }
+            }
+
+            // Final fallback
+            try
+            {
+                combo.Text = target;
+            }
+            catch { }
         }
     }
 }
