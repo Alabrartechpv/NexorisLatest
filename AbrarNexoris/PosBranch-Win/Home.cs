@@ -425,6 +425,15 @@ namespace PosBranch_Win
             {
                 var activeTab = tabControlMain.ActiveTab;
 
+                // Never close the main Home tab
+                if (string.Equals(activeTab.Key, "Home", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(activeTab.Text, "Home", StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+
+                int prevIndex = Math.Max(0, activeTab.Index - 1);
+
                 // Close the form in the tab
                 if (activeTab.TabPage.Controls.Count > 0 && activeTab.TabPage.Controls[0] is Form)
                 {
@@ -448,8 +457,24 @@ namespace PosBranch_Win
                     }
                 }
 
-                // Remove the tab after closing the form
-                tabControlMain.Tabs.Remove(activeTab);
+                // Remove the tab if it wasn't already removed by FormClosed handler
+                if (tabControlMain.Tabs.Contains(activeTab))
+                {
+                    tabControlMain.Tabs.Remove(activeTab);
+                }
+
+                // CRITICAL FIX: Always ensure SelectedTab is valid so UltraTabControl never disappears
+                if (tabControlMain.Tabs.Count > 0)
+                {
+                    if (prevIndex >= 0 && prevIndex < tabControlMain.Tabs.Count)
+                    {
+                        tabControlMain.SelectedTab = tabControlMain.Tabs[prevIndex];
+                    }
+                    else
+                    {
+                        tabControlMain.SelectedTab = tabControlMain.Tabs[0];
+                    }
+                }
             }
         }
 
@@ -682,7 +707,20 @@ namespace PosBranch_Win
                     {
                         if (newTab != null && tabControlMain.Tabs.Contains(newTab))
                         {
+                            int prevIndex = Math.Max(0, newTab.Index - 1);
                             tabControlMain.Tabs.Remove(newTab);
+
+                            if (tabControlMain.Tabs.Count > 0)
+                            {
+                                if (prevIndex >= 0 && prevIndex < tabControlMain.Tabs.Count)
+                                {
+                                    tabControlMain.SelectedTab = tabControlMain.Tabs[prevIndex];
+                                }
+                                else
+                                {
+                                    tabControlMain.SelectedTab = tabControlMain.Tabs[0];
+                                }
+                            }
                         }
                         SyncReportNavigatorActiveItemWithOpenTabs();
                         UpdateHoldToolVisibility();
@@ -917,9 +955,23 @@ namespace PosBranch_Win
                     {
                         if (newTab != null && tabControlMain.Tabs.Contains(newTab))
                         {
+                            int prevIndex = Math.Max(0, newTab.Index - 1);
                             // Remove all controls first, then the tab
                             newTab.TabPage.Controls.Clear();
                             tabControlMain.Tabs.Remove(newTab);
+
+                            if (tabControlMain.Tabs.Count > 0)
+                            {
+                                if (prevIndex >= 0 && prevIndex < tabControlMain.Tabs.Count)
+                                {
+                                    tabControlMain.SelectedTab = tabControlMain.Tabs[prevIndex];
+                                }
+                                else
+                                {
+                                    tabControlMain.SelectedTab = tabControlMain.Tabs[0];
+                                }
+                            }
+
                             // Force garbage collection of the closed form sooner
                             GC.Collect();
                         }
@@ -2646,6 +2698,28 @@ namespace PosBranch_Win
             if (ctrl && keyCode == Keys.I)
             {
                 ToggleNexorisAI();
+                return true;
+            }
+
+            if (keyCode == Keys.Escape && !ctrl && !alt)
+            {
+                // Check if an UltraGrid cell is actively in edit mode
+                IntPtr focusHandle = GetFocus();
+                if (focusHandle != IntPtr.Zero)
+                {
+                    Control focused = Control.FromHandle(focusHandle) ?? Control.FromChildHandle(focusHandle);
+                    Control parent = focused;
+                    while (parent != null)
+                    {
+                        if (parent is Infragistics.Win.UltraWinGrid.UltraGrid grid && grid.ActiveCell != null && grid.ActiveCell.IsInEditMode)
+                        {
+                            return base.ProcessCmdKey(ref msg, keyData);
+                        }
+                        parent = parent.Parent;
+                    }
+                }
+
+                CloseCurrentTab();
                 return true;
             }
 

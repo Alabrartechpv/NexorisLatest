@@ -110,12 +110,30 @@ namespace PosBranch_Win.Reports.InventoryReport
                 return;
             }
 
+            KeyPreview = true;
+            KeyDown += FrmSmartReorderDashboard_KeyDown;
             InitializeRuntimeAppearance();
             BindStaticCombos();
             LoadLookupData();
             SetupGridMenu();
             SetupHeaderDragToHideAndColumnChooser();
             LoadData();
+        }
+
+        private void FrmSmartReorderDashboard_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Escape)
+            {
+                if (_columnChooserForm != null && !_columnChooserForm.IsDisposed && _columnChooserForm.Visible)
+                {
+                    _columnChooserForm.Close();
+                    e.Handled = true;
+                    return;
+                }
+
+                this.Close();
+                e.Handled = true;
+            }
         }
 
         private bool IsDesignTime()

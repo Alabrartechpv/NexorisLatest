@@ -313,6 +313,13 @@ namespace PosBranch_Win.Transaction
 
         private void FrmStockAdjustment_KeyDown(object sender, KeyEventArgs e)
         {
+            if (e.KeyCode == Keys.Escape)
+            {
+                this.Close();
+                e.Handled = true;
+                return;
+            }
+
             if (e.KeyCode == Keys.F7)
             {
                 try
