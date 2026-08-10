@@ -793,10 +793,9 @@ namespace PosBranch_Win.ChartOfAccount
                 int branchId = GetContextValue(SessionContext.BranchId, DataBase.BranchId);
                 int finYearId = GetContextValue(SessionContext.FinYearId, DataBase.FinyearId);
 
-                if (branchId <= 0)
-                {
-                    throw new InvalidOperationException("Chart of Accounts cannot be loaded because BranchId is missing.");
-                }
+                if (companyId <= 0) companyId = 1;
+                if (branchId <= 0) branchId = 1;
+                if (finYearId <= 0) finYearId = 1;
 
                 // Load only current branch account groups.
                 var accountGroupsTable = accountGroupRepo.GetAllAccountGroups(branchId);
@@ -900,6 +899,13 @@ namespace PosBranch_Win.ChartOfAccount
                 }
 
                 ultraTree1.ExpandAll();
+
+                // Select the first node by default so details & balance panel populates
+                if (ultraTree1.Nodes.Count > 0)
+                {
+                    ultraTree1.Nodes[0].Selected = true;
+                    UpdateDetailsPanel(ultraTree1.Nodes[0]);
+                }
             }
             catch (Exception ex)
             {
@@ -914,7 +920,7 @@ namespace PosBranch_Win.ChartOfAccount
 
         private void ApplyDynamicLedgerBalances(DataTable ledgersTable, int companyId, int branchId, int finYearId)
         {
-            if (ledgersTable == null || companyId <= 0 || branchId <= 0 || finYearId <= 0)
+            if (ledgersTable == null)
             {
                 return;
             }
@@ -924,8 +930,27 @@ namespace PosBranch_Win.ChartOfAccount
                 ledgersTable.Columns.Add("Balance", typeof(decimal));
             }
 
+            if (companyId <= 0) companyId = GetContextValue(SessionContext.CompanyId, DataBase.CompanyId);
+            if (companyId <= 0) companyId = 1;
+
+            if (branchId <= 0) branchId = GetContextValue(SessionContext.BranchId, DataBase.BranchId);
+            if (branchId <= 0) branchId = 1;
+
+            if (finYearId <= 0) finYearId = GetContextValue(SessionContext.FinYearId, DataBase.FinyearId);
+            if (finYearId <= 0) finYearId = 1;
+
+            // Get closing balances from POS_TrialBalance stored procedure
             DateTime toDate = DateTime.Today.AddDays(1).AddSeconds(-1);
-            var balances = ledgerRepo.GetLedgerBalances(companyId, branchId, finYearId, toDate);
+            Dictionary<int, decimal> balances = null;
+            try
+            {
+                balances = ledgerRepo.GetLedgerBalances(companyId, branchId, finYearId, toDate);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error fetching ledger balances: {ex.Message}");
+            }
+
             foreach (DataRow row in ledgersTable.Rows)
             {
                 if (row["LedgerID"] == DBNull.Value)
@@ -934,8 +959,35 @@ namespace PosBranch_Win.ChartOfAccount
                 }
 
                 int ledgerId = Convert.ToInt32(row["LedgerID"]);
-                decimal balance;
-                row["Balance"] = balances.TryGetValue(ledgerId, out balance) ? balance : 0;
+
+                // 1st priority: Closing balance from POS_TrialBalance SP
+                decimal txnBalance = 0;
+                if (balances != null && balances.TryGetValue(ledgerId, out txnBalance) && txnBalance != 0)
+                {
+                    row["Balance"] = txnBalance;
+                    continue;
+                }
+
+                // 2nd priority: Existing Balance column from GETALL SP
+                decimal existingBal = 0;
+                if (row["Balance"] != DBNull.Value)
+                {
+                    existingBal = Convert.ToDecimal(row["Balance"]);
+                }
+                if (existingBal != 0)
+                {
+                    continue;
+                }
+
+                // 3rd priority: Opening balance from OpnDebit - OpnCredit
+                decimal opnDebit = row.Table.Columns.Contains("OpnDebit") && row["OpnDebit"] != DBNull.Value ? Convert.ToDecimal(row["OpnDebit"]) : 0;
+                decimal opnCredit = row.Table.Columns.Contains("OpnCredit") && row["OpnCredit"] != DBNull.Value ? Convert.ToDecimal(row["OpnCredit"]) : 0;
+                decimal openingBal = opnDebit - opnCredit;
+
+                if (openingBal != 0)
+                {
+                    row["Balance"] = openingBal;
+                }
             }
         }
 
@@ -1116,7 +1168,16 @@ namespace PosBranch_Win.ChartOfAccount
             // If it is a ledger node (leaf)
             if (node.Tag is DataRow row && row.Table.Columns.Contains("LedgerName"))
             {
-                totalBalance = row["Balance"] != DBNull.Value ? Convert.ToDecimal(row["Balance"]) : 0;
+                if (row.Table.Columns.Contains("Balance") && row["Balance"] != DBNull.Value)
+                {
+                    totalBalance = Convert.ToDecimal(row["Balance"]);
+                }
+                else
+                {
+                    decimal opnDebit = row.Table.Columns.Contains("OpnDebit") && row["OpnDebit"] != DBNull.Value ? Convert.ToDecimal(row["OpnDebit"]) : 0;
+                    decimal opnCredit = row.Table.Columns.Contains("OpnCredit") && row["OpnCredit"] != DBNull.Value ? Convert.ToDecimal(row["OpnCredit"]) : 0;
+                    totalBalance = opnDebit - opnCredit;
+                }
                 ledgerCount = 1;
                 return;
             }
@@ -1175,7 +1236,18 @@ namespace PosBranch_Win.ChartOfAccount
             if (node.Tag is DataRow row && row.Table.Columns.Contains("LedgerName"))
             {
                 string ledgerName = row["LedgerName"].ToString();
-                decimal ledgerBalance = row["Balance"] != DBNull.Value ? Convert.ToDecimal(row["Balance"]) : 0;
+                decimal ledgerBalance = 0;
+                if (row.Table.Columns.Contains("Balance") && row["Balance"] != DBNull.Value)
+                {
+                    ledgerBalance = Convert.ToDecimal(row["Balance"]);
+                }
+                else
+                {
+                    decimal opnDebit = row.Table.Columns.Contains("OpnDebit") && row["OpnDebit"] != DBNull.Value ? Convert.ToDecimal(row["OpnDebit"]) : 0;
+                    decimal opnCredit = row.Table.Columns.Contains("OpnCredit") && row["OpnCredit"] != DBNull.Value ? Convert.ToDecimal(row["OpnCredit"]) : 0;
+                    ledgerBalance = opnDebit - opnCredit;
+                }
+
                 node.Text = ledgerBalance != 0
                     ? $"{ledgerName} {FormatBalanceInBrackets(ledgerBalance)}"
                     : ledgerName;
@@ -1350,18 +1422,22 @@ namespace PosBranch_Win.ChartOfAccount
             }
         }
 
+        private Rectangle dragBoxFromMouseDown = Rectangle.Empty;
+        private Infragistics.Win.UltraWinTree.UltraTreeNode dragNode = null;
+
         private void EnableDragAndDrop()
         {
-            // Enable drag and drop for the tree
+            // Enable drag and drop for the tree safely with drag movement threshold
             ultraTree1.AllowDrop = true;
             ultraTree1.MouseDown += UltraTree1_MouseDown;
+            ultraTree1.MouseMove += UltraTree1_MouseMove;
+            ultraTree1.MouseUp += UltraTree1_MouseUp;
             ultraTree1.DragOver += UltraTree1_DragOver;
             ultraTree1.DragDrop += UltraTree1_DragDrop;
         }
 
         private void UltraTree1_MouseDown(object sender, MouseEventArgs e)
         {
-            // Start the drag operation
             if (e.Button == MouseButtons.Left)
             {
                 Infragistics.Win.UltraWinTree.UltraTreeNode node =
@@ -1371,13 +1447,40 @@ namespace PosBranch_Win.ChartOfAccount
                 {
                     DataRow row = node.Tag as DataRow;
 
-                    // Only allow dragging ledger nodes
+                    // Only prepare drag for ledger nodes if mouse actually moves
                     if (row != null && row.Table.Columns.Contains("LedgerName"))
                     {
-                        ultraTree1.DoDragDrop(node, DragDropEffects.Move);
+                        Size dragSize = SystemInformation.DragSize;
+                        dragBoxFromMouseDown = new Rectangle(new Point(e.X - (dragSize.Width / 2),
+                                                                       e.Y - (dragSize.Height / 2)), dragSize);
+                        dragNode = node;
+                        return;
                     }
                 }
             }
+            dragBoxFromMouseDown = Rectangle.Empty;
+            dragNode = null;
+        }
+
+        private void UltraTree1_MouseMove(object sender, MouseEventArgs e)
+        {
+            if ((e.Button & MouseButtons.Left) == MouseButtons.Left)
+            {
+                if (dragBoxFromMouseDown != Rectangle.Empty &&
+                    !dragBoxFromMouseDown.Contains(e.X, e.Y) &&
+                    dragNode != null)
+                {
+                    ultraTree1.DoDragDrop(dragNode, DragDropEffects.Move);
+                    dragBoxFromMouseDown = Rectangle.Empty;
+                    dragNode = null;
+                }
+            }
+        }
+
+        private void UltraTree1_MouseUp(object sender, MouseEventArgs e)
+        {
+            dragBoxFromMouseDown = Rectangle.Empty;
+            dragNode = null;
         }
 
         private void UltraTree1_DragOver(object sender, DragEventArgs e)
@@ -1433,7 +1536,7 @@ namespace PosBranch_Win.ChartOfAccount
                         int ledgerId = Convert.ToInt32(sourceRow["LedgerID"]);
                         int newGroupId = Convert.ToInt32(targetRow["GroupID"]);
 
-                        // Move the ledger to the new group
+                        // Move the ledger to the new group only if group actually changed
                         MoveLedgerToGroup(ledgerId, newGroupId);
                     }
                 }
@@ -1452,6 +1555,13 @@ namespace PosBranch_Win.ChartOfAccount
                 if (matchingLedgers.Length > 0)
                 {
                     DataRow ledgerRow = matchingLedgers[0];
+
+                    int currentGroupId = Convert.ToInt32(ledgerRow["GroupID"]);
+                    if (currentGroupId == newGroupId)
+                    {
+                        // Already in this group, no need to move
+                        return;
+                    }
 
                     // Get CompanyID dynamically from the ledgerRow
                     int companyId = SessionContext.CompanyId;

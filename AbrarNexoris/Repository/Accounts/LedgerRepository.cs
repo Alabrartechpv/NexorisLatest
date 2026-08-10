@@ -69,10 +69,7 @@ namespace Repository.Accounts
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@_Operation", "GETBALANCES");
-                    cmd.Parameters.AddWithValue("@CompanyId", companyId);
-                    cmd.Parameters.AddWithValue("@BranchId", branchId);
-                    cmd.Parameters.AddWithValue("@FinYearId", finYearId);
-                    cmd.Parameters.AddWithValue("@ToDate", toDate);
+                    cmd.Parameters.AddWithValue("@BranchID", branchId <= 0 ? (object)DBNull.Value : branchId);
 
                     using (SqlDataReader reader = cmd.ExecuteReader())
                     {
