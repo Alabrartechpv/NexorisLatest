@@ -2628,6 +2628,9 @@ namespace PosBranch_Win
             }
         }
 
+        [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Auto)]
+        private static extern IntPtr GetFocus();
+
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
             Keys keyCode = keyData & Keys.KeyCode;
@@ -2647,52 +2650,36 @@ namespace PosBranch_Win
             }
 
             // Shortcuts to open forms: I (Item Master), P (Purchase), S (Sales Invoice), A (Stock Adjustment), R (Sales Return), E (Purchase Return)
-            if (!IsTextInputControlFocused() || alt || (ctrl && keyCode != Keys.I))
+            // Should ONLY run when NO text input field is focused AND when the active tab is Home / Dashboard
+            if (!ctrl && !alt)
             {
-                switch (keyCode)
+                bool isHomeTabActive = (tabControlMain == null || tabControlMain.SelectedTab == null ||
+                                       string.Equals(tabControlMain.SelectedTab.Key, "Home", StringComparison.OrdinalIgnoreCase) ||
+                                       string.Equals(tabControlMain.SelectedTab.Text, "Home", StringComparison.OrdinalIgnoreCase));
+
+                if (isHomeTabActive && !IsTextInputControlFocused())
                 {
-                    case Keys.I:
-                        if (!ctrl)
-                        {
+                    switch (keyCode)
+                    {
+                        case Keys.I:
                             OpenFormInTab(new Master.frmItemMasterNew(), "Item Master");
                             return true;
-                        }
-                        break;
-                    case Keys.P:
-                        if (!ctrl)
-                        {
+                        case Keys.P:
                             OpenFormInTab(new Transaction.FrmPurchase(), "Purchase");
                             return true;
-                        }
-                        break;
-                    case Keys.S:
-                        if (!ctrl)
-                        {
+                        case Keys.S:
                             OpenFormInTab(new Transaction.frmSalesInvoice(), "Sales Invoice");
                             return true;
-                        }
-                        break;
-                    case Keys.A:
-                        if (!ctrl)
-                        {
+                        case Keys.A:
                             OpenFormInTab(new Transaction.FrmStockAdjustment(), "Stock Adjustment");
                             return true;
-                        }
-                        break;
-                    case Keys.R:
-                        if (!ctrl)
-                        {
+                        case Keys.R:
                             OpenFormInTab(new Transaction.frmSalesReturn(), "Sales Return");
                             return true;
-                        }
-                        break;
-                    case Keys.E:
-                        if (!ctrl)
-                        {
+                        case Keys.E:
                             OpenFormInTab(new Transaction.frmPurchaseReturn(), "Purchase Return");
                             return true;
-                        }
-                        break;
+                    }
                 }
             }
 
@@ -2703,22 +2690,33 @@ namespace PosBranch_Win
         {
             try
             {
-                Control focused = GetFocusedControl(this);
-                if (focused == null) return false;
-
-                if (focused is TextBoxBase ||
-                    focused is DateTimePicker ||
-                    focused is ComboBox ||
-                    focused.GetType().Name.Contains("TextBox") ||
-                    focused.GetType().Name.Contains("UltraTextEditor") ||
-                    focused.GetType().Name.Contains("UltraComboEditor") ||
-                    focused.GetType().Name.Contains("UltraDateTimeEditor") ||
-                    focused.GetType().Name.Contains("UltraNumericEditor"))
+                // 1. Check native Win32 thread focus handle
+                IntPtr focusHandle = GetFocus();
+                if (focusHandle != IntPtr.Zero)
                 {
-                    return true;
+                    Control focused = Control.FromHandle(focusHandle) ?? Control.FromChildHandle(focusHandle);
+                    if (focused != null && IsControlOrAncestorTextInput(focused))
+                    {
+                        return true;
+                    }
                 }
 
-                if (focused is Infragistics.Win.UltraWinGrid.UltraGrid grid && grid.ActiveCell != null && grid.ActiveCell.IsInEditMode)
+                // 2. Check ActiveControl in tab control & child form hierarchy
+                if (tabControlMain != null && tabControlMain.SelectedTab != null && tabControlMain.SelectedTab.TabPage != null)
+                {
+                    foreach (Control child in tabControlMain.SelectedTab.TabPage.Controls)
+                    {
+                        Control focusedChild = GetFocusedControl(child);
+                        if (focusedChild != null && IsControlOrAncestorTextInput(focusedChild))
+                        {
+                            return true;
+                        }
+                    }
+                }
+
+                // 3. Fallback check on Home active control
+                Control activeControl = GetFocusedControl(this);
+                if (activeControl != null && IsControlOrAncestorTextInput(activeControl))
                 {
                     return true;
                 }
@@ -2729,6 +2727,45 @@ namespace PosBranch_Win
             {
                 return false;
             }
+        }
+
+        private bool IsControlOrAncestorTextInput(Control control)
+        {
+            Control current = control;
+            while (current != null)
+            {
+                if (current is TextBoxBase ||
+                    current is DateTimePicker ||
+                    current is ComboBox)
+                {
+                    return true;
+                }
+
+                Type t = current.GetType();
+                string typeName = t.Name;
+                string fullName = t.FullName ?? string.Empty;
+
+                if (typeName.Contains("TextBox") ||
+                    typeName.Contains("TextEditor") ||
+                    typeName.Contains("ComboEditor") ||
+                    typeName.Contains("DateTimeEditor") ||
+                    typeName.Contains("NumericEditor") ||
+                    typeName.Contains("MaskedEdit") ||
+                    typeName.Contains("Edit") ||
+                    fullName.Contains("UltraWinEditors") ||
+                    fullName.Contains("Embeddable"))
+                {
+                    return true;
+                }
+
+                if (current is Infragistics.Win.UltraWinGrid.UltraGrid grid && grid.ActiveCell != null && grid.ActiveCell.IsInEditMode)
+                {
+                    return true;
+                }
+
+                current = current.Parent;
+            }
+            return false;
         }
 
         private Control GetFocusedControl(Control parent)
