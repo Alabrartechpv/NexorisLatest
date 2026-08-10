@@ -1,11 +1,14 @@
 using Infragistics.Win;
+using Infragistics.Win.Misc;
 using Infragistics.Win.UltraWinEditors;
 using Infragistics.Win.UltraWinGrid;
 using ModelClass;
 using ModelClass.Master;
 using ModelClass.Report;
+using PosBranch_Win.DialogBox;
 using PosBranch_Win.Transaction;
 using Repository;
+using Repository.MasterRepositry;
 using Repository.TransactionRepository;
 using System;
 using System.Collections.Generic;
@@ -20,6 +23,33 @@ namespace PosBranch_Win.Reports.InventoryReport
 {
     public partial class FrmSmartReorderDashboard : Form
     {
+        // ─── Theme Palette (matches frmVendorOutstandingReport / Stock Report theme) ────────
+        private static readonly Color FormBackColor        = Color.FromArgb(232, 246, 255);
+        private static readonly Color FilterPanelBackColor = Color.FromArgb(232, 246, 255);
+        private static readonly Color ActionPanelBackColor = Color.FromArgb(206, 223, 238);
+        private static readonly Color BorderBlue           = Color.FromArgb(118, 154, 198);
+        private static readonly Color ControlBackColor     = Color.White;
+        private static readonly Color ControlTextColor     = Color.FromArgb(18, 49, 102);
+        private static readonly Color GridHeaderBlue       = Color.FromArgb(93, 151, 214);
+        private static readonly Color GridHeaderBlueDark   = Color.FromArgb(67, 118, 184);
+        private static readonly Color GridSelectedBlue     = Color.FromArgb(173, 216, 255);
+        private static readonly Color GridRowLine          = Color.FromArgb(197, 217, 241);
+        private static readonly Color GridAltRow           = Color.FromArgb(246, 250, 255);
+        private static readonly Color GridFooterBorder     = Color.FromArgb(144, 181, 223);
+        private static readonly Color SkyBlueOutline       = Color.FromArgb(160, 210, 255);
+
+        // ─── Action Panel Theme (Exact match with ultraPanel6 of frmReportFormatDialog) ───────
+        private static readonly Color ButtonTopColor       = Color.FromArgb(234, 244, 255);
+        private static readonly Color ButtonBottomColor    = Color.FromArgb(152, 188, 235);
+        private static readonly Color ButtonBorderColor    = Color.FromArgb(73, 119, 184);
+        private static readonly Color ButtonTextBlue       = Color.FromArgb(14, 47, 108);
+
+        private static readonly Color PanelHoverTopColor   = Color.FromArgb(245, 250, 255);
+        private static readonly Color PanelHoverBottomColor= Color.FromArgb(170, 206, 244);
+
+        private static readonly Color PanelPressedTopColor = Color.FromArgb(205, 226, 248);
+        private static readonly Color PanelPressedBottomColor = Color.FromArgb(128, 170, 224);
+
         private sealed class ComboItem
         {
             public string Text { get; set; }
@@ -39,6 +69,10 @@ namespace PosBranch_Win.Reports.InventoryReport
         private bool _layoutLoaded;
         private bool _suppressGridCellUpdate;
 
+        // ─── Attached Cell Footer Synchronization State ─────────────────────────────
+        private readonly Dictionary<string, Label> _footerLabels = new Dictionary<string, Label>();
+        private readonly Dictionary<string, string> _columnAggregations = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
         private const string GridLayoutFileName = "SmartReorderGridLayout.xml";
         private string GridLayoutPath => Path.Combine(Application.StartupPath, GridLayoutFileName);
 
@@ -55,6 +89,13 @@ namespace PosBranch_Win.Reports.InventoryReport
 
             Load += FrmSmartReorderDashboard_Load;
             FormClosing += FrmSmartReorderDashboard_FormClosing;
+
+            // Wire grid events for attached cell footer scrolling
+            ultraGridMaster.Resize += (s, e) => UpdateFooterCellPositions();
+            ultraGridMaster.AfterColPosChanged += (s, e) => UpdateFooterCellPositions();
+            ultraGridMaster.AfterColRegionScroll += (s, e) => UpdateFooterCellPositions();
+            ultraGridMaster.AfterRowRegionScroll += (s, e) => UpdateFooterCellPositions();
+            ultraGridMaster.Paint += (s, e) => UpdateFooterCellPositions();
         }
 
         private void FrmSmartReorderDashboard_Load(object sender, EventArgs e)
@@ -106,70 +147,412 @@ namespace PosBranch_Win.Reports.InventoryReport
 
         private void InitializeRuntimeAppearance()
         {
-            ConfigureButton(btnViewGrid, Color.FromArgb(72, 122, 214), Color.FromArgb(95, 145, 230));
-         
-            ConfigureButton(btnGeneratePO, Color.FromArgb(86, 118, 208), Color.FromArgb(117, 146, 225));
-            ConfigureButton(btnGenBranchPO, Color.FromArgb(86, 118, 208), Color.FromArgb(117, 146, 225));
-            ConfigureButton(btnRefreshStats, Color.FromArgb(67, 160, 71), Color.FromArgb(102, 187, 106));
-            ConfigureButton(btnHideSelection, Color.FromArgb(84, 120, 190), Color.FromArgb(112, 148, 214));
+            BackColor = FormBackColor;
+
+            // ── Panels ─────────────────────────────────────────────────────────────
+            ultraPanelSelection.Appearance.BackColor  = FilterPanelBackColor;
+            ultraPanelSelection.Appearance.BorderColor = BorderBlue;
+            ultraPanelSelection.BorderStyle = UIElementBorderStyle.Solid;
+
+            ultraPanelActionBar.Appearance.BackColor  = ActionPanelBackColor;
+            ultraPanelActionBar.Appearance.BorderColor = BorderBlue;
+            ultraPanelActionBar.BorderStyle = UIElementBorderStyle.Solid;
+            ultraPanelActionBar.Size = new Size(ultraPanelActionBar.Width, 38);
+
+            ultraPanelGrid.Appearance.BackColor  = FormBackColor;
+            ultraPanelGrid.Appearance.BorderColor = BorderBlue;
+            ultraPanelGrid.BorderStyle = UIElementBorderStyle.Solid;
+
+            gridFooterPanel.Appearance.BackColor  = GridHeaderBlue;
+            gridFooterPanel.Appearance.BackColor2 = GridHeaderBlue;
+            gridFooterPanel.Appearance.BackGradientStyle = GradientStyle.None;
+            gridFooterPanel.Appearance.BorderColor = GridFooterBorder;
+            gridFooterPanel.BorderStyle = UIElementBorderStyle.Solid;
+            gridFooterPanel.Height = 28;
+
+            // ── Labels ─────────────────────────────────────────────────────────────
+            StyleLabel(lblItemNo);
+            StyleLabel(lblFromBarcode);
+            StyleLabel(lblCategory);
+            StyleLabel(lblGroup);
+            StyleLabel(lblAlert);
+            StyleLabel(lblMoreOptions);
+
+            StyleStatusCountLabel(lblCount);
+            StyleStatusCountLabel(lblExceptionCount);
+
+            // ── Combos & Text Editors (SkyBlue outline) ─────────────────────────────
+            StyleFilterCombo(cmbItemNoMode);
+            StyleFilterCombo(cmbCategory);
+            StyleFilterCombo(cmbGroup);
+            StyleFilterCombo(cmbAlert);
+            StyleFilterCombo(cmbMoreOptions);
+            StyleTextEditor(txtFromBarcode);
+
+            // ── Style Action Panels (Exact ultraPanel6 theme of frmReportFormatDialog) ───
+            RegisterPanelButton(ultraPanel19, OpenItemMasterSearch);
+            RegisterPanelButton(ultraPanel2, () => BtnViewGrid_Click(null, EventArgs.Empty));
+            RegisterPanelButton(ultraPanel3, () => BtnGeneratePO_Click(null, EventArgs.Empty));
+            RegisterPanelButton(ultraPanel4, () => BtnGenBranchPO_Click(null, EventArgs.Empty));
+            RegisterPanelButton(ultraPanel5, () => BtnRefreshStats_Click(null, EventArgs.Empty));
+            RegisterPanelButton(ultraPanel1, OpenPresetDialog);
+            RegisterPanelButton(ultraPanel6, () => BtnHideSelection_Click(null, EventArgs.Empty));
 
             ConfigureGridAppearance();
-            _toolTip.SetToolTip(btnRefreshStats, "Refresh ADS snapshot from the database.");
+            if (ultraPanel5 != null)
+            {
+                _toolTip.SetToolTip(ultraPanel5, "Refresh ADS snapshot from the database.");
+            }
         }
 
-        private void ConfigureButton(Infragistics.Win.Misc.UltraButton button, Color startColor, Color endColor)
+        private void OpenItemMasterSearch()
         {
-            button.UseAppStyling = false;
-            button.UseOsThemes = DefaultableBoolean.False;
-            button.Appearance.BackColor = startColor;
-            button.Appearance.BackColor2 = endColor;
-            button.Appearance.BackGradientStyle = GradientStyle.Vertical;
-            button.Appearance.ForeColor = Color.White;
-            button.Appearance.FontData.Bold = DefaultableBoolean.True;
-            button.Appearance.BorderColor = startColor;
-            button.HotTrackAppearance.BackColor = endColor;
-            button.HotTrackAppearance.ForeColor = Color.White;
+            try
+            {
+                using (frmdialForItemMaster dialog = new frmdialForItemMaster("SmartReorder"))
+                {
+                    if (dialog.ShowDialog(this) == DialogResult.OK)
+                    {
+                        string barcode = !string.IsNullOrWhiteSpace(dialog.SelectedBarcode)
+                            ? dialog.SelectedBarcode
+                            : (!string.IsNullOrWhiteSpace(dialog.SelectedItemNo) ? dialog.SelectedItemNo : Convert.ToString(dialog.Tag));
+
+                        if (!string.IsNullOrWhiteSpace(barcode))
+                        {
+                            txtFromBarcode.Text = barcode;
+                            LoadData();
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Unable to open Item Master Dialog.\n\n" + ex.Message, "Smart Reorder", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void OpenPresetDialog()
+        {
+            try
+            {
+                ultraGridMaster.UpdateData();
+
+                // 1. Collect selected items from grid (checkbox column or selected rows)
+                List<SmartReorderItemModel> selectedItems = new List<SmartReorderItemModel>();
+
+                foreach (UltraGridRow row in ultraGridMaster.Rows.GetFilteredInNonGroupByRows())
+                {
+                    if (row.ListObject is SmartReorderItemModel item && item.IsSelected)
+                    {
+                        selectedItems.Add(item);
+                    }
+                }
+
+                if (selectedItems.Count == 0 && ultraGridMaster.Selected.Rows.Count > 0)
+                {
+                    foreach (UltraGridRow row in ultraGridMaster.Selected.Rows)
+                    {
+                        if (row.ListObject is SmartReorderItemModel item)
+                        {
+                            selectedItems.Add(item);
+                        }
+                    }
+                }
+
+                // Remove duplicates if any
+                selectedItems = selectedItems.GroupBy(x => x.ItemId).Select(g => g.First()).ToList();
+
+                // 2. If items are selected, prompt for preset name and save preset with items
+                if (selectedItems.Count > 0)
+                {
+                    string presetName = FrmQuickPurchasePresets.ShowInputDialog(
+                        $"Enter Preset Name for {selectedItems.Count} selected item(s):", 
+                        "New Preset");
+
+                    if (string.IsNullOrWhiteSpace(presetName))
+                    {
+                        return; // Canceled by user
+                    }
+
+                    QuickPurchasePresetRepository presetRepo = new QuickPurchasePresetRepository();
+                    int presetId = presetRepo.SavePreset(new QuickPurchasePreset
+                    {
+                        PresetName = presetName.Trim(),
+                        VendorId = 0
+                    });
+
+                    if (presetId > 0)
+                    {
+                        foreach (SmartReorderItemModel item in selectedItems)
+                        {
+                            double qty = item.FinalQuantity > 0 
+                                ? (double)item.FinalQuantity 
+                                : (item.SuggestedQuantity > 0 ? (double)item.SuggestedQuantity : 1.0);
+
+                            QuickPurchasePresetItem presetItem = new QuickPurchasePresetItem
+                            {
+                                PresetId = presetId,
+                                ItemId = (int)item.ItemId,
+                                ItemName = item.ItemName,
+                                Barcode = item.Barcode,
+                                Unit = item.Unit,
+                                UnitId = item.UnitId,
+                                UnitPrice = 0,
+                                Cost = 0,
+                                Quantity = (int)Math.Max(1, Math.Round(qty))
+                            };
+                            presetRepo.AddItemToPreset(presetItem);
+                        }
+
+                        using (FrmQuickPurchasePresets presetsDialog = new FrmQuickPurchasePresets(presetId))
+                        {
+                            presetsDialog.ShowDialog(this);
+                        }
+                    }
+                }
+                else
+                {
+                    // No items selected -> simply open Presets Dialog
+                    using (FrmQuickPurchasePresets presetsDialog = new FrmQuickPurchasePresets())
+                    {
+                        presetsDialog.ShowDialog(this);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Unable to open Quick Purchase Presets.\n\n" + ex.Message, "Smart Reorder", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        // ─── Register Panel Buttons (Matches ultraPanel6 of frmReportFormatDialog) ────────
+        public void RegisterPanelButton(UltraPanel panel, Action clickAction = null)
+        {
+            if (panel == null)
+                return;
+
+            panel.UseAppStyling = false;
+            panel.Cursor = Cursors.Hand;
+            panel.BorderStyle = UIElementBorderStyle.Rounded1;
+            ApplyPanelButtonStyle(panel, false, false);
+
+            EventHandler clickHandler = (s, e) => clickAction?.Invoke();
+            EventHandler mouseEnterHandler = (s, e) => ApplyPanelButtonStyle(panel, true, false);
+            EventHandler mouseLeaveHandler = (s, e) =>
+            {
+                Point clientPoint = panel.PointToClient(Control.MousePosition);
+                bool isInside = panel.ClientRectangle.Contains(clientPoint);
+                ApplyPanelButtonStyle(panel, isInside, false);
+            };
+            MouseEventHandler mouseDownHandler = (s, e) =>
+            {
+                if (e.Button == MouseButtons.Left)
+                {
+                    ApplyPanelButtonStyle(panel, true, true);
+                }
+            };
+            MouseEventHandler mouseUpHandler = (s, e) =>
+            {
+                Point clientPoint = panel.PointToClient(Control.MousePosition);
+                bool isInside = panel.ClientRectangle.Contains(clientPoint);
+                ApplyPanelButtonStyle(panel, isInside, false);
+            };
+
+            if (clickAction != null)
+            {
+                panel.Click += clickHandler;
+                panel.ClientArea.Click += clickHandler;
+            }
+            panel.MouseEnter += mouseEnterHandler;
+            panel.MouseLeave += mouseLeaveHandler;
+            panel.MouseDown += mouseDownHandler;
+            panel.MouseUp += mouseUpHandler;
+
+            panel.ClientArea.MouseEnter += mouseEnterHandler;
+            panel.ClientArea.MouseLeave += mouseLeaveHandler;
+            panel.ClientArea.MouseDown += mouseDownHandler;
+            panel.ClientArea.MouseUp += mouseUpHandler;
+
+            foreach (Control child in panel.ClientArea.Controls)
+            {
+                child.Cursor = Cursors.Hand;
+                if (clickAction != null)
+                    child.Click += clickHandler;
+                child.MouseEnter += mouseEnterHandler;
+                child.MouseLeave += mouseLeaveHandler;
+                child.MouseDown += mouseDownHandler;
+                child.MouseUp += mouseUpHandler;
+
+                if (child is Label label)
+                {
+                    label.ForeColor = ButtonTextBlue;
+                    label.Font = new Font("Microsoft Sans Serif", 9F, FontStyle.Regular, GraphicsUnit.Point, 0);
+                    label.BackColor = Color.Transparent;
+                }
+                else if (child is UltraLabel uLbl)
+                {
+                    uLbl.Appearance.ForeColor = ButtonTextBlue;
+                    uLbl.Appearance.FontData.Name = "Microsoft Sans Serif";
+                    uLbl.Appearance.FontData.SizeInPoints = 9F;
+                    uLbl.Appearance.BackColor = Color.Transparent;
+                }
+            }
+        }
+
+        private static void ApplyPanelButtonStyle(UltraPanel panel, bool isHover, bool isPressed)
+        {
+            if (panel == null) return;
+            Infragistics.Win.Appearance appearance = (Infragistics.Win.Appearance)panel.Appearance;
+            appearance.BackGradientStyle = GradientStyle.Vertical;
+            appearance.BorderColor = ButtonBorderColor;
+            appearance.ForeColor = ButtonTextBlue;
+
+            if (isPressed)
+            {
+                appearance.BackColor = PanelPressedTopColor;
+                appearance.BackColor2 = PanelPressedBottomColor;
+            }
+            else if (isHover)
+            {
+                appearance.BackColor = PanelHoverTopColor;
+                appearance.BackColor2 = PanelHoverBottomColor;
+            }
+            else
+            {
+                appearance.BackColor = ButtonTopColor;
+                appearance.BackColor2 = ButtonBottomColor;
+            }
+        }
+
+        private static void StyleLabel(Infragistics.Win.Misc.UltraLabel lbl)
+        {
+            if (lbl == null) return;
+            lbl.Appearance.BackColor = Color.Transparent;
+            lbl.Appearance.ForeColor = Color.FromArgb(18, 47, 95);
+            lbl.Appearance.FontData.Bold = DefaultableBoolean.False;
+            lbl.Appearance.FontData.Name = "Microsoft Sans Serif";
+            lbl.Appearance.FontData.SizeInPoints = 9F;
+        }
+
+        private static void StyleStatusCountLabel(Infragistics.Win.Misc.UltraLabel lbl)
+        {
+            if (lbl == null) return;
+            lbl.Appearance.BackColor = Color.Transparent;
+            lbl.Appearance.ForeColor = ControlTextColor; // #123166 Dark Navy
+            lbl.Appearance.FontData.Bold = DefaultableBoolean.True;
+            lbl.Appearance.FontData.Name = "Microsoft Sans Serif";
+            lbl.Appearance.FontData.SizeInPoints = 9F;
+        }
+
+        private static void StyleFilterCombo(UltraComboEditor combo)
+        {
+            if (combo == null) return;
+            combo.UseAppStyling  = false;
+            combo.UseOsThemes    = DefaultableBoolean.False;
+            combo.DisplayStyle   = EmbeddableElementDisplayStyle.Office2013;
+            combo.BorderStyle    = UIElementBorderStyle.Solid;
+            combo.Appearance.BackColor  = ControlBackColor;
+            combo.Appearance.BorderColor = SkyBlueOutline;
+            combo.Appearance.ForeColor  = ControlTextColor;
+            combo.Appearance.FontData.Name = "Microsoft Sans Serif";
+            combo.Appearance.FontData.SizeInPoints = 9F;
+            combo.ButtonStyle   = UIElementButtonStyle.Office2003ToolbarButton;
+        }
+
+        private static void StyleTextEditor(UltraTextEditor editor)
+        {
+            if (editor == null) return;
+            editor.UseAppStyling  = false;
+            editor.UseOsThemes    = DefaultableBoolean.False;
+            editor.DisplayStyle   = EmbeddableElementDisplayStyle.Office2013;
+            editor.BorderStyle    = UIElementBorderStyle.Solid;
+            editor.Appearance.BackColor  = ControlBackColor;
+            editor.Appearance.BorderColor = SkyBlueOutline;
+            editor.Appearance.ForeColor  = ControlTextColor;
+            editor.Appearance.FontData.Name = "Microsoft Sans Serif";
+            editor.Appearance.FontData.SizeInPoints = 9F;
         }
 
         private void ConfigureGridAppearance()
         {
             ultraGridMaster.UseAppStyling = false;
             ultraGridMaster.UseOsThemes = DefaultableBoolean.False;
+            ultraGridMaster.DisplayLayout.Appearance.BackColor = FormBackColor;
             ultraGridMaster.DisplayLayout.CaptionVisible = DefaultableBoolean.False;
-            ultraGridMaster.DisplayLayout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
+
+            // Free cell positions (No AutoFit stretching / squishing)
+            ultraGridMaster.DisplayLayout.AutoFitStyle = AutoFitStyle.None;
+            ultraGridMaster.DisplayLayout.ScrollBounds = ScrollBounds.ScrollToFill;
+            ultraGridMaster.DisplayLayout.Scrollbars = Scrollbars.Both;
+
             ultraGridMaster.DisplayLayout.BorderStyle = UIElementBorderStyle.Solid;
             ultraGridMaster.DisplayLayout.GroupByBox.Hidden = true;
+
             ultraGridMaster.DisplayLayout.Override.AllowAddNew = AllowAddNew.No;
             ultraGridMaster.DisplayLayout.Override.AllowDelete = DefaultableBoolean.False;
             ultraGridMaster.DisplayLayout.Override.AllowUpdate = DefaultableBoolean.True;
             ultraGridMaster.DisplayLayout.Override.AllowColMoving = AllowColMoving.WithinBand;
-            ultraGridMaster.DisplayLayout.Override.AllowRowFiltering = DefaultableBoolean.True;
-            ultraGridMaster.DisplayLayout.Override.FilterUIType = FilterUIType.HeaderIcons;
+
+            // ── Slim & Clean Header Appearance (Matches Image 2 without any funnel icons or pins) ─
+            ultraGridMaster.DisplayLayout.Override.AllowRowFiltering = DefaultableBoolean.False;
+            ultraGridMaster.DisplayLayout.Override.FilterUIType = FilterUIType.Default;
             ultraGridMaster.DisplayLayout.Override.FilterOperatorLocation = FilterOperatorLocation.Hidden;
-            ultraGridMaster.DisplayLayout.Override.HeaderClickAction = HeaderClickAction.SortMulti;
+            ultraGridMaster.DisplayLayout.Override.HeaderClickAction = HeaderClickAction.SortSingle;
+            ultraGridMaster.DisplayLayout.Override.WrapHeaderText = DefaultableBoolean.False;
+            ultraGridMaster.DisplayLayout.Override.HeaderStyle = HeaderStyle.Standard;
+
+            ultraGridMaster.DisplayLayout.Override.HeaderAppearance.BackColor = GridHeaderBlue;
+            ultraGridMaster.DisplayLayout.Override.HeaderAppearance.BackColor2 = GridHeaderBlueDark;
+            ultraGridMaster.DisplayLayout.Override.HeaderAppearance.BackGradientStyle = GradientStyle.Vertical;
+            ultraGridMaster.DisplayLayout.Override.HeaderAppearance.ForeColor = Color.White;
+            ultraGridMaster.DisplayLayout.Override.HeaderAppearance.BorderColor = BorderBlue;
+            ultraGridMaster.DisplayLayout.Override.HeaderAppearance.TextHAlign = HAlign.Center;
+            ultraGridMaster.DisplayLayout.Override.HeaderAppearance.TextVAlign = VAlign.Middle;
+            ultraGridMaster.DisplayLayout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.False;
+            ultraGridMaster.DisplayLayout.Override.HeaderAppearance.FontData.Name = "Microsoft Sans Serif";
+            ultraGridMaster.DisplayLayout.Override.HeaderAppearance.FontData.SizeInPoints = 8.25F;
+            ultraGridMaster.DisplayLayout.Override.HeaderAppearance.ThemedElementAlpha = Alpha.Transparent;
+
+            // ── Row Selectors with Numbers (1, 2, 3...) ────────────────────────────
             ultraGridMaster.DisplayLayout.Override.RowSelectors = DefaultableBoolean.True;
-            ultraGridMaster.DisplayLayout.Override.RowSelectorHeaderStyle = RowSelectorHeaderStyle.ColumnChooserButton;
-            ultraGridMaster.DisplayLayout.Override.RowSelectorWidth = 28;
+            ultraGridMaster.DisplayLayout.Override.RowSelectorWidth = 25;
+            ultraGridMaster.DisplayLayout.Override.RowSelectorNumberStyle = RowSelectorNumberStyle.RowIndex;
+            ultraGridMaster.DisplayLayout.Override.RowSelectorAppearance.BackColor = GridHeaderBlueDark;
+            ultraGridMaster.DisplayLayout.Override.RowSelectorAppearance.BackColor2 = GridHeaderBlue;
+            ultraGridMaster.DisplayLayout.Override.RowSelectorAppearance.BackGradientStyle = GradientStyle.Vertical;
+            ultraGridMaster.DisplayLayout.Override.RowSelectorAppearance.BorderColor = BorderBlue;
+            ultraGridMaster.DisplayLayout.Override.RowSelectorAppearance.ForeColor = Color.White;
+            ultraGridMaster.DisplayLayout.Override.RowSelectorAppearance.FontData.Bold = DefaultableBoolean.True;
+            ultraGridMaster.DisplayLayout.Override.RowSelectorAppearance.TextHAlign = HAlign.Center;
+
+            // ── Row & Cell Colors ──────────────────────────────────────────────────
             ultraGridMaster.DisplayLayout.Override.MinRowHeight = 24;
             ultraGridMaster.DisplayLayout.Override.DefaultRowHeight = 24;
             ultraGridMaster.DisplayLayout.Override.CellClickAction = CellClickAction.EditAndSelectText;
+
             ultraGridMaster.DisplayLayout.Override.RowAppearance.BackColor = Color.White;
-            ultraGridMaster.DisplayLayout.Override.RowAlternateAppearance.BackColor = Color.FromArgb(247, 250, 255);
-            ultraGridMaster.DisplayLayout.Override.ActiveRowAppearance.BackColor = Color.FromArgb(120, 116, 235);
-            ultraGridMaster.DisplayLayout.Override.ActiveRowAppearance.ForeColor = Color.White;
-            ultraGridMaster.DisplayLayout.Override.SelectedRowAppearance.BackColor = Color.FromArgb(120, 116, 235);
-            ultraGridMaster.DisplayLayout.Override.SelectedRowAppearance.ForeColor = Color.White;
-            ultraGridMaster.DisplayLayout.Override.HeaderAppearance.BackColor = Color.FromArgb(145, 179, 222);
-            ultraGridMaster.DisplayLayout.Override.HeaderAppearance.BackColor2 = Color.FromArgb(118, 157, 209);
-            ultraGridMaster.DisplayLayout.Override.HeaderAppearance.BackGradientStyle = GradientStyle.Vertical;
-            ultraGridMaster.DisplayLayout.Override.HeaderAppearance.ForeColor = Color.FromArgb(17, 52, 102);
-            ultraGridMaster.DisplayLayout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.True;
-            ultraGridMaster.DisplayLayout.Override.HeaderAppearance.BorderColor = Color.FromArgb(103, 142, 196);
+            ultraGridMaster.DisplayLayout.Override.RowAppearance.ForeColor = ControlTextColor;
+            ultraGridMaster.DisplayLayout.Override.RowAppearance.BorderColor = GridRowLine;
+            ultraGridMaster.DisplayLayout.Override.RowAlternateAppearance.BackColor = GridAltRow;
+            ultraGridMaster.DisplayLayout.Override.RowAlternateAppearance.BorderColor = GridRowLine;
+
+            ultraGridMaster.DisplayLayout.Override.ActiveRowAppearance.BackColor = GridSelectedBlue;
+            ultraGridMaster.DisplayLayout.Override.ActiveRowAppearance.ForeColor = ControlTextColor;
+            ultraGridMaster.DisplayLayout.Override.ActiveRowAppearance.FontData.Bold = DefaultableBoolean.False;
+
+            ultraGridMaster.DisplayLayout.Override.SelectedRowAppearance.BackColor = GridSelectedBlue;
+            ultraGridMaster.DisplayLayout.Override.SelectedRowAppearance.ForeColor = ControlTextColor;
+            ultraGridMaster.DisplayLayout.Override.SelectedRowAppearance.FontData.Bold = DefaultableBoolean.False;
+
+            ultraGridMaster.DisplayLayout.Override.BorderStyleHeader = UIElementBorderStyle.Solid;
             ultraGridMaster.DisplayLayout.Override.BorderStyleCell = UIElementBorderStyle.Solid;
             ultraGridMaster.DisplayLayout.Override.BorderStyleRow = UIElementBorderStyle.Solid;
-            ultraGridMaster.DisplayLayout.Override.CellAppearance.BorderColor = Color.FromArgb(210, 220, 235);
+            ultraGridMaster.DisplayLayout.Override.CellAppearance.BorderColor = GridRowLine;
+            ultraGridMaster.DisplayLayout.Override.CellAppearance.ForeColor = ControlTextColor;
+            ultraGridMaster.DisplayLayout.Override.CellAppearance.FontData.Name = "Microsoft Sans Serif";
+            ultraGridMaster.DisplayLayout.Override.CellAppearance.FontData.SizeInPoints = 8.25F;
+
             ultraGridMaster.DisplayLayout.Override.RowSizing = RowSizing.AutoFree;
-            ultraGridMaster.DisplayLayout.Override.WrapHeaderText = DefaultableBoolean.True;
         }
 
         private void BindStaticCombos()
@@ -344,6 +727,9 @@ namespace PosBranch_Win.Reports.InventoryReport
                 LoadGridLayout();
             }
 
+            CreateFooterCells();
+            UpdateFooterCellPositions();
+            UpdateFooterValues();
             UpdateSummary();
             RefreshColumnChooser();
         }
@@ -360,31 +746,301 @@ namespace PosBranch_Win.Reports.InventoryReport
             lblExceptionCount.Text = "Exceptions: " + _allRows.Count(IsExceptionItem);
         }
 
+        // ─── Attached Cell Footer Implementation ────────────────────────────────────
+        private void CreateFooterCells()
+        {
+            gridFooterPanel.ClientArea.Controls.Clear();
+            _footerLabels.Clear();
+
+            if (ultraGridMaster.DisplayLayout == null || ultraGridMaster.DisplayLayout.Bands.Count == 0)
+                return;
+
+            UltraGridBand band = ultraGridMaster.DisplayLayout.Bands[0];
+            int xOffset = ultraGridMaster.DisplayLayout.Override.RowSelectorWidth;
+
+            foreach (UltraGridColumn column in band.Columns.Cast<UltraGridColumn>().OrderBy(c => c.Header.VisiblePosition))
+            {
+                if (column.Hidden)
+                    continue;
+
+                Label footerLabel = new Label
+                {
+                    Name = "footer_" + column.Key,
+                    Text = string.Empty,
+                    TextAlign = ContentAlignment.MiddleCenter,
+                    BackColor = GridHeaderBlue,
+                    BorderStyle = BorderStyle.None,
+                    AutoSize = false,
+                    Width = column.Width,
+                    Height = Math.Max(gridFooterPanel.Height - 2, 22),
+                    Left = xOffset,
+                    Top = 1,
+                    Tag = Tuple.Create(column.Key, string.Empty),
+                    ForeColor = Color.White,
+                    Font = new Font("Microsoft Sans Serif", 8.25F, FontStyle.Bold, GraphicsUnit.Point, 0),
+                    ContextMenuStrip = CreateFooterContextMenu(column.Key)
+                };
+
+                gridFooterPanel.ClientArea.Controls.Add(footerLabel);
+                _footerLabels[column.Key] = footerLabel;
+
+                // Default aggregation for ALL columns on form load is "None" (No hardcoding)
+                if (!_columnAggregations.ContainsKey(column.Key))
+                {
+                    _columnAggregations[column.Key] = "None";
+                }
+
+                xOffset += column.Width;
+            }
+        }
+
+        private ContextMenuStrip CreateFooterContextMenu(string columnKey)
+        {
+            ContextMenuStrip menu = new ContextMenuStrip();
+            menu.Tag = columnKey;
+
+            bool isNumeric = ultraGridMaster.DisplayLayout.Bands.Count > 0 &&
+                             ultraGridMaster.DisplayLayout.Bands[0].Columns.Exists(columnKey) &&
+                             IsSummableColumn(ultraGridMaster.DisplayLayout.Bands[0].Columns[columnKey]);
+
+            ToolStripMenuItem itemSum = new ToolStripMenuItem("Sum") { Tag = "Sum", Enabled = isNumeric };
+            itemSum.Click += FooterContextMenu_Click;
+
+            ToolStripMenuItem itemMin = new ToolStripMenuItem("Min") { Tag = "Min" };
+            itemMin.Click += FooterContextMenu_Click;
+
+            ToolStripMenuItem itemMax = new ToolStripMenuItem("Max") { Tag = "Max" };
+            itemMax.Click += FooterContextMenu_Click;
+
+            ToolStripMenuItem itemCount = new ToolStripMenuItem("Count") { Tag = "Count" };
+            itemCount.Click += FooterContextMenu_Click;
+
+            ToolStripMenuItem itemAverage = new ToolStripMenuItem("Average") { Tag = "Avg", Enabled = isNumeric };
+            itemAverage.Click += FooterContextMenu_Click;
+
+            ToolStripMenuItem itemNone = new ToolStripMenuItem("None") { Tag = "None" };
+            itemNone.Click += FooterContextMenu_Click;
+
+            menu.Items.Add(itemSum);
+            menu.Items.Add(itemMin);
+            menu.Items.Add(itemMax);
+            menu.Items.Add(itemCount);
+            menu.Items.Add(itemAverage);
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add(itemNone);
+
+            menu.Opening += (sender, e) =>
+            {
+                string currentAggregation = _columnAggregations.ContainsKey(columnKey) ? _columnAggregations[columnKey] : "None";
+                foreach (ToolStripItem menuItem in menu.Items)
+                {
+                    ToolStripMenuItem toolStripMenuItem = menuItem as ToolStripMenuItem;
+                    if (toolStripMenuItem != null && toolStripMenuItem.Tag != null)
+                    {
+                        toolStripMenuItem.Checked = string.Equals(toolStripMenuItem.Tag.ToString(), currentAggregation, StringComparison.OrdinalIgnoreCase);
+                    }
+                }
+            };
+
+            return menu;
+        }
+
+        private void FooterContextMenu_Click(object sender, EventArgs e)
+        {
+            ToolStripMenuItem item = sender as ToolStripMenuItem;
+            if (item == null) return;
+            ContextMenuStrip menu = item.Owner as ContextMenuStrip;
+            if (menu == null || menu.Tag == null || item.Tag == null) return;
+
+            string columnKey = menu.Tag.ToString();
+            string aggregation = item.Tag.ToString();
+
+            _columnAggregations[columnKey] = aggregation;
+            UpdateFooterValues();
+        }
+
+        private void UpdateFooterCellPositions()
+        {
+            if (ultraGridMaster.DisplayLayout == null || ultraGridMaster.DisplayLayout.Bands.Count == 0 || _footerLabels.Count == 0)
+                return;
+
+            UltraGridBand band = ultraGridMaster.DisplayLayout.Bands[0];
+            int rowSelectorWidth = ultraGridMaster.DisplayLayout.Override.RowSelectorWidth;
+            int scrollOffset = 0;
+            if (ultraGridMaster.ActiveColScrollRegion != null)
+            {
+                scrollOffset = ultraGridMaster.ActiveColScrollRegion.Position;
+            }
+
+            int calculatedX = rowSelectorWidth - scrollOffset;
+
+            foreach (UltraGridColumn column in band.Columns.Cast<UltraGridColumn>().OrderBy(c => c.Header.VisiblePosition))
+            {
+                if (column.Hidden || !_footerLabels.ContainsKey(column.Key))
+                    continue;
+
+                Label footerLabel = _footerLabels[column.Key];
+                var headerUI = column.Header.GetUIElement();
+                int left, width;
+
+                if (headerUI != null)
+                {
+                    left = headerUI.Rect.Left;
+                    width = headerUI.Rect.Width;
+                }
+                else
+                {
+                    left = calculatedX;
+                    width = column.Width;
+                }
+
+                calculatedX += column.Width;
+
+                footerLabel.Left = left;
+                footerLabel.Width = width;
+                footerLabel.Top = 1;
+                footerLabel.Height = Math.Max(gridFooterPanel.Height - 2, 22);
+                footerLabel.Visible = (left + width > 0 && left < gridFooterPanel.Width);
+                footerLabel.Invalidate();
+            }
+        }
+
+        private void UpdateFooterValues()
+        {
+            if (_footerLabels.Count == 0) return;
+
+            List<UltraGridRow> visibleRows = GetVisibleDataRows().ToList();
+            foreach (KeyValuePair<string, Label> footerEntry in _footerLabels)
+            {
+                string columnKey = footerEntry.Key;
+                Label footerLabel = footerEntry.Value;
+
+                if (!_columnAggregations.ContainsKey(columnKey) ||
+                    string.Equals(_columnAggregations[columnKey], "None", StringComparison.OrdinalIgnoreCase))
+                {
+                    footerLabel.Text = string.Empty;
+                    footerLabel.Tag = Tuple.Create(columnKey, string.Empty);
+                    footerLabel.Invalidate();
+                    continue;
+                }
+
+                object result = CalculateAggregation(columnKey, _columnAggregations[columnKey], visibleRows);
+                string displayValue = FormatAggregationResult(columnKey, _columnAggregations[columnKey], result);
+
+                footerLabel.Text = displayValue;
+                footerLabel.Tag = Tuple.Create(columnKey, displayValue);
+                footerLabel.ForeColor = Color.White;
+                footerLabel.Invalidate();
+            }
+        }
+
+        private object CalculateAggregation(string columnKey, string aggregation, List<UltraGridRow> visibleRows)
+        {
+            if (visibleRows == null || visibleRows.Count == 0)
+                return aggregation == "Count" ? (object)0 : null;
+
+            switch (aggregation)
+            {
+                case "Sum":
+                    return visibleRows
+                        .Where(row => row.Cells.Exists(columnKey))
+                        .Select(row => GetNumericValue(row.Cells[columnKey].Value))
+                        .Where(value => value.HasValue)
+                        .Sum(value => value.Value);
+                case "Min":
+                    return visibleRows
+                        .Where(row => row.Cells.Exists(columnKey))
+                        .Select(row => row.Cells[columnKey].Value)
+                        .Where(HasCellValue)
+                        .Cast<IComparable>()
+                        .OrderBy(value => value)
+                        .FirstOrDefault();
+                case "Max":
+                    return visibleRows
+                        .Where(row => row.Cells.Exists(columnKey))
+                        .Select(row => row.Cells[columnKey].Value)
+                        .Where(HasCellValue)
+                        .Cast<IComparable>()
+                        .OrderByDescending(value => value)
+                        .FirstOrDefault();
+                case "Count":
+                    return visibleRows.Count(row => row.Cells.Exists(columnKey) && HasCellValue(row.Cells[columnKey].Value));
+                case "Avg":
+                    List<decimal> values = visibleRows
+                        .Where(row => row.Cells.Exists(columnKey))
+                        .Select(row => GetNumericValue(row.Cells[columnKey].Value))
+                        .Where(value => value.HasValue)
+                        .Select(value => value.Value)
+                        .ToList();
+                    return values.Count == 0 ? 0m : values.Average();
+                default:
+                    return null;
+            }
+        }
+
+        private string FormatAggregationResult(string columnKey, string aggregation, object result)
+        {
+            if (result == null) return string.Empty;
+            if (aggregation == "Count") return Convert.ToString(result);
+
+            if (ultraGridMaster.DisplayLayout != null &&
+                ultraGridMaster.DisplayLayout.Bands.Count > 0 &&
+                ultraGridMaster.DisplayLayout.Bands[0].Columns.Exists(columnKey))
+            {
+                UltraGridColumn column = ultraGridMaster.DisplayLayout.Bands[0].Columns[columnKey];
+                decimal? numericValue = GetNumericValue(result);
+                if (numericValue.HasValue)
+                {
+                    if (!string.IsNullOrWhiteSpace(column.Format))
+                        return numericValue.Value.ToString(column.Format);
+
+                    return numericValue.Value.ToString("N2");
+                }
+            }
+
+            return Convert.ToString(result);
+        }
+
+        private IEnumerable<UltraGridRow> GetVisibleDataRows()
+        {
+            foreach (UltraGridRow row in ultraGridMaster.Rows)
+            {
+                if (row != null && row.IsDataRow && !row.IsFilteredOut)
+                    yield return row;
+            }
+        }
+
+        private static bool HasCellValue(object value)
+        {
+            return value != null && value != DBNull.Value && !string.IsNullOrWhiteSpace(Convert.ToString(value));
+        }
+
+        private static decimal? GetNumericValue(object value)
+        {
+            if (value == null || value == DBNull.Value) return null;
+            decimal result;
+            return decimal.TryParse(Convert.ToString(value), out result) ? result : (decimal?)null;
+        }
+
+        private static bool IsSummableColumn(UltraGridColumn column)
+        {
+            if (column == null || column.DataType == null) return false;
+            Type t = column.DataType;
+            return t == typeof(decimal) || t == typeof(double) || t == typeof(float) ||
+                   t == typeof(int) || t == typeof(long) || t == typeof(short);
+        }
+
         private void BtnViewGrid_Click(object sender, EventArgs e)
         {
             LoadData();
         }
 
-        private void BtnPreviewGrid_Click(object sender, EventArgs e)
-        {
-            LoadData();
-            MessageBox.Show("Grid preview is not implemented yet. The latest data has been refreshed.", "Smart Reorder", MessageBoxButtons.OK, MessageBoxIcon.Information);
-        }
-
-        private void BtnPreviewReport_Click(object sender, EventArgs e)
-        {
-            LoadData();
-            MessageBox.Show("Report preview is not implemented yet. The latest data has been refreshed.", "Smart Reorder", MessageBoxButtons.OK, MessageBoxIcon.Information);
-        }
-
         private void BtnGeneratePO_Click(object sender, EventArgs e)
         {
-            // Commit any pending edits in the grid
             ultraGridMaster.UpdateData();
 
             List<SmartReorderItemModel> selectedItems = new List<SmartReorderItemModel>();
 
-            // Only grab rows that are currently visible/filtered
             foreach (UltraGridRow row in ultraGridMaster.Rows.GetFilteredInNonGroupByRows())
             {
                 SmartReorderItemModel item = row.ListObject as SmartReorderItemModel;
@@ -440,7 +1096,10 @@ namespace PosBranch_Win.Reports.InventoryReport
         private void BtnHideSelection_Click(object sender, EventArgs e)
         {
             ultraPanelSelection.Visible = !ultraPanelSelection.Visible;
-            btnHideSelection.Text = ultraPanelSelection.Visible ? "Hide Selection" : "Show Selection";
+            if (lblHideSelection != null)
+            {
+                lblHideSelection.Text = ultraPanelSelection.Visible ? "Hide Selection" : "Show Selection";
+            }
         }
 
         private void ChkShowOnlyExceptions_CheckedChanged(object sender, EventArgs e)
@@ -461,6 +1120,13 @@ namespace PosBranch_Win.Reports.InventoryReport
         private void UltraGridMaster_InitializeLayout(object sender, InitializeLayoutEventArgs e)
         {
             UltraGridBand band = e.Layout.Bands[0];
+
+            // ── Enforce Slim & Clean Headers (No filter icons, no pins, clean single line) ─
+            e.Layout.Override.AllowRowFiltering = DefaultableBoolean.False;
+            e.Layout.Override.FilterUIType = FilterUIType.Default;
+            e.Layout.Override.FilterOperatorLocation = FilterOperatorLocation.Hidden;
+            e.Layout.Override.WrapHeaderText = DefaultableBoolean.False;
+            e.Layout.Override.HeaderStyle = HeaderStyle.Standard;
 
             ConfigureColumn(band, "IsSelected", "Sel...", 50, true, "0");
             if (band.Columns.Exists("IsSelected"))
@@ -492,6 +1158,10 @@ namespace PosBranch_Win.Reports.InventoryReport
             HideColumn(band, "NearestExpiryDate");
             HideColumn(band, "LastSaleDate");
             HideColumn(band, "RequiredQuantity");
+
+            CreateFooterCells();
+            UpdateFooterCellPositions();
+            UpdateFooterValues();
         }
 
         private void ConfigureColumn(UltraGridBand band, string key, string caption, int width, bool editable, string format)
@@ -530,7 +1200,7 @@ namespace PosBranch_Win.Reports.InventoryReport
 
             string alert = (item.Alert ?? string.Empty).Trim();
             e.Row.Appearance.BackColor = Color.Empty;
-            e.Row.Appearance.ForeColor = Color.Black;
+            e.Row.Appearance.ForeColor = ControlTextColor;
 
             UltraGridCell alertCell = e.Row.Cells["Alert"];
             if (alertCell == null)
@@ -539,7 +1209,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             }
 
             alertCell.Appearance.BackColor = Color.Empty;
-            alertCell.Appearance.ForeColor = Color.Black;
+            alertCell.Appearance.ForeColor = ControlTextColor;
 
             if (alert.StartsWith("URGENT", StringComparison.OrdinalIgnoreCase))
             {
@@ -603,6 +1273,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                 {
                     _suppressGridCellUpdate = false;
                 }
+                UpdateFooterValues();
             }
         }
 
@@ -680,6 +1351,9 @@ namespace PosBranch_Win.Reports.InventoryReport
                 }
 
                 column.Hidden = e.NewValue != CheckState.Checked;
+                CreateFooterCells();
+                UpdateFooterCellPositions();
+                UpdateFooterValues();
             }));
         }
 
@@ -703,9 +1377,10 @@ namespace PosBranch_Win.Reports.InventoryReport
 
             try
             {
+                // Delete stale runtime XML layout file if it exists so code layout always applies
                 if (File.Exists(GridLayoutPath))
                 {
-                    ultraGridMaster.DisplayLayout.LoadFromXml(GridLayoutPath);
+                    File.Delete(GridLayoutPath);
                 }
             }
             catch
@@ -717,13 +1392,7 @@ namespace PosBranch_Win.Reports.InventoryReport
 
         private void SaveGridLayout()
         {
-            try
-            {
-                ultraGridMaster.DisplayLayout.SaveAsXml(GridLayoutPath);
-            }
-            catch
-            {
-            }
+            // Disabled runtime XML grid layout saving so the clean design and column order remains consistent across all computers
         }
 
         private void FrmSmartReorderDashboard_FormClosing(object sender, FormClosingEventArgs e)
