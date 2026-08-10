@@ -69,6 +69,11 @@ namespace PosBranch_Win.Reports.InventoryReport
         private bool _layoutLoaded;
         private bool _suppressGridCellUpdate;
 
+        // ─── Header Drag-to-Hide & Column Chooser State ──────────────────────────────
+        private bool _isDraggingHeaderToHide;
+        private UltraGridColumn _columnBeingDragged;
+        private Point _headerDragStartPoint;
+
         // ─── Attached Cell Footer Synchronization State ─────────────────────────────
         private readonly Dictionary<string, Label> _footerLabels = new Dictionary<string, Label>();
         private readonly Dictionary<string, string> _columnAggregations = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -109,6 +114,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             BindStaticCombos();
             LoadLookupData();
             SetupGridMenu();
+            SetupHeaderDragToHideAndColumnChooser();
             LoadData();
         }
 
@@ -513,8 +519,9 @@ namespace PosBranch_Win.Reports.InventoryReport
             ultraGridMaster.DisplayLayout.Override.HeaderAppearance.FontData.SizeInPoints = 8.25F;
             ultraGridMaster.DisplayLayout.Override.HeaderAppearance.ThemedElementAlpha = Alpha.Transparent;
 
-            // ── Row Selectors with Numbers (1, 2, 3...) ────────────────────────────
+            // ── Row Selectors with Numbers (1, 2, 3...) & Column Chooser Button ─────
             ultraGridMaster.DisplayLayout.Override.RowSelectors = DefaultableBoolean.True;
+            ultraGridMaster.DisplayLayout.Override.RowSelectorHeaderStyle = RowSelectorHeaderStyle.ColumnChooserButton;
             ultraGridMaster.DisplayLayout.Override.RowSelectorWidth = 25;
             ultraGridMaster.DisplayLayout.Override.RowSelectorNumberStyle = RowSelectorNumberStyle.RowIndex;
             ultraGridMaster.DisplayLayout.Override.RowSelectorAppearance.BackColor = GridHeaderBlueDark;
@@ -1128,19 +1135,13 @@ namespace PosBranch_Win.Reports.InventoryReport
             e.Layout.Override.WrapHeaderText = DefaultableBoolean.False;
             e.Layout.Override.HeaderStyle = HeaderStyle.Standard;
 
-            ConfigureColumn(band, "IsSelected", "Sel...", 50, true, "0");
-            if (band.Columns.Exists("IsSelected"))
-            {
-                band.Columns["IsSelected"].Style = Infragistics.Win.UltraWinGrid.ColumnStyle.CheckBox;
-                band.Columns["IsSelected"].CellActivation = Activation.AllowEdit;
-            }
-
-            ConfigureColumn(band, "Barcode", "Item No.", 120, false, null);
-            ConfigureColumn(band, "ItemName", "Description", 220, false, null);
-            ConfigureColumn(band, "Unit", "Unit", 80, false, null);
-            ConfigureColumn(band, "Order_Cycle_Days", "Cycle Days", 80, false, "0");
-            ConfigureColumn(band, "Box_Quantity", "Box Qty", 70, false, "0");
-            ConfigureColumn(band, "Category", "Category", 100, false, null);
+            ConfigureColumn(band, "IsSelected", "Select", 45, true, null);
+            ConfigureColumn(band, "ItemName", "Item Name", 220, false, null);
+            ConfigureColumn(band, "Barcode", "Barcode", 110, false, null);
+            ConfigureColumn(band, "Unit", "Unit", 70, false, null);
+            ConfigureColumn(band, "Order_Cycle_Days", "Order Cycle (Days)", 90, false, null);
+            ConfigureColumn(band, "Box_Quantity", "Box Qty", 80, false, null);
+            ConfigureColumn(band, "Category", "Category", 120, false, null);
             ConfigureColumn(band, "Group", "Group", 100, false, null);
             ConfigureColumn(band, "CurrentStock", "Current Stock", 95, false, "0.####");
             ConfigureColumn(band, "AverageDailySales", "ADS", 80, false, "0.####");
@@ -1151,6 +1152,12 @@ namespace PosBranch_Win.Reports.InventoryReport
             ConfigureColumn(band, "DaysOfStockLeft", "Days Left", 80, false, "0.##");
             ConfigureColumn(band, "Alert", "Alert", 150, false, null);
             ConfigureColumn(band, "Reason", "Reason", 260, false, null);
+
+            ConfigureColumn(band, "RequiredQuantity", "Required Qty", 90, false, "0.####");
+            ConfigureColumn(band, "NearestExpiryDate", "Nearest Expiry Date", 110, false, null);
+            ConfigureColumn(band, "LastSaleDate", "Last Sale Date", 110, false, null);
+            ConfigureColumn(band, "Is_Perishable", "Perishable", 80, false, null);
+            ConfigureColumn(band, "UnitId", "Unit ID", 80, false, null);
 
             HideColumn(band, "ItemId");
             HideColumn(band, "UnitId");
@@ -1284,6 +1291,76 @@ namespace PosBranch_Win.Reports.InventoryReport
             ultraGridMaster.ContextMenuStrip = _gridMenu;
         }
 
+        private void SetupHeaderDragToHideAndColumnChooser()
+        {
+            ultraGridMaster.MouseDown += UltraGridMaster_MouseDown;
+            ultraGridMaster.MouseMove += UltraGridMaster_MouseMove;
+            ultraGridMaster.MouseUp += UltraGridMaster_MouseUp;
+        }
+
+        private void UltraGridMaster_MouseDown(object sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Right)
+            {
+                if (_gridMenu != null)
+                {
+                    _gridMenu.Show(ultraGridMaster, e.Location);
+                }
+                return;
+            }
+
+            if (e.Button == MouseButtons.Left)
+            {
+                Infragistics.Win.UIElement element = ultraGridMaster.DisplayLayout.UIElement?.ElementFromPoint(e.Location);
+                Infragistics.Win.UltraWinGrid.HeaderUIElement headerElement = element as Infragistics.Win.UltraWinGrid.HeaderUIElement ?? element?.GetAncestor(typeof(Infragistics.Win.UltraWinGrid.HeaderUIElement)) as Infragistics.Win.UltraWinGrid.HeaderUIElement;
+
+                if (headerElement != null && headerElement.Header is Infragistics.Win.UltraWinGrid.ColumnHeader colHeader && colHeader.Column != null)
+                {
+                    _columnBeingDragged = colHeader.Column;
+                    _headerDragStartPoint = e.Location;
+                    _isDraggingHeaderToHide = false;
+                }
+            }
+        }
+
+        private void UltraGridMaster_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Left && _columnBeingDragged != null)
+            {
+                int dragYDelta = e.Y - _headerDragStartPoint.Y;
+
+                // Dragged down past header height (> 25px down into grid body)
+                if (dragYDelta > 25)
+                {
+                    _isDraggingHeaderToHide = true;
+                    Cursor.Current = Cursors.No;
+                }
+                else
+                {
+                    _isDraggingHeaderToHide = false;
+                }
+            }
+        }
+
+        private void UltraGridMaster_MouseUp(object sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Left && _columnBeingDragged != null)
+            {
+                if (_isDraggingHeaderToHide)
+                {
+                    _columnBeingDragged.Hidden = true;
+                    CreateFooterCells();
+                    UpdateFooterCellPositions();
+                    UpdateFooterValues();
+                    RefreshColumnChooser();
+                }
+
+                _columnBeingDragged = null;
+                _isDraggingHeaderToHide = false;
+                Cursor.Current = Cursors.Default;
+            }
+        }
+
         private void ShowColumnChooser()
         {
             if (_columnChooserForm == null || _columnChooserForm.IsDisposed)
@@ -1314,6 +1391,23 @@ namespace PosBranch_Win.Reports.InventoryReport
             _columnChooserForm.Controls.Add(_columnChooserListBox);
         }
 
+        private sealed class ColumnChooserItem
+        {
+            public UltraGridColumn Column { get; }
+            public string DisplayText { get; }
+
+            public ColumnChooserItem(UltraGridColumn column)
+            {
+                Column = column;
+                DisplayText = !string.IsNullOrWhiteSpace(column.Header?.Caption) ? column.Header.Caption : column.Key;
+            }
+
+            public override string ToString()
+            {
+                return DisplayText;
+            }
+        }
+
         private void RefreshColumnChooser()
         {
             if (_columnChooserListBox == null || ultraGridMaster.DisplayLayout.Bands.Count == 0)
@@ -1332,11 +1426,11 @@ namespace PosBranch_Win.Reports.InventoryReport
                     continue;
                 }
 
-                int index = _columnChooserListBox.Items.Add(column);
+                ColumnChooserItem item = new ColumnChooserItem(column);
+                int index = _columnChooserListBox.Items.Add(item);
                 _columnChooserListBox.SetItemChecked(index, !column.Hidden);
             }
 
-            _columnChooserListBox.DisplayMember = "Header.Caption";
             _columnChooserListBox.ItemCheck += ColumnChooserListBox_ItemCheck;
         }
 
@@ -1344,13 +1438,13 @@ namespace PosBranch_Win.Reports.InventoryReport
         {
             BeginInvoke(new Action(() =>
             {
-                UltraGridColumn column = _columnChooserListBox.Items[e.Index] as UltraGridColumn;
-                if (column == null)
+                ColumnChooserItem item = _columnChooserListBox.Items[e.Index] as ColumnChooserItem;
+                if (item == null || item.Column == null)
                 {
                     return;
                 }
 
-                column.Hidden = e.NewValue != CheckState.Checked;
+                item.Column.Hidden = e.NewValue != CheckState.Checked;
                 CreateFooterCells();
                 UpdateFooterCellPositions();
                 UpdateFooterValues();
