@@ -3,6 +3,7 @@ using System.Data;
 using System.Data.SqlClient;
 using ModelClass;
 using Repository;
+using Repository.MasterRepositry;
 
 namespace PosBranch_Win.Utilities
 {
@@ -117,8 +118,9 @@ namespace PosBranch_Win.Utilities
 
                 EnsureReturnLedgers(conn, companyId, branchId);
 
-                // Seed default Item Types for a fresh install
+                // Seed default Item Types and Paymodes for a fresh install
                 EnsureItemTypeSeedData();
+                PaymodeRepository.EnsurePaymodeSeedData(conn);
 
                 return true;
             }

@@ -588,21 +588,11 @@ namespace Repository
         {
             try
             {
-                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_Initialsetup, conn))
-                {
-                    cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@CompanyName", "Nexoris Retail");
-                    cmd.Parameters.AddWithValue("@CompanyCaption", "Nexoris Retail");
-                    cmd.Parameters.AddWithValue("@BranchName", "Main Branch");
-                    cmd.Parameters.AddWithValue("@BranchAddress", "Main Branch Address");
-                    cmd.Parameters.AddWithValue("@BranchPhone", "123456789");
-                    cmd.Parameters.AddWithValue("@AdminPassword", "admin");
-                    cmd.ExecuteNonQuery();
-                }
+                PaymodeRepository.EnsurePaymodeSeedData(conn);
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"AutoSeedPayModes error via SP: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"AutoSeedPayModes error: {ex.Message}");
             }
         }
 
