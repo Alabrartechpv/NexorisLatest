@@ -533,7 +533,7 @@ namespace Repository.Accounts
                     return dt;
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 throw;
             }

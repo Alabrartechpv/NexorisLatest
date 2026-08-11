@@ -1,21 +1,23 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
-using System.Data.SqlClient;
 using System.Drawing;
 using System.Linq;
 using System.Windows.Forms;
 using Infragistics.Win;
 using Infragistics.Win.UltraWinGrid;
 using ModelClass;
-using Repository;
+using ModelClass.Master;
+using Repository.MasterRepositry;
 
 namespace PosBranch_Win.Master
 {
     public partial class FrmPaymodeMaster : Form
     {
+        private readonly PaymodeRepository paymodeRepo = new PaymodeRepository();
+        private readonly LedgerRepository ledgerRepo = new LedgerRepository();
         private DataTable dtPaymodes;
-        private DataTable dtLedgers;
+        private List<AccountLedgerDDL> ledgersList;
 
         public FrmPaymodeMaster()
         {
@@ -112,35 +114,18 @@ namespace PosBranch_Win.Master
         {
             try
             {
-                var baseRepo = new BaseRepostitory();
-                if (baseRepo.DataConnection.State == ConnectionState.Open)
-                    baseRepo.DataConnection.Close();
-
-                baseRepo.DataConnection.Open();
-
-                string sql = @"
-                    SELECT LedgerID, LedgerName 
-                    FROM LedgerMaster 
-                    ORDER BY LedgerName";
-
-                using (SqlCommand cmd = new SqlCommand(sql, (SqlConnection)baseRepo.DataConnection))
+                var request = new AccountLedgerDDLRequest
                 {
-                    using (SqlDataAdapter da = new SqlDataAdapter(cmd))
-                    {
-                        dtLedgers = new DataTable();
-                        da.Fill(dtLedgers);
-                    }
-                }
+                    BranchId = SessionContext.BranchId > 0 ? SessionContext.BranchId : 1,
+                    For = "ALL"
+                };
+                var gridResult = ledgerRepo.getAccountLedgerDDL(request);
+                ledgersList = gridResult?.List?.ToList() ?? new List<AccountLedgerDDL>();
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error loading ledgers list: {ex.Message}");
-            }
-            finally
-            {
-                var baseRepo = new BaseRepostitory();
-                if (baseRepo.DataConnection.State == ConnectionState.Open)
-                    baseRepo.DataConnection.Close();
+                ledgersList = new List<AccountLedgerDDL>();
             }
         }
 
@@ -148,34 +133,46 @@ namespace PosBranch_Win.Master
         {
             try
             {
-                var baseRepo = new BaseRepostitory();
-                if (baseRepo.DataConnection.State == ConnectionState.Open)
-                    baseRepo.DataConnection.Close();
+                List<PaymodeModel> list = paymodeRepo.GetAllPaymodes();
+                if (list == null) list = new List<PaymodeModel>();
 
-                baseRepo.DataConnection.Open();
-
-                string sql = "SELECT * FROM PayMode";
-
-                using (SqlCommand cmd = new SqlCommand(sql, (SqlConnection)baseRepo.DataConnection))
+                // Find CASH-IN-HAND ledger ID from ledgersList if available
+                int cashInHandLedgerId = 0;
+                if (ledgersList != null && ledgersList.Count > 0)
                 {
-                    using (SqlDataAdapter da = new SqlDataAdapter(cmd))
+                    var cashLedger = ledgersList.FirstOrDefault(l =>
+                        string.Equals(l.Name, "CASH-IN-HAND", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(l.Name, "CASH", StringComparison.OrdinalIgnoreCase));
+                    if (cashLedger != null)
                     {
-                        dtPaymodes = new DataTable();
-                        da.Fill(dtPaymodes);
+                        cashInHandLedgerId = cashLedger.Id;
                     }
                 }
 
-                if (!dtPaymodes.Columns.Contains("LedgerID"))
+                foreach (var pm in list)
                 {
-                    dtPaymodes.Columns.Add("LedgerID", typeof(int));
+                    if (string.Equals(pm.PayModeName, "Credit", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Credit paymode uses customer ledger dynamically at sale time, so LedgerID is always 0 (unselected)
+                        pm.LedgerID = 0;
+                    }
+                    else if (string.Equals(pm.PayModeName, "Cash", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (pm.LedgerID <= 0 && cashInHandLedgerId > 0)
+                        {
+                            pm.LedgerID = cashInHandLedgerId;
+                        }
+                    }
                 }
 
-                foreach (DataRow row in dtPaymodes.Rows)
+                dtPaymodes = new DataTable();
+                dtPaymodes.Columns.Add("PayModeID", typeof(int));
+                dtPaymodes.Columns.Add("PayModeName", typeof(string));
+                dtPaymodes.Columns.Add("LedgerID", typeof(int));
+
+                foreach (var item in list)
                 {
-                    if (row["LedgerID"] == DBNull.Value)
-                    {
-                        row["LedgerID"] = 0;
-                    }
+                    dtPaymodes.Rows.Add(item.PayModeID, item.PayModeName, item.LedgerID);
                 }
 
                 ultraGridPaymode.DataSource = dtPaymodes;
@@ -186,62 +183,35 @@ namespace PosBranch_Win.Master
                 MessageBox.Show($"Error fetching paymodes: {ex.Message}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
-            finally
-            {
-                var baseRepo = new BaseRepostitory();
-                if (baseRepo.DataConnection.State == ConnectionState.Open)
-                    baseRepo.DataConnection.Close();
-            }
-        }
-
-        private string GetPaymodeIdColumnName()
-        {
-            if (dtPaymodes == null) return "PaymodeID";
-            if (dtPaymodes.Columns.Contains("PaymodeID")) return "PaymodeID";
-            if (dtPaymodes.Columns.Contains("PayModeID")) return "PayModeID";
-            if (dtPaymodes.Columns.Contains("ID")) return "ID";
-            return dtPaymodes.Columns[0].ColumnName;
-        }
-
-        private string GetPaymodeNameColumnName()
-        {
-            if (dtPaymodes == null) return "PaymodeName";
-            if (dtPaymodes.Columns.Contains("PayModeName")) return "PayModeName";
-            if (dtPaymodes.Columns.Contains("PaymodeName")) return "PaymodeName";
-            if (dtPaymodes.Columns.Contains("PayMode")) return "PayMode";
-            if (dtPaymodes.Columns.Contains("Paymode")) return "Paymode";
-            return dtPaymodes.Columns.Count > 1 ? dtPaymodes.Columns[1].ColumnName : dtPaymodes.Columns[0].ColumnName;
         }
 
         private void UltraGridPaymode_InitializeLayout(object sender, InitializeLayoutEventArgs e)
         {
             var band = e.Layout.Bands[0];
-            string idCol = GetPaymodeIdColumnName();
-            string nameCol = GetPaymodeNameColumnName();
 
             foreach (var col in band.Columns)
             {
                 col.Hidden = true;
             }
 
-            if (band.Columns.Exists(idCol))
+            if (band.Columns.Exists("PayModeID"))
             {
-                band.Columns[idCol].Hidden = false;
-                band.Columns[idCol].Header.Caption = "ID";
-                band.Columns[idCol].Width = 60;
-                band.Columns[idCol].CellActivation = Activation.NoEdit;
-                band.Columns[idCol].CellAppearance.TextHAlign = HAlign.Center;
-                band.Columns[idCol].Header.Appearance.TextHAlign = HAlign.Center;
+                band.Columns["PayModeID"].Hidden = false;
+                band.Columns["PayModeID"].Header.Caption = "ID";
+                band.Columns["PayModeID"].Width = 60;
+                band.Columns["PayModeID"].CellActivation = Activation.NoEdit;
+                band.Columns["PayModeID"].CellAppearance.TextHAlign = HAlign.Center;
+                band.Columns["PayModeID"].Header.Appearance.TextHAlign = HAlign.Center;
             }
 
-            if (band.Columns.Exists(nameCol))
+            if (band.Columns.Exists("PayModeName"))
             {
-                band.Columns[nameCol].Hidden = false;
-                band.Columns[nameCol].Header.Caption = "Payment Mode";
-                band.Columns[nameCol].Width = 220;
-                band.Columns[nameCol].CellActivation = Activation.NoEdit;
-                band.Columns[nameCol].CellAppearance.FontData.Bold = DefaultableBoolean.True;
-                band.Columns[nameCol].Header.Appearance.TextHAlign = HAlign.Left;
+                band.Columns["PayModeName"].Hidden = false;
+                band.Columns["PayModeName"].Header.Caption = "Payment Mode";
+                band.Columns["PayModeName"].Width = 220;
+                band.Columns["PayModeName"].CellActivation = Activation.NoEdit;
+                band.Columns["PayModeName"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
+                band.Columns["PayModeName"].Header.Appearance.TextHAlign = HAlign.Left;
             }
 
             if (band.Columns.Exists("LedgerID"))
@@ -262,13 +232,11 @@ namespace PosBranch_Win.Master
                 vl.ValueListItems.Clear();
                 vl.ValueListItems.Add(0, "-- Select Account Ledger --");
 
-                if (dtLedgers != null && dtLedgers.Rows.Count > 0)
+                if (ledgersList != null && ledgersList.Count > 0)
                 {
-                    foreach (DataRow r in dtLedgers.Rows)
+                    foreach (var l in ledgersList)
                     {
-                        int id = Convert.ToInt32(r["LedgerID"]);
-                        string name = r["LedgerName"].ToString();
-                        vl.ValueListItems.Add(id, name);
+                        vl.ValueListItems.Add(l.Id, l.Name);
                     }
                 }
 
@@ -283,31 +251,31 @@ namespace PosBranch_Win.Master
             try
             {
                 ultraGridPaymode.UpdateData();
-                var baseRepo = new BaseRepostitory();
-                if (baseRepo.DataConnection.State == ConnectionState.Open)
-                    baseRepo.DataConnection.Close();
-
-                baseRepo.DataConnection.Open();
-
-                string idCol = GetPaymodeIdColumnName();
                 int updatedCount = 0;
 
                 foreach (DataRow row in dtPaymodes.Rows)
                 {
-                    if (row.RowState == DataRowState.Modified || row.RowState == DataRowState.Unchanged)
-                    {
-                        int paymodeId = Convert.ToInt32(row[idCol]);
-                        int ledgerId = row["LedgerID"] != DBNull.Value ? Convert.ToInt32(row["LedgerID"]) : 0;
+                    int paymodeId = Convert.ToInt32(row["PayModeID"]);
+                    string paymodeName = row["PayModeName"]?.ToString() ?? "";
+                    int ledgerId = row["LedgerID"] != DBNull.Value ? Convert.ToInt32(row["LedgerID"]) : 0;
 
-                        string updateSql = $"UPDATE PayMode SET LedgerID = @LedgerID WHERE {idCol} = @PaymodeID";
-                        using (SqlCommand cmd = new SqlCommand(updateSql, (SqlConnection)baseRepo.DataConnection))
-                        {
-                            cmd.Parameters.AddWithValue("@LedgerID", ledgerId > 0 ? (object)ledgerId : DBNull.Value);
-                            cmd.Parameters.AddWithValue("@PaymodeID", paymodeId);
-                            cmd.ExecuteNonQuery();
-                            updatedCount++;
-                        }
+                    PaymodeModel model = paymodeRepo.GetPaymodeById(paymodeId);
+                    if (model == null)
+                    {
+                        model = new PaymodeModel { PayModeID = paymodeId, PayModeName = paymodeName };
                     }
+
+                    if (string.Equals(paymodeName, "Credit", StringComparison.OrdinalIgnoreCase))
+                    {
+                        model.LedgerID = 0; // Credit sales post to the selected Customer's ledger dynamically at sale time
+                    }
+                    else
+                    {
+                        model.LedgerID = ledgerId;
+                    }
+
+                    paymodeRepo.SavePaymode(model);
+                    updatedCount++;
                 }
 
                 MessageBox.Show($"Paymode account mappings saved successfully! ({updatedCount} rows updated)",
@@ -319,12 +287,6 @@ namespace PosBranch_Win.Master
             {
                 MessageBox.Show($"Error saving paymode mappings: {ex.Message}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-            finally
-            {
-                var baseRepo = new BaseRepostitory();
-                if (baseRepo.DataConnection.State == ConnectionState.Open)
-                    baseRepo.DataConnection.Close();
             }
         }
 

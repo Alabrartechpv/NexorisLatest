@@ -86,10 +86,19 @@ namespace Repository.MasterRepositry
                 {
                     while (reader.Read())
                     {
+                        string pmName = reader["PayModeName"]?.ToString();
+                        int rawLedgerId = reader["LedgerID"] != DBNull.Value ? Convert.ToInt32(reader["LedgerID"]) : 0;
+
+                        // Credit sales post to individual Customer Account ledgers dynamically at sale time, so static LedgerID is 0
+                        if (!string.IsNullOrEmpty(pmName) && string.Equals(pmName, "Credit", StringComparison.OrdinalIgnoreCase))
+                        {
+                            rawLedgerId = 0;
+                        }
+
                         PaymodeModel item = new PaymodeModel
                         {
                             PayModeID = reader["PayModeID"] != DBNull.Value ? Convert.ToInt32(reader["PayModeID"]) : 0,
-                            PayModeName = reader["PayModeName"]?.ToString(),
+                            PayModeName = pmName,
                             Description = reader["Description"]?.ToString(),
                             FunctionKey = reader["FunctionKey"]?.ToString(),
                             PaymodeType = reader["PaymodeType"]?.ToString(),
@@ -99,8 +108,8 @@ namespace Repository.MasterRepositry
                             RequireFillInReference = reader["RequireFillInReference"] != DBNull.Value && Convert.ToBoolean(reader["RequireFillInReference"]),
                             IsHide = reader["IsHide"] != DBNull.Value && Convert.ToBoolean(reader["IsHide"]),
                             DontOpenDrawer = reader["DontOpenDrawer"] != DBNull.Value && Convert.ToBoolean(reader["DontOpenDrawer"]),
-                            LedgerID = reader["LedgerID"] != DBNull.Value ? Convert.ToInt32(reader["LedgerID"]) : 0,
-                            LedgerName = reader["LedgerName"]?.ToString()
+                            LedgerID = rawLedgerId,
+                            LedgerName = rawLedgerId > 0 ? reader["LedgerName"]?.ToString() : null
                         };
                         list.Add(item);
                     }
@@ -289,10 +298,16 @@ namespace Repository.MasterRepositry
                     photoParam.Value = (model.Photo != null && model.Photo.Length > 0) ? (object)model.Photo : DBNull.Value;
                     cmd.Parameters.Add(photoParam);
 
+                    int effectiveLedgerId = model.LedgerID;
+                    if (!string.IsNullOrEmpty(model.PayModeName) && string.Equals(model.PayModeName, "Credit", StringComparison.OrdinalIgnoreCase))
+                    {
+                        effectiveLedgerId = 0;
+                    }
+
                     cmd.Parameters.AddWithValue("@RequireFillInReference", model.RequireFillInReference);
                     cmd.Parameters.AddWithValue("@IsHide", model.IsHide);
                     cmd.Parameters.AddWithValue("@DontOpenDrawer", model.DontOpenDrawer);
-                    cmd.Parameters.AddWithValue("@LedgerID", model.LedgerID > 0 ? (object)model.LedgerID : DBNull.Value);
+                    cmd.Parameters.AddWithValue("@LedgerID", effectiveLedgerId > 0 ? (object)effectiveLedgerId : DBNull.Value);
 
                     object res = cmd.ExecuteScalar();
                     return res != null && res != DBNull.Value ? Convert.ToInt32(res) : model.PayModeID;
