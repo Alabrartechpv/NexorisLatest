@@ -90,6 +90,7 @@ namespace Repository
         public static string POS_UserActivityLog = "POS_UserActivityLog";
         public static string POS_TransactionActivityLog = "POS_TransactionActivityLog";                             
         public static string POS_VendorOutstandingListing = "POS_VendorOutstandingListing";
+        public static string POS_Counter = "POS_Counter";
 
 
         #region Report Side

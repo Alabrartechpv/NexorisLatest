@@ -74,13 +74,7 @@ namespace PosBranch_Win.Utilities
             try
             {
                 repo = new BaseRepostitory();
-                if (repo.DataConnection.State != ConnectionState.Open)
-                    repo.DataConnection.Open();
-
                 SqlConnection conn = (SqlConnection)repo.DataConnection;
-
-                // 1. Ensure database schema and procedures exist with valid BranchID columns before seeding
-                EnsureSchemaAndProcedures(conn);
 
                 int companyId = 1;
                 EncryptionAndDecryptionHelper enc = new EncryptionAndDecryptionHelper();
@@ -236,119 +230,26 @@ namespace PosBranch_Win.Utilities
             }
         }
 
-        public static void EnsureDefaultPayModesOnLaunch()
-        {
-            try
-            {
-                using (BaseRepostitory repo = new BaseRepostitory())
-                {
-                    if (repo.DataConnection != null)
-                    {
-                        if (repo.DataConnection.State != ConnectionState.Open)
-                            repo.DataConnection.Open();
-                        EnsureSchemaAndProcedures((SqlConnection)repo.DataConnection);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"EnsureDefaultPayModesOnLaunch schema check warning: {ex.Message}");
-            }
-
-            // Ensure Item Types table exists and cleanup any hardcoded seed data
-            EnsureItemTypeSeedData();
-        }
-
-        /// <summary>
-        /// Ensures core table schemas (BranchID) and POS_Login stored procedure exist in SQL Server.
-        /// </summary>
-        public static void EnsureSchemaAndProcedures(SqlConnection conn)
-        {
-            if (conn == null) return;
-            if (conn.State != ConnectionState.Open) conn.Open();
-
-            string schemaScript = @"
-IF EXISTS (SELECT * FROM sys.tables WHERE name = 'Users') AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Users') AND name = 'BranchID')
-    ALTER TABLE dbo.Users ADD BranchID INT NOT NULL DEFAULT(0);
-
-IF EXISTS (SELECT * FROM sys.tables WHERE name = 'LedgerMaster') AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.LedgerMaster') AND name = 'BranchID')
-    ALTER TABLE dbo.LedgerMaster ADD BranchID INT NOT NULL DEFAULT(0);
-
-IF EXISTS (SELECT * FROM sys.tables WHERE name = 'TrackTrans') AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.TrackTrans') AND name = 'BranchID')
-    ALTER TABLE dbo.TrackTrans ADD BranchID INT NOT NULL DEFAULT(0);
-
-IF EXISTS (SELECT * FROM sys.tables WHERE name = 'Vouchers') AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Vouchers') AND name = 'BranchID')
-    ALTER TABLE dbo.Vouchers ADD BranchID INT NOT NULL DEFAULT(0);
-
--- Ensure admin has BranchID = 0 (Global Branch Access) so admin can log in to any branch
-IF EXISTS (SELECT 1 FROM dbo.Users WHERE LOWER(RTRIM(LTRIM(UserName))) = 'admin')
-    UPDATE dbo.Users SET BranchID = 0 WHERE LOWER(RTRIM(LTRIM(UserName))) = 'admin';
-
-IF NOT EXISTS (SELECT * FROM sys.procedures WHERE name = 'POS_Login')
-    EXEC('CREATE PROCEDURE dbo.POS_Login AS BEGIN SET NOCOUNT ON; END');
-";
-
-            using (SqlCommand cmd = new SqlCommand(schemaScript, conn))
-            {
-                cmd.ExecuteNonQuery();
-            }
-
-            string alterLoginScript = @"
-ALTER PROCEDURE dbo.POS_Login
-    @UserName NVARCHAR(150),
-    @Password NVARCHAR(250),
-    @BranchId BIGINT = 0
-AS
-BEGIN
-    SET NOCOUNT ON;
-
-    SELECT TOP 1
-        CASE WHEN ISNULL(u.BranchID, 0) = 0 THEN @BranchId ELSE u.BranchID END AS BranchId,
-        ISNULL(u.CompanyID, 1) AS CompanyId,
-        ISNULL(u.Email, '') AS Email,
-        u.UserID AS UserId,
-        u.UserName,
-        ISNULL(ul.UserLevel, CASE WHEN LOWER(u.UserName) = 'admin' THEN 'Admin' ELSE 'User' END) AS UserLevel,
-        'Success' AS Message,
-        1 AS FinYearID
-    FROM dbo.Users u
-    LEFT JOIN dbo.UserLevel ul ON u.UserLevelID = ul.UserLevelID
-    WHERE LOWER(RTRIM(LTRIM(u.UserName))) = LOWER(RTRIM(LTRIM(@UserName)))
-      AND (u.Password = @Password OR u.Password = 'admin' OR LOWER(RTRIM(LTRIM(u.UserName))) = 'admin' OR u.Password IS NULL OR u.Password = '')
-      AND ISNULL(u.IsDelete, 0) = 0
-      AND (u.BranchID = @BranchId OR u.BranchID = 0 OR @BranchId = 0 OR LOWER(RTRIM(LTRIM(u.UserName))) = 'admin');
-END;
-";
-            using (SqlCommand cmd = new SqlCommand(alterLoginScript, conn))
-            {
-                cmd.ExecuteNonQuery();
-            }
-        }
-
-        /// <summary>
-        /// Ensures ItemTypes table and calls POS_ItemType stored procedure.
-        /// </summary>
         public static void EnsureItemTypeSeedData()
         {
-            Repository.BaseRepostitory repo = null;
+            BaseRepostitory repo = null;
             try
             {
-                repo = new Repository.BaseRepostitory();
+                repo = new BaseRepostitory();
                 if (repo.DataConnection == null) return;
                 if (repo.DataConnection.State != ConnectionState.Open)
                     repo.DataConnection.Open();
 
-                SqlConnection conn = (SqlConnection)repo.DataConnection;
-
-                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_ItemType, conn))
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_ItemType, (SqlConnection)repo.DataConnection))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@_Operation", "GETALL");
+                    cmd.Parameters.AddWithValue("@_Operation", "SEED");
                     cmd.ExecuteNonQuery();
                 }
             }
             catch (Exception ex)
             {
+                // SEED operation may not exist on older SP versions — log but do not block startup
                 System.Diagnostics.Debug.WriteLine($"EnsureItemTypeSeedData warning: {ex.Message}");
             }
             finally
