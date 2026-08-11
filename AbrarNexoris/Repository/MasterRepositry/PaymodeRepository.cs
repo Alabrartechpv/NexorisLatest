@@ -20,197 +20,19 @@ namespace Repository.MasterRepositry
             SqlConnection conn = DataConnection as SqlConnection;
             if (conn == null) return false;
 
-            bool openedHere = false;
             try
             {
                 if (conn.State != ConnectionState.Open)
                 {
                     conn.Open();
-                    openedHere = true;
                 }
-
-                // 1. Ensure Table Columns exist in PayMode
-                string tableScript = @"
-                    IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'PayMode')
-                    BEGIN
-                        CREATE TABLE [dbo].[PayMode](
-                            [PayModeID] [int] IDENTITY(1,1) NOT NULL PRIMARY KEY,
-                            [PayModeName] [nvarchar](100) NOT NULL,
-                            [Description] [nvarchar](250) NULL,
-                            [FunctionKey] [nvarchar](50) NULL,
-                            [PaymodeType] [nvarchar](50) NULL,
-                            [Category] [nvarchar](50) NULL,
-                            [FileName] [nvarchar](100) NULL,
-                            [Photo] [varbinary](max) NULL,
-                            [RequireFillInReference] [bit] NULL DEFAULT 0,
-                            [IsHide] [bit] NULL DEFAULT 0,
-                            [DontOpenDrawer] [bit] NULL DEFAULT 0,
-                            [LedgerID] [int] NULL,
-                            [IsDelete] [bit] NULL DEFAULT 0
-                        );
-                    END
-                    ELSE
-                    BEGIN
-                        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('PayMode') AND name = 'Description')
-                            ALTER TABLE PayMode ADD [Description] [nvarchar](250) NULL;
-                        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('PayMode') AND name = 'FunctionKey')
-                            ALTER TABLE PayMode ADD [FunctionKey] [nvarchar](50) NULL;
-                        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('PayMode') AND name = 'PaymodeType')
-                            ALTER TABLE PayMode ADD [PaymodeType] [nvarchar](50) NULL;
-                        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('PayMode') AND name = 'Category')
-                            ALTER TABLE PayMode ADD [Category] [nvarchar](50) NULL;
-                        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('PayMode') AND name = 'FileName')
-                            ALTER TABLE PayMode ADD [FileName] [nvarchar](100) NULL;
-                        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('PayMode') AND name = 'Photo')
-                            ALTER TABLE PayMode ADD [Photo] [varbinary](max) NULL;
-                        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('PayMode') AND name = 'RequireFillInReference')
-                            ALTER TABLE PayMode ADD [RequireFillInReference] [bit] NULL DEFAULT 0;
-                        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('PayMode') AND name = 'IsHide')
-                            ALTER TABLE PayMode ADD [IsHide] [bit] NULL DEFAULT 0;
-                        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('PayMode') AND name = 'DontOpenDrawer')
-                            ALTER TABLE PayMode ADD [DontOpenDrawer] [bit] NULL DEFAULT 0;
-                        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('PayMode') AND name = 'LedgerID')
-                            ALTER TABLE PayMode ADD [LedgerID] [int] NULL;
-                        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('PayMode') AND name = 'IsDelete')
-                            ALTER TABLE PayMode ADD [IsDelete] [bit] NULL DEFAULT 0;
-                    END";
-
-                using (SqlCommand cmd = new SqlCommand(tableScript, conn))
-                {
-                    cmd.ExecuteNonQuery();
-                }
-
-                // 2. Ensure Stored Procedure _POS_PayMode_Setup exists
-                string spScript = @"
-                    IF EXISTS (SELECT * FROM sys.objects WHERE type = 'P' AND name = '_POS_PayMode_Setup')
-                        DROP PROCEDURE [dbo].[_POS_PayMode_Setup];
-                ";
-
-                using (SqlCommand cmd = new SqlCommand(spScript, conn))
-                {
-                    cmd.ExecuteNonQuery();
-                }
-
-                string createSpScript = @"
-                    CREATE PROCEDURE [dbo].[_POS_PayMode_Setup]
-                        @_Operation nvarchar(50) = 'GETALL',
-                        @PayModeID int = 0,
-                        @PayModeName nvarchar(100) = NULL,
-                        @Description nvarchar(250) = NULL,
-                        @FunctionKey nvarchar(50) = NULL,
-                        @PaymodeType nvarchar(50) = NULL,
-                        @Category nvarchar(50) = NULL,
-                        @FileName nvarchar(100) = NULL,
-                        @Photo varbinary(max) = NULL,
-                        @RequireFillInReference bit = 0,
-                        @IsHide bit = 0,
-                        @DontOpenDrawer bit = 0,
-                        @LedgerID int = NULL
-                    AS
-                    BEGIN
-                        SET NOCOUNT ON;
-
-                        IF @_Operation = 'GETALL'
-                        BEGIN
-                            SELECT 
-                                p.PayModeID,
-                                ISNULL(p.PayModeName, '') AS PayModeName,
-                                ISNULL(p.Description, '') AS Description,
-                                ISNULL(p.FunctionKey, '') AS FunctionKey,
-                                ISNULL(p.PaymodeType, '') AS PaymodeType,
-                                ISNULL(p.Category, '') AS Category,
-                                ISNULL(p.FileName, '') AS FileName,
-                                p.Photo,
-                                ISNULL(p.RequireFillInReference, 0) AS RequireFillInReference,
-                                ISNULL(p.IsHide, 0) AS IsHide,
-                                ISNULL(p.DontOpenDrawer, 0) AS DontOpenDrawer,
-                                ISNULL(p.LedgerID, 0) AS LedgerID,
-                                ISNULL(l.LedgerName, '') AS LedgerName
-                            FROM PayMode p
-                            LEFT JOIN LedgerMaster l ON p.LedgerID = l.LedgerID
-                            WHERE ISNULL(p.IsDelete, 0) = 0
-                            ORDER BY p.PayModeID;
-                        END
-                        ELSE IF @_Operation = 'GETBYID'
-                        BEGIN
-                            SELECT 
-                                p.PayModeID,
-                                ISNULL(p.PayModeName, '') AS PayModeName,
-                                ISNULL(p.Description, '') AS Description,
-                                ISNULL(p.FunctionKey, '') AS FunctionKey,
-                                ISNULL(p.PaymodeType, '') AS PaymodeType,
-                                ISNULL(p.Category, '') AS Category,
-                                ISNULL(p.FileName, '') AS FileName,
-                                p.Photo,
-                                ISNULL(p.RequireFillInReference, 0) AS RequireFillInReference,
-                                ISNULL(p.IsHide, 0) AS IsHide,
-                                ISNULL(p.DontOpenDrawer, 0) AS DontOpenDrawer,
-                                ISNULL(p.LedgerID, 0) AS LedgerID,
-                                ISNULL(l.LedgerName, '') AS LedgerName
-                            FROM PayMode p
-                            LEFT JOIN LedgerMaster l ON p.LedgerID = l.LedgerID
-                            WHERE p.PayModeID = @PayModeID AND ISNULL(p.IsDelete, 0) = 0;
-                        END
-                        ELSE IF @_Operation = 'INSERT'
-                        BEGIN
-                            INSERT INTO PayMode (
-                                PayModeName, Description, FunctionKey, PaymodeType, Category,
-                                FileName, Photo, RequireFillInReference, IsHide, DontOpenDrawer, LedgerID, IsDelete
-                            )
-                            VALUES (
-                                @PayModeName, @Description, @FunctionKey, @PaymodeType, @Category,
-                                @FileName, @Photo, @RequireFillInReference, @IsHide, @DontOpenDrawer, @LedgerID, 0
-                            );
-
-                            SELECT SCOPE_IDENTITY() AS PayModeID;
-                        END
-                        ELSE IF @_Operation = 'UPDATE'
-                        BEGIN
-                            UPDATE PayMode
-                            SET PayModeName = @PayModeName,
-                                Description = @Description,
-                                FunctionKey = @FunctionKey,
-                                PaymodeType = @PaymodeType,
-                                Category = @Category,
-                                FileName = @FileName,
-                                Photo = CASE WHEN @Photo IS NOT NULL THEN @Photo ELSE Photo END,
-                                RequireFillInReference = @RequireFillInReference,
-                                IsHide = @IsHide,
-                                DontOpenDrawer = @DontOpenDrawer,
-                                LedgerID = @LedgerID
-                            WHERE PayModeID = @PayModeID;
-
-                            SELECT @PayModeID AS PayModeID;
-                        END
-                        ELSE IF @_Operation = 'DELETE'
-                        BEGIN
-                            UPDATE PayMode SET IsDelete = 1 WHERE PayModeID = @PayModeID;
-                            SELECT @PayModeID AS PayModeID;
-                        END
-                        ELSE IF @_Operation = 'REMOVE_PHOTO'
-                        BEGIN
-                            UPDATE PayMode SET Photo = NULL WHERE PayModeID = @PayModeID;
-                            SELECT @PayModeID AS PayModeID;
-                        END
-                    END";
-
-                using (SqlCommand cmd = new SqlCommand(createSpScript, conn))
-                {
-                    cmd.ExecuteNonQuery();
-                }
-
                 isStorageEnsured = true;
                 return true;
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error ensuring Paymode storage: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"EnsureStorage check warning: {ex.Message}");
                 return false;
-            }
-            finally
-            {
-                if (openedHere && conn.State == ConnectionState.Open)
-                    conn.Close();
             }
         }
 
@@ -231,34 +53,12 @@ namespace Repository.MasterRepositry
                     openedHere = true;
                 }
 
-                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_GeneralPaymodeSetup, conn))
+                list = FetchPaymodesFromConn(conn);
+                if (list == null || list.Count == 0)
                 {
-                    cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@_Operation", "GETALL");
-
-                    using (SqlDataReader reader = cmd.ExecuteReader())
-                    {
-                        while (reader.Read())
-                        {
-                            PaymodeModel item = new PaymodeModel
-                            {
-                                PayModeID = reader["PayModeID"] != DBNull.Value ? Convert.ToInt32(reader["PayModeID"]) : 0,
-                                PayModeName = reader["PayModeName"]?.ToString(),
-                                Description = reader["Description"]?.ToString(),
-                                FunctionKey = reader["FunctionKey"]?.ToString(),
-                                PaymodeType = reader["PaymodeType"]?.ToString(),
-                                Category = reader["Category"]?.ToString(),
-                                FileName = reader["FileName"]?.ToString(),
-                                Photo = reader["Photo"] != DBNull.Value ? (byte[])reader["Photo"] : null,
-                                RequireFillInReference = reader["RequireFillInReference"] != DBNull.Value && Convert.ToBoolean(reader["RequireFillInReference"]),
-                                IsHide = reader["IsHide"] != DBNull.Value && Convert.ToBoolean(reader["IsHide"]),
-                                DontOpenDrawer = reader["DontOpenDrawer"] != DBNull.Value && Convert.ToBoolean(reader["DontOpenDrawer"]),
-                                LedgerID = reader["LedgerID"] != DBNull.Value ? Convert.ToInt32(reader["LedgerID"]) : 0,
-                                LedgerName = reader["LedgerName"]?.ToString()
-                            };
-                            list.Add(item);
-                        }
-                    }
+                    // Table was cleared or empty: auto-seed required default paymodes
+                    EnsurePaymodeSeedData(conn);
+                    list = FetchPaymodesFromConn(conn);
                 }
             }
             catch (Exception ex)
@@ -271,7 +71,129 @@ namespace Repository.MasterRepositry
                     conn.Close();
             }
 
+            return list ?? new List<PaymodeModel>();
+        }
+
+        private List<PaymodeModel> FetchPaymodesFromConn(SqlConnection conn)
+        {
+            List<PaymodeModel> list = new List<PaymodeModel>();
+            using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_GeneralPaymodeSetup, conn))
+            {
+                cmd.CommandType = CommandType.StoredProcedure;
+                cmd.Parameters.AddWithValue("@_Operation", "GETALL");
+
+                using (SqlDataReader reader = cmd.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        PaymodeModel item = new PaymodeModel
+                        {
+                            PayModeID = reader["PayModeID"] != DBNull.Value ? Convert.ToInt32(reader["PayModeID"]) : 0,
+                            PayModeName = reader["PayModeName"]?.ToString(),
+                            Description = reader["Description"]?.ToString(),
+                            FunctionKey = reader["FunctionKey"]?.ToString(),
+                            PaymodeType = reader["PaymodeType"]?.ToString(),
+                            Category = reader["Category"]?.ToString(),
+                            FileName = reader["FileName"]?.ToString(),
+                            Photo = reader["Photo"] != DBNull.Value ? (byte[])reader["Photo"] : null,
+                            RequireFillInReference = reader["RequireFillInReference"] != DBNull.Value && Convert.ToBoolean(reader["RequireFillInReference"]),
+                            IsHide = reader["IsHide"] != DBNull.Value && Convert.ToBoolean(reader["IsHide"]),
+                            DontOpenDrawer = reader["DontOpenDrawer"] != DBNull.Value && Convert.ToBoolean(reader["DontOpenDrawer"]),
+                            LedgerID = reader["LedgerID"] != DBNull.Value ? Convert.ToInt32(reader["LedgerID"]) : 0,
+                            LedgerName = reader["LedgerName"]?.ToString()
+                        };
+                        list.Add(item);
+                    }
+                }
+            }
             return list;
+        }
+
+        public static void EnsurePaymodeSeedData(SqlConnection conn)
+        {
+            if (conn == null) return;
+
+            bool openedHere = false;
+            try
+            {
+                if (conn.State != ConnectionState.Open)
+                {
+                    conn.Open();
+                    openedHere = true;
+                }
+
+                // Check if records already exist via Stored Procedure
+                try
+                {
+                    using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_GeneralPaymodeSetup, conn))
+                    {
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.AddWithValue("@_Operation", "GETALL");
+                        using (SqlDataReader reader = cmd.ExecuteReader())
+                        {
+                            if (reader.HasRows) return;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"EnsurePaymodeSeedData GETALL check warning: {ex.Message}");
+                }
+
+                var defaultPaymodes = new List<PaymodeModel>
+                {
+                    new PaymodeModel { PayModeID = 1, PayModeName = "Credit", Description = "Credit Sales / Customer Account", FunctionKey = "", PaymodeType = "Credit", Category = "Credit Account", RequireFillInReference = false, IsHide = false, DontOpenDrawer = true },
+                    new PaymodeModel { PayModeID = 2, PayModeName = "Cash", Description = "Cash Payment", FunctionKey = "F1", PaymodeType = "Cash", Category = "General", RequireFillInReference = false, IsHide = false, DontOpenDrawer = false },
+                    new PaymodeModel { PayModeID = 3, PayModeName = "Card", Description = "Credit / Debit Card", FunctionKey = "F2", PaymodeType = "Card", Category = "Card Gateway", RequireFillInReference = true, IsHide = false, DontOpenDrawer = true },
+                    new PaymodeModel { PayModeID = 4, PayModeName = "BankTransfer", Description = "Direct Bank Transfer", FunctionKey = "F3", PaymodeType = "Bank Transfer", Category = "Banking", RequireFillInReference = true, IsHide = false, DontOpenDrawer = true },
+                    new PaymodeModel { PayModeID = 5, PayModeName = "UPI", Description = "UPI / QR Digital Payment", FunctionKey = "F4", PaymodeType = "UPI / QR", Category = "Digital Payment", RequireFillInReference = true, IsHide = false, DontOpenDrawer = true },
+                    new PaymodeModel { PayModeID = 6, PayModeName = "Cheque", Description = "Cheque / Draft Payment", FunctionKey = "F5", PaymodeType = "Cheque", Category = "Banking", RequireFillInReference = true, IsHide = false, DontOpenDrawer = true },
+                    new PaymodeModel { PayModeID = 7, PayModeName = "Gift Voucher", Description = "Gift Voucher / Coupon Payment", FunctionKey = "F6", PaymodeType = "Gift Voucher", Category = "General", RequireFillInReference = true, IsHide = false, DontOpenDrawer = true }
+                };
+
+                foreach (var pm in defaultPaymodes)
+                {
+                    try
+                    {
+                        using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_GeneralPaymodeSetup, conn))
+                        {
+                            cmd.CommandType = CommandType.StoredProcedure;
+                            cmd.Parameters.AddWithValue("@_Operation", "INSERT");
+                            cmd.Parameters.AddWithValue("@PayModeID", pm.PayModeID);
+                            cmd.Parameters.AddWithValue("@PayModeName", pm.PayModeName);
+                            cmd.Parameters.AddWithValue("@Description", (object)pm.Description ?? DBNull.Value);
+                            cmd.Parameters.AddWithValue("@FunctionKey", (object)pm.FunctionKey ?? DBNull.Value);
+                            cmd.Parameters.AddWithValue("@PaymodeType", (object)pm.PaymodeType ?? DBNull.Value);
+                            cmd.Parameters.AddWithValue("@Category", (object)pm.Category ?? DBNull.Value);
+                            cmd.Parameters.AddWithValue("@FileName", DBNull.Value);
+
+                            SqlParameter photoParam = new SqlParameter("@Photo", SqlDbType.VarBinary, -1);
+                            photoParam.Value = DBNull.Value;
+                            cmd.Parameters.Add(photoParam);
+
+                            cmd.Parameters.AddWithValue("@RequireFillInReference", pm.RequireFillInReference);
+                            cmd.Parameters.AddWithValue("@IsHide", pm.IsHide);
+                            cmd.Parameters.AddWithValue("@DontOpenDrawer", pm.DontOpenDrawer);
+                            cmd.Parameters.AddWithValue("@LedgerID", DBNull.Value);
+
+                            cmd.ExecuteNonQuery();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"SP seed insertion warning for {pm.PayModeName}: {ex.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"EnsurePaymodeSeedData exception: {ex.Message}");
+            }
+            finally
+            {
+                if (openedHere && conn.State == ConnectionState.Open)
+                    conn.Close();
+            }
         }
 
         public PaymodeModel GetPaymodeById(int paymodeId)
@@ -351,63 +273,29 @@ namespace Repository.MasterRepositry
                     openedHere = true;
                 }
 
-                if (model.PayModeID > 0)
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_GeneralPaymodeSetup, conn))
                 {
-                    // --- UPDATE existing record ---
-                    string updateSql = @"
-                        UPDATE PayMode
-                        SET PayModeName = @PayModeName,
-                            Description = @Description,
-                            FunctionKey = @FunctionKey,
-                            PaymodeType = @PaymodeType,
-                            Category = @Category,
-                            FileName = @FileName,
-                            Photo = CASE WHEN @Photo IS NOT NULL THEN @Photo ELSE Photo END,
-                            RequireFillInReference = @RequireFillInReference,
-                            IsHide = @IsHide,
-                            DontOpenDrawer = @DontOpenDrawer,
-                            LedgerID = @LedgerID
-                        WHERE PayModeID = @PayModeID;";
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@_Operation", model.PayModeID > 0 ? "UPDATE" : "INSERT");
+                    cmd.Parameters.AddWithValue("@PayModeID", model.PayModeID);
+                    cmd.Parameters.AddWithValue("@PayModeName", (object)model.PayModeName ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@Description", (object)model.Description ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@FunctionKey", (object)model.FunctionKey ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@PaymodeType", (object)model.PaymodeType ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@Category", (object)model.Category ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@FileName", (object)model.FileName ?? DBNull.Value);
 
-                    using (SqlCommand cmd = new SqlCommand(updateSql, conn))
-                    {
-                        AddDataParameters(cmd, model);
-                        cmd.ExecuteNonQuery();
-                        return model.PayModeID;
-                    }
-                }
-                else
-                {
-                    // --- INSERT new record ---
-                    // The existing PayMode table uses a non-IDENTITY int PK.
-                    // We must manually compute the next safe ID before inserting.
-                    int nextId = 1;
-                    using (SqlCommand cmdNext = new SqlCommand(
-                        "SELECT ISNULL(MAX(PayModeID), 0) + 1 FROM PayMode", conn))
-                    {
-                        object nextRes = cmdNext.ExecuteScalar();
-                        if (nextRes != null && nextRes != DBNull.Value)
-                            nextId = Convert.ToInt32(nextRes);
-                    }
+                    SqlParameter photoParam = new SqlParameter("@Photo", SqlDbType.VarBinary, -1);
+                    photoParam.Value = (model.Photo != null && model.Photo.Length > 0) ? (object)model.Photo : DBNull.Value;
+                    cmd.Parameters.Add(photoParam);
 
-                    model.PayModeID = nextId;
+                    cmd.Parameters.AddWithValue("@RequireFillInReference", model.RequireFillInReference);
+                    cmd.Parameters.AddWithValue("@IsHide", model.IsHide);
+                    cmd.Parameters.AddWithValue("@DontOpenDrawer", model.DontOpenDrawer);
+                    cmd.Parameters.AddWithValue("@LedgerID", model.LedgerID > 0 ? (object)model.LedgerID : DBNull.Value);
 
-                    string insertSql = @"
-                        INSERT INTO PayMode (
-                            PayModeID, PayModeName, Description, FunctionKey, PaymodeType, Category,
-                            FileName, Photo, RequireFillInReference, IsHide, DontOpenDrawer, LedgerID, IsDelete
-                        )
-                        VALUES (
-                            @PayModeID, @PayModeName, @Description, @FunctionKey, @PaymodeType, @Category,
-                            @FileName, @Photo, @RequireFillInReference, @IsHide, @DontOpenDrawer, @LedgerID, 0
-                        );";
-
-                    using (SqlCommand cmd = new SqlCommand(insertSql, conn))
-                    {
-                        AddDataParameters(cmd, model);
-                        cmd.ExecuteNonQuery();
-                        return model.PayModeID;
-                    }
+                    object res = cmd.ExecuteScalar();
+                    return res != null && res != DBNull.Value ? Convert.ToInt32(res) : model.PayModeID;
                 }
             }
             catch (Exception ex)
@@ -420,34 +308,6 @@ namespace Repository.MasterRepositry
                 if (openedHere && conn.State == ConnectionState.Open)
                     conn.Close();
             }
-        }
-
-        private void AddDataParameters(SqlCommand cmd, PaymodeModel model)
-        {
-            if (cmd == null || model == null) return;
-            cmd.Parameters.Add("@PayModeID", SqlDbType.Int).Value = model.PayModeID;
-            cmd.Parameters.Add("@PayModeName", SqlDbType.NVarChar, 100).Value = (object)model.PayModeName ?? string.Empty;
-            cmd.Parameters.Add("@Description", SqlDbType.NVarChar, 250).Value = (object)model.Description ?? string.Empty;
-            cmd.Parameters.Add("@FunctionKey", SqlDbType.NVarChar, 50).Value = (object)model.FunctionKey ?? string.Empty;
-            cmd.Parameters.Add("@PaymodeType", SqlDbType.NVarChar, 50).Value = (object)model.PaymodeType ?? string.Empty;
-            cmd.Parameters.Add("@Category", SqlDbType.NVarChar, 50).Value = (object)model.Category ?? string.Empty;
-            cmd.Parameters.Add("@FileName", SqlDbType.NVarChar, 100).Value = (object)model.FileName ?? string.Empty;
-
-            SqlParameter photoParam = new SqlParameter("@Photo", SqlDbType.VarBinary, -1);
-            if (model.Photo != null && model.Photo.Length > 0)
-                photoParam.Value = model.Photo;
-            else
-                photoParam.Value = DBNull.Value;
-            cmd.Parameters.Add(photoParam);
-
-            cmd.Parameters.Add("@RequireFillInReference", SqlDbType.Bit).Value = model.RequireFillInReference;
-            cmd.Parameters.Add("@IsHide", SqlDbType.Bit).Value = model.IsHide;
-            cmd.Parameters.Add("@DontOpenDrawer", SqlDbType.Bit).Value = model.DontOpenDrawer;
-
-            if (model.LedgerID > 0)
-                cmd.Parameters.Add("@LedgerID", SqlDbType.Int).Value = model.LedgerID;
-            else
-                cmd.Parameters.Add("@LedgerID", SqlDbType.Int).Value = DBNull.Value;
         }
 
         public bool DeletePaymode(int paymodeId)
@@ -467,10 +327,11 @@ namespace Repository.MasterRepositry
                     openedHere = true;
                 }
 
-                using (SqlCommand cmd = new SqlCommand(
-                    "UPDATE PayMode SET IsDelete = 1 WHERE PayModeID = @PayModeID", conn))
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_GeneralPaymodeSetup, conn))
                 {
-                    cmd.Parameters.Add("@PayModeID", SqlDbType.Int).Value = paymodeId;
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@_Operation", "DELETE");
+                    cmd.Parameters.AddWithValue("@PayModeID", paymodeId);
                     cmd.ExecuteNonQuery();
                     return true;
                 }
@@ -478,7 +339,7 @@ namespace Repository.MasterRepositry
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error deleting paymode: {ex.Message}");
-                throw ex;
+                throw;
             }
             finally
             {
@@ -504,10 +365,11 @@ namespace Repository.MasterRepositry
                     openedHere = true;
                 }
 
-                using (SqlCommand cmd = new SqlCommand(
-                    "UPDATE PayMode SET Photo = NULL, FileName = NULL WHERE PayModeID = @PayModeID", conn))
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_GeneralPaymodeSetup, conn))
                 {
-                    cmd.Parameters.Add("@PayModeID", SqlDbType.Int).Value = paymodeId;
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@_Operation", "REMOVE_PHOTO");
+                    cmd.Parameters.AddWithValue("@PayModeID", paymodeId);
                     cmd.ExecuteNonQuery();
                     return true;
                 }

@@ -497,8 +497,10 @@ namespace PosBranch_Win
 
             try
             {
-                using (SqlCommand cmd = new SqlCommand("SELECT CounterName FROM CounterMaster WHERE CounterID = @CounterID", (SqlConnection)con.DataConnection))
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_Counter, (SqlConnection)con.DataConnection))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@_Operation", "GETBYID");
                     cmd.Parameters.AddWithValue("@CounterID", counterId);
                     if (con.DataConnection.State != ConnectionState.Open) con.DataConnection.Open();
                     object result = cmd.ExecuteScalar();
