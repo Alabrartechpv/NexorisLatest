@@ -16,6 +16,79 @@ namespace Repository.TransactionRepository
 {
     public class PurchaseReturnRepository : BaseRepostitory
     {
+        private static bool _pReturnSchemaEnsured = false;
+        private static readonly object _pReturnSchemaLock = new object();
+
+        public PurchaseReturnRepository()
+        {
+            EnsurePReturnMasterSchema();
+        }
+
+        public void EnsurePReturnMasterSchema()
+        {
+            if (_pReturnSchemaEnsured) return;
+
+            lock (_pReturnSchemaLock)
+            {
+                if (_pReturnSchemaEnsured) return;
+
+                try
+                {
+                    bool wasClosed = DataConnection.State == ConnectionState.Closed;
+                    if (wasClosed) DataConnection.Open();
+
+                    string sql = @"
+                        IF EXISTS (
+                            SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS 
+                            WHERE TABLE_NAME = 'PReturnMaster' AND COLUMN_NAME = 'CurSymbol' AND IS_NULLABLE = 'NO'
+                        )
+                        BEGIN
+                            DECLARE @ConstraintName NVARCHAR(200);
+                            SELECT @ConstraintName = name FROM sys.default_constraints 
+                            WHERE parent_object_id = OBJECT_ID('PReturnMaster') 
+                            AND parent_column_id = COLUMNPROPERTY(OBJECT_ID('PReturnMaster'), 'CurSymbol', 'ColumnId');
+
+                            IF @ConstraintName IS NOT NULL
+                            BEGIN
+                                EXEC('ALTER TABLE dbo.PReturnMaster DROP CONSTRAINT [' + @ConstraintName + ']');
+                            END
+
+                            ALTER TABLE dbo.PReturnMaster ALTER COLUMN CurSymbol NVARCHAR(50) NULL;
+                        END
+
+                        IF EXISTS (
+                            SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'PReturnMaster'
+                        )
+                        AND NOT EXISTS (
+                            SELECT 1 FROM sys.default_constraints 
+                            WHERE parent_object_id = OBJECT_ID('PReturnMaster') 
+                            AND parent_column_id = COLUMNPROPERTY(OBJECT_ID('PReturnMaster'), 'CurSymbol', 'ColumnId')
+                        )
+                        BEGIN
+                            ALTER TABLE dbo.PReturnMaster ADD CONSTRAINT DF_PReturnMaster_CurSymbol DEFAULT('RM') FOR CurSymbol;
+                        END
+                    ";
+
+                    using (SqlCommand cmd = new SqlCommand(sql, (SqlConnection)DataConnection))
+                    {
+                        cmd.ExecuteNonQuery();
+                    }
+
+                    if (wasClosed && DataConnection.State == ConnectionState.Open)
+                    {
+                        DataConnection.Close();
+                    }
+
+                    _pReturnSchemaEnsured = true;
+                    System.Diagnostics.Debug.WriteLine("Successfully verified and updated PReturnMaster CurSymbol schema constraint.");
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine("EnsurePReturnMasterSchema error: " + ex.Message);
+                }
+            }
+        }
+
         // Static field to store the active transaction for UpdatePurchaseReturnDetails
         private static SqlTransaction activeTransaction = null;
 
@@ -580,8 +653,8 @@ namespace Repository.TransactionRepository
                         cmd.Parameters.AddWithValue("@CessPer", pr.CessPer);
                         cmd.Parameters.AddWithValue("@CessAmt", pr.CessAmt);
                         cmd.Parameters.AddWithValue("@CalAfterTax", pr.CalAfterTax);
-                        cmd.Parameters.AddWithValue("@CurrencyID", pr.CurrencyID);
-                        cmd.Parameters.AddWithValue("@CurSymbol", pr.CurSymbol ?? "");
+                        cmd.Parameters.AddWithValue("@CurrencyID", pr.CurrencyID > 0 ? pr.CurrencyID : 1);
+                        cmd.Parameters.AddWithValue("@CurSymbol", !string.IsNullOrWhiteSpace(pr.CurSymbol) ? pr.CurSymbol : "RM");
                         cmd.Parameters.AddWithValue("@SeriesID", pr.SeriesID);
                         cmd.Parameters.AddWithValue("@VoucherID", pr.VoucherID);
                         cmd.Parameters.AddWithValue("@_Operation", isUpdate ? "UPDATE" : "CREATE");

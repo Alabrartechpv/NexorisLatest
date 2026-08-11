@@ -30,6 +30,7 @@ namespace PosBranch_Win.Transaction
         private void InitializeComponent()
         {
             Infragistics.Win.Appearance appearance1 = new Infragistics.Win.Appearance();
+            Infragistics.Win.Appearance appearance2 = new Infragistics.Win.Appearance();
             Infragistics.Win.Appearance appearance3 = new Infragistics.Win.Appearance();
             Infragistics.Win.Appearance appearance4 = new Infragistics.Win.Appearance();
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(frmPurchaseReturn));
@@ -62,10 +63,12 @@ namespace PosBranch_Win.Transaction
             Infragistics.Win.Appearance appearance31 = new Infragistics.Win.Appearance();
             Infragistics.Win.Appearance appearance32 = new Infragistics.Win.Appearance();
             Infragistics.Win.Appearance appearance33 = new Infragistics.Win.Appearance();
-            Infragistics.Win.Appearance appearance2 = new Infragistics.Win.Appearance();
             this.btnReturn = new System.Windows.Forms.Button();
             this.btnReturnAll = new System.Windows.Forms.Button();
             this.ultraPanel1 = new Infragistics.Win.Misc.UltraPanel();
+            this.ultraPanel2 = new Infragistics.Win.Misc.UltraPanel();
+            this.label11 = new System.Windows.Forms.Label();
+            this.ultraTextEditor4 = new Infragistics.Win.UltraWinEditors.UltraTextEditor();
             this.ultraPanel4 = new Infragistics.Win.Misc.UltraPanel();
             this.ultraPictureBox3 = new Infragistics.Win.UltraWinEditors.UltraPictureBox();
             this.ultraPanel11 = new Infragistics.Win.Misc.UltraPanel();
@@ -81,7 +84,7 @@ namespace PosBranch_Win.Transaction
             this.button2 = new System.Windows.Forms.Button();
             this.label3 = new System.Windows.Forms.Label();
             this.cmbBranch = new System.Windows.Forms.ComboBox();
-            this.ultraTextEditor3 = new Infragistics.Win.UltraWinEditors.UltraTextEditor();
+            this.mall = new Infragistics.Win.UltraWinEditors.UltraTextEditor();
             this.ultraTextEditor1 = new Infragistics.Win.UltraWinEditors.UltraTextEditor();
             this.textBox2 = new Infragistics.Win.UltraWinEditors.UltraTextEditor();
             this.ultraDateTimeEditor2 = new Infragistics.Win.UltraWinEditors.UltraDateTimeEditor();
@@ -100,6 +103,7 @@ namespace PosBranch_Win.Transaction
             this.TxtBarcode = new Infragistics.Win.UltraWinEditors.UltraTextEditor();
             this.chkGRN = new System.Windows.Forms.CheckBox();
             this.chkWithoutGRN = new System.Windows.Forms.CheckBox();
+            this.checkBox1 = new System.Windows.Forms.CheckBox();
             this.vendorid = new Infragistics.Win.Misc.UltraLabel();
             this.lblPRamount = new System.Windows.Forms.Label();
             this.VendorName = new Infragistics.Win.UltraWinEditors.UltraTextEditor();
@@ -115,15 +119,15 @@ namespace PosBranch_Win.Transaction
             this.textBox1 = new Infragistics.Win.UltraWinEditors.UltraTextEditor();
             this.label2 = new System.Windows.Forms.Label();
             this.lblPno = new System.Windows.Forms.Label();
+            this.label1 = new System.Windows.Forms.Label();
             this.ultraPictureBox7 = new Infragistics.Win.UltraWinEditors.UltraPictureBox();
             this.ultraPictureBox8 = new Infragistics.Win.UltraWinEditors.UltraPictureBox();
             this.ultraPictureBox9 = new Infragistics.Win.UltraWinEditors.UltraPictureBox();
-            this.ultraTextEditor4 = new Infragistics.Win.UltraWinEditors.UltraTextEditor();
-            this.label1 = new System.Windows.Forms.Label();
-            this.ultraPanel2 = new Infragistics.Win.Misc.UltraPanel();
-            this.label11 = new System.Windows.Forms.Label();
             this.ultraPanel1.ClientArea.SuspendLayout();
             this.ultraPanel1.SuspendLayout();
+            this.ultraPanel2.ClientArea.SuspendLayout();
+            this.ultraPanel2.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.ultraTextEditor4)).BeginInit();
             this.ultraPanel4.ClientArea.SuspendLayout();
             this.ultraPanel4.SuspendLayout();
             this.ultraPanel11.ClientArea.SuspendLayout();
@@ -135,7 +139,7 @@ namespace PosBranch_Win.Transaction
             ((System.ComponentModel.ISupportInitialize)(this.ultraTextEditor2)).BeginInit();
             this.ultraPanel10.ClientArea.SuspendLayout();
             this.ultraPanel10.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.ultraTextEditor3)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.mall)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.ultraTextEditor1)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.textBox2)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.ultraDateTimeEditor2)).BeginInit();
@@ -150,9 +154,6 @@ namespace PosBranch_Win.Transaction
             ((System.ComponentModel.ISupportInitialize)(this.TxtSRNO)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.ultraDateTimeEditor1)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.textBox1)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.ultraTextEditor4)).BeginInit();
-            this.ultraPanel2.ClientArea.SuspendLayout();
-            this.ultraPanel2.SuspendLayout();
             this.SuspendLayout();
             // 
             // btnReturn
@@ -218,7 +219,7 @@ namespace PosBranch_Win.Transaction
             this.ultraPanel1.ClientArea.Controls.Add(this.button2);
             this.ultraPanel1.ClientArea.Controls.Add(this.label3);
             this.ultraPanel1.ClientArea.Controls.Add(this.cmbBranch);
-            this.ultraPanel1.ClientArea.Controls.Add(this.ultraTextEditor3);
+            this.ultraPanel1.ClientArea.Controls.Add(this.mall);
             this.ultraPanel1.ClientArea.Controls.Add(this.ultraTextEditor1);
             this.ultraPanel1.ClientArea.Controls.Add(this.textBox2);
             this.ultraPanel1.ClientArea.Controls.Add(this.ultraDateTimeEditor2);
@@ -244,6 +245,44 @@ namespace PosBranch_Win.Transaction
             this.ultraPanel1.Size = new System.Drawing.Size(1235, 700);
             this.ultraPanel1.TabIndex = 0;
             this.ultraPanel1.PaintClient += new System.Windows.Forms.PaintEventHandler(this.ultraPanel1_PaintClient);
+            // 
+            // ultraPanel2
+            // 
+            appearance2.BackColor = System.Drawing.Color.LightBlue;
+            appearance2.BackColor2 = System.Drawing.Color.SkyBlue;
+            appearance2.BackGradientStyle = Infragistics.Win.GradientStyle.GlassBottom50;
+            appearance2.BackHatchStyle = Infragistics.Win.BackHatchStyle.None;
+            this.ultraPanel2.Appearance = appearance2;
+            this.ultraPanel2.BorderStyle = Infragistics.Win.UIElementBorderStyle.Rounded1;
+            // 
+            // ultraPanel2.ClientArea
+            // 
+            this.ultraPanel2.ClientArea.Controls.Add(this.label11);
+            this.ultraPanel2.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(0)))), ((int)(((byte)(0)))), ((int)(((byte)(0)))));
+            this.ultraPanel2.Location = new System.Drawing.Point(288, 605);
+            this.ultraPanel2.Name = "ultraPanel2";
+            this.ultraPanel2.Size = new System.Drawing.Size(75, 69);
+            this.ultraPanel2.TabIndex = 141;
+            // 
+            // label11
+            // 
+            this.label11.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.label11.AutoSize = true;
+            this.label11.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(0)))), ((int)(((byte)(0)))), ((int)(((byte)(0)))));
+            this.label11.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label11.Location = new System.Drawing.Point(9, 24);
+            this.label11.Name = "label11";
+            this.label11.Size = new System.Drawing.Size(53, 15);
+            this.label11.TabIndex = 129;
+            this.label11.Text = "View Bill";
+            // 
+            // ultraTextEditor4
+            // 
+            this.ultraTextEditor4.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.ultraTextEditor4.Location = new System.Drawing.Point(101, 73);
+            this.ultraTextEditor4.Name = "ultraTextEditor4";
+            this.ultraTextEditor4.Size = new System.Drawing.Size(133, 24);
+            this.ultraTextEditor4.TabIndex = 139;
             // 
             // ultraPanel4
             // 
@@ -451,6 +490,7 @@ namespace PosBranch_Win.Transaction
             this.button2.Size = new System.Drawing.Size(23, 22);
             this.button2.TabIndex = 133;
             this.button2.UseVisualStyleBackColor = false;
+            this.button2.Click += new System.EventHandler(this.button2_Click);
             // 
             // label3
             // 
@@ -475,15 +515,15 @@ namespace PosBranch_Win.Transaction
             this.cmbBranch.Visible = false;
             this.cmbBranch.SelectedIndexChanged += new System.EventHandler(this.cmbBranch_SelectedIndexChanged);
             // 
-            // ultraTextEditor3
+            // mall
             // 
-            this.ultraTextEditor3.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            this.mall.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.ultraTextEditor3.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.ultraTextEditor3.Location = new System.Drawing.Point(233, 129);
-            this.ultraTextEditor3.Name = "ultraTextEditor3";
-            this.ultraTextEditor3.Size = new System.Drawing.Size(735, 24);
-            this.ultraTextEditor3.TabIndex = 131;
+            this.mall.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.mall.Location = new System.Drawing.Point(233, 129);
+            this.mall.Name = "mall";
+            this.mall.Size = new System.Drawing.Size(735, 24);
+            this.mall.TabIndex = 131;
             // 
             // ultraTextEditor1
             // 
@@ -537,6 +577,7 @@ namespace PosBranch_Win.Transaction
             this.ultraPanel3.ClientArea.Controls.Add(this.TxtBarcode);
             this.ultraPanel3.ClientArea.Controls.Add(this.chkGRN);
             this.ultraPanel3.ClientArea.Controls.Add(this.chkWithoutGRN);
+            this.ultraPanel3.ClientArea.Controls.Add(this.checkBox1);
             this.ultraPanel3.ClientArea.Controls.Add(this.vendorid);
             this.ultraPanel3.Location = new System.Drawing.Point(12, 166);
             this.ultraPanel3.Name = "ultraPanel3";
@@ -562,7 +603,7 @@ namespace PosBranch_Win.Transaction
             // 
             this.SubTotal.AutoSize = true;
             this.SubTotal.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.SubTotal.Location = new System.Drawing.Point(582, 16);
+            this.SubTotal.Location = new System.Drawing.Point(828, 21);
             this.SubTotal.Name = "SubTotal";
             this.SubTotal.Size = new System.Drawing.Size(72, 16);
             this.SubTotal.TabIndex = 30;
@@ -574,7 +615,7 @@ namespace PosBranch_Win.Transaction
             this.TxtSubTotal.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             this.TxtSubTotal.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.TxtSubTotal.Location = new System.Drawing.Point(660, 12);
+            this.TxtSubTotal.Location = new System.Drawing.Point(906, 17);
             this.TxtSubTotal.Name = "TxtSubTotal";
             this.TxtSubTotal.Size = new System.Drawing.Size(76, 24);
             this.TxtSubTotal.TabIndex = 31;
@@ -790,6 +831,19 @@ namespace PosBranch_Win.Transaction
             this.chkWithoutGRN.Text = "Without GRN";
             this.chkWithoutGRN.UseVisualStyleBackColor = true;
             // 
+            // checkBox1
+            // 
+            this.checkBox1.AutoSize = true;
+            this.checkBox1.Font = new System.Drawing.Font("Segoe UI", 9.75F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.checkBox1.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(35)))), ((int)(((byte)(80)))));
+            this.checkBox1.Location = new System.Drawing.Point(470, 20);
+            this.checkBox1.Name = "checkBox1";
+            this.checkBox1.Size = new System.Drawing.Size(138, 21);
+            this.checkBox1.TabIndex = 42;
+            this.checkBox1.Text = "Master Reason All";
+            this.checkBox1.UseVisualStyleBackColor = true;
+            this.checkBox1.Visible = false;
+            // 
             // vendorid
             // 
             this.vendorid.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
@@ -902,7 +956,7 @@ namespace PosBranch_Win.Transaction
             this.Vendorbutton.Size = new System.Drawing.Size(23, 23);
             this.Vendorbutton.TabIndex = 39;
             this.Vendorbutton.UseVisualStyleBackColor = false;
-            this.Vendorbutton.Click += new System.EventHandler(this.button2_Click);
+            this.Vendorbutton.Click += new System.EventHandler(this.Vendorbutton_Click);
             // 
             // lblDte
             // 
@@ -968,6 +1022,16 @@ namespace PosBranch_Win.Transaction
             this.lblPno.TabIndex = 11;
             this.lblPno.Text = "Purchase No:";
             // 
+            // label1
+            // 
+            this.label1.AutoSize = true;
+            this.label1.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label1.Location = new System.Drawing.Point(29, 77);
+            this.label1.Name = "label1";
+            this.label1.Size = new System.Drawing.Size(75, 16);
+            this.label1.TabIndex = 140;
+            this.label1.Text = "Invoice No.";
+            // 
             // ultraPictureBox7
             // 
             appearance31.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(192)))), ((int)(((byte)(255)))), ((int)(((byte)(192)))));
@@ -1016,54 +1080,6 @@ namespace PosBranch_Win.Transaction
             this.ultraPictureBox9.Size = new System.Drawing.Size(14, 17);
             this.ultraPictureBox9.TabIndex = 200;
             // 
-            // ultraTextEditor4
-            // 
-            this.ultraTextEditor4.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.ultraTextEditor4.Location = new System.Drawing.Point(101, 73);
-            this.ultraTextEditor4.Name = "ultraTextEditor4";
-            this.ultraTextEditor4.Size = new System.Drawing.Size(133, 24);
-            this.ultraTextEditor4.TabIndex = 139;
-            // 
-            // label1
-            // 
-            this.label1.AutoSize = true;
-            this.label1.Font = new System.Drawing.Font("Microsoft Sans Serif", 9.75F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label1.Location = new System.Drawing.Point(29, 77);
-            this.label1.Name = "label1";
-            this.label1.Size = new System.Drawing.Size(75, 16);
-            this.label1.TabIndex = 140;
-            this.label1.Text = "Invoice No.";
-            // 
-            // ultraPanel2
-            // 
-            appearance2.BackColor = System.Drawing.Color.LightBlue;
-            appearance2.BackColor2 = System.Drawing.Color.SkyBlue;
-            appearance2.BackGradientStyle = Infragistics.Win.GradientStyle.GlassBottom50;
-            appearance2.BackHatchStyle = Infragistics.Win.BackHatchStyle.None;
-            this.ultraPanel2.Appearance = appearance2;
-            this.ultraPanel2.BorderStyle = Infragistics.Win.UIElementBorderStyle.Rounded1;
-            // 
-            // ultraPanel2.ClientArea
-            // 
-            this.ultraPanel2.ClientArea.Controls.Add(this.label11);
-            this.ultraPanel2.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(0)))), ((int)(((byte)(0)))), ((int)(((byte)(0)))));
-            this.ultraPanel2.Location = new System.Drawing.Point(288, 605);
-            this.ultraPanel2.Name = "ultraPanel2";
-            this.ultraPanel2.Size = new System.Drawing.Size(75, 69);
-            this.ultraPanel2.TabIndex = 141;
-            // 
-            // label11
-            // 
-            this.label11.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
-            this.label11.AutoSize = true;
-            this.label11.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(0)))), ((int)(((byte)(0)))), ((int)(((byte)(0)))));
-            this.label11.Font = new System.Drawing.Font("Microsoft Sans Serif", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label11.Location = new System.Drawing.Point(9, 24);
-            this.label11.Name = "label11";
-            this.label11.Size = new System.Drawing.Size(53, 15);
-            this.label11.TabIndex = 129;
-            this.label11.Text = "View Bill";
-            // 
             // frmPurchaseReturn
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -1075,6 +1091,10 @@ namespace PosBranch_Win.Transaction
             this.ultraPanel1.ClientArea.ResumeLayout(false);
             this.ultraPanel1.ClientArea.PerformLayout();
             this.ultraPanel1.ResumeLayout(false);
+            this.ultraPanel2.ClientArea.ResumeLayout(false);
+            this.ultraPanel2.ClientArea.PerformLayout();
+            this.ultraPanel2.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)(this.ultraTextEditor4)).EndInit();
             this.ultraPanel4.ClientArea.ResumeLayout(false);
             this.ultraPanel4.ResumeLayout(false);
             this.ultraPanel11.ClientArea.ResumeLayout(false);
@@ -1087,7 +1107,7 @@ namespace PosBranch_Win.Transaction
             this.ultraPanel10.ClientArea.ResumeLayout(false);
             this.ultraPanel10.ClientArea.PerformLayout();
             this.ultraPanel10.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)(this.ultraTextEditor3)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.mall)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.ultraTextEditor1)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.textBox2)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.ultraDateTimeEditor2)).EndInit();
@@ -1103,10 +1123,6 @@ namespace PosBranch_Win.Transaction
             ((System.ComponentModel.ISupportInitialize)(this.TxtSRNO)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.ultraDateTimeEditor1)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.textBox1)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.ultraTextEditor4)).EndInit();
-            this.ultraPanel2.ClientArea.ResumeLayout(false);
-            this.ultraPanel2.ClientArea.PerformLayout();
-            this.ultraPanel2.ResumeLayout(false);
             this.ResumeLayout(false);
 
         }
@@ -1148,7 +1164,7 @@ namespace PosBranch_Win.Transaction
         private Infragistics.Win.UltraWinEditors.UltraTextEditor ultraTextEditor2;
         public Infragistics.Win.UltraWinEditors.UltraTextEditor ultraTextEditor1;
         private System.Windows.Forms.Label label2;
-        private Infragistics.Win.UltraWinEditors.UltraTextEditor ultraTextEditor3;
+        private Infragistics.Win.UltraWinEditors.UltraTextEditor mall;
         private System.Windows.Forms.Button button2;
         private System.Windows.Forms.Label label3;
         private System.Windows.Forms.Button btnReturn;
@@ -1168,6 +1184,7 @@ namespace PosBranch_Win.Transaction
         private Infragistics.Win.UltraWinEditors.UltraTextEditor TxtSubTotal;
         public System.Windows.Forms.CheckBox chkGRN;
         public System.Windows.Forms.CheckBox chkWithoutGRN;
+        public System.Windows.Forms.CheckBox checkBox1;
         public Infragistics.Win.UltraWinEditors.UltraTextEditor ultraTextEditor4;
         private System.Windows.Forms.Label label1;
         private Infragistics.Win.Misc.UltraPanel ultraPanel2;

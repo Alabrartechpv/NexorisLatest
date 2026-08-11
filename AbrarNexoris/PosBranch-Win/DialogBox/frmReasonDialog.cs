@@ -21,6 +21,9 @@ namespace PosBranch_Win.DialogBox
 {
     public partial class frmReasonDialog : Form
     {
+        public string SelectedReasonName { get; private set; } = string.Empty;
+        public string SelectedLedgerId { get; private set; } = string.Empty;
+
         private FrmStockAdjustment stockk; // Keep reference to parent
         private Dropdowns drop = new Dropdowns();
         private DataTable fullDataTable = null;
@@ -495,12 +498,22 @@ namespace PosBranch_Win.DialogBox
                     UltraGridCell reasNameCell = this.ultraGrid1.ActiveRow.Cells["ReasonName"];
 
                     string selectedReasonName = reasNameCell.Value != null ? reasNameCell.Value.ToString() : "";
+                    string selectedLedgerId = ledgIdCell.Value != null ? ledgIdCell.Value.ToString() : "";
+
+                    SelectedReasonName = selectedReasonName;
+                    SelectedLedgerId = selectedLedgerId;
+
+                    var purchaseReturnForm = Application.OpenForms.OfType<frmPurchaseReturn>().FirstOrDefault();
+                    if (purchaseReturnForm != null)
+                    {
+                        purchaseReturnForm.SetReasonDetails(selectedReasonName, selectedLedgerId);
+                    }
 
                     stockk = Application.OpenForms.OfType<FrmStockAdjustment>().FirstOrDefault();
                     if (stockk != null)
                     {
                         stockk.txtb_reason.Text = selectedReasonName;
-                        stockk.ultlbl_ledgerid.Text = ledgIdCell.Value != null ? ledgIdCell.Value.ToString() : "";
+                        stockk.ultlbl_ledgerid.Text = selectedLedgerId;
                     }
 
                     var reasonMasterForm = Application.OpenForms.OfType<Master.FrmReason>().FirstOrDefault();

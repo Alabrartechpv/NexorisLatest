@@ -16,6 +16,79 @@ namespace Repository.TransactionRepository
 {
     public class PurchaseInvoiceRepository : BaseRepostitory
     {
+        private static bool _schemaEnsured = false;
+        private static readonly object _schemaLock = new object();
+
+        public PurchaseInvoiceRepository()
+        {
+            EnsurePMasterSchema();
+        }
+
+        public void EnsurePMasterSchema()
+        {
+            if (_schemaEnsured) return;
+
+            lock (_schemaLock)
+            {
+                if (_schemaEnsured) return;
+
+                try
+                {
+                    bool wasClosed = DataConnection.State == ConnectionState.Closed;
+                    if (wasClosed) DataConnection.Open();
+
+                    string sql = @"
+                        IF EXISTS (
+                            SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS 
+                            WHERE TABLE_NAME = 'PMaster' AND COLUMN_NAME = 'CurSymbol' AND IS_NULLABLE = 'NO'
+                        )
+                        BEGIN
+                            DECLARE @ConstraintName NVARCHAR(200);
+                            SELECT @ConstraintName = name FROM sys.default_constraints 
+                            WHERE parent_object_id = OBJECT_ID('PMaster') 
+                            AND parent_column_id = COLUMNPROPERTY(OBJECT_ID('PMaster'), 'CurSymbol', 'ColumnId');
+
+                            IF @ConstraintName IS NOT NULL
+                            BEGIN
+                                EXEC('ALTER TABLE dbo.PMaster DROP CONSTRAINT [' + @ConstraintName + ']');
+                            END
+
+                            ALTER TABLE dbo.PMaster ALTER COLUMN CurSymbol NVARCHAR(50) NULL;
+                        END
+
+                        IF EXISTS (
+                            SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'PMaster'
+                        )
+                        AND NOT EXISTS (
+                            SELECT 1 FROM sys.default_constraints 
+                            WHERE parent_object_id = OBJECT_ID('PMaster') 
+                            AND parent_column_id = COLUMNPROPERTY(OBJECT_ID('PMaster'), 'CurSymbol', 'ColumnId')
+                        )
+                        BEGIN
+                            ALTER TABLE dbo.PMaster ADD CONSTRAINT DF_PMaster_CurSymbol DEFAULT('RM') FOR CurSymbol;
+                        END
+                    ";
+
+                    using (SqlCommand cmd = new SqlCommand(sql, (SqlConnection)DataConnection))
+                    {
+                        cmd.ExecuteNonQuery();
+                    }
+
+                    if (wasClosed && DataConnection.State == ConnectionState.Open)
+                    {
+                        DataConnection.Close();
+                    }
+
+                    _schemaEnsured = true;
+                    System.Diagnostics.Debug.WriteLine("Successfully verified and updated PMaster CurSymbol schema constraint.");
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine("EnsurePMasterSchema error: " + ex.Message);
+                }
+            }
+        }
+
         public int PurcaseNo = 0;
         LedgerRepository objLedgerRepository = new LedgerRepository();
         public PurchaseStockUpdateOnPricesettings objPricesettingsStock = new PurchaseStockUpdateOnPricesettings();
@@ -65,18 +138,81 @@ namespace Repository.TransactionRepository
             return PurcaseNo;
         }
 
+        private DynamicParameters GetPurchaseMasterParameters(PurchaseMaster ObjPurchaseMaster)
+        {
+            var p = new DynamicParameters();
+            p.Add("@CompanyId", ObjPurchaseMaster.CompanyId);
+            p.Add("@FinYearId", ObjPurchaseMaster.FinYearId);
+            p.Add("@BranchId", ObjPurchaseMaster.BranchId);
+            p.Add("@BranchName", ObjPurchaseMaster.BranchName ?? "");
+            p.Add("@PurchaseNo", ObjPurchaseMaster.PurchaseNo);
+            p.Add("@PurchaseDate", ObjPurchaseMaster.PurchaseDate != DateTime.MinValue ? ObjPurchaseMaster.PurchaseDate : DateTime.Now);
+            p.Add("@InvoiceNo", ObjPurchaseMaster.InvoiceNo ?? "");
+            p.Add("@InvoiceDate", ObjPurchaseMaster.InvoiceDate != DateTime.MinValue ? ObjPurchaseMaster.InvoiceDate : DateTime.Now);
+            p.Add("@LedgerID", ObjPurchaseMaster.LedgerID);
+            p.Add("@VendorName", ObjPurchaseMaster.VendorName ?? "");
+            p.Add("@PaymodeID", ObjPurchaseMaster.PaymodeID);
+            p.Add("@Paymode", ObjPurchaseMaster.Paymode ?? "Cash");
+            p.Add("@PaymodeLedgerID", ObjPurchaseMaster.PaymodeLedgerID);
+            p.Add("@CreditPeriod", ObjPurchaseMaster.CreditPeriod);
+            p.Add("@SubTotal", ObjPurchaseMaster.SubTotal);
+            p.Add("@SpDisPer", ObjPurchaseMaster.SpDisPer);
+            p.Add("@SpDsiAmt", ObjPurchaseMaster.SpDsiAmt);
+            p.Add("@BillDiscountPer", ObjPurchaseMaster.BillDiscountPer);
+            p.Add("@BillDiscountAmt", ObjPurchaseMaster.BillDiscountAmt);
+            p.Add("@TaxPer", ObjPurchaseMaster.TaxPer);
+            p.Add("@TaxAmt", ObjPurchaseMaster.TaxAmt);
+            p.Add("@Frieght", ObjPurchaseMaster.Frieght);
+            p.Add("@ExpenseAmt", ObjPurchaseMaster.ExpenseAmt);
+            p.Add("@OtherExpAmt", ObjPurchaseMaster.OtherExpAmt);
+            p.Add("@GrandTotal", ObjPurchaseMaster.GrandTotal);
+            p.Add("@CancelFlag", ObjPurchaseMaster.CancelFlag);
+            p.Add("@UserID", ObjPurchaseMaster.UserID);
+            p.Add("@UserName", ObjPurchaseMaster.UserName ?? "");
+            p.Add("@TaxType", !string.IsNullOrWhiteSpace(ObjPurchaseMaster.TaxType) ? ObjPurchaseMaster.TaxType : "I");
+            p.Add("@Remarks", ObjPurchaseMaster.Remarks ?? "");
+            p.Add("@RoundOff", ObjPurchaseMaster.RoundOff);
+            p.Add("@CessPer", ObjPurchaseMaster.CessPer);
+            p.Add("@CessAmt", ObjPurchaseMaster.CessAmt);
+            p.Add("@CalAfterTax", ObjPurchaseMaster.CalAfterTax);
+            p.Add("@CurrencyID", ObjPurchaseMaster.CurrencyID > 0 ? ObjPurchaseMaster.CurrencyID : 1);
+            p.Add("@CurSymbol", !string.IsNullOrWhiteSpace(ObjPurchaseMaster.CurSymbol) ? ObjPurchaseMaster.CurSymbol : "RM");
+            p.Add("@SeriesID", ObjPurchaseMaster.SeriesID);
+            p.Add("@VoucherID", ObjPurchaseMaster.VoucherID);
+            p.Add("@IsSyncd", ObjPurchaseMaster.IsSyncd);
+            p.Add("@Paid", ObjPurchaseMaster.Paid);
+            p.Add("@Pid", ObjPurchaseMaster.Pid);
+            p.Add("@POrderMasterId", ObjPurchaseMaster.POrderMasterId);
+            p.Add("@BilledBy", ObjPurchaseMaster.BilledBy ?? "");
+            p.Add("@TrnsType", !string.IsNullOrWhiteSpace(ObjPurchaseMaster.TrnsType) ? ObjPurchaseMaster.TrnsType : "Purchase");
+            p.Add("@NetTotal", ObjPurchaseMaster.NetTotal);
+            p.Add("@_Operation", ObjPurchaseMaster._Operation ?? "");
+            return p;
+        }
+
         public string SavePurchaseInvoice(PurchaseMaster ObjPurchaseMaster, PurchaseDetails objPurchaseDetails, DataGridView dgvItem)
         {
             string result = "";
             Voucher objVoucher = new Voucher();
+            EnsurePMasterSchema();
             DataConnection.Open();
             var trans = DataConnection.BeginTransaction();
             try
             {
+                if (string.IsNullOrWhiteSpace(ObjPurchaseMaster.CurSymbol))
+                {
+                    ObjPurchaseMaster.CurSymbol = "RM";
+                }
+                if (ObjPurchaseMaster.CurrencyID <= 0)
+                {
+                    ObjPurchaseMaster.CurrencyID = 1;
+                }
+
                 ObjPurchaseMaster._Operation = "GENERATEPURCHASENO";
                 ObjPurchaseMaster.FinYearId = SessionContext.FinYearId;
 
-                List<PurchaseMaster> ObjPurchasNo = DataConnection.Query<PurchaseMaster>(STOREDPROCEDURE.POS_Purchase, ObjPurchaseMaster, trans, commandType: CommandType.StoredProcedure).ToList<PurchaseMaster>();
+                var pGenerate = GetPurchaseMasterParameters(ObjPurchaseMaster);
+                List<PurchaseMaster> ObjPurchasNo = DataConnection.Query<PurchaseMaster>(STOREDPROCEDURE.POS_Purchase, pGenerate, trans, commandType: CommandType.StoredProcedure).ToList<PurchaseMaster>();
                 if (ObjPurchasNo.Count > 0)
                 {
                     foreach (PurchaseMaster ObjPurchasePurchasno in ObjPurchasNo)
@@ -106,7 +242,8 @@ namespace Repository.TransactionRepository
                 ObjPurchaseMaster.TaxAmt = totalTaxAmountForMaster;
 
                 ObjPurchaseMaster._Operation = "CREATE";
-                List<PurchaseMaster> PurchaseMaster = DataConnection.Query<PurchaseMaster>(STOREDPROCEDURE.POS_Purchase, ObjPurchaseMaster, trans, commandType: CommandType.StoredProcedure).ToList<PurchaseMaster>();
+                var pCreate = GetPurchaseMasterParameters(ObjPurchaseMaster);
+                List<PurchaseMaster> PurchaseMaster = DataConnection.Query<PurchaseMaster>(STOREDPROCEDURE.POS_Purchase, pCreate, trans, commandType: CommandType.StoredProcedure).ToList<PurchaseMaster>();
 
                 if (dgvItem != null && dgvItem.Rows.Count > 0)
                 {
@@ -420,6 +557,15 @@ namespace Repository.TransactionRepository
             var trans = DataConnection.BeginTransaction();
             try
             {
+                if (string.IsNullOrWhiteSpace(ObjPmaster.CurSymbol))
+                {
+                    ObjPmaster.CurSymbol = "RM";
+                }
+                if (ObjPmaster.CurrencyID <= 0)
+                {
+                    ObjPmaster.CurrencyID = 1;
+                }
+
                 // Get the original FinYearId from the database to ensure consistency
                 int originalFinYearId = ObjPmaster.FinYearId;
 
@@ -432,7 +578,8 @@ namespace Repository.TransactionRepository
                 ObjPmaster.TaxAmt = totalTaxAmount;
 
                 ObjPmaster._Operation = "UPDATE";
-                List<PurchaseMaster> ObjUpdatePmaster = DataConnection.Query<PurchaseMaster>(STOREDPROCEDURE.POS_Purchase, ObjPmaster, trans, commandType: CommandType.StoredProcedure).ToList<PurchaseMaster>();
+                var pUpdate = GetPurchaseMasterParameters(ObjPmaster);
+                List<PurchaseMaster> ObjUpdatePmaster = DataConnection.Query<PurchaseMaster>(STOREDPROCEDURE.POS_Purchase, pUpdate, trans, commandType: CommandType.StoredProcedure).ToList<PurchaseMaster>();
                 ObjVoucher.BranchID = SessionContext.BranchId;
                 ObjVoucher.VoucherID = ObjPmaster.VoucherID;
                 ObjVoucher._Operation = "UPDATE";

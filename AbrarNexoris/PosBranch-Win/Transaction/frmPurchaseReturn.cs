@@ -162,6 +162,18 @@ namespace PosBranch_Win.Transaction
 
                 SetupHeaderDragToHideAndColumnChooser();
 
+                // Register button2 click and ultraTextEditor3 KeyDown for Master Reason lookup dialog
+                if (button2 != null)
+                {
+                    button2.Click -= button2_Click;
+                    button2.Click += button2_Click;
+                }
+                if (mall != null)
+                {
+                    mall.KeyDown -= ultraTextEditor3_KeyDown;
+                    mall.KeyDown += ultraTextEditor3_KeyDown;
+                }
+
             }
             catch (Exception ex)
             {
@@ -401,11 +413,38 @@ namespace PosBranch_Win.Transaction
                 chkGRN.CheckedChanged += chkGRN_CheckedChanged;
                 chkWithoutGRN.CheckedChanged += chkWithoutGRN_CheckedChanged;
 
+                if (checkBox1 != null)
+                {
+                    checkBox1.CheckedChanged -= checkBox1_CheckedChanged;
+                    checkBox1.CheckedChanged += checkBox1_CheckedChanged;
+                }
+
                 ApplyGRNModeState(chkGRN.Checked);
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("Error initializing GRN mode check boxes: " + ex.Message);
+            }
+        }
+
+        private void checkBox1_CheckedChanged(object sender, EventArgs e)
+        {
+            try
+            {
+                bool useMasterReasonAll = checkBox1 != null && checkBox1.Checked;
+
+                if (ultraGrid1 != null && ultraGrid1.DisplayLayout != null && ultraGrid1.DisplayLayout.Bands.Count > 0)
+                {
+                    UltraGridBand band = ultraGrid1.DisplayLayout.Bands[0];
+                    if (band.Columns.Exists("Reason"))
+                    {
+                        band.Columns["Reason"].Hidden = useMasterReasonAll;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Error in checkBox1_CheckedChanged: " + ex.Message);
             }
         }
 
@@ -482,24 +521,33 @@ namespace PosBranch_Win.Transaction
                     if (ultraPictureBox10 != null) ultraPictureBox10.Visible = true;
                     if (ultraPictureBox14 != null) ultraPictureBox14.Visible = true;
 
-                    // Hide: ultraTextEditor3, button2 (Master reason row), TxtBarcode, BtnDial, lblBarcode, label3
-                    if (ultraTextEditor3 != null) { ultraTextEditor3.Text = ""; ultraTextEditor3.Enabled = false; ultraTextEditor3.Visible = false; }
+                    // Hide: ultraTextEditor3, button2 (Master reason row), TxtBarcode, BtnDial, lblBarcode, label3, checkBox1
+                    if (mall != null) { mall.Text = ""; mall.Enabled = false; mall.Visible = false; }
                     if (button2 != null) { button2.Enabled = false; button2.Visible = false; }
                     if (label3 != null) label3.Visible = false;           // Master reason label
                     if (TxtBarcode != null) { TxtBarcode.Text = ""; TxtBarcode.ReadOnly = true; TxtBarcode.Enabled = false; TxtBarcode.Visible = false; }
                     if (BtnDial != null) { BtnDial.Enabled = false; BtnDial.Visible = false; }
                     if (lblBarcode != null) lblBarcode.Visible = false;
+                    if (checkBox1 != null) { checkBox1.Checked = false; checkBox1.Visible = false; }
+                    
+                    // Show Reason column in GRN mode
+                    if (ultraGrid1 != null && ultraGrid1.DisplayLayout != null && ultraGrid1.DisplayLayout.Bands.Count > 0)
+                    {
+                        if (ultraGrid1.DisplayLayout.Bands[0].Columns.Exists("Reason"))
+                            ultraGrid1.DisplayLayout.Bands[0].Columns["Reason"].Hidden = false;
+                    }
                 }
                 else
                 {
                     // ── WITHOUT GRN MODE ────────────────────────────────────────
-                    // Show: ultraTextEditor3, button2, label3 (Master reason), TxtBarcode, BtnDial, lblBarcode
-                    if (ultraTextEditor3 != null) { ultraTextEditor3.Visible = true; ultraTextEditor3.Enabled = true; }
+                    // Show: ultraTextEditor3, button2, label3 (Master reason), TxtBarcode, BtnDial, lblBarcode, checkBox1
+                    if (mall != null) { mall.Visible = true; mall.Enabled = true; }
                     if (button2 != null) { button2.Visible = true; button2.Enabled = true; }
                     if (label3 != null) label3.Visible = true;            // Master reason label
                     if (TxtBarcode != null) { TxtBarcode.Enabled = true; TxtBarcode.ReadOnly = false; TxtBarcode.Visible = true; }
                     if (BtnDial != null) { BtnDial.Enabled = true; BtnDial.Visible = true; }
                     if (lblBarcode != null) lblBarcode.Visible = true;
+                    if (checkBox1 != null) { checkBox1.Visible = true; }
 
                     // Hide: textBox1, btnAddPurchaceList, ultraTextEditor1, lblPRamount, lblPno, ultraTextEditor4, label1
                     if (textBox1 != null) { textBox1.Text = ""; textBox1.Enabled = false; textBox1.Visible = false; }
@@ -522,11 +570,291 @@ namespace PosBranch_Win.Transaction
                     if (ultraPictureBox3 != null) ultraPictureBox3.Visible = false;
                     if (ultraPictureBox10 != null) ultraPictureBox10.Visible = false;
                     if (ultraPictureBox14 != null) ultraPictureBox14.Visible = false;
+
+                    // Update Reason column visibility according to checkBox1 state
+                    checkBox1_CheckedChanged(checkBox1, EventArgs.Empty);
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("Error applying GRN mode state: " + ex.Message);
+            }
+        }
+
+        private bool _isOpeningReasonDialog = false;
+        private void button2_Click(object sender, EventArgs e)
+        {
+            if (_isOpeningReasonDialog) return;
+            try
+            {
+                _isOpeningReasonDialog = true;
+                frmReasonDialog dialog = new frmReasonDialog();
+                if (dialog.ShowDialog(this) == DialogResult.OK)
+                {
+                    if (!string.IsNullOrWhiteSpace(dialog.SelectedReasonName))
+                    {
+                        SetReasonDetails(dialog.SelectedReasonName, dialog.SelectedLedgerId);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error opening Reason Dialog: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                _isOpeningReasonDialog = false;
+            }
+        }
+
+        private Infragistics.Win.UltraWinEditors.UltraComboEditor _gridReasonCombo;
+        private Infragistics.Win.UltraWinEditors.EditorButton _btnAddReason;
+
+        private void SetupGridReasonEditorButton()
+        {
+            try
+            {
+                if (ultraGrid1 == null || ultraGrid1.DisplayLayout == null || ultraGrid1.DisplayLayout.Bands.Count == 0)
+                    return;
+
+                UltraGridBand band = ultraGrid1.DisplayLayout.Bands[0];
+                if (!band.Columns.Exists("Reason")) return;
+
+                // Use native UltraGrid ComboBox DropDown styling for Reason column so dropdown arrow ▼ displays in cell
+                band.Columns["Reason"].EditorComponent = null;
+                band.Columns["Reason"].Style = Infragistics.Win.UltraWinGrid.ColumnStyle.DropDown;
+                band.Columns["Reason"].ButtonDisplayStyle = Infragistics.Win.UltraWinGrid.ButtonDisplayStyle.Always;
+
+                // Populate reasons list into ValueList
+                RefreshGridReasonValueList();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Error setting up grid reason editor button: " + ex.Message);
+            }
+        }
+
+        private void RefreshGridReasonValueList()
+        {
+            try
+            {
+                if (ultraGrid1 == null || ultraGrid1.DisplayLayout == null || ultraGrid1.DisplayLayout.Bands.Count == 0)
+                    return;
+
+                UltraGridBand band = ultraGrid1.DisplayLayout.Bands[0];
+                if (!band.Columns.Exists("Reason")) return;
+
+                band.Columns["Reason"].CellActivation = Activation.AllowEdit;
+                band.Columns["Reason"].Style = Infragistics.Win.UltraWinGrid.ColumnStyle.DropDown;
+                band.Columns["Reason"].ButtonDisplayStyle = Infragistics.Win.UltraWinGrid.ButtonDisplayStyle.Always;
+
+                Infragistics.Win.ValueList reasonList = new Infragistics.Win.ValueList();
+                reasonList.ValueListItems.Add(new Infragistics.Win.ValueListItem("Select Reason"));
+                reasonList.ValueListItems.Add(new Infragistics.Win.ValueListItem("Damaged"));
+                reasonList.ValueListItems.Add(new Infragistics.Win.ValueListItem("Expired"));
+                reasonList.ValueListItems.Add(new Infragistics.Win.ValueListItem("Non-ordered"));
+                reasonList.ValueListItems.Add(new Infragistics.Win.ValueListItem("Other"));
+
+                // Fetch custom master reasons from database dynamically
+                try
+                {
+                    Repository.TransactionRepository.StockAdjustmentRepository stockRepo = new Repository.TransactionRepository.StockAdjustmentRepository();
+                    var dbReasons = stockRepo.GetStockAdjustmentReasons(ModelClass.SessionContext.BranchId);
+                    if (dbReasons != null)
+                    {
+                        foreach (var r in dbReasons)
+                        {
+                            if (!string.IsNullOrWhiteSpace(r.ReasonName) && !reasonList.ValueListItems.Cast<Infragistics.Win.ValueListItem>().Any(x => x.DataValue != null && x.DataValue.ToString().Equals(r.ReasonName.Trim(), StringComparison.OrdinalIgnoreCase)))
+                            {
+                                reasonList.ValueListItems.Add(new Infragistics.Win.ValueListItem(r.ReasonName.Trim()));
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine("Error loading DB reasons into list: " + ex.Message);
+                }
+
+                band.Columns["Reason"].ValueList = reasonList;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Error refreshing grid reason value list: " + ex.Message);
+            }
+        }
+
+        private void AutoSaveTypedNewReason(string reason)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(reason)) return;
+                string cleanReason = reason.Trim();
+
+                // Standard default reasons
+                string[] defaultReasons = new string[] { "Select Reason", "Damaged", "Expired", "Non-ordered", "Other" };
+                if (defaultReasons.Any(d => d.Equals(cleanReason, StringComparison.OrdinalIgnoreCase)))
+                    return;
+
+                // Check if reason is already loaded in our current ValueList
+                if (ultraGrid1 != null && ultraGrid1.DisplayLayout != null && ultraGrid1.DisplayLayout.Bands.Count > 0 && ultraGrid1.DisplayLayout.Bands[0].Columns.Exists("Reason"))
+                {
+                    var valList = ultraGrid1.DisplayLayout.Bands[0].Columns["Reason"].ValueList as Infragistics.Win.ValueList;
+                    if (valList != null && valList.ValueListItems.Cast<Infragistics.Win.ValueListItem>().Any(item => item.DataValue != null && item.DataValue.ToString().Trim().Equals(cleanReason, StringComparison.OrdinalIgnoreCase)))
+                        return;
+                }
+
+                // Save new reason to database via StockAdjustmentRepository
+                Repository.TransactionRepository.StockAdjustmentRepository stockRepo = new Repository.TransactionRepository.StockAdjustmentRepository();
+                ModelClass.TransactionModels.StockAdjustmentReasonMaster reasonModel = new ModelClass.TransactionModels.StockAdjustmentReasonMaster
+                {
+                    Id = 0,
+                    CompanyId = ModelClass.SessionContext.CompanyId,
+                    BranchId = ModelClass.SessionContext.BranchId,
+                    ReasonName = cleanReason,
+                    ReasonType = "Loss"
+                };
+
+                string saveResult = stockRepo.SaveStockAdjustmentReason(reasonModel);
+                System.Diagnostics.Debug.WriteLine($"Auto-saved new typed reason '{cleanReason}' to database: {saveResult}");
+
+                // Refresh dropdown list so the newly typed reason becomes available as a default reason
+                RefreshGridReasonValueList();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Error in AutoSaveTypedNewReason: " + ex.Message);
+            }
+        }
+
+        private void GridReasonEditor_EditorButtonClick(object sender, Infragistics.Win.UltraWinEditors.EditorButtonEventArgs e)
+        {
+            try
+            {
+                if (e.Button.Key == "btnAddReasonKey")
+                {
+                    OpenAddNewReasonPrompt();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Error in GridReasonEditor_EditorButtonClick: " + ex.Message);
+            }
+        }
+
+        private void OpenAddNewReasonPrompt()
+        {
+            try
+            {
+                string newReason = PromptForReasonInput("Add New Reason", "Enter new Master Reason name:");
+                if (string.IsNullOrWhiteSpace(newReason)) return;
+
+                // Save new reason to database via StockAdjustmentRepository (POS_StockAdjustmentReasonMaster SP)
+                Repository.TransactionRepository.StockAdjustmentRepository stockRepo = new Repository.TransactionRepository.StockAdjustmentRepository();
+                ModelClass.TransactionModels.StockAdjustmentReasonMaster reasonModel = new ModelClass.TransactionModels.StockAdjustmentReasonMaster
+                {
+                    Id = 0,
+                    CompanyId = ModelClass.SessionContext.CompanyId,
+                    BranchId = ModelClass.SessionContext.BranchId,
+                    ReasonName = newReason.Trim(),
+                    ReasonType = "Loss"
+                };
+
+                string saveResult = stockRepo.SaveStockAdjustmentReason(reasonModel);
+                if (saveResult == "success")
+                {
+                    MessageBox.Show($"New reason '{newReason.Trim()}' saved to database successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+                    // Refresh dropdown list so new reason is available
+                    RefreshGridReasonValueList();
+
+                    // Populate into active grid row's Reason cell
+                    if (ultraGrid1 != null && ultraGrid1.ActiveRow != null && ultraGrid1.ActiveRow.Cells.Exists("Reason"))
+                    {
+                        ultraGrid1.ActiveRow.Cells["Reason"].Value = newReason.Trim();
+                    }
+
+                    // Also set ultraTextEditor3 if in Master Reason mode or visible
+                    if (mall != null && (checkBox1 != null && checkBox1.Checked || mall.Visible))
+                    {
+                        mall.Text = newReason.Trim();
+                    }
+                }
+                else
+                {
+                    MessageBox.Show("Failed to save reason to database: " + saveResult, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error adding new reason: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private string PromptForReasonInput(string title, string promptText)
+        {
+            using (Form prompt = new Form())
+            {
+                prompt.Width = 420;
+                prompt.Height = 170;
+                prompt.FormBorderStyle = FormBorderStyle.FixedDialog;
+                prompt.Text = title;
+                prompt.StartPosition = FormStartPosition.CenterParent;
+                prompt.MaximizeBox = false;
+                prompt.MinimizeBox = false;
+
+                Label textLabel = new Label() { Left = 20, Top = 15, Width = 360, Text = promptText, Font = new System.Drawing.Font("Segoe UI", 9.75F, System.Drawing.FontStyle.Bold) };
+                TextBox textBox = new TextBox() { Left = 20, Top = 42, Width = 360, Font = new System.Drawing.Font("Segoe UI", 10F) };
+                Button confirmation = new Button() { Text = "Save", Left = 200, Width = 85, Height = 28, Top = 80, DialogResult = DialogResult.OK, FlatStyle = FlatStyle.System };
+                Button cancel = new Button() { Text = "Cancel", Left = 295, Width = 85, Height = 28, Top = 80, DialogResult = DialogResult.Cancel, FlatStyle = FlatStyle.System };
+
+                prompt.Controls.Add(textLabel);
+                prompt.Controls.Add(textBox);
+                prompt.Controls.Add(confirmation);
+                prompt.Controls.Add(cancel);
+                prompt.AcceptButton = confirmation;
+                prompt.CancelButton = cancel;
+
+                return prompt.ShowDialog(this) == DialogResult.OK ? textBox.Text.Trim() : string.Empty;
+            }
+        }
+
+        private void ultraTextEditor3_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter || e.KeyCode == Keys.F7)
+            {
+                button2_Click(sender, e);
+                e.Handled = true;
+            }
+        }
+
+        public void SetReasonDetails(string reasonName, string ledgerId = null)
+        {
+            if (mall != null)
+            {
+                mall.Text = reasonName ?? string.Empty;
+                if (!string.IsNullOrEmpty(ledgerId))
+                {
+                    mall.Tag = ledgerId;
+                }
+            }
+
+            // Populate grid row reasons if empty
+            if (ultraGrid1 != null && ultraGrid1.Rows.Count > 0)
+            {
+                foreach (UltraGridRow row in ultraGrid1.Rows)
+                {
+                    if (row.Cells.Exists("Reason"))
+                    {
+                        if (row.Cells["Reason"].Value == null ||
+                            row.Cells["Reason"].Value == DBNull.Value ||
+                            string.IsNullOrWhiteSpace(row.Cells["Reason"].Value.ToString()) ||
+                            row.Cells["Reason"].Value.ToString() == "Select Reason")
+                        {
+                            row.Cells["Reason"].Value = reasonName;
+                        }
+                    }
+                }
             }
         }
 
@@ -3233,39 +3561,12 @@ namespace PosBranch_Win.Transaction
                                     break;
 
                                 case "Reason":
-                                    column.Width = 150;
+                                    column.Width = 160;
                                     column.CellActivation = Activation.AllowEdit;
-                                    column.Style = Infragistics.Win.UltraWinGrid.ColumnStyle.DropDownList;
                                     column.Header.Caption = "Reason *"; // Add asterisk to indicate mandatory field
-                                    column.CellAppearance.TextHAlign = HAlign.Center;
-
-                                    // Create ValueList for Reason dropdown with valid options only
-                                    Infragistics.Win.ValueList reasonList = new Infragistics.Win.ValueList();
-                                    // Remove the 'Select Reason' option since we're making this mandatory
-                                    reasonList.ValueListItems.Add(new Infragistics.Win.ValueListItem("Expired"));
-                                    reasonList.ValueListItems.Add(new Infragistics.Win.ValueListItem("Damaged"));
-                                    reasonList.ValueListItems.Add(new Infragistics.Win.ValueListItem("NonOrdered"));
-                                    reasonList.ValueListItems.Add(new Infragistics.Win.ValueListItem("NonDemand"));
-
-                                    column.ValueList = reasonList;
                                     column.CellAppearance.TextHAlign = HAlign.Left;
-
-                                    // Make sure that the reason values from the database are respected
-                                    // The dropdown style is already set by using ColumnStyle.DropDownList above
-
-                                    // Log the current values for debugging
-                                    System.Diagnostics.Debug.WriteLine("Current reason values in grid:");
-                                    if (ultraGrid1.Rows.Count > 0)
-                                    {
-                                        foreach (UltraGridRow row in ultraGrid1.Rows)
-                                        {
-                                            if (row.Cells.Exists("Reason"))
-                                            {
-                                                object reasonValue = row.Cells["Reason"].Value;
-                                                System.Diagnostics.Debug.WriteLine($"Row {row.Index}: Reason = {reasonValue}");
-                                            }
-                                        }
-                                    }
+                                    column.Style = Infragistics.Win.UltraWinGrid.ColumnStyle.DropDown;
+                                    column.ButtonDisplayStyle = Infragistics.Win.UltraWinGrid.ButtonDisplayStyle.Always;
                                     break;
                             }
                         }
@@ -3275,6 +3576,15 @@ namespace PosBranch_Win.Transaction
                     if (band.Columns.Exists("ItemID"))
                     {
                         band.Columns["ItemID"].Hidden = true;
+                    }
+
+                    // Attach + EditorButton and load DB reasons into Reason cell
+                    SetupGridReasonEditorButton();
+
+                    // If Master Reason All is checked, hide the Reason column
+                    if (checkBox1 != null && checkBox1.Checked && band.Columns.Exists("Reason"))
+                    {
+                        band.Columns["Reason"].Hidden = true;
                     }
 
                     // Apply SalesReturn grid styling
@@ -3895,9 +4205,10 @@ namespace PosBranch_Win.Transaction
                         {
                             cell.Appearance.BackColor = Color.Empty;
                             cell.Appearance.ForeColor = Color.Empty;
-                        }
 
-                        // Removed auto-select checkbox behavior
+                            // Automatically save new typed reason into database so it becomes a default reason!
+                            AutoSaveTypedNewReason(newReason);
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -4402,7 +4713,7 @@ namespace PosBranch_Win.Transaction
 
         }
 
-        private void button2_Click(object sender, EventArgs e)
+        private void Vendorbutton_Click(object sender, EventArgs e)
         {
             // Show pbxSave and hide ultraPictureBox4
             pbxSave.Visible = true;
@@ -5171,74 +5482,85 @@ namespace PosBranch_Win.Transaction
                 // Make sure the grid's data is current before validation
                 ultraGrid1.UpdateData();
 
-                // Predefined list of valid reasons
-                string[] validReasons = new string[] { "Expired", "Damaged", "NonOrdered", "NonDemand", "EXPIRED", "DAMAGED", "NONORDERED", "NONDEMAND" };
-
-                if (ultraGrid1.Rows.Count > 0)
+                // If Master Reason All (checkBox1) is checked, assign ultraTextEditor3.Text (master reason) to all selected rows
+                if (checkBox1 != null && checkBox1.Checked)
                 {
+                    string masterReason = (mall != null && !string.IsNullOrWhiteSpace(mall.Text)) 
+                        ? mall.Text.Trim() 
+                        : "Return";
+
                     foreach (UltraGridRow row in ultraGrid1.Rows)
                     {
-                        if (!row.IsDataRow || row.IsFilteredOut)
-                            continue;
-
-                        // Skip empty rows
-                        if (!row.Cells.Exists("ItemID") || row.Cells["ItemID"].Value == null)
-                            continue;
-
-                        // Check if this row is selected via the SELECT column
-                        bool isSelected = false;
-                        if (row.Cells.Exists("SELECT"))
+                        if (row.IsDataRow && row.Cells.Exists("Reason"))
                         {
-                            var selectValue = row.Cells["SELECT"].Value;
-                            isSelected = selectValue != null && selectValue != DBNull.Value && Convert.ToBoolean(selectValue);
+                            row.Cells["Reason"].Value = masterReason;
                         }
+                    }
+                }
+                else
+                {
+                    // Predefined list of valid reasons
+                    string[] validReasons = new string[] { "Expired", "Damaged", "NonOrdered", "NonDemand", "EXPIRED", "DAMAGED", "NONORDERED", "NONDEMAND" };
 
-                        // Only validate reason for selected rows
-                        if (!isSelected)
-                            continue;
-
-                        // Check if Reason is valid
-                        bool validReasonFound = false;
-                        string currentReason = "";
-
-                        if (row.Cells.Exists("Reason") && row.Cells["Reason"].Value != null)
+                    if (ultraGrid1.Rows.Count > 0)
+                    {
+                        foreach (UltraGridRow row in ultraGrid1.Rows)
                         {
-                            currentReason = row.Cells["Reason"].Value.ToString().Trim();
+                            if (!row.IsDataRow || row.IsFilteredOut)
+                                continue;
 
-                            // Skip "Select Reason" as it's not a valid option
-                            if (currentReason.Equals("Select Reason", StringComparison.OrdinalIgnoreCase))
+                            // Skip empty rows
+                            if (!row.Cells.Exists("ItemID") || row.Cells["ItemID"].Value == null)
+                                continue;
+
+                            // Check if this row is selected via the SELECT column
+                            bool isSelected = false;
+                            if (row.Cells.Exists("SELECT"))
                             {
-                                validReasonFound = false;
+                                var selectValue = row.Cells["SELECT"].Value;
+                                isSelected = selectValue != null && selectValue != DBNull.Value && Convert.ToBoolean(selectValue);
                             }
-                            else
+
+                            // Only validate reason for selected rows
+                            if (!isSelected)
+                                continue;
+
+                            // Check if Reason is valid
+                            bool validReasonFound = false;
+                            string currentReason = "";
+
+                            if (row.Cells.Exists("Reason") && row.Cells["Reason"].Value != null)
                             {
-                                // Check if the current reason is in the list of valid reasons
-                                foreach (string validReason in validReasons)
+                                currentReason = row.Cells["Reason"].Value.ToString().Trim();
+
+                                // Skip "Select Reason" as it's not a valid option
+                                if (currentReason.Equals("Select Reason", StringComparison.OrdinalIgnoreCase))
                                 {
-                                    if (currentReason.Equals(validReason, StringComparison.OrdinalIgnoreCase))
-                                    {
-                                        validReasonFound = true;
-                                        break;
-                                    }
+                                    validReasonFound = false;
+                                }
+                                else
+                                {
+                                    // Accept custom master reasons from database or standard reasons
+                                    validReasonFound = !string.IsNullOrWhiteSpace(currentReason);
                                 }
                             }
-                        }
 
-                        if (!validReasonFound)
-                        {
-                            hasInvalidReason = true;
-                            // Get item description for the error message
-                            if (row.Cells.Exists("Description") && row.Cells["Description"].Value != null)
+                            if (!validReasonFound)
                             {
-                                firstInvalidItemDesc = row.Cells["Description"].Value.ToString();
-                            }
-                            else
-                            {
-                                firstInvalidItemDesc = "Item ID: " + row.Cells["ItemID"].Value.ToString();
-                            }
+                                hasInvalidReason = true;
+                                // Get item description for the error message
+                                if (row.Cells.Exists("Description") && row.Cells["Description"].Value != null)
+                                {
+                                    firstInvalidItemDesc = row.Cells["Description"].Value.ToString();
+                                }
+                                else
+                                {
+                                    firstInvalidItemDesc = "Item ID: " + row.Cells["ItemID"].Value.ToString();
+                                }
 
-                            firstInvalidRowIndex = row.Index;
-                            break;
+                                firstInvalidRowIndex = row.Index;
+                                break;
+                            }
                         }
                     }
                 }
@@ -5415,7 +5737,7 @@ namespace PosBranch_Win.Transaction
                     }
                 }
                 prMaster.TaxType = taxType;
-                prMaster.Remarks = "";
+                prMaster.Remarks = (mall != null && !string.IsNullOrWhiteSpace(mall.Text)) ? mall.Text.Trim() : "";
                 prMaster.RoundOff = 0;
                 prMaster.CessPer = 0;
                 prMaster.CessAmt = 0;
@@ -5516,6 +5838,19 @@ namespace PosBranch_Win.Transaction
                             continue;
                         }
 
+                        // If row reason is empty, fallback to master reason from ultraTextEditor3 if available
+                        if (row.Cells.Exists("Reason") &&
+                            (row.Cells["Reason"].Value == null ||
+                             row.Cells["Reason"].Value == DBNull.Value ||
+                             string.IsNullOrWhiteSpace(row.Cells["Reason"].Value.ToString()) ||
+                             row.Cells["Reason"].Value.ToString() == "Select Reason"))
+                        {
+                            if (mall != null && !string.IsNullOrWhiteSpace(mall.Text))
+                            {
+                                row.Cells["Reason"].Value = mall.Text.Trim();
+                            }
+                        }
+
                         // Now that we know this row is selected, validate the Reason field
                         if (row.Cells.Exists("Reason") &&
                             (row.Cells["Reason"].Value == null ||
@@ -5588,10 +5923,15 @@ namespace PosBranch_Win.Transaction
                     // Save the PR number to prevent duplicates
                     _currentlyLoadedPurchaseNo = returnedPrNo;
 
-                    // Call the method to save details
-                    UpdatePurchaseReturnDetails(returnedPrNo);
+                    // Save details to database silently (without update popup)
+                    UpdatePurchaseReturnDetails(returnedPrNo, isSilent: true);
+
                     prMaster.PReturnNo = returnedPrNo;
                     SavePurchaseReturnActivityLog("SAVE", prMaster);
+
+                    // Show Save success message to user
+                    MessageBox.Show($"Purchase Return #{returnedPrNo} saved successfully!",
+                        "Save Successful", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
                     // Generate and display debit note preview
                     DebitNote debitNote = GenerateDebitNote(prMaster, returnedPrNo);
@@ -5733,6 +6073,9 @@ namespace PosBranch_Win.Transaction
                             col.Format = "N2";
                         }
                     }
+
+                    // Always ensure Reason column keeps DropDownList style and ValueList on Layout Initialize
+                    RefreshGridReasonValueList();
                 }
 
                 CreateFooterCells();
@@ -6896,6 +7239,31 @@ namespace PosBranch_Win.Transaction
                                 : prMaster.InvoiceNo;
                         }
 
+                        // Check if the loaded bill is WITHOUT GR (Without GRN mode)
+                        bool isWithoutGR = (!string.IsNullOrEmpty(prMaster.InvoiceNo) && prMaster.InvoiceNo.Trim().Equals("WITHOUT GR", StringComparison.OrdinalIgnoreCase)) ||
+                                           (!string.IsNullOrEmpty(prMaster.PInvoice) && prMaster.PInvoice.Trim().Equals("WITHOUT GR", StringComparison.OrdinalIgnoreCase));
+
+                        if (isWithoutGR && chkWithoutGRN != null)
+                        {
+                            chkWithoutGRN.Checked = true;
+                        }
+                        else if (chkGRN != null)
+                        {
+                            chkGRN.Checked = true;
+                        }
+
+                        // Restore saved Master Reason details to mall
+                        if (mall != null)
+                        {
+                            mall.Text = prMaster.Remarks ?? "";
+                        }
+
+                        // Auto-check checkBox1 (Master Reason All) if in Without GRN mode and Master Reason exists
+                        if (isWithoutGR && checkBox1 != null)
+                        {
+                            checkBox1.Checked = !string.IsNullOrWhiteSpace(prMaster.Remarks);
+                        }
+
                         // Set payment method - only if we have valid payment method data from database
                         // If no payment method found, leave it at "Select payment" (no hardcoding)
                         if (prMaster.PaymodeID > 0 && cmbPaymntMethod != null)
@@ -6999,6 +7367,12 @@ namespace PosBranch_Win.Transaction
 
                         // Apply grid formatting to ensure only the specified columns are visible
                         ConfigureItemsGridLayout();
+
+                        // Enforce Reason column visibility state based on checkBox1 (Master Reason All)
+                        if (checkBox1 != null)
+                        {
+                            checkBox1_CheckedChanged(checkBox1, EventArgs.Empty);
+                        }
 
                         // Make sure reason values are preserved - IMPORTANT for keeping original reasons
                         PreserveReasonValues();
@@ -7140,6 +7514,20 @@ namespace PosBranch_Win.Transaction
                                     System.Diagnostics.Debug.WriteLine($"Retrieved SubTotal: {prMaster.SubTotal}");
                                 }
 
+                                // Get Remarks (Master reason)
+                                if (!reader.IsDBNull(reader.GetOrdinal("Remarks")))
+                                {
+                                    prMaster.Remarks = reader.GetString(reader.GetOrdinal("Remarks"));
+                                    System.Diagnostics.Debug.WriteLine($"Retrieved Remarks: {prMaster.Remarks}");
+                                }
+
+                                // Get PInvoice
+                                if (!reader.IsDBNull(reader.GetOrdinal("PInvoice")))
+                                {
+                                    prMaster.PInvoice = reader.GetString(reader.GetOrdinal("PInvoice"));
+                                    System.Diagnostics.Debug.WriteLine($"Retrieved PInvoice: {prMaster.PInvoice}");
+                                }
+
                                 return prMaster;
                             }
                             else
@@ -7245,6 +7633,18 @@ namespace PosBranch_Win.Transaction
                                 {
                                     prMaster.SubTotal = Convert.ToDouble(row["SubTotal"]);
                                     System.Diagnostics.Debug.WriteLine("SubTotal: " + prMaster.SubTotal);
+                                }
+
+                                if (dt.Columns.Contains("Remarks") && row["Remarks"] != DBNull.Value)
+                                {
+                                    prMaster.Remarks = row["Remarks"].ToString();
+                                    System.Diagnostics.Debug.WriteLine("Remarks: " + prMaster.Remarks);
+                                }
+
+                                if (dt.Columns.Contains("PInvoice") && row["PInvoice"] != DBNull.Value)
+                                {
+                                    prMaster.PInvoice = row["PInvoice"].ToString();
+                                    System.Diagnostics.Debug.WriteLine("PInvoice: " + prMaster.PInvoice);
                                 }
 
                                 return prMaster;
@@ -7931,7 +8331,7 @@ namespace PosBranch_Win.Transaction
         }
 
         // Utility method to update purchase return details in the database
-        private void UpdatePurchaseReturnDetails(int prNo)
+        private void UpdatePurchaseReturnDetails(int prNo, bool isSilent = false)
         {
             try
             {
@@ -8043,23 +8443,29 @@ namespace PosBranch_Win.Transaction
                             string updateResult = prRepo.UpdatePR(pr);
                             System.Diagnostics.Debug.WriteLine($"Updated PReturnMaster result: {updateResult}");
 
-                            // Show success message to user
-                            if (updateResult.Contains("success"))
+                            // Show success message to user (only if not silent)
+                            if (!isSilent)
                             {
-                                MessageBox.Show($"Purchase Return #{prNo} updated successfully!",
-                                    "Update Successful", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                            }
-                            else
-                            {
-                                MessageBox.Show($"Update failed: {updateResult}", "Update Error",
-                                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                if (updateResult.Contains("success"))
+                                {
+                                    MessageBox.Show($"Purchase Return #{prNo} updated successfully!",
+                                        "Update Successful", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                }
+                                else
+                                {
+                                    MessageBox.Show($"Update failed: {updateResult}", "Update Error",
+                                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                                }
                             }
                         }
                         else
                         {
                             System.Diagnostics.Debug.WriteLine($"ERROR: Could not retrieve existing master record for ID {prMasterId}");
-                            MessageBox.Show($"Could not retrieve existing Purchase Return record (ID: {prMasterId})",
-                                "Data Retrieval Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            if (!isSilent)
+                            {
+                                MessageBox.Show($"Could not retrieve existing Purchase Return record (ID: {prMasterId})",
+                                    "Data Retrieval Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            }
                         }
                     }
                     catch (Exception ex)
@@ -8071,9 +8477,12 @@ namespace PosBranch_Win.Transaction
                             System.Diagnostics.Debug.WriteLine($"Inner exception: {ex.InnerException.Message}");
                         }
 
-                        // Show detailed error to user
-                        MessageBox.Show($"Error updating Purchase Return master record:\n\n{ex.Message}\n\nPlease check the debug output for more details.",
-                            "Update Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        if (!isSilent)
+                        {
+                            // Show detailed error to user
+                            MessageBox.Show($"Error updating Purchase Return master record:\n\n{ex.Message}\n\nPlease check the debug output for more details.",
+                                "Update Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }
                     }
                 }
 
@@ -8185,8 +8594,11 @@ namespace PosBranch_Win.Transaction
                         prRepo.UpdatePurchaseReturnDetails(pr, finalDetails, false);
                         System.Diagnostics.Debug.WriteLine($"Final commit completed successfully for {itemsProcessed} items");
 
-                        MessageBox.Show($"Successfully updated {itemsProcessed} items for Purchase Return #{prNo}.",
-                            "Update Successful", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        if (!isSilent)
+                        {
+                            MessageBox.Show($"Successfully updated {itemsProcessed} items for Purchase Return #{prNo}.",
+                                "Update Successful", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        }
                     }
                     catch (Exception commitEx)
                     {
@@ -8194,8 +8606,11 @@ namespace PosBranch_Win.Transaction
                         {
                             // This is expected if the transaction was already committed
                             System.Diagnostics.Debug.WriteLine("Transaction already completed, items were saved successfully");
-                            MessageBox.Show($"Successfully updated {itemsProcessed} items for Purchase Return #{prNo}.",
-                                "Update Successful", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            if (!isSilent)
+                            {
+                                MessageBox.Show($"Successfully updated {itemsProcessed} items for Purchase Return #{prNo}.",
+                                    "Update Successful", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            }
                         }
                         else
                         {
@@ -9835,6 +10250,10 @@ namespace PosBranch_Win.Transaction
                 if (ultraTextEditor2 != null)
                 {
                     ultraTextEditor2.Text = "";
+                }
+                if (mall != null)
+                {
+                    mall.Text = "";
                 }
                 if (_lstVendorSuggestions != null)
                 {

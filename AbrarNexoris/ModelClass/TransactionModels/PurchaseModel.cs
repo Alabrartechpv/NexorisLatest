@@ -46,8 +46,8 @@ namespace ModelClass.TransactionModels
         public double CessPer { get; set; }
         public double CessAmt { get; set; }
         public double CalAfterTax { get; set; }
-        public int CurrencyID { get; set; }
-        public string CurSymbol { get; set; }
+        public int CurrencyID { get; set; } = 1;
+        public string CurSymbol { get; set; } = "RM";
         public int SeriesID { get; set; }
         public int VoucherID { get; set; }
         public bool IsSyncd { get; set; }

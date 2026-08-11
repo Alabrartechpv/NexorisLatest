@@ -365,7 +365,7 @@ namespace PosBranch_Win.Transaction
                 {
                     var defaultCurrency = currencies.List.FirstOrDefault();
                     purchaseMaster.CurrencyID = defaultCurrency?.CurrencyID ?? 1;
-                    purchaseMaster.CurSymbol = defaultCurrency?.CurrencySymbol ?? "RM";
+                    purchaseMaster.CurSymbol = !string.IsNullOrWhiteSpace(defaultCurrency?.CurrencySymbol) ? defaultCurrency.CurrencySymbol : "RM";
                 }
                 else
                 {
@@ -379,6 +379,15 @@ namespace PosBranch_Win.Transaction
                 purchaseMaster.CurrencyID = 1;
                 purchaseMaster.CurSymbol = "RM";
                 System.Diagnostics.Debug.WriteLine($"Error loading currency: {ex.Message}");
+            }
+
+            if (string.IsNullOrWhiteSpace(purchaseMaster.CurSymbol))
+            {
+                purchaseMaster.CurSymbol = "RM";
+            }
+            if (purchaseMaster.CurrencyID <= 0)
+            {
+                purchaseMaster.CurrencyID = 1;
             }
         }
 

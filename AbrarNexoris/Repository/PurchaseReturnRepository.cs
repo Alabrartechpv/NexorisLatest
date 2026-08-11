@@ -164,8 +164,8 @@ namespace Repository.TransactionRepository
                         cmd.Parameters.AddWithValue("@CessPer", pr.CessPer);
                         cmd.Parameters.AddWithValue("@CessAmt", pr.CessAmt);
                         cmd.Parameters.AddWithValue("@CalAfterTax", pr.CalAfterTax);
-                        cmd.Parameters.AddWithValue("@CurrencyID", pr.CurrencyID);
-                        cmd.Parameters.AddWithValue("@CurSymbol", pr.CurSymbol);
+                        cmd.Parameters.AddWithValue("@CurrencyID", pr.CurrencyID > 0 ? pr.CurrencyID : 1);
+                        cmd.Parameters.AddWithValue("@CurSymbol", !string.IsNullOrWhiteSpace(pr.CurSymbol) ? pr.CurSymbol : "RM");
                         cmd.Parameters.AddWithValue("@SeriesID", pr.SeriesID);
                         cmd.Parameters.AddWithValue("@VoucherID", pr.VoucherID);
                         cmd.Parameters.AddWithValue("@_Operation", "CREATE");
