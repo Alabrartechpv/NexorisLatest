@@ -727,6 +727,105 @@ namespace PosBranch_Win.Transaction
             }
         }
 
+        private void OpenBatchReasonDialog()
+        {
+            try
+            {
+                if (ultraGrid1 == null || ultraGrid1.Rows.Count == 0)
+                {
+                    MessageBox.Show("No items available in the grid to set batch reason.", "Notice", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                // Collect current items from ultraGrid1
+                List<PosBranch_Win.DialogBox.BatchReasonItemInfo> itemList = new List<PosBranch_Win.DialogBox.BatchReasonItemInfo>();
+                foreach (UltraGridRow row in ultraGrid1.Rows)
+                {
+                    if (row.IsAddRow || row.Cells == null || !row.Cells.Exists("Description") || row.Cells["Description"].Value == null) continue;
+
+                    string slNo = row.Cells.Exists("Sl No") && row.Cells["Sl No"].Value != null ? row.Cells["Sl No"].Value.ToString() : (row.Index + 1).ToString();
+                    string desc = row.Cells.Exists("Description") && row.Cells["Description"].Value != null ? row.Cells["Description"].Value.ToString() : "";
+                    string barcode = row.Cells.Exists("Barcode") && row.Cells["Barcode"].Value != null ? row.Cells["Barcode"].Value.ToString() : "";
+                    string currReason = row.Cells.Exists("Reason") && row.Cells["Reason"].Value != null ? row.Cells["Reason"].Value.ToString() : "";
+
+                    itemList.Add(new PosBranch_Win.DialogBox.BatchReasonItemInfo
+                    {
+                        RowIndex = row.Index,
+                        IsSelected = true,
+                        SlNo = slNo,
+                        Description = desc,
+                        Barcode = barcode,
+                        CurrentReason = currReason
+                    });
+                }
+
+                if (itemList.Count == 0)
+                {
+                    MessageBox.Show("No valid item rows found in grid.", "Notice", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                // Available default and DB reasons
+                List<string> reasons = new List<string> { "Damaged", "Expired", "Non-ordered", "Other" };
+                try
+                {
+                    Repository.TransactionRepository.StockAdjustmentRepository stockRepo = new Repository.TransactionRepository.StockAdjustmentRepository();
+                    var dbReasons = stockRepo.GetStockAdjustmentReasons(ModelClass.SessionContext.BranchId);
+                    if (dbReasons != null)
+                    {
+                        foreach (var r in dbReasons)
+                        {
+                            if (!string.IsNullOrWhiteSpace(r.ReasonName) && !reasons.Any(x => x.Equals(r.ReasonName.Trim(), StringComparison.OrdinalIgnoreCase)))
+                            {
+                                reasons.Add(r.ReasonName.Trim());
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine("Error loading DB reasons for batch dialog: " + ex.Message);
+                }
+
+                using (PosBranch_Win.DialogBox.frmBatchReasonDialog dlg = new PosBranch_Win.DialogBox.frmBatchReasonDialog(itemList, reasons))
+                {
+                    if (dlg.ShowDialog(this) == DialogResult.OK)
+                    {
+                        string batchReason = dlg.SelectedReason;
+                        List<int> targetRowIndices = dlg.SelectedRowIndices;
+
+                        if (targetRowIndices != null && targetRowIndices.Count > 0 && !string.IsNullOrWhiteSpace(batchReason))
+                        {
+                            // Apply batch reason to all target rows
+                            foreach (int rIdx in targetRowIndices)
+                            {
+                                if (rIdx >= 0 && rIdx < ultraGrid1.Rows.Count)
+                                {
+                                    UltraGridRow targetRow = ultraGrid1.Rows[rIdx];
+                                    if (targetRow.Cells.Exists("Reason"))
+                                    {
+                                        targetRow.Cells["Reason"].Value = batchReason;
+                                    }
+                                }
+                            }
+
+                            // If new reason, auto-save to database & refresh ValueList
+                            AutoSaveTypedNewReason(batchReason);
+
+                            // Refresh ValueList
+                            RefreshGridReasonValueList();
+
+                            MessageBox.Show($"Batch Reason '{batchReason}' applied to {targetRowIndices.Count} selected item(s)!", "Batch Reason Applied", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error opening batch reason dialog: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
         private void GridReasonEditor_EditorButtonClick(object sender, Infragistics.Win.UltraWinEditors.EditorButtonEventArgs e)
         {
             try
@@ -3866,6 +3965,43 @@ namespace PosBranch_Win.Transaction
         {
             try
             {
+                // Handle 'R' key when focus is in any Reason cell to open Batch Reason Dialog
+                if (e.KeyCode == Keys.R && !e.Control && !e.Alt && ultraGrid1.ActiveCell != null && ultraGrid1.ActiveCell.Column.Key == "Reason")
+                {
+                    e.Handled = true;
+                    e.SuppressKeyPress = true;
+                    OpenBatchReasonDialog();
+                    return;
+                }
+
+                // Handle 'R' key when focus is in Return Qty cell to move to next row's Return Qty cell
+                if (e.KeyCode == Keys.R && !e.Control && !e.Alt && ultraGrid1.ActiveCell != null && (ultraGrid1.ActiveCell.Column.Key == "Returned qty" || ultraGrid1.ActiveCell.Column.Key == "Return Qty"))
+                {
+                    e.Handled = true;
+                    e.SuppressKeyPress = true;
+
+                    UltraGridRow currentRow = ultraGrid1.ActiveRow;
+                    if (currentRow != null && currentRow.Index < ultraGrid1.Rows.Count - 1)
+                    {
+                        UltraGridRow nextRow = ultraGrid1.Rows[currentRow.Index + 1];
+                        string currentColumnKey = ultraGrid1.ActiveCell.Column.Key;
+
+                        if (nextRow.Cells.Exists(currentColumnKey))
+                        {
+                            ultraGrid1.ActiveRow = nextRow;
+                            ultraGrid1.ActiveCell = nextRow.Cells[currentColumnKey];
+                            ultraGrid1.Selected.Rows.Clear();
+                            ultraGrid1.Selected.Rows.Add(nextRow);
+
+                            if (nextRow.Cells[currentColumnKey].Column.CellActivation == Activation.AllowEdit)
+                            {
+                                ultraGrid1.PerformAction(UltraGridAction.EnterEditMode);
+                            }
+                        }
+                    }
+                    return;
+                }
+
                 // Handle Down Arrow key specifically
                 if (e.KeyCode == Keys.Down)
                 {
