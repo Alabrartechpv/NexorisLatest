@@ -465,8 +465,42 @@ namespace PosBranch_Win.DialogBox
         private UltraGridColumn columnToMove = null;
         private bool isDraggingColumn = false;
         private System.Windows.Forms.ToolTip toolTip = new System.Windows.Forms.ToolTip(); // ToolTip control for feedback
+        private static readonly Cursor blackXCursor = CreateBlackXCursor();
 
-        // Handle mouse down on grid to initiate drag
+        private static Cursor CreateBlackXCursor()
+        {
+            try
+            {
+                using (Bitmap bmp = new Bitmap(32, 32))
+                using (Graphics g = Graphics.FromImage(bmp))
+                {
+                    g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                    g.Clear(Color.Transparent);
+
+                    using (SolidBrush bgBrush = new SolidBrush(Color.Black))
+                    {
+                        g.FillEllipse(bgBrush, 4, 4, 24, 24);
+                    }
+
+                    using (Pen whitePen = new Pen(Color.White, 3.5f))
+                    {
+                        whitePen.StartCap = System.Drawing.Drawing2D.LineCap.Round;
+                        whitePen.EndCap = System.Drawing.Drawing2D.LineCap.Round;
+                        g.DrawLine(whitePen, 11, 11, 21, 21);
+                        g.DrawLine(whitePen, 21, 11, 11, 21);
+                    }
+
+                    IntPtr hIcon = bmp.GetHicon();
+                    return new Cursor(hIcon);
+                }
+            }
+            catch
+            {
+                return Cursors.No;
+            }
+        }
+
+        // Handle mouse down on grid to initiate drag (Header only)
         private void UltraGrid1_MouseDown(object sender, MouseEventArgs e)
         {
             try
@@ -474,39 +508,19 @@ namespace PosBranch_Win.DialogBox
                 // Reset drag state
                 isDraggingColumn = false;
                 columnToMove = null;
-
-                // Store the mouse down position
                 startPoint = new Point(e.X, e.Y);
 
-                // If we're in the header area, try to determine which column
-                if (e.Y < 40) // Assuming header is in the top 40 pixels
+                if (ultraGrid1.DisplayLayout == null || ultraGrid1.DisplayLayout.Bands.Count == 0)
+                    return;
+
+                Infragistics.Win.UIElement element = ultraGrid1.DisplayLayout.UIElement?.ElementFromPoint(e.Location);
+                Infragistics.Win.UltraWinGrid.HeaderUIElement headerElement = element as Infragistics.Win.UltraWinGrid.HeaderUIElement ?? element?.GetAncestor(typeof(Infragistics.Win.UltraWinGrid.HeaderUIElement)) as Infragistics.Win.UltraWinGrid.HeaderUIElement;
+                UltraGridColumn col = headerElement?.GetContext(typeof(UltraGridColumn)) as UltraGridColumn;
+
+                if (headerElement != null && col != null && !col.Hidden)
                 {
-                    // Use a simpler approach to find which column was clicked
-                    // Calculate horizontal position of each column
-                    int xPos = 0;
-
-                    // Account for row selector width if present
-                    if (ultraGrid1.DisplayLayout.Override.RowSelectors == Infragistics.Win.DefaultableBoolean.True)
-                    {
-                        xPos += ultraGrid1.DisplayLayout.Override.RowSelectorWidth;
-                    }
-
-                    // Find which column contains the x position
-                    foreach (UltraGridColumn col in ultraGrid1.DisplayLayout.Bands[0].Columns)
-                    {
-                        if (!col.Hidden)
-                        {
-                            // Check if click is within this column's width
-                            if (e.X >= xPos && e.X < xPos + col.Width)
-                            {
-                                columnToMove = col;
-                                isDraggingColumn = true;
-                                break;
-                            }
-
-                            xPos += col.Width;
-                        }
-                    }
+                    columnToMove = col;
+                    isDraggingColumn = true;
                 }
             }
             catch (Exception ex)
@@ -583,47 +597,29 @@ namespace PosBranch_Win.DialogBox
             }
         }
 
-        // Handle mouse move to initiate drag if needed
+        // Handle mouse move to initiate drag feedback
         private void UltraGrid1_MouseMove(object sender, MouseEventArgs e)
         {
             try
             {
-                // Only track movement if we're dragging a column
+                // Only track movement if we're dragging a column header
                 if (e.Button == MouseButtons.Left && columnToMove != null && isDraggingColumn)
                 {
-                    // Calculate how far the mouse has moved
                     int deltaX = Math.Abs(e.X - startPoint.X);
-                    int deltaY = Math.Abs(e.Y - startPoint.Y);
+                    int deltaY = e.Y - startPoint.Y;
 
-                    // Only start drag if moved beyond threshold
-                    if (deltaX > SystemInformation.DragSize.Width || deltaY > SystemInformation.DragSize.Height)
+                    if (deltaY > 20 && deltaY > deltaX)
                     {
-                        // Check if moving primarily downward (column to chooser)
-                        bool isDraggingDown = (e.Y > startPoint.Y && deltaY > deltaX);
+                        ultraGrid1.Cursor = blackXCursor;
 
-                        if (isDraggingDown)
-                        {
-                            // Change cursor to indicate a drag operation
-                            ultraGrid1.Cursor = Cursors.No;
-
-                            // Show tooltip with hint
-                            string columnName = !string.IsNullOrEmpty(columnToMove.Header.Caption) ?
+                        string columnName = !string.IsNullOrEmpty(columnToMove.Header.Caption) ?
                                             columnToMove.Header.Caption : columnToMove.Key;
-                            toolTip.SetToolTip(ultraGrid1, $"Drag down to hide '{columnName}' column");
-
-                            // If dragged downward more than 50 pixels, hide the column
-                            if (e.Y - startPoint.Y > 50)
-                            {
-                                // Hide the column and add to customization
-                                HideColumn(columnToMove);
-
-                                // Reset drag state
-                                columnToMove = null;
-                                isDraggingColumn = false;
-                                ultraGrid1.Cursor = Cursors.Default;
-                                toolTip.SetToolTip(ultraGrid1, "");
-                            }
-                        }
+                        toolTip.SetToolTip(ultraGrid1, $"✖ Drag down to hide '{columnName}' column");
+                    }
+                    else
+                    {
+                        ultraGrid1.Cursor = Cursors.Default;
+                        toolTip.SetToolTip(ultraGrid1, "");
                     }
                 }
             }
@@ -640,6 +636,15 @@ namespace PosBranch_Win.DialogBox
         {
             try
             {
+                if (isDraggingColumn && columnToMove != null)
+                {
+                    int dragDistanceY = e.Y - startPoint.Y;
+                    // Only hide column if user dragged down into mid section (> 40px down) and released mouse button
+                    if (dragDistanceY > 40)
+                    {
+                        HideColumn(columnToMove);
+                    }
+                }
                 // Reset cursor
                 ultraGrid1.Cursor = Cursors.Default;
                 toolTip.SetToolTip(ultraGrid1, "");

@@ -6378,7 +6378,7 @@ namespace PosBranch_Win.Transaction
                 if (vendorid == null || string.IsNullOrWhiteSpace(vendorid.Text) || !int.TryParse(vendorid.Text, out vendorId) || vendorId <= 0)
                 {
                     ShowPlayfulVendorAlert();
-                    button2_Click(sender, e);
+                    Vendorbutton_Click(sender, e);
 
                     // Re-check vendorid after vendor selection dialog closes
                     if (vendorid == null || string.IsNullOrWhiteSpace(vendorid.Text) || !int.TryParse(vendorid.Text, out vendorId) || vendorId <= 0)
@@ -11060,20 +11060,16 @@ namespace PosBranch_Win.Transaction
             int deltaX = Math.Abs(e.X - headerDragStartPoint.X);
             int deltaY = e.Y - headerDragStartPoint.Y;
 
-            if (deltaY > 25 && deltaY > deltaX)
+            if (deltaY > 20 && deltaY > deltaX)
             {
                 ultraGrid1.Cursor = blackXCursor;
                 string colName = !string.IsNullOrEmpty(columnBeingDragged.Header.Caption) ? columnBeingDragged.Header.Caption : columnBeingDragged.Key;
                 headerToolTip.SetToolTip(ultraGrid1, $"✖ Drag down to hide '{colName}' column");
-
-                if (deltaY > 50)
-                {
-                    HideColumn(columnBeingDragged);
-                    isDraggingHeaderToHide = false;
-                    columnBeingDragged = null;
-                    ultraGrid1.Cursor = Cursors.Default;
-                    headerToolTip.SetToolTip(ultraGrid1, string.Empty);
-                }
+            }
+            else
+            {
+                ultraGrid1.Cursor = Cursors.Default;
+                headerToolTip.SetToolTip(ultraGrid1, string.Empty);
             }
         }
 
