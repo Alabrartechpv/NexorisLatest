@@ -453,6 +453,40 @@ namespace PosBranch_Win.Transaction
         private UltraGridColumn columnToMove = null;
         private bool isDraggingColumn = false;
         private System.Windows.Forms.ToolTip columnToolTip = new System.Windows.Forms.ToolTip();
+        private static readonly Cursor blackXCursor = CreateBlackXCursor();
+
+        private static Cursor CreateBlackXCursor()
+        {
+            try
+            {
+                using (Bitmap bmp = new Bitmap(32, 32))
+                using (Graphics g = Graphics.FromImage(bmp))
+                {
+                    g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                    g.Clear(Color.Transparent);
+
+                    using (SolidBrush bgBrush = new SolidBrush(Color.Black))
+                    {
+                        g.FillEllipse(bgBrush, 4, 4, 24, 24);
+                    }
+
+                    using (Pen whitePen = new Pen(Color.White, 3.5f))
+                    {
+                        whitePen.StartCap = System.Drawing.Drawing2D.LineCap.Round;
+                        whitePen.EndCap = System.Drawing.Drawing2D.LineCap.Round;
+                        g.DrawLine(whitePen, 11, 11, 21, 21);
+                        g.DrawLine(whitePen, 21, 11, 11, 21);
+                    }
+
+                    IntPtr hIcon = bmp.GetHicon();
+                    return new Cursor(hIcon);
+                }
+            }
+            catch
+            {
+                return Cursors.No;
+            }
+        }
 
         // Helper class to store column information in the listbox
         private class ColumnItem
@@ -9394,27 +9428,17 @@ namespace PosBranch_Win.Transaction
                 columnToMove = null;
                 startPoint = new Point(e.X, e.Y);
 
-                if (e.Y < 40) // Header area
-                {
-                    int xPos = 0;
-                    if (ultraGrid1.DisplayLayout.Override.RowSelectors == DefaultableBoolean.True)
-                    {
-                        xPos += ultraGrid1.DisplayLayout.Override.RowSelectorWidth;
-                    }
+                if (ultraGrid1.DisplayLayout == null || ultraGrid1.DisplayLayout.Bands.Count == 0)
+                    return;
 
-                    foreach (UltraGridColumn col in ultraGrid1.DisplayLayout.Bands[0].Columns)
-                    {
-                        if (!col.Hidden)
-                        {
-                            if (e.X >= xPos && e.X < xPos + col.Width)
-                            {
-                                columnToMove = col;
-                                isDraggingColumn = true;
-                                break;
-                            }
-                            xPos += col.Width;
-                        }
-                    }
+                Infragistics.Win.UIElement element = ultraGrid1.DisplayLayout.UIElement?.ElementFromPoint(e.Location);
+                Infragistics.Win.UltraWinGrid.HeaderUIElement headerElement = element as Infragistics.Win.UltraWinGrid.HeaderUIElement ?? element?.GetAncestor(typeof(Infragistics.Win.UltraWinGrid.HeaderUIElement)) as Infragistics.Win.UltraWinGrid.HeaderUIElement;
+                UltraGridColumn col = headerElement?.GetContext(typeof(UltraGridColumn)) as UltraGridColumn;
+
+                if (headerElement != null && col != null && !col.Hidden)
+                {
+                    columnToMove = col;
+                    isDraggingColumn = true;
                 }
             }
             catch (Exception ex)
@@ -9432,28 +9456,19 @@ namespace PosBranch_Win.Transaction
                 if (e.Button == MouseButtons.Left && columnToMove != null && isDraggingColumn)
                 {
                     int deltaX = Math.Abs(e.X - startPoint.X);
-                    int deltaY = Math.Abs(e.Y - startPoint.Y);
+                    int deltaY = e.Y - startPoint.Y;
 
-                    if (deltaX > SystemInformation.DragSize.Width || deltaY > SystemInformation.DragSize.Height)
+                    if (deltaY > 20 && deltaY > deltaX)
                     {
-                        bool isDraggingDown = (e.Y > startPoint.Y && deltaY > deltaX);
-
-                        if (isDraggingDown)
-                        {
-                            ultraGrid1.Cursor = Cursors.No;
-                            string columnName = !string.IsNullOrEmpty(columnToMove.Header.Caption) ?
-                                                columnToMove.Header.Caption : columnToMove.Key;
-                            columnToolTip.SetToolTip(ultraGrid1, $"Drag down to hide '{columnName}' column");
-
-                            if (e.Y - startPoint.Y > 50)
-                            {
-                                HideColumn(columnToMove);
-                                columnToMove = null;
-                                isDraggingColumn = false;
-                                ultraGrid1.Cursor = Cursors.Default;
-                                columnToolTip.SetToolTip(ultraGrid1, "");
-                            }
-                        }
+                        ultraGrid1.Cursor = blackXCursor;
+                        string columnName = !string.IsNullOrEmpty(columnToMove.Header.Caption) ?
+                                            columnToMove.Header.Caption : columnToMove.Key;
+                        columnToolTip.SetToolTip(ultraGrid1, $"✖ Drag down to hide '{columnName}' column");
+                    }
+                    else
+                    {
+                        ultraGrid1.Cursor = Cursors.Default;
+                        columnToolTip.SetToolTip(ultraGrid1, "");
                     }
                 }
             }
@@ -9469,6 +9484,15 @@ namespace PosBranch_Win.Transaction
         {
             try
             {
+                if (isDraggingColumn && columnToMove != null)
+                {
+                    int dragDistanceY = e.Y - startPoint.Y;
+                    // Only hide column if user dragged down into mid section (> 40px down) and released mouse button
+                    if (dragDistanceY > 40)
+                    {
+                        HideColumn(columnToMove);
+                    }
+                }
                 ultraGrid1.Cursor = Cursors.Default;
                 columnToolTip.SetToolTip(ultraGrid1, "");
                 isDraggingColumn = false;

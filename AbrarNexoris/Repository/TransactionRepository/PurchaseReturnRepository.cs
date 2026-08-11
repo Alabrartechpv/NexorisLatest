@@ -67,6 +67,14 @@ namespace Repository.TransactionRepository
                         BEGIN
                             ALTER TABLE dbo.PReturnMaster ADD CONSTRAINT DF_PReturnMaster_CurSymbol DEFAULT('RM') FOR CurSymbol;
                         END
+
+                        -- Auto-fix existing PReturnMaster rows that have duplicate VoucherID = 1 so each gets a unique VoucherID matching PReturnNo
+                        IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'PReturnMaster')
+                        BEGIN
+                            UPDATE PReturnMaster 
+                            SET VoucherID = PReturnNo 
+                            WHERE (VoucherID IS NULL OR VoucherID <= 1) AND PReturnNo > 1;
+                        END
                     ";
 
                     using (SqlCommand cmd = new SqlCommand(sql, (SqlConnection)DataConnection))
@@ -483,35 +491,65 @@ namespace Repository.TransactionRepository
                         }
                     }
 
-                    // Generate the Voucher ID first (similar to SalesReturnRepository approach)
+                    // Generate the Voucher ID first
                     int voucherId = 0;
-                    using (SqlCommand voucherCmd = new SqlCommand("POS_Vouchers", (SqlConnection)DataConnection, trans))
+                    try
                     {
-                        voucherCmd.CommandType = CommandType.StoredProcedure;
-                        voucherCmd.Parameters.AddWithValue("@CompanyID", pr.CompanyId > 0 ? pr.CompanyId : Convert.ToInt32(DataBase.CompanyId));
-                        voucherCmd.Parameters.AddWithValue("@BranchID", pr.BranchId > 0 ? pr.BranchId : Convert.ToInt32(DataBase.BranchId));
-                        voucherCmd.Parameters.AddWithValue("@FinYearID", pr.FinYearId > 0 ? pr.FinYearId : Convert.ToInt32(DataBase.FinyearId));
-                        voucherCmd.Parameters.AddWithValue("@VoucherType", ModelClass.VoucherType.DebitNote);
-                        voucherCmd.Parameters.AddWithValue("@_Operation", "GENERATENUMBER");
-
-                        using (SqlDataAdapter da = new SqlDataAdapter(voucherCmd))
+                        using (SqlCommand voucherCmd = new SqlCommand("POS_Vouchers", (SqlConnection)DataConnection, trans))
                         {
-                            DataSet ds = new DataSet();
-                            da.Fill(ds);
-                            if ((ds != null) && (ds.Tables.Count > 0) && (ds.Tables[0] != null) && (ds.Tables[0].Rows.Count > 0))
+                            voucherCmd.CommandType = CommandType.StoredProcedure;
+                            voucherCmd.Parameters.AddWithValue("@CompanyID", pr.CompanyId > 0 ? pr.CompanyId : Convert.ToInt32(DataBase.CompanyId));
+                            voucherCmd.Parameters.AddWithValue("@BranchID", pr.BranchId > 0 ? pr.BranchId : Convert.ToInt32(DataBase.BranchId));
+                            voucherCmd.Parameters.AddWithValue("@FinYearID", pr.FinYearId > 0 ? pr.FinYearId : Convert.ToInt32(DataBase.FinyearId));
+                            voucherCmd.Parameters.AddWithValue("@VoucherType", ModelClass.VoucherType.DebitNote);
+                            voucherCmd.Parameters.AddWithValue("@_Operation", "GENERATENUMBER");
+
+                            using (SqlDataAdapter da = new SqlDataAdapter(voucherCmd))
                             {
-                                voucherId = Convert.ToInt32(ds.Tables[0].Rows[0][0]);
-                                pr.VoucherID = voucherId;
-                                System.Diagnostics.Debug.WriteLine($"Generated voucher ID: {voucherId}");
+                                DataSet ds = new DataSet();
+                                da.Fill(ds);
+                                if ((ds != null) && (ds.Tables.Count > 0) && (ds.Tables[0] != null) && (ds.Tables[0].Rows.Count > 0))
+                                {
+                                    voucherId = Convert.ToInt32(ds.Tables[0].Rows[0][0]);
+                                }
                             }
                         }
                     }
-
-                    if (voucherId <= 0)
+                    catch (Exception ex)
                     {
-                        System.Diagnostics.Debug.WriteLine("Failed to generate voucher ID");
-                        return "Error: Failed to generate voucher ID";
+                        System.Diagnostics.Debug.WriteLine("POS_Vouchers GENERATENUMBER error: " + ex.Message);
                     }
+
+                    // Fallback & Safety: If POS_Vouchers returned <= 1 when PReturnMaster already has records,
+                    // calculate max(VoucherID) + 1 to guarantee unique incrementing VoucherIDs across returns
+                    try
+                    {
+                        using (SqlCommand maxCmd = new SqlCommand(@"
+                            SELECT ISNULL(MAX(VoucherID), 0) + 1 
+                            FROM PReturnMaster 
+                            WHERE BranchId = @BranchId AND FinYearId = @FinYearId", (SqlConnection)DataConnection, trans))
+                        {
+                            maxCmd.Parameters.AddWithValue("@BranchId", pr.BranchId > 0 ? pr.BranchId : Convert.ToInt32(DataBase.BranchId));
+                            maxCmd.Parameters.AddWithValue("@FinYearId", pr.FinYearId > 0 ? pr.FinYearId : Convert.ToInt32(DataBase.FinyearId));
+                            object maxRes = maxCmd.ExecuteScalar();
+                            if (maxRes != null && maxRes != DBNull.Value)
+                            {
+                                int maxVoucherId = Convert.ToInt32(maxRes);
+                                if (maxVoucherId > voucherId)
+                                {
+                                    voucherId = maxVoucherId;
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine("Error calculating max VoucherID: " + ex.Message);
+                    }
+
+                    if (voucherId <= 0) voucherId = 1;
+                    pr.VoucherID = voucherId;
+                    System.Diagnostics.Debug.WriteLine($"Final generated VoucherID: {voucherId} for PR");
 
                     // Check if there's an existing PR for this purchase number (only if not "WITHOUT GR")
                     int existingPRNo = 0;
