@@ -7331,7 +7331,7 @@ namespace PosBranch_Win.Transaction
                             $"PReturnDate={prMaster.PReturnDate.ToString("yyyy-MM-dd")}, InvoiceNo={prMaster.InvoiceNo}");
 
                         // Set vendor details (VendorName shows Vendor ID number, ultraTextEditor2 shows Vendor Name text)
-                        int vId = prMaster.LedgerID;
+                        int vId = (int)prMaster.LedgerID;
                         string vName = prMaster.VendorName;
 
                         if (vId > 0 && (string.IsNullOrWhiteSpace(vName) || vName == vId.ToString()))
