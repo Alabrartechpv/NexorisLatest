@@ -740,6 +740,21 @@ namespace ModelClass
         }
 
         /// <summary>
+        /// Indicates whether the logged in user has Administrator / Admin privileges
+        /// </summary>
+        public static bool IsAdmin
+        {
+            get
+            {
+                if (string.IsNullOrWhiteSpace(UserLevel)) return false;
+                string ul = UserLevel.Trim();
+                return ul.Equals("Admin", StringComparison.OrdinalIgnoreCase) ||
+                       ul.Equals("Administrator", StringComparison.OrdinalIgnoreCase) ||
+                       ul.IndexOf("admin", StringComparison.OrdinalIgnoreCase) >= 0;
+            }
+        }
+
+        /// <summary>
         /// Checks if the current user has View permission for the specified form
         /// </summary>
         /// <param name="formKey">Form key matching the tool key in ultraToolbarsManager</param>
@@ -747,8 +762,8 @@ namespace ModelClass
         public static bool CanView(string formKey)
         {
             if (string.IsNullOrEmpty(formKey)) return false;
-            // Administrator always has access (fallback)
-            if (UserLevel?.Equals("Administrator", StringComparison.OrdinalIgnoreCase) == true) return true;
+            // Admin always has full access (fallback)
+            if (IsAdmin) return true;
             return _permissions.TryGetValue(formKey, out var p) && p.CanView;
         }
 
@@ -758,7 +773,7 @@ namespace ModelClass
         public static bool CanAdd(string formKey)
         {
             if (string.IsNullOrEmpty(formKey)) return false;
-            if (UserLevel?.Equals("Administrator", StringComparison.OrdinalIgnoreCase) == true) return true;
+            if (IsAdmin) return true;
             return _permissions.TryGetValue(formKey, out var p) && p.CanAdd;
         }
 
@@ -768,7 +783,7 @@ namespace ModelClass
         public static bool CanEdit(string formKey)
         {
             if (string.IsNullOrEmpty(formKey)) return false;
-            if (UserLevel?.Equals("Administrator", StringComparison.OrdinalIgnoreCase) == true) return true;
+            if (IsAdmin) return true;
             return _permissions.TryGetValue(formKey, out var p) && p.CanEdit;
         }
 
@@ -778,7 +793,7 @@ namespace ModelClass
         public static bool CanDelete(string formKey)
         {
             if (string.IsNullOrEmpty(formKey)) return false;
-            if (UserLevel?.Equals("Administrator", StringComparison.OrdinalIgnoreCase) == true) return true;
+            if (IsAdmin) return true;
             return _permissions.TryGetValue(formKey, out var p) && p.CanDelete;
         }
 

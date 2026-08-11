@@ -1073,7 +1073,7 @@ namespace PosBranch_Win.ChartOfAccount
                 txtType.Text = string.Empty;
                 txtParentGroup.Text = string.Empty;
                 txtLedgerCount.Text = "0";
-                txtBalance.Text = "$0.00";
+                txtBalance.Text = "(0.00 Dr)";
                 lblBreadcrumb.Text = string.Empty;
 
                 if (selectedNode == null) return;

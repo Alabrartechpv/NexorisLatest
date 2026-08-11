@@ -1585,13 +1585,6 @@ namespace PosBranch_Win
             }
         }
 
-
-
-
-
-
-
-
         // (test button click handlers removed)
 
         private void toolStripStatusLabel2_Click(object sender, EventArgs e)
@@ -1635,7 +1628,7 @@ namespace PosBranch_Win
                                              toolKey == "LastBill" ||
                                              toolKey == "Database";
 
-                        bool hasPermission = isGlobalAction || SessionContext.CanView(toolKey) || SessionContext.CanView(tool.Key);
+                        bool hasPermission = SessionContext.IsAdmin || isGlobalAction || SessionContext.CanView(toolKey) || SessionContext.CanView(tool.Key);
                         
                         if (tool.SharedProps != null)
                         {

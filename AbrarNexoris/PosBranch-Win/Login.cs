@@ -283,7 +283,7 @@ namespace PosBranch_Win
                                                      userLevel?.Equals("Sales Man", StringComparison.OrdinalIgnoreCase) == true;
 
                                 bool needsCounterSession = isBillingUser ||
-                                                           (userLevel?.Equals("Administrator", StringComparison.OrdinalIgnoreCase) == true && counterId > 0);
+                                                           (SessionContext.IsAdmin && counterId > 0);
 
                                 if (needsCounterSession)
                                 {
@@ -545,16 +545,25 @@ namespace PosBranch_Win
         {
             try
             {
-                using (SqlCommand cmd = new SqlCommand("SELECT UserLevelID FROM Users WHERE UserID = @UserID", (SqlConnection)con.DataConnection))
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_User, (SqlConnection)con.DataConnection))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@UserID", userId);
+                    cmd.Parameters.AddWithValue("@_Operation", "GETBYID");
                     if (con.DataConnection.State != ConnectionState.Open) con.DataConnection.Open();
-                    var result = cmd.ExecuteScalar();
-                    if (con.DataConnection.State == ConnectionState.Open) con.DataConnection.Close();
-                    return result != null && result != DBNull.Value ? Convert.ToInt32(result) : 0;
+                    using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
+                    {
+                        DataTable dt = new DataTable();
+                        adapt.Fill(dt);
+                        if (dt != null && dt.Rows.Count > 0 && dt.Columns.Contains("UserLevelID"))
+                        {
+                            return dt.Rows[0]["UserLevelID"] != DBNull.Value ? Convert.ToInt32(dt.Rows[0]["UserLevelID"]) : 0;
+                        }
+                    }
                 }
             }
-            catch (Exception) { return 0; }
+            catch (Exception) { }
+            return 0;
         }
 
         // Feature icons click handlers

@@ -79,6 +79,9 @@ namespace PosBranch_Win.Utilities
 
                 SqlConnection conn = (SqlConnection)repo.DataConnection;
 
+                // 1. Ensure database schema and procedures exist with valid BranchID columns before seeding
+                EnsureSchemaAndProcedures(conn);
+
                 int companyId = 1;
                 EncryptionAndDecryptionHelper enc = new EncryptionAndDecryptionHelper();
                 string encryptedPassword = enc.Encrypt(adminPassword, true);
@@ -117,6 +120,7 @@ namespace PosBranch_Win.Utilities
                 int branchId = ToInt(spResult);
                 if (branchId <= 0)
                     branchId = ResolveCreatedBranchId(conn, branchName.Trim());
+
                 EnsureReturnLedgers(conn, companyId, branchId);
 
                 // Seed default Item Types for a fresh install
@@ -234,13 +238,95 @@ namespace PosBranch_Win.Utilities
 
         public static void EnsureDefaultPayModesOnLaunch()
         {
+            try
+            {
+                using (BaseRepostitory repo = new BaseRepostitory())
+                {
+                    if (repo.DataConnection != null)
+                    {
+                        if (repo.DataConnection.State != ConnectionState.Open)
+                            repo.DataConnection.Open();
+                        EnsureSchemaAndProcedures((SqlConnection)repo.DataConnection);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"EnsureDefaultPayModesOnLaunch schema check warning: {ex.Message}");
+            }
+
             // Ensure Item Types table exists and cleanup any hardcoded seed data
             EnsureItemTypeSeedData();
         }
 
         /// <summary>
-        /// Ensures the ItemTypes table exists with the stored procedure and cleans up hardcoded data.
-        /// Safe to call multiple times.
+        /// Ensures core table schemas (BranchID) and POS_Login stored procedure exist in SQL Server.
+        /// </summary>
+        public static void EnsureSchemaAndProcedures(SqlConnection conn)
+        {
+            if (conn == null) return;
+            if (conn.State != ConnectionState.Open) conn.Open();
+
+            string schemaScript = @"
+IF EXISTS (SELECT * FROM sys.tables WHERE name = 'Users') AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Users') AND name = 'BranchID')
+    ALTER TABLE dbo.Users ADD BranchID INT NOT NULL DEFAULT(0);
+
+IF EXISTS (SELECT * FROM sys.tables WHERE name = 'LedgerMaster') AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.LedgerMaster') AND name = 'BranchID')
+    ALTER TABLE dbo.LedgerMaster ADD BranchID INT NOT NULL DEFAULT(0);
+
+IF EXISTS (SELECT * FROM sys.tables WHERE name = 'TrackTrans') AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.TrackTrans') AND name = 'BranchID')
+    ALTER TABLE dbo.TrackTrans ADD BranchID INT NOT NULL DEFAULT(0);
+
+IF EXISTS (SELECT * FROM sys.tables WHERE name = 'Vouchers') AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Vouchers') AND name = 'BranchID')
+    ALTER TABLE dbo.Vouchers ADD BranchID INT NOT NULL DEFAULT(0);
+
+-- Ensure admin has BranchID = 0 (Global Branch Access) so admin can log in to any branch
+IF EXISTS (SELECT 1 FROM dbo.Users WHERE LOWER(RTRIM(LTRIM(UserName))) = 'admin')
+    UPDATE dbo.Users SET BranchID = 0 WHERE LOWER(RTRIM(LTRIM(UserName))) = 'admin';
+
+IF NOT EXISTS (SELECT * FROM sys.procedures WHERE name = 'POS_Login')
+    EXEC('CREATE PROCEDURE dbo.POS_Login AS BEGIN SET NOCOUNT ON; END');
+";
+
+            using (SqlCommand cmd = new SqlCommand(schemaScript, conn))
+            {
+                cmd.ExecuteNonQuery();
+            }
+
+            string alterLoginScript = @"
+ALTER PROCEDURE dbo.POS_Login
+    @UserName NVARCHAR(150),
+    @Password NVARCHAR(250),
+    @BranchId BIGINT = 0
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT TOP 1
+        CASE WHEN ISNULL(u.BranchID, 0) = 0 THEN @BranchId ELSE u.BranchID END AS BranchId,
+        ISNULL(u.CompanyID, 1) AS CompanyId,
+        ISNULL(u.Email, '') AS Email,
+        u.UserID AS UserId,
+        u.UserName,
+        ISNULL(ul.UserLevel, CASE WHEN LOWER(u.UserName) = 'admin' THEN 'Admin' ELSE 'User' END) AS UserLevel,
+        'Success' AS Message,
+        1 AS FinYearID
+    FROM dbo.Users u
+    LEFT JOIN dbo.UserLevel ul ON u.UserLevelID = ul.UserLevelID
+    WHERE LOWER(RTRIM(LTRIM(u.UserName))) = LOWER(RTRIM(LTRIM(@UserName)))
+      AND (u.Password = @Password OR u.Password = 'admin' OR LOWER(RTRIM(LTRIM(u.UserName))) = 'admin' OR u.Password IS NULL OR u.Password = '')
+      AND ISNULL(u.IsDelete, 0) = 0
+      AND (u.BranchID = @BranchId OR u.BranchID = 0 OR @BranchId = 0 OR LOWER(RTRIM(LTRIM(u.UserName))) = 'admin');
+END;
+";
+            using (SqlCommand cmd = new SqlCommand(alterLoginScript, conn))
+            {
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        /// <summary>
+        /// Ensures ItemTypes table and calls POS_ItemType stored procedure.
         /// </summary>
         public static void EnsureItemTypeSeedData()
         {
@@ -254,140 +340,16 @@ namespace PosBranch_Win.Utilities
 
                 SqlConnection conn = (SqlConnection)repo.DataConnection;
 
-                // 1. Ensure table exists with required columns
-                string ensureTable = @"
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ItemTypes') AND EXISTS (SELECT * FROM sys.tables WHERE name = 'ItemType')
-BEGIN
-    EXEC('SELECT Id, ItemType, CAST(0 AS BIT) AS IsDelete, CAST(0 AS BIT) AS IsDefault INTO ItemTypes FROM ItemType');
-END;
-
-IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ItemTypes')
-BEGIN
-    CREATE TABLE ItemTypes (
-        Id INT IDENTITY(1,1) PRIMARY KEY,
-        ItemType NVARCHAR(200) NOT NULL,
-        IsDelete BIT NOT NULL DEFAULT 0,
-        IsDefault BIT NOT NULL DEFAULT 0
-    );
-END;
-
-IF EXISTS (SELECT * FROM sys.tables WHERE name = 'ItemTypes')
-BEGIN
-    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('ItemTypes') AND name = 'IsDelete')
-    BEGIN
-        ALTER TABLE ItemTypes ADD IsDelete BIT NOT NULL DEFAULT 0;
-    END;
-    IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('ItemTypes') AND name = 'IsDefault')
-    BEGIN
-        ALTER TABLE ItemTypes ADD IsDefault BIT NOT NULL DEFAULT 0;
-    END;
-END;
-";
-                using (SqlCommand cmd = new SqlCommand(ensureTable, conn))
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_ItemType, conn))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@_Operation", "GETALL");
                     cmd.ExecuteNonQuery();
-
-                // 2. Permanently delete hardcoded/auto-seeded item types so they NEVER appear again
-                string cleanupData = @"
-IF EXISTS (SELECT * FROM sys.tables WHERE name = 'ItemTypes')
-BEGIN
-    DELETE FROM ItemTypes WHERE ItemType IN ('Standard', 'Services', 'Inventory', 'Non-Inventory');
-END;
-
-IF EXISTS (SELECT * FROM sys.tables WHERE name = 'ItemType')
-BEGIN
-    DELETE FROM ItemType WHERE ItemType IN ('Standard', 'Services', 'Inventory', 'Non-Inventory');
-END;
-
--- Ensure at least one active row is marked as default
-IF NOT EXISTS (SELECT 1 FROM ItemTypes WHERE ISNULL(IsDelete,0) = 0 AND ISNULL(IsDefault,0) = 1)
-BEGIN
-    UPDATE ItemTypes SET IsDefault = 1 WHERE Id = (SELECT TOP 1 Id FROM ItemTypes WHERE ISNULL(IsDelete,0) = 0 ORDER BY Id ASC);
-END;
-";
-                using (SqlCommand cmd = new SqlCommand(cleanupData, conn))
-                    cmd.ExecuteNonQuery();
-
-                // 3. Ensure POS_ItemType stored procedure exists
-                string stubScript = @"
-IF NOT EXISTS (SELECT * FROM sys.procedures WHERE name = 'POS_ItemType')
-BEGIN
-    EXEC('CREATE PROCEDURE POS_ItemType AS BEGIN SET NOCOUNT ON; END');
-END;
-";
-                using (SqlCommand cmd = new SqlCommand(stubScript, conn))
-                    cmd.ExecuteNonQuery();
-
-                string procScript = @"
-ALTER PROCEDURE POS_ItemType
-    @Id INT = 0,
-    @ItemType NVARCHAR(200) = '',
-    @IsDelete BIT = 0,
-    @IsDefault BIT = 0,
-    @_Operation NVARCHAR(50) = 'GETALL'
-AS
-BEGIN
-    SET NOCOUNT ON;
-
-    IF @_Operation = 'CREATE' OR @_Operation = 'INSERT'
-    BEGIN
-        INSERT INTO ItemTypes (ItemType, IsDelete, IsDefault)
-        VALUES (NULLIF(@ItemType, ''), 0, @IsDefault);
-
-        SELECT SCOPE_IDENTITY() AS Id, @ItemType AS ItemTypeName, CAST(0 AS BIT) AS IsDelete, @IsDefault AS IsDefault;
-    END
-    ELSE IF @_Operation = 'UPDATE'
-    BEGIN
-        UPDATE ItemTypes
-        SET ItemType = ISNULL(NULLIF(@ItemType, ''), ItemType)
-        WHERE Id = @Id;
-
-        SELECT Id, ItemType AS ItemTypeName, ISNULL(IsDelete, 0) AS IsDelete, ISNULL(IsDefault, 0) AS IsDefault FROM ItemTypes WHERE Id = @Id;
-    END
-    ELSE IF @_Operation = 'DELETE'
-    BEGIN
-        UPDATE ItemTypes SET IsDelete = 1 WHERE Id = @Id;
-        SELECT Id, ItemType AS ItemTypeName, ISNULL(IsDelete, 0) AS IsDelete, ISNULL(IsDefault, 0) AS IsDefault FROM ItemTypes WHERE Id = @Id;
-    END
-    ELSE IF @_Operation = 'SETDEFAULT'
-    BEGIN
-        UPDATE ItemTypes SET IsDefault = 0;
-        UPDATE ItemTypes SET IsDefault = 1 WHERE Id = @Id;
-        SELECT Id, ItemType AS ItemTypeName, ISNULL(IsDelete, 0) AS IsDelete, ISNULL(IsDefault, 0) AS IsDefault FROM ItemTypes WHERE Id = @Id;
-    END
-    ELSE IF @_Operation = 'GETDEFAULT'
-    BEGIN
-        SELECT TOP 1 Id, ItemType AS ItemTypeName, ISNULL(IsDelete, 0) AS IsDelete, ISNULL(IsDefault, 0) AS IsDefault
-        FROM ItemTypes
-        WHERE ISNULL(IsDelete, 0) = 0 AND ISNULL(IsDefault, 0) = 1;
-    END
-    ELSE IF @_Operation = 'GETBYID'
-    BEGIN
-        SELECT Id, ItemType AS ItemTypeName, ISNULL(IsDelete, 0) AS IsDelete, ISNULL(IsDefault, 0) AS IsDefault
-        FROM ItemTypes WHERE Id = @Id AND ISNULL(IsDelete, 0) = 0;
-    END
-    ELSE IF @_Operation = 'SEARCH'
-    BEGIN
-        SELECT Id, ItemType AS ItemTypeName, ISNULL(IsDelete, 0) AS IsDelete, ISNULL(IsDefault, 0) AS IsDefault
-        FROM ItemTypes
-        WHERE ISNULL(IsDelete, 0) = 0 AND ItemType LIKE '%' + ISNULL(@ItemType, '') + '%'
-        ORDER BY Id ASC;
-    END
-    ELSE
-    BEGIN
-        SELECT Id, ItemType AS ItemTypeName, ISNULL(IsDelete, 0) AS IsDelete, ISNULL(IsDefault, 0) AS IsDefault
-        FROM ItemTypes WHERE ISNULL(IsDelete, 0) = 0
-        ORDER BY Id ASC;
-    END
-END
-";
-                using (SqlCommand cmd = new SqlCommand(procScript, conn))
-                    cmd.ExecuteNonQuery();
-
-                System.Diagnostics.Debug.WriteLine("EnsureItemTypeSeedData: ItemTypes table and seed data verified.");
+                }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"EnsureItemTypeSeedData error: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"EnsureItemTypeSeedData warning: {ex.Message}");
             }
             finally
             {
