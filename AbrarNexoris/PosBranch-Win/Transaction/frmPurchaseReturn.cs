@@ -5795,7 +5795,7 @@ namespace PosBranch_Win.Transaction
                 {
                     // Use selected vendor
                     prMaster.LedgerID = Convert.ToInt32(vendorid.Text);
-                    prMaster.VendorName = VendorName.Text;
+                    prMaster.VendorName = (ultraTextEditor2 != null && !string.IsNullOrWhiteSpace(ultraTextEditor2.Text)) ? ultraTextEditor2.Text : VendorName.Text;
                 }
 
                 prMaster.CreditPeriod = 0;
@@ -7330,19 +7330,28 @@ namespace PosBranch_Win.Transaction
                             $"Paymode={prMaster.Paymode}, PaymodeID={prMaster.PaymodeID}, " +
                             $"PReturnDate={prMaster.PReturnDate.ToString("yyyy-MM-dd")}, InvoiceNo={prMaster.InvoiceNo}");
 
-                        // Set vendor name
-                        if (!string.IsNullOrEmpty(prMaster.VendorName))
+                        // Set vendor details (VendorName shows Vendor ID number, ultraTextEditor2 shows Vendor Name text)
+                        int vId = prMaster.LedgerID;
+                        string vName = prMaster.VendorName;
+
+                        if (vId > 0 && (string.IsNullOrWhiteSpace(vName) || vName == vId.ToString()))
                         {
-                            System.Diagnostics.Debug.WriteLine($"Setting VendorName to: {prMaster.VendorName}");
-                            VendorName.Text = prMaster.VendorName;
+                            try
+                            {
+                                VendorDDLGrids vendorGrid = drop.VendorDDL();
+                                var foundVendor = vendorGrid?.List?.FirstOrDefault(v => v.LedgerID == vId);
+                                if (foundVendor != null && !string.IsNullOrWhiteSpace(foundVendor.LedgerName))
+                                {
+                                    vName = foundVendor.LedgerName;
+                                }
+                            }
+                            catch (Exception ex)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"Error fetching vendor name for ID {vId}: {ex.Message}");
+                            }
                         }
 
-                        // Set vendor ID
-                        if (prMaster.LedgerID > 0)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"Setting vendorid to: {prMaster.LedgerID}");
-                            vendorid.Text = prMaster.LedgerID.ToString();
-                        }
+                        SetVendorInfo(vId, vName);
 
 
                         // Set return date in ultraDateTimeEditor1
@@ -8489,7 +8498,7 @@ namespace PosBranch_Win.Transaction
 
                 // Get vendor details
                 pr.LedgerID = Convert.ToInt32(vendorid.Text);
-                pr.VendorName = VendorName.Text;
+                pr.VendorName = (ultraTextEditor2 != null && !string.IsNullOrWhiteSpace(ultraTextEditor2.Text)) ? ultraTextEditor2.Text : VendorName.Text;
 
                 ApplyHiddenPaymentDefaults(pr);
 
@@ -9334,7 +9343,7 @@ namespace PosBranch_Win.Transaction
                     pr.VoucherID = existingPR.VoucherID;
 
                     // Set vendor information
-                    pr.VendorName = VendorName.Text ?? "";
+                    pr.VendorName = (ultraTextEditor2 != null && !string.IsNullOrWhiteSpace(ultraTextEditor2.Text)) ? ultraTextEditor2.Text : (VendorName.Text ?? "");
                     pr.LedgerID = !string.IsNullOrEmpty(vendorid.Text) ? Convert.ToInt32(vendorid.Text) : existingPR.LedgerID;
 
                     ApplyHiddenPaymentDefaults(pr, existingPR);
