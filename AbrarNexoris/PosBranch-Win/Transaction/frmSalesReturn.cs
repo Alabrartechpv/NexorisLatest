@@ -485,7 +485,14 @@ namespace PosBranch_Win.Transaction
                 }
                 else if (currentControl == dtSReturnDate)
                 {
-                    TxtBarcode.Focus();
+                    if (rbWithoutBill != null && rbWithoutBill.Checked && TxtBarcode != null && TxtBarcode.Enabled)
+                    {
+                        TxtBarcode.Focus();
+                    }
+                    else
+                    {
+                        textBox1.Focus();
+                    }
                     return true;
                 }
                 else if (currentControl == TxtBarcode)
@@ -2482,28 +2489,27 @@ namespace PosBranch_Win.Transaction
 
         private void rbReturnMode_CheckedChanged(object sender, EventArgs e)
         {
-            // Barcode input & F7 button remain visible and active in both modes
-            if (labelBarcode != null)
-            {
-                labelBarcode.Visible = true;
-            }
-            if (TxtBarcode != null)
-            {
-                TxtBarcode.Visible = true;
-                TxtBarcode.ReadOnly = false;
-                TxtBarcode.Appearance.BackColor = System.Drawing.Color.White;
-            }
-            if (barbtn != null)
-            {
-                barbtn.Visible = true;
-                barbtn.Enabled = true;
-                barbtn.BackColor = System.Drawing.Color.FromArgb(0, 122, 204);
-                barbtn.ForeColor = System.Drawing.Color.White;
-            }
-
             if (rbWithoutBill != null && rbWithoutBill.Checked)
             {
-                // Switch to Without Bill mode: dim bill fields
+                // Switch to Without Bill mode: enable barcode input & item search button
+                if (labelBarcode != null)
+                {
+                    labelBarcode.Enabled = true;
+                }
+                if (TxtBarcode != null)
+                {
+                    TxtBarcode.Enabled = true;
+                    TxtBarcode.ReadOnly = false;
+                    TxtBarcode.Appearance.BackColor = System.Drawing.Color.White;
+                }
+                if (barbtn != null)
+                {
+                    barbtn.Enabled = true;
+                    barbtn.BackColor = System.Drawing.Color.FromArgb(0, 122, 204);
+                    barbtn.ForeColor = System.Drawing.Color.White;
+                }
+
+                // Dim bill fields
                 textBox1.ReadOnly = true;
                 textBox1.Value = "without bill";
                 btn_Add_Custm.Enabled = false;
@@ -2522,7 +2528,25 @@ namespace PosBranch_Win.Transaction
             }
             else if (rbWithBill != null && rbWithBill.Checked)
             {
-                // Switch to With Bill mode: enable bill fields
+                // Switch to With Bill mode: enable bill fields, DISABLE barcode & direct item search access
+                if (labelBarcode != null)
+                {
+                    labelBarcode.Enabled = false;
+                }
+                if (TxtBarcode != null)
+                {
+                    TxtBarcode.Enabled = false;
+                    TxtBarcode.ReadOnly = true;
+                    TxtBarcode.Text = "";
+                    TxtBarcode.Appearance.BackColor = System.Drawing.Color.LightGray;
+                }
+                if (barbtn != null)
+                {
+                    barbtn.Enabled = false;
+                    barbtn.BackColor = System.Drawing.Color.LightGray;
+                    barbtn.ForeColor = System.Drawing.Color.DimGray;
+                }
+
                 textBox1.ReadOnly = false;
                 if (textBox1.Value?.ToString() == "without bill")
                 {

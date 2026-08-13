@@ -3662,6 +3662,10 @@ namespace PosBranch_Win.Transaction
             {
                 sales = new SalesMaster();
                 salesDetails = new SalesDetails();
+                if (operations != null && operations.PendingPaymentDetails != null)
+                {
+                    operations.PendingPaymentDetails.Clear();
+                }
                 // Reset hold bill editing flags
                 isEditingHoldBill = false;
                 editingHoldBillNo = 0;
@@ -5329,6 +5333,11 @@ namespace PosBranch_Win.Transaction
         {
             // Show receipt panel (payment panel is now handled by modal dialog)
             ultraPanel7.Visible = true;
+            ultraPanel7.BringToFront();
+
+            // Allow clicking anywhere on ultraPanel7 or its child labels to dismiss it
+            ultraPanel7.Click -= UltraPanel7_Click;
+            ultraPanel7.Click += UltraPanel7_Click;
 
             // Update receipt panel labels
             label19.Text = total;
@@ -5338,6 +5347,11 @@ namespace PosBranch_Win.Transaction
             // Clear the form and grid
             Clear();
             ResetGrid();
+        }
+
+        private void UltraPanel7_Click(object sender, EventArgs e)
+        {
+            HideReceiptPanel();
         }
 
 
@@ -6263,30 +6277,10 @@ namespace PosBranch_Win.Transaction
         // Add this method to hide the receipt panel (ultraPanel7) when user interacts with controls
         private void HideReceiptPanel()
         {
-            // Only hide the panel if it's visible
-            if (ultraPanel7.Visible)
+            // Always hide the receipt panel if it's visible
+            if (ultraPanel7 != null && ultraPanel7.Visible)
             {
-                // Get the active control
-                Control activeControl = this.ActiveControl;
-
-                // List of control names that should trigger hiding the receipt panel
-                string[] controlNames = new string[] {
-                    "button1",      // F11 key
-                    "txtBarcode",
-                    "button5",
-                    "button2",      // F6
-                    "cmbPaymt",
-                    "ultraPictureBox1", // F1
-                    "button3",
-                    "button4",
-                    "cmpPrice"
-                };
-
-                // Only hide if the active control is in our list
-                if (activeControl != null && controlNames.Contains(activeControl.Name))
-                {
-                    ultraPanel7.Visible = false;
-                }
+                ultraPanel7.Visible = false;
             }
         }
 

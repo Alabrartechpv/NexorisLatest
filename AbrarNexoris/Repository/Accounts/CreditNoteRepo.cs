@@ -8,6 +8,7 @@ using System.Data;
 using System.Data.SqlClient;
 using ModelClass.TransactionModels;
 using ModelClass;
+using Repository.MasterRepositry;
 
 namespace Repository.Accounts
 {
@@ -293,26 +294,57 @@ namespace Repository.Accounts
                         {
                             int finYearId = SessionContext.FinYearId;
 
-                            // 1. Generate Voucher Number if not provided
+                            // 1. Resolve Voucher ID — reuse SalesReturn's VoucherID if available, else generate new
                             if (master.VoucherId <= 0)
                             {
-                                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_Vouchers, conn, transaction))
+                                // First check if the linked Sales Return already generated a VoucherID
+                                if (master.SReturnNo > 0)
                                 {
-                                    cmd.CommandType = CommandType.StoredProcedure;
-                                    cmd.Parameters.AddWithValue("@BranchID", master.BranchId);
-                                    cmd.Parameters.AddWithValue("@FinYearID", finYearId);
-                                    cmd.Parameters.AddWithValue("@VoucherType", "Credit Note");
-                                    cmd.Parameters.AddWithValue("@_Operation", "GENERATENUMBER");
-
-                                    object result = cmd.ExecuteScalar();
-                                    if (result != null && result != DBNull.Value)
+                                    try
                                     {
-                                        master.VoucherId = Convert.ToInt32(result);
+                                        using (SqlCommand srCmd = new SqlCommand("SELECT VoucherID FROM _POS_SalesReturn WHERE SReturnNo = @SReturnNo AND BranchId = @BranchId", conn, transaction))
+                                        {
+                                            srCmd.Parameters.AddWithValue("@SReturnNo", master.SReturnNo);
+                                            srCmd.Parameters.AddWithValue("@BranchId", master.BranchId);
+                                            object srVoucherResult = srCmd.ExecuteScalar();
+                                            if (srVoucherResult != null && srVoucherResult != DBNull.Value)
+                                            {
+                                                int existingVoucherId = Convert.ToInt32(srVoucherResult);
+                                                if (existingVoucherId > 0)
+                                                {
+                                                    master.VoucherId = existingVoucherId;
+                                                    System.Diagnostics.Debug.WriteLine($"Reusing existing VoucherID {existingVoucherId} from SalesReturn #{master.SReturnNo} for Credit Note.");
+                                                }
+                                            }
+                                        }
                                     }
-                                    else
+                                    catch (Exception ex)
                                     {
-                                        transaction.Rollback();
-                                        return false;
+                                        System.Diagnostics.Debug.WriteLine($"Could not check SalesReturn VoucherID: {ex.Message}");
+                                    }
+                                }
+
+                                // If still no VoucherId, generate a new one via stored procedure
+                                if (master.VoucherId <= 0)
+                                {
+                                    using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_Vouchers, conn, transaction))
+                                    {
+                                        cmd.CommandType = CommandType.StoredProcedure;
+                                        cmd.Parameters.AddWithValue("@BranchID", master.BranchId);
+                                        cmd.Parameters.AddWithValue("@FinYearID", finYearId);
+                                        cmd.Parameters.AddWithValue("@VoucherType", "Credit Note");
+                                        cmd.Parameters.AddWithValue("@_Operation", "GENERATENUMBER");
+
+                                        object result = cmd.ExecuteScalar();
+                                        if (result != null && result != DBNull.Value)
+                                        {
+                                            master.VoucherId = Convert.ToInt32(result);
+                                        }
+                                        else
+                                        {
+                                            transaction.Rollback();
+                                            return false;
+                                        }
                                     }
                                 }
                             }
@@ -462,7 +494,53 @@ namespace Repository.Accounts
                                     cmd.ExecuteNonQuery();
                                 }
 
-                                // Credit entry (Customer account - reduce receivable)
+                                // Retrieve GST tax amounts from the linked Sales Return details
+                                // so we can split the voucher entries properly (matching cash customer behavior)
+                                var gstTaxAmounts = new Dictionary<double, double>();
+                                if (master.SReturnNo > 0)
+                                {
+                                    try
+                                    {
+                                        using (SqlCommand taxCmd = new SqlCommand(STOREDPROCEDURE.POS_SReturnDetails, conn, transaction))
+                                        {
+                                            taxCmd.CommandType = CommandType.StoredProcedure;
+                                            taxCmd.Parameters.AddWithValue("@SReturnNo", master.SReturnNo);
+                                            taxCmd.Parameters.AddWithValue("@BranchId", master.BranchId);
+                                            taxCmd.Parameters.AddWithValue("@FinYearId", finYearId);
+                                            taxCmd.Parameters.AddWithValue("@_Operation", "GETALLSRETURNDETAILS");
+
+                                            using (SqlDataAdapter da = new SqlDataAdapter(taxCmd))
+                                            {
+                                                DataTable dtTax = new DataTable();
+                                                da.Fill(dtTax);
+
+                                                foreach (DataRow row in dtTax.Rows)
+                                                {
+                                                    double taxPer = row["TaxPer"] != DBNull.Value ? Convert.ToDouble(row["TaxPer"]) : 0;
+                                                    double taxAmt = row["TaxAmt"] != DBNull.Value ? Convert.ToDouble(row["TaxAmt"]) : 0;
+
+                                                    if (taxPer > 0 && taxAmt > 0)
+                                                    {
+                                                        if (gstTaxAmounts.ContainsKey(taxPer))
+                                                            gstTaxAmounts[taxPer] += taxAmt;
+                                                        else
+                                                            gstTaxAmounts[taxPer] = taxAmt;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        System.Diagnostics.Debug.WriteLine($"Warning: Could not retrieve GST amounts from SalesReturn details: {ex.Message}. Voucher will be created without GST split.");
+                                    }
+                                }
+
+                                double totalGST = gstTaxAmounts.Values.Sum();
+                                double creditAmountWithoutGST = master.CreditAmount - totalGST;
+                                int slNo = 1;
+
+                                // SlNo 1: Credit entry (Customer account - reduce receivable)
                                 using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_Vouchers, conn, transaction))
                                 {
                                     cmd.CommandType = CommandType.StoredProcedure;
@@ -477,7 +555,7 @@ namespace Repository.Accounts
                                     cmd.Parameters.AddWithValue("@Debit", 0);
                                     cmd.Parameters.AddWithValue("@Credit", (float)master.CreditAmount);
                                     cmd.Parameters.AddWithValue("@Narration", master.Narration ?? "");
-                                    cmd.Parameters.AddWithValue("@SlNo", 1);
+                                    cmd.Parameters.AddWithValue("@SlNo", slNo++);
                                     cmd.Parameters.AddWithValue("@Mode", "");
                                     cmd.Parameters.AddWithValue("@ModeID", 0);
                                     cmd.Parameters.AddWithValue("@UserDate", DateTime.Now);
@@ -495,7 +573,7 @@ namespace Repository.Accounts
                                     }
                                 }
 
-                                // Debit entry (Sales Return or Credit Note Issued account)
+                                // SlNo 2: Debit entry (Sales Return account - net of GST)
                                 using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_Vouchers, conn, transaction))
                                 {
                                     cmd.CommandType = CommandType.StoredProcedure;
@@ -507,10 +585,10 @@ namespace Repository.Accounts
                                     cmd.Parameters.AddWithValue("@VoucherNumber", "CN" + master.VoucherId);
                                     cmd.Parameters.AddWithValue("@LedgerID", master.PaymentMethodLedgerId);
                                     cmd.Parameters.AddWithValue("@VoucherType", "Credit Note");
-                                    cmd.Parameters.AddWithValue("@Debit", (float)master.CreditAmount);
+                                    cmd.Parameters.AddWithValue("@Debit", (float)creditAmountWithoutGST);
                                     cmd.Parameters.AddWithValue("@Credit", 0);
                                     cmd.Parameters.AddWithValue("@Narration", master.Narration ?? "");
-                                    cmd.Parameters.AddWithValue("@SlNo", 2);
+                                    cmd.Parameters.AddWithValue("@SlNo", slNo++);
                                     cmd.Parameters.AddWithValue("@Mode", "");
                                     cmd.Parameters.AddWithValue("@ModeID", 0);
                                     cmd.Parameters.AddWithValue("@UserDate", DateTime.Now);
@@ -525,6 +603,90 @@ namespace Repository.Accounts
                                     {
                                         transaction.Rollback();
                                         return false;
+                                    }
+                                }
+
+                                // SlNo 3+: GST entries (CGST and SGST DEBIT - reverse output tax liability)
+                                const int GST_OUTPUT_GROUP_ID = 23; // DUTIES & TAXES group
+                                var ledgerRepo = new Repository.MasterRepositry.LedgerRepository();
+
+                                foreach (var gstEntry in gstTaxAmounts)
+                                {
+                                    double taxPercentage = gstEntry.Key;
+                                    double totalTaxAmount = gstEntry.Value;
+
+                                    double cgstAmount = Math.Round(totalTaxAmount / 2, 2);
+                                    double sgstAmount = Math.Round(totalTaxAmount / 2, 2);
+                                    double cgstPercentage = taxPercentage / 2;
+                                    double sgstPercentage = taxPercentage / 2;
+
+                                    string cgstPercentageStr = cgstPercentage % 1 == 0 ? cgstPercentage.ToString("0") : cgstPercentage.ToString("0.#");
+                                    string sgstPercentageStr = sgstPercentage % 1 == 0 ? sgstPercentage.ToString("0") : sgstPercentage.ToString("0.#");
+
+                                    // CGST Debit entry
+                                    string cgstLedgerName = $"OUTPUT CGST {cgstPercentageStr}%";
+                                    int cgstLedgerId = ledgerRepo.GetLedgerId(cgstLedgerName, GST_OUTPUT_GROUP_ID, master.BranchId);
+                                    if (cgstLedgerId > 0 && cgstAmount > 0)
+                                    {
+                                        using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_Vouchers, conn, transaction))
+                                        {
+                                            cmd.CommandType = CommandType.StoredProcedure;
+                                            cmd.Parameters.AddWithValue("@CompanyID", master.CompanyId);
+                                            cmd.Parameters.AddWithValue("@BranchID", master.BranchId);
+                                            cmd.Parameters.AddWithValue("@VoucherID", master.VoucherId);
+                                            cmd.Parameters.AddWithValue("@VoucherSeriesID", 0);
+                                            cmd.Parameters.AddWithValue("@VoucherDate", master.VoucherDate);
+                                            cmd.Parameters.AddWithValue("@VoucherNumber", "CN" + master.VoucherId);
+                                            cmd.Parameters.AddWithValue("@LedgerID", cgstLedgerId);
+                                            cmd.Parameters.AddWithValue("@VoucherType", "Credit Note");
+                                            cmd.Parameters.AddWithValue("@Debit", (float)cgstAmount);
+                                            cmd.Parameters.AddWithValue("@Credit", 0);
+                                            cmd.Parameters.AddWithValue("@Narration", master.Narration ?? "");
+                                            cmd.Parameters.AddWithValue("@SlNo", slNo++);
+                                            cmd.Parameters.AddWithValue("@Mode", "");
+                                            cmd.Parameters.AddWithValue("@ModeID", 0);
+                                            cmd.Parameters.AddWithValue("@UserDate", DateTime.Now);
+                                            cmd.Parameters.AddWithValue("@UserID", master.UserId);
+                                            cmd.Parameters.AddWithValue("@CancelFlag", false);
+                                            cmd.Parameters.AddWithValue("@FinYearID", finYearId);
+                                            cmd.Parameters.AddWithValue("@IsSyncd", false);
+                                            cmd.Parameters.AddWithValue("@_Operation", "CREATE");
+                                            cmd.ExecuteScalar();
+                                        }
+                                        System.Diagnostics.Debug.WriteLine($"Created CGST voucher entry: {cgstLedgerName} = {cgstAmount}");
+                                    }
+
+                                    // SGST Debit entry
+                                    string sgstLedgerName = $"OUTPUT SGST {sgstPercentageStr}%";
+                                    int sgstLedgerId = ledgerRepo.GetLedgerId(sgstLedgerName, GST_OUTPUT_GROUP_ID, master.BranchId);
+                                    if (sgstLedgerId > 0 && sgstAmount > 0)
+                                    {
+                                        using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_Vouchers, conn, transaction))
+                                        {
+                                            cmd.CommandType = CommandType.StoredProcedure;
+                                            cmd.Parameters.AddWithValue("@CompanyID", master.CompanyId);
+                                            cmd.Parameters.AddWithValue("@BranchID", master.BranchId);
+                                            cmd.Parameters.AddWithValue("@VoucherID", master.VoucherId);
+                                            cmd.Parameters.AddWithValue("@VoucherSeriesID", 0);
+                                            cmd.Parameters.AddWithValue("@VoucherDate", master.VoucherDate);
+                                            cmd.Parameters.AddWithValue("@VoucherNumber", "CN" + master.VoucherId);
+                                            cmd.Parameters.AddWithValue("@LedgerID", sgstLedgerId);
+                                            cmd.Parameters.AddWithValue("@VoucherType", "Credit Note");
+                                            cmd.Parameters.AddWithValue("@Debit", (float)sgstAmount);
+                                            cmd.Parameters.AddWithValue("@Credit", 0);
+                                            cmd.Parameters.AddWithValue("@Narration", master.Narration ?? "");
+                                            cmd.Parameters.AddWithValue("@SlNo", slNo++);
+                                            cmd.Parameters.AddWithValue("@Mode", "");
+                                            cmd.Parameters.AddWithValue("@ModeID", 0);
+                                            cmd.Parameters.AddWithValue("@UserDate", DateTime.Now);
+                                            cmd.Parameters.AddWithValue("@UserID", master.UserId);
+                                            cmd.Parameters.AddWithValue("@CancelFlag", false);
+                                            cmd.Parameters.AddWithValue("@FinYearID", finYearId);
+                                            cmd.Parameters.AddWithValue("@IsSyncd", false);
+                                            cmd.Parameters.AddWithValue("@_Operation", "CREATE");
+                                            cmd.ExecuteScalar();
+                                        }
+                                        System.Diagnostics.Debug.WriteLine($"Created SGST voucher entry: {sgstLedgerName} = {sgstAmount}");
                                     }
                                 }
                             }

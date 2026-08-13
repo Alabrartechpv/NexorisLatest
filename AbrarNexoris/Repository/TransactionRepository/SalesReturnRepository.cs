@@ -1569,56 +1569,10 @@ namespace Repository.TransactionRepository
                     }
                     else // IDENTIFIED CUSTOMER — Credit Customer Ledger (SUNDRY DEBTORS)
                     {
-                        // First voucher entry - Credit Customer Account (customer gets credit for return)
-                        Voucher objVoucher = new Voucher();
-                        objVoucher.CompanyID = DataBase.CompanyId != null ? Convert.ToInt32(DataBase.CompanyId) : 0;
-                        objVoucher.BranchID = DataBase.BranchId != null ? Convert.ToInt32(DataBase.BranchId) : 0;
-                        objVoucher.VoucherID = sr.VoucherID;
-                        objVoucher.VoucherSeriesID = sr.SeriesId;
-                        objVoucher.VoucherDate = sr.SReturnDate;
-                        objVoucher.VoucherNumber = "SR" + sr.SReturnNo.ToString();
-                        objVoucher.GroupID = Convert.ToInt32(AccountGroup.SUNDRY_DEBTORS);
-                        objVoucher.LedgerID = sr.LedgerID;
-                        objVoucher.LedgerName = sr.CustomerName;
-                        objVoucher.VoucherType = "Credit Note";
-                        // Credit customer's account for credit note
-                        objVoucher.Debit = 0;
-                        objVoucher.Credit = sr.GrandTotal;
-                        objVoucher.Narration = "Sales Return #" + sr.SReturnNo;
-                        objVoucher.SlNo = 1;
-                        objVoucher.Mode = "";
-                        objVoucher.ModeID = 0;
-                        objVoucher.UserDate = DateTime.Now;
-                        objVoucher.UserName = DataBase.UserName;
-                        objVoucher.UserID = Convert.ToInt32(DataBase.UserId);
-                        objVoucher.CancelFlag = false;
-                        objVoucher.FinYearID = sr.FinYearId;
-                        objVoucher.IsSyncd = false;
-                        objVoucher._Operation = "CREATE";
-
-                        CreateVoucherEntry(objVoucher, (SqlTransaction)trans, $"VoucherID={objVoucher.VoucherID}, Type=CREDIT, Customer={objVoucher.LedgerName}, Amount={sr.GrandTotal}");
-
-                        // Second voucher entry - Debit Sales Return (reverse of Sales)
-                        // Calculate GST amounts for proper voucher split
-                        Dictionary<double, double> gstTaxAmountsCredit = CalculateGSTAmounts(dgvInvoice);
-                        double totalGSTCredit = gstTaxAmountsCredit.Values.Sum();
-                        double returnAmountWithoutGSTCredit = sr.GrandTotal - totalGSTCredit;
-                        int slNoCredit = 2;
-
-                        objVoucher.GroupID = Convert.ToInt32(AccountGroup.SALES_ACCOUNT);
-                        objVoucher.LedgerID = ledgerRepository.GetLedgerId(DefaultLedgers.SALESRETURN, (int)AccountGroup.SALES_ACCOUNT, Convert.ToInt32(DataBase.BranchId));
-                        if (objVoucher.LedgerID <= 0)
-                            throw new Exception("Sales Return ledger not found. Please configure Sales Return ledger in the system.");
-                        objVoucher.LedgerName = DefaultLedgers.SALESRETURN;
-                        // Debit Sales (Sales Return) - without GST
-                        objVoucher.Credit = 0;
-                        objVoucher.Debit = returnAmountWithoutGSTCredit;
-                        objVoucher.SlNo = slNoCredit++;
-
-                        CreateVoucherEntry(objVoucher, (SqlTransaction)trans, $"VoucherID={objVoucher.VoucherID}, Type=DEBIT, Account=Sales Return, Amount={returnAmountWithoutGSTCredit}");
-
-                        // Create GST voucher entries (CGST and SGST) - DEBITED for return
-                        CreateGSTReturnVoucherEntries(sr, objVoucher, trans, gstTaxAmountsCredit, sr.SReturnDate, ref slNoCredit);
+                        // GL voucher creation for credit customers is handled when Credit Note is saved (in FrmCreditNote),
+                        // matching saveSR() CREATE behavior and Purchase Return & Debit Note pattern.
+                        // Do NOT create voucher entries here to prevent double-posting.
+                        System.Diagnostics.Debug.WriteLine($"Credit customer (LedgerID={sr.LedgerID}): GL voucher update deferred to Credit Note screen.");
                     }
 
                     trans.Commit();

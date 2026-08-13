@@ -1408,12 +1408,55 @@ namespace Repository
             return TaxType;
         }
 
+        public static void EnsureTaxSeedData(SqlConnection conn)
+        {
+            if (conn == null) return;
+
+            bool openedHere = false;
+            try
+            {
+                if (conn.State != ConnectionState.Open)
+                {
+                    conn.Open();
+                    openedHere = true;
+                }
+
+                // Call POS_dropdown Stored Procedure with operation SEEDTAXPER
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_dropdown, conn))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@BranchId", 0);
+                    cmd.Parameters.AddWithValue("@CompanyId", 0);
+                    cmd.Parameters.AddWithValue("@FinyearId", 0);
+                    cmd.Parameters.AddWithValue("@Barcode", "");
+                    cmd.Parameters.AddWithValue("@Operation", "SEEDTAXPER");
+                    cmd.ExecuteNonQuery();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"EnsureTaxSeedData SP warning: {ex.Message}");
+            }
+            finally
+            {
+                if (openedHere && conn.State == ConnectionState.Open)
+                {
+                    conn.Close();
+                }
+            }
+        }
+
         public TaxPerDDlGrid GetTaxPer()
         {
             TaxPerDDlGrid taxper = new TaxPerDDlGrid();
+            if (DataConnection.State == ConnectionState.Open)
+                DataConnection.Close();
+
             DataConnection.Open();
             try
             {
+                EnsureTaxSeedData((SqlConnection)DataConnection);
+
                 using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_dropdown, (SqlConnection)DataConnection))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
@@ -1436,13 +1479,27 @@ namespace Repository
             }
             catch (Exception ex)
             {
-                throw ex;
+                System.Diagnostics.Debug.WriteLine($"GetTaxPer error: {ex.Message}");
             }
             finally
             {
                 if (DataConnection.State == ConnectionState.Open)
                     DataConnection.Close();
             }
+
+            // Fallback: If DB table is still empty or SP returned nothing, return default tax percentages (0%, 5%, 12%, 18%, 28%)
+            if (taxper.List == null || !taxper.List.Any())
+            {
+                taxper.List = new List<TaxPerDDl>
+                {
+                    new TaxPerDDl { Id = 1, TaxPer = 0.00m },
+                    new TaxPerDDl { Id = 2, TaxPer = 5.00m },
+                    new TaxPerDDl { Id = 3, TaxPer = 12.00m },
+                    new TaxPerDDl { Id = 4, TaxPer = 18.00m },
+                    new TaxPerDDl { Id = 5, TaxPer = 28.00m }
+                };
+            }
+
             return taxper;
         }
 
