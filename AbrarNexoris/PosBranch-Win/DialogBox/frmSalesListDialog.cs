@@ -381,7 +381,7 @@ namespace PosBranch_Win.DialogBox
                 e.Layout.Override.HeaderAppearance.FontData.SizeInPoints = 9;
                 e.Layout.Override.HeaderAppearance.FontData.Name = "Microsoft Sans Serif";
                 e.Layout.Bands[0].Columns.Cast<UltraGridColumn>().ToList().ForEach(c => c.Hidden = true);
-                string[] columnsToShow = { "BillNo", "BillDate", "CustomerName", "NetAmount", "Status" };
+                string[] columnsToShow = { "BillNo", "BillDate", "CustomerName", "CounterId", "NetAmount", "Status" };
                 for (int i = 0; i < columnsToShow.Length; i++)
                 {
                     if (e.Layout.Bands[0].Columns.Exists(columnsToShow[i]))
@@ -392,9 +392,10 @@ namespace PosBranch_Win.DialogBox
                         switch (columnsToShow[i])
                         {
                             case "BillNo": col.Header.Caption = "Bill No"; col.Width = 80; break;
-                            case "BillDate": col.Header.Caption = "Date"; col.Width = 100; col.Format = "dd-MM-yyyy"; break;
-                            case "CustomerName": col.Header.Caption = "Customer Name"; col.Width = 280; col.CellAppearance.TextHAlign = HAlign.Left; break;
-                            case "NetAmount": col.Header.Caption = "Amount"; col.Width = 110; col.Format = "N2"; col.CellAppearance.TextHAlign = HAlign.Right; break;
+                            case "BillDate": col.Header.Caption = "Date & Time"; col.Width = 135; col.Format = "dd-MM-yyyy HH:mm"; break;
+                            case "CustomerName": col.Header.Caption = "Customer Name"; col.Width = 210; col.CellAppearance.TextHAlign = HAlign.Left; break;
+                            case "CounterId": col.Header.Caption = "Counter"; col.Width = 70; col.CellAppearance.TextHAlign = HAlign.Center; break;
+                            case "NetAmount": col.Header.Caption = "Amount"; col.Width = 100; col.Format = "N2"; col.CellAppearance.TextHAlign = HAlign.Right; break;
                             case "Status": col.Header.Caption = "Status"; col.Width = 80; break;
                         }
                     }
@@ -408,7 +409,7 @@ namespace PosBranch_Win.DialogBox
         private void InitializeSearchFilterComboBox()
         {
             comboBox1.Items.Clear();
-            comboBox1.Items.AddRange(new object[] { "All", "Bill No", "Customer Name" });
+            comboBox1.Items.AddRange(new object[] { "All", "Bill No", "Customer Name", "Counter" });
             comboBox1.SelectedIndex = 0;
             comboBox1.SelectedIndexChanged += (s, e) => FilterData();
             textBoxsearch.TextChanged += (s, e) => FilterData();
@@ -430,7 +431,8 @@ namespace PosBranch_Win.DialogBox
                         {
                             case "Bill No": return b.BillNo.ToString().ToLower().Contains(searchText);
                             case "Customer Name": return b.CustomerName?.ToLower().Contains(searchText) ?? false;
-                            default: return b.BillNo.ToString().ToLower().Contains(searchText) || (b.CustomerName?.ToLower().Contains(searchText) ?? false);
+                            case "Counter": return b.CounterId.ToString().ToLower().Contains(searchText);
+                            default: return b.BillNo.ToString().ToLower().Contains(searchText) || (b.CustomerName?.ToLower().Contains(searchText) ?? false) || b.CounterId.ToString().ToLower().Contains(searchText);
                         }
                     });
                 }
@@ -444,7 +446,7 @@ namespace PosBranch_Win.DialogBox
         private void InitializeColumnOrderComboBox()
         {
             comboBox2.Items.Clear();
-            comboBox2.Items.AddRange(new object[] { "Bill No", "Date", "Customer Name", "Amount" });
+            comboBox2.Items.AddRange(new object[] { "Bill No", "Date", "Customer Name", "Counter", "Amount" });
             comboBox2.SelectedIndex = 0;
             comboBox2.SelectedIndexChanged += (s, e) => ReorderColumns(comboBox2.SelectedItem.ToString());
         }
@@ -453,7 +455,7 @@ namespace PosBranch_Win.DialogBox
         {
             if (ultraGrid1.DisplayLayout.Bands.Count == 0) return;
             ultraGrid1.SuspendLayout();
-            var columnMap = new Dictionary<string, string> { { "Bill No", "BillNo" }, { "Date", "BillDate" }, { "Customer Name", "CustomerName" }, { "Amount", "NetAmount" } };
+            var columnMap = new Dictionary<string, string> { { "Bill No", "BillNo" }, { "Date", "BillDate" }, { "Customer Name", "CustomerName" }, { "Counter", "CounterId" }, { "Amount", "NetAmount" } };
             string key = columnMap.ContainsKey(selectedColumn) ? columnMap[selectedColumn] : "BillNo";
             if (ultraGrid1.DisplayLayout.Bands[0].Columns.Exists(key))
             {

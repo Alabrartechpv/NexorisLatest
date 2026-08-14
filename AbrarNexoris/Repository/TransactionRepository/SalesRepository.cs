@@ -1691,7 +1691,7 @@ namespace Repository.TransactionRepository
                     cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
                     cmd.Parameters.AddWithValue("@CompanyId", SessionContext.CompanyId);
                     cmd.Parameters.AddWithValue("@Operation", "GetHold");
-                    cmd.Parameters.AddWithValue("@CounterId", isAdmin ? 0 : SessionContext.CounterId);
+                    cmd.Parameters.AddWithValue("@CounterId", 0);
                     using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
                     {
                         DataSet ds = new DataSet();
@@ -1700,9 +1700,9 @@ namespace Repository.TransactionRepository
                         {
                             var allHoldBills = ds.Tables[0].ToListOfObject<GetHoldBill>();
 
-                            // Filter by BranchId and CounterId to ensure data separation between counters/branches (Admins bypass CounterId filter)
+                            // Filter by BranchId and CounterId to ensure data separation between counters/branches (Admins bypass; include Admin sales with CounterId 0)
                             item.List = allHoldBills
-                                .Where(bill => bill.BranchId == SessionContext.BranchId && (isAdmin || bill.CounterId == SessionContext.CounterId))
+                                .Where(bill => bill.BranchId == SessionContext.BranchId && (isAdmin || bill.CounterId == SessionContext.CounterId || bill.CounterId == 0))
                                 .ToList();
                         }
                     }
@@ -1737,7 +1737,7 @@ namespace Repository.TransactionRepository
                     cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
                     cmd.Parameters.AddWithValue("@CompanyId", SessionContext.CompanyId);
                     cmd.Parameters.AddWithValue("@FinYearId", SessionContext.FinYearId);
-                    cmd.Parameters.AddWithValue("@CounterId", isAdmin ? 0 : SessionContext.CounterId);
+                    cmd.Parameters.AddWithValue("@CounterId", 0);
                     cmd.Parameters.AddWithValue("@_Operation", "GETALL");
                     using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
                     {
@@ -1823,9 +1823,9 @@ namespace Repository.TransactionRepository
                                 }
                             }
 
-                            // Filter by CounterId in C# as double-safety (Admins bypass)
+                            // Filter by CounterId in C# as double-safety (Admins bypass; include Admin sales with CounterId 0)
                             item.List = bills
-                                .Where(bill => isAdmin || bill.CounterId == SessionContext.CounterId)
+                                .Where(bill => isAdmin || bill.CounterId == SessionContext.CounterId || bill.CounterId == 0)
                                 .ToList();
                         }
                         else
