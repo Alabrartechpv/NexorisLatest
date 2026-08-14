@@ -2242,15 +2242,10 @@ namespace PosBranch_Win
                 Accounts.FrmBankReconciliation bankRec = new Accounts.FrmBankReconciliation();
                 OpenFormInTab(bankRec, "Bank Reconciliation");
             }
-            if (e.Tool.Key == "General PM setup" || e.Tool.Key == "GeneralPMsetup" || e.Tool.Key == "General Paymode Setup" || e.Tool.Key == "PaymodeSetup")
+            if (e.Tool.Key == "General PM setup" || e.Tool.Key == "GeneralPMsetup" || e.Tool.Key == "General Paymode Setup" || e.Tool.Key == "PaymodeSetup" || e.Tool.Key == "PaymodeMaster" || e.Tool.Key == "Paymode")
             {
                 Master.frmGeneralPaymodeSetup paymodeForm = new Master.frmGeneralPaymodeSetup();
                 OpenFormInTabSafe(paymodeForm, "General PM Setup");
-            }
-            if (e.Tool.Key == "PaymodeMaster" || e.Tool.Key == "Paymode")
-            {
-                Master.FrmPaymodeMaster paymodeMaster = new Master.FrmPaymodeMaster();
-                OpenFormInTab(paymodeMaster, "Paymode Account Setup");
             }
             if (e.Tool.Key == "BankStatementReport")
             {

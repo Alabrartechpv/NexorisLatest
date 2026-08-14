@@ -31,7 +31,7 @@ namespace PosBranch_Win.Transaction
         {
             this.components = new System.ComponentModel.Container();
             Infragistics.Win.Appearance appearance1 = new Infragistics.Win.Appearance();
-            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(FrmSalesCmpt));
+            Infragistics.Win.Appearance appearance2 = new Infragistics.Win.Appearance();
             Infragistics.Win.Appearance appearance3 = new Infragistics.Win.Appearance();
             Infragistics.Win.Appearance appearance4 = new Infragistics.Win.Appearance();
             Infragistics.Win.Appearance appearance5 = new Infragistics.Win.Appearance();
@@ -44,17 +44,8 @@ namespace PosBranch_Win.Transaction
             Infragistics.Win.Appearance appearance12 = new Infragistics.Win.Appearance();
             Infragistics.Win.Appearance appearance13 = new Infragistics.Win.Appearance();
             Infragistics.Win.Appearance appearance14 = new Infragistics.Win.Appearance();
-            Infragistics.Win.Appearance appearance2 = new Infragistics.Win.Appearance();
             this.uplBody = new Infragistics.Win.Misc.UltraPanel();
-            this.panel1 = new System.Windows.Forms.Panel();
-            this.pictureBox1 = new System.Windows.Forms.PictureBox();
-            this.label13 = new System.Windows.Forms.Label();
-            this.pictureBox2 = new System.Windows.Forms.PictureBox();
-            this.label15 = new System.Windows.Forms.Label();
-            this.pictureBox3 = new System.Windows.Forms.PictureBox();
-            this.label14 = new System.Windows.Forms.Label();
-            this.pictureBox4 = new System.Windows.Forms.PictureBox();
-            this.label16 = new System.Windows.Forms.Label();
+            this.ultraPanel1 = new Infragistics.Win.Misc.UltraPanel();
             this.ultraButton2 = new Infragistics.Win.Misc.UltraButton();
             this.ultraButton1 = new Infragistics.Win.Misc.UltraButton();
             this.label9 = new System.Windows.Forms.Label();
@@ -68,18 +59,24 @@ namespace PosBranch_Win.Transaction
             this.ultraPanel10 = new Infragistics.Win.Misc.UltraPanel();
             this.label23 = new Infragistics.Win.Misc.UltraLabel();
             this.Total = new System.Windows.Forms.Label();
+            this.pnlSeparator = new System.Windows.Forms.Panel();
+            this.panel1 = new System.Windows.Forms.Panel();
+            this.pictureBox1 = new System.Windows.Forms.PictureBox();
+            this.label13 = new System.Windows.Forms.Label();
+            this.pictureBox2 = new System.Windows.Forms.PictureBox();
+            this.label15 = new System.Windows.Forms.Label();
+            this.pictureBox3 = new System.Windows.Forms.PictureBox();
+            this.label14 = new System.Windows.Forms.Label();
+            this.pictureBox4 = new System.Windows.Forms.PictureBox();
+            this.label16 = new System.Windows.Forms.Label();
             this.txtReffc = new Infragistics.Win.UltraWinEditors.UltraTextEditor();
             this.TxtPayedAmtfc = new Infragistics.Win.UltraWinEditors.UltraTextEditor();
             this.cmbPaymodefc = new Infragistics.Win.UltraWinEditors.UltraComboEditor();
             this.toolTip1 = new System.Windows.Forms.ToolTip(this.components);
-            this.ultraPanel1 = new Infragistics.Win.Misc.UltraPanel();
             this.uplBody.ClientArea.SuspendLayout();
             this.uplBody.SuspendLayout();
-            this.panel1.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.pictureBox2)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.pictureBox3)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.pictureBox4)).BeginInit();
+            this.ultraPanel1.ClientArea.SuspendLayout();
+            this.ultraPanel1.SuspendLayout();
             this.panel3.ClientArea.SuspendLayout();
             this.panel3.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.ultraGridPayments)).BeginInit();
@@ -92,11 +89,14 @@ namespace PosBranch_Win.Transaction
             this.ultraPanel13.SuspendLayout();
             this.ultraPanel10.ClientArea.SuspendLayout();
             this.ultraPanel10.SuspendLayout();
+            this.panel1.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBox2)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBox3)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBox4)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.txtReffc)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.TxtPayedAmtfc)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.cmbPaymodefc)).BeginInit();
-            this.ultraPanel1.ClientArea.SuspendLayout();
-            this.ultraPanel1.SuspendLayout();
             this.SuspendLayout();
             // 
             // uplBody
@@ -110,140 +110,32 @@ namespace PosBranch_Win.Transaction
             // uplBody.ClientArea
             // 
             this.uplBody.ClientArea.Controls.Add(this.ultraPanel1);
-            this.uplBody.ClientArea.Controls.Add(this.panel1);
             this.uplBody.ClientArea.Controls.Add(this.label9);
             this.uplBody.ClientArea.Controls.Add(this.panel3);
             this.uplBody.ClientArea.Controls.Add(this.ultraPanel12);
             this.uplBody.ClientArea.Controls.Add(this.panel2);
+            this.uplBody.ClientArea.Controls.Add(this.pnlSeparator);
+            this.uplBody.ClientArea.Controls.Add(this.panel1);
             this.uplBody.Dock = System.Windows.Forms.DockStyle.Fill;
             this.uplBody.Location = new System.Drawing.Point(0, 0);
             this.uplBody.Name = "uplBody";
             this.uplBody.Size = new System.Drawing.Size(661, 448);
             this.uplBody.TabIndex = 2;
             // 
-            // panel1
+            // ultraPanel1
             // 
-            this.panel1.AutoScroll = true;
-            this.panel1.BackColor = System.Drawing.Color.White;
-            this.panel1.Controls.Add(this.pictureBox1);
-            this.panel1.Controls.Add(this.label13);
-            this.panel1.Controls.Add(this.pictureBox2);
-            this.panel1.Controls.Add(this.label15);
-            this.panel1.Controls.Add(this.pictureBox3);
-            this.panel1.Controls.Add(this.label14);
-            this.panel1.Controls.Add(this.pictureBox4);
-            this.panel1.Controls.Add(this.label16);
-            this.panel1.Dock = System.Windows.Forms.DockStyle.Left;
-            this.panel1.Location = new System.Drawing.Point(0, 0);
-            this.panel1.Name = "panel1";
-            this.panel1.Padding = new System.Windows.Forms.Padding(5);
-            this.panel1.Size = new System.Drawing.Size(150, 446);
-            this.panel1.TabIndex = 0;
+            appearance2.BackColor = System.Drawing.Color.Transparent;
+            this.ultraPanel1.Appearance = appearance2;
+            this.ultraPanel1.BorderStyle = Infragistics.Win.UIElementBorderStyle.None;
             // 
-            // pictureBox1
+            // ultraPanel1.ClientArea
             // 
-            this.pictureBox1.BackColor = System.Drawing.Color.White;
-            this.pictureBox1.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle; // Card border
-            this.pictureBox1.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.pictureBox1.Image = ((System.Drawing.Image)(resources.GetObject("pictureBox1.Image")));
-            this.pictureBox1.Location = new System.Drawing.Point(15, 20);
-            this.pictureBox1.Margin = new System.Windows.Forms.Padding(0);
-            this.pictureBox1.Name = "pictureBox1";
-            this.pictureBox1.Size = new System.Drawing.Size(110, 80);
-            this.pictureBox1.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
-            this.pictureBox1.TabIndex = 0;
-            this.pictureBox1.TabStop = false;
-            // 
-            // label13
-            // 
-            this.label13.BackColor = System.Drawing.Color.Transparent;
-            this.label13.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.label13.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label13.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(52)))), ((int)(((byte)(58)))), ((int)(((byte)(64)))));
-            this.label13.Location = new System.Drawing.Point(15, 103);
-            this.label13.Name = "label13";
-            this.label13.Size = new System.Drawing.Size(110, 25);
-            this.label13.TabIndex = 1;
-            this.label13.Text = "Cash (F1)";
-            this.label13.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-            // 
-            // pictureBox2
-            // 
-            this.pictureBox2.BackColor = System.Drawing.Color.White;
-            this.pictureBox2.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle; // Card border
-            this.pictureBox2.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.pictureBox2.Image = ((System.Drawing.Image)(resources.GetObject("pictureBox2.Image")));
-            this.pictureBox2.Location = new System.Drawing.Point(15, 130);
-            this.pictureBox2.Name = "pictureBox2";
-            this.pictureBox2.Size = new System.Drawing.Size(110, 80);
-            this.pictureBox2.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
-            this.pictureBox2.TabIndex = 2;
-            this.pictureBox2.TabStop = false;
-            // 
-            // label15
-            // 
-            this.label15.BackColor = System.Drawing.Color.Transparent;
-            this.label15.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.label15.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label15.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(52)))), ((int)(((byte)(58)))), ((int)(((byte)(64)))));
-            this.label15.Location = new System.Drawing.Point(15, 213);
-            this.label15.Name = "label15";
-            this.label15.Size = new System.Drawing.Size(110, 25);
-            this.label15.TabIndex = 3;
-            this.label15.Text = "Card (F2)";
-            this.label15.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-            // 
-            // pictureBox3
-            // 
-            this.pictureBox3.BackColor = System.Drawing.Color.White;
-            this.pictureBox3.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle; // Card border
-            this.pictureBox3.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.pictureBox3.Image = global::PosBranch_Win.Properties.Resources.bank;
-            this.pictureBox3.Location = new System.Drawing.Point(15, 240);
-            this.pictureBox3.Name = "pictureBox3";
-            this.pictureBox3.Size = new System.Drawing.Size(110, 80);
-            this.pictureBox3.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
-            this.pictureBox3.TabIndex = 4;
-            this.pictureBox3.TabStop = false;
-            // 
-            // label14
-            // 
-            this.label14.BackColor = System.Drawing.Color.Transparent;
-            this.label14.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.label14.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
-            this.label14.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(52)))), ((int)(((byte)(58)))), ((int)(((byte)(64)))));
-            this.label14.Location = new System.Drawing.Point(15, 323);
-            this.label14.Name = "label14";
-            this.label14.Size = new System.Drawing.Size(110, 25);
-            this.label14.TabIndex = 5;
-            this.label14.Text = "Transfer (F3)";
-            this.label14.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
-            // 
-            // pictureBox4
-            // 
-            this.pictureBox4.BackColor = System.Drawing.Color.White;
-            this.pictureBox4.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle; // Card border
-            this.pictureBox4.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.pictureBox4.Image = ((System.Drawing.Image)(resources.GetObject("pictureBox4.Image")));
-            this.pictureBox4.Location = new System.Drawing.Point(15, 350);
-            this.pictureBox4.Name = "pictureBox4";
-            this.pictureBox4.Size = new System.Drawing.Size(110, 80);
-            this.pictureBox4.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
-            this.pictureBox4.TabIndex = 26;
-            this.pictureBox4.TabStop = false;
-            // 
-            // label16
-            // 
-            this.label16.BackColor = System.Drawing.Color.Transparent;
-            this.label16.Cursor = System.Windows.Forms.Cursors.Hand;
-            this.label16.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.label16.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(52)))), ((int)(((byte)(58)))), ((int)(((byte)(64)))));
-            this.label16.Location = new System.Drawing.Point(15, 433);
-            this.label16.Name = "label16";
-            this.label16.Size = new System.Drawing.Size(110, 25);
-            this.label16.TabIndex = 6;
-            this.label16.Text = "UPI (F4)";
-            this.label16.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            this.ultraPanel1.ClientArea.Controls.Add(this.ultraButton2);
+            this.ultraPanel1.ClientArea.Controls.Add(this.ultraButton1);
+            this.ultraPanel1.Location = new System.Drawing.Point(161, 366);
+            this.ultraPanel1.Name = "ultraPanel1";
+            this.ultraPanel1.Size = new System.Drawing.Size(495, 80);
+            this.ultraPanel1.TabIndex = 32;
             // 
             // ultraButton2
             // 
@@ -258,8 +150,7 @@ namespace PosBranch_Win.Transaction
             appearance3.TextVAlignAsString = "Middle";
             this.ultraButton2.Appearance = appearance3;
             this.ultraButton2.ButtonStyle = Infragistics.Win.UIElementButtonStyle.Flat;
-            this.ultraButton2.ShapeImage = null; // Ensure no interfering shape
-            this.ultraButton2.Location = new System.Drawing.Point(232, 13);
+            this.ultraButton2.Location = new System.Drawing.Point(241, 16);
             this.ultraButton2.Name = "ultraButton2";
             this.ultraButton2.Size = new System.Drawing.Size(120, 45);
             this.ultraButton2.TabIndex = 1;
@@ -279,8 +170,7 @@ namespace PosBranch_Win.Transaction
             appearance4.TextVAlignAsString = "Middle";
             this.ultraButton1.Appearance = appearance4;
             this.ultraButton1.ButtonStyle = Infragistics.Win.UIElementButtonStyle.Flat;
-            this.ultraButton1.ShapeImage = null; // Ensure no interfering shape
-            this.ultraButton1.Location = new System.Drawing.Point(96, 13);
+            this.ultraButton1.Location = new System.Drawing.Point(96, 16);
             this.ultraButton1.Name = "ultraButton1";
             this.ultraButton1.Size = new System.Drawing.Size(120, 45);
             this.ultraButton1.TabIndex = 0;
@@ -293,7 +183,7 @@ namespace PosBranch_Win.Transaction
             this.label9.BackColor = System.Drawing.Color.Transparent;
             this.label9.Font = new System.Drawing.Font("Segoe UI", 16F, System.Drawing.FontStyle.Bold);
             this.label9.ForeColor = System.Drawing.Color.DimGray;
-            this.label9.Location = new System.Drawing.Point(159, 298);
+            this.label9.Location = new System.Drawing.Point(170, 310);
             this.label9.Name = "label9";
             this.label9.Size = new System.Drawing.Size(91, 30);
             this.label9.TabIndex = 3;
@@ -302,16 +192,16 @@ namespace PosBranch_Win.Transaction
             // panel3
             // 
             appearance5.BackColor = System.Drawing.Color.Transparent;
-            appearance5.BorderColor = System.Drawing.Color.Black;
+            appearance5.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(182)))), ((int)(((byte)(200)))), ((int)(((byte)(224)))));
             this.panel3.Appearance = appearance5;
-            this.panel3.BorderStyle = Infragistics.Win.UIElementBorderStyle.WindowsVista;
+            this.panel3.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
             // 
             // panel3.ClientArea
             // 
             this.panel3.ClientArea.Controls.Add(this.ultraGridPayments);
-            this.panel3.Location = new System.Drawing.Point(149, 104);
+            this.panel3.Location = new System.Drawing.Point(161, 104);
             this.panel3.Name = "panel3";
-            this.panel3.Size = new System.Drawing.Size(509, 150);
+            this.panel3.Size = new System.Drawing.Size(495, 165);
             this.panel3.TabIndex = 2;
             this.panel3.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
             // 
@@ -320,7 +210,7 @@ namespace PosBranch_Win.Transaction
             this.ultraGridPayments.Dock = System.Windows.Forms.DockStyle.Fill;
             this.ultraGridPayments.Location = new System.Drawing.Point(0, 0);
             this.ultraGridPayments.Name = "ultraGridPayments";
-            this.ultraGridPayments.Size = new System.Drawing.Size(507, 148);
+            this.ultraGridPayments.Size = new System.Drawing.Size(493, 163);
             this.ultraGridPayments.TabIndex = 8;
             // 
             // ultraPanel12
@@ -333,7 +223,7 @@ namespace PosBranch_Win.Transaction
             // ultraPanel12.ClientArea
             // 
             this.ultraPanel12.ClientArea.Controls.Add(this.ultraPanel11);
-            this.ultraPanel12.Location = new System.Drawing.Point(250, 280);
+            this.ultraPanel12.Location = new System.Drawing.Point(264, 280);
             this.ultraPanel12.Name = "ultraPanel12";
             this.ultraPanel12.Size = new System.Drawing.Size(253, 69);
             this.ultraPanel12.TabIndex = 31;
@@ -374,9 +264,9 @@ namespace PosBranch_Win.Transaction
             this.panel2.BackColor = System.Drawing.Color.Transparent;
             this.panel2.Controls.Add(this.ultraPanel13);
             this.panel2.Controls.Add(this.Total);
-            this.panel2.Location = new System.Drawing.Point(149, 0);
+            this.panel2.Location = new System.Drawing.Point(161, 0);
             this.panel2.Name = "panel2";
-            this.panel2.Size = new System.Drawing.Size(510, 102);
+            this.panel2.Size = new System.Drawing.Size(495, 102);
             this.panel2.TabIndex = 1;
             // 
             // ultraPanel13
@@ -439,6 +329,134 @@ namespace PosBranch_Win.Transaction
             this.Total.TabIndex = 0;
             this.Total.Text = "Total";
             // 
+            // pnlSeparator
+            // 
+            this.pnlSeparator.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(199)))), ((int)(((byte)(215)))), ((int)(((byte)(232)))));
+            this.pnlSeparator.Dock = System.Windows.Forms.DockStyle.Left;
+            this.pnlSeparator.Location = new System.Drawing.Point(155, 0);
+            this.pnlSeparator.Name = "pnlSeparator";
+            this.pnlSeparator.Size = new System.Drawing.Size(1, 446);
+            this.pnlSeparator.TabIndex = 33;
+            // 
+            // panel1
+            // 
+            this.panel1.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(248)))), ((int)(((byte)(251)))), ((int)(((byte)(255)))));
+            this.panel1.Controls.Add(this.pictureBox1);
+            this.panel1.Controls.Add(this.label13);
+            this.panel1.Controls.Add(this.pictureBox2);
+            this.panel1.Controls.Add(this.label15);
+            this.panel1.Controls.Add(this.pictureBox3);
+            this.panel1.Controls.Add(this.label14);
+            this.panel1.Controls.Add(this.pictureBox4);
+            this.panel1.Controls.Add(this.label16);
+            this.panel1.Dock = System.Windows.Forms.DockStyle.Left;
+            this.panel1.Location = new System.Drawing.Point(0, 0);
+            this.panel1.Name = "panel1";
+            this.panel1.Size = new System.Drawing.Size(155, 446);
+            this.panel1.TabIndex = 0;
+            // 
+            // pictureBox1
+            // 
+            this.pictureBox1.BackColor = System.Drawing.Color.White;
+            this.pictureBox1.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.pictureBox1.Cursor = System.Windows.Forms.Cursors.Hand;
+            this.pictureBox1.Location = new System.Drawing.Point(15, 20);
+            this.pictureBox1.Margin = new System.Windows.Forms.Padding(0);
+            this.pictureBox1.Name = "pictureBox1";
+            this.pictureBox1.Size = new System.Drawing.Size(110, 80);
+            this.pictureBox1.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
+            this.pictureBox1.TabIndex = 0;
+            this.pictureBox1.TabStop = false;
+            // 
+            // label13
+            // 
+            this.label13.BackColor = System.Drawing.Color.Transparent;
+            this.label13.Cursor = System.Windows.Forms.Cursors.Hand;
+            this.label13.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label13.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(52)))), ((int)(((byte)(58)))), ((int)(((byte)(64)))));
+            this.label13.Location = new System.Drawing.Point(15, 103);
+            this.label13.Name = "label13";
+            this.label13.Size = new System.Drawing.Size(110, 25);
+            this.label13.TabIndex = 1;
+            this.label13.Text = "Cash (F1)";
+            this.label13.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            // 
+            // pictureBox2
+            // 
+            this.pictureBox2.BackColor = System.Drawing.Color.White;
+            this.pictureBox2.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.pictureBox2.Cursor = System.Windows.Forms.Cursors.Hand;
+            this.pictureBox2.Location = new System.Drawing.Point(15, 130);
+            this.pictureBox2.Name = "pictureBox2";
+            this.pictureBox2.Size = new System.Drawing.Size(110, 80);
+            this.pictureBox2.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
+            this.pictureBox2.TabIndex = 2;
+            this.pictureBox2.TabStop = false;
+            // 
+            // label15
+            // 
+            this.label15.BackColor = System.Drawing.Color.Transparent;
+            this.label15.Cursor = System.Windows.Forms.Cursors.Hand;
+            this.label15.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label15.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(52)))), ((int)(((byte)(58)))), ((int)(((byte)(64)))));
+            this.label15.Location = new System.Drawing.Point(15, 213);
+            this.label15.Name = "label15";
+            this.label15.Size = new System.Drawing.Size(110, 25);
+            this.label15.TabIndex = 3;
+            this.label15.Text = "Card (F2)";
+            this.label15.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            // 
+            // pictureBox3
+            // 
+            this.pictureBox3.BackColor = System.Drawing.Color.White;
+            this.pictureBox3.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.pictureBox3.Cursor = System.Windows.Forms.Cursors.Hand;
+            this.pictureBox3.Image = global::PosBranch_Win.Properties.Resources.bank;
+            this.pictureBox3.Location = new System.Drawing.Point(15, 240);
+            this.pictureBox3.Name = "pictureBox3";
+            this.pictureBox3.Size = new System.Drawing.Size(110, 80);
+            this.pictureBox3.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
+            this.pictureBox3.TabIndex = 4;
+            this.pictureBox3.TabStop = false;
+            // 
+            // label14
+            // 
+            this.label14.BackColor = System.Drawing.Color.Transparent;
+            this.label14.Cursor = System.Windows.Forms.Cursors.Hand;
+            this.label14.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold);
+            this.label14.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(52)))), ((int)(((byte)(58)))), ((int)(((byte)(64)))));
+            this.label14.Location = new System.Drawing.Point(15, 323);
+            this.label14.Name = "label14";
+            this.label14.Size = new System.Drawing.Size(110, 25);
+            this.label14.TabIndex = 5;
+            this.label14.Text = "Transfer (F3)";
+            this.label14.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            // 
+            // pictureBox4
+            // 
+            this.pictureBox4.BackColor = System.Drawing.Color.White;
+            this.pictureBox4.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+            this.pictureBox4.Cursor = System.Windows.Forms.Cursors.Hand;
+            this.pictureBox4.Location = new System.Drawing.Point(15, 350);
+            this.pictureBox4.Name = "pictureBox4";
+            this.pictureBox4.Size = new System.Drawing.Size(110, 80);
+            this.pictureBox4.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom;
+            this.pictureBox4.TabIndex = 26;
+            this.pictureBox4.TabStop = false;
+            // 
+            // label16
+            // 
+            this.label16.BackColor = System.Drawing.Color.Transparent;
+            this.label16.Cursor = System.Windows.Forms.Cursors.Hand;
+            this.label16.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.label16.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(52)))), ((int)(((byte)(58)))), ((int)(((byte)(64)))));
+            this.label16.Location = new System.Drawing.Point(15, 433);
+            this.label16.Name = "label16";
+            this.label16.Size = new System.Drawing.Size(110, 25);
+            this.label16.TabIndex = 6;
+            this.label16.Text = "UPI (F4)";
+            this.label16.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            // 
             // txtReffc
             // 
             appearance12.BackColor = System.Drawing.SystemColors.InactiveCaption;
@@ -463,7 +481,7 @@ namespace PosBranch_Win.Transaction
             // 
             // cmbPaymodefc
             // 
-            this.cmbPaymodefc.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left)
+            this.cmbPaymodefc.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
             appearance14.BackColor = System.Drawing.SystemColors.InactiveCaption;
             this.cmbPaymodefc.Appearance = appearance14;
@@ -474,27 +492,15 @@ namespace PosBranch_Win.Transaction
             this.cmbPaymodefc.Size = new System.Drawing.Size(160, 28);
             this.cmbPaymodefc.TabIndex = 5;
             // 
-            // ultraPanel1
-            // 
-            appearance2.BackColor = System.Drawing.Color.Transparent;
-            this.ultraPanel1.Appearance = appearance2;
-            this.ultraPanel1.BorderStyle = Infragistics.Win.UIElementBorderStyle.WindowsVista;
-            // 
-            // ultraPanel1.ClientArea
-            // 
-            this.ultraPanel1.ClientArea.Controls.Add(this.ultraButton2);
-            this.ultraPanel1.ClientArea.Controls.Add(this.ultraButton1);
-            this.ultraPanel1.Location = new System.Drawing.Point(150, 366);
-            this.ultraPanel1.Name = "ultraPanel1";
-            this.ultraPanel1.Size = new System.Drawing.Size(508, 80);
-            this.ultraPanel1.TabIndex = 32;
-            // 
             // FrmSalesCmpt
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(661, 448);
             this.Controls.Add(this.uplBody);
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
+            this.MaximizeBox = false;
+            this.MinimizeBox = false;
             this.Name = "FrmSalesCmpt";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "Payment";
@@ -502,11 +508,8 @@ namespace PosBranch_Win.Transaction
             this.uplBody.ClientArea.ResumeLayout(false);
             this.uplBody.ClientArea.PerformLayout();
             this.uplBody.ResumeLayout(false);
-            this.panel1.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.pictureBox2)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.pictureBox3)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.pictureBox4)).EndInit();
+            this.ultraPanel1.ClientArea.ResumeLayout(false);
+            this.ultraPanel1.ResumeLayout(false);
             this.panel3.ClientArea.ResumeLayout(false);
             this.panel3.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.ultraGridPayments)).EndInit();
@@ -520,11 +523,14 @@ namespace PosBranch_Win.Transaction
             this.ultraPanel13.ResumeLayout(false);
             this.ultraPanel10.ClientArea.ResumeLayout(false);
             this.ultraPanel10.ResumeLayout(false);
+            this.panel1.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBox1)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBox2)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBox3)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.pictureBox4)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.txtReffc)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.TxtPayedAmtfc)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.cmbPaymodefc)).EndInit();
-            this.ultraPanel1.ClientArea.ResumeLayout(false);
-            this.ultraPanel1.ResumeLayout(false);
             this.ResumeLayout(false);
 
         }
@@ -533,6 +539,7 @@ namespace PosBranch_Win.Transaction
 
         private Infragistics.Win.Misc.UltraPanel uplBody;
         private System.Windows.Forms.Panel panel1;
+        private System.Windows.Forms.Panel pnlSeparator;
         private System.Windows.Forms.PictureBox pictureBox1;
         private System.Windows.Forms.Label label13;
         private System.Windows.Forms.Label label14;

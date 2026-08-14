@@ -2373,15 +2373,17 @@ namespace Repository.TransactionRepository
             {
                 try
                 {
-                    using (SqlCommand ledgerCmd = new SqlCommand(STOREDPROCEDURE.POS_PayMode, (SqlConnection)DataConnection))
+                    using (SqlCommand ledgerCmd = new SqlCommand(STOREDPROCEDURE.POS_GeneralPaymodeSetup, (SqlConnection)DataConnection))
                     {
                         ledgerCmd.CommandType = CommandType.StoredProcedure;
                         ledgerCmd.Parameters.AddWithValue("@_Operation", "GETBYID");
                         ledgerCmd.Parameters.AddWithValue("@PaymodeID", sales.PaymodeId);
-                        object ledgerResult = ledgerCmd.ExecuteScalar();
-                        if (ledgerResult != null && ledgerResult != DBNull.Value)
+                        using (SqlDataReader rdr = ledgerCmd.ExecuteReader())
                         {
-                            sales.PaymodeLedgerId = Convert.ToInt32(ledgerResult);
+                            if (rdr.Read())
+                            {
+                                try { sales.PaymodeLedgerId = Convert.ToInt32(rdr["LedgerID"]); } catch { }
+                            }
                         }
                     }
                 }
@@ -2679,7 +2681,7 @@ namespace Repository.TransactionRepository
                         string ledgerName = DefaultLedgers.CASH;
                         try
                         {
-                            using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_PayMode, (SqlConnection)DataConnection, (SqlTransaction)trans))
+                            using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_GeneralPaymodeSetup, (SqlConnection)DataConnection, (SqlTransaction)trans))
                             {
                                 cmd.CommandType = CommandType.StoredProcedure;
                                 cmd.Parameters.AddWithValue("@_Operation", "GETBYID");
@@ -2731,14 +2733,19 @@ namespace Repository.TransactionRepository
                 {
                     try
                     {
-                        using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_PayMode, (SqlConnection)DataConnection, (SqlTransaction)trans))
+                        using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_GeneralPaymodeSetup, (SqlConnection)DataConnection, (SqlTransaction)trans))
                         {
                             cmd.CommandType = CommandType.StoredProcedure;
                             cmd.Parameters.AddWithValue("@_Operation", "GETBYID");
                             cmd.Parameters.AddWithValue("@PaymodeID", sales.PaymodeId);
-                            object res = cmd.ExecuteScalar();
-                            if (res != null && res != DBNull.Value)
-                                targetLedgerId = Convert.ToInt64(res);
+                            using (SqlDataReader rdr = cmd.ExecuteReader())
+                            {
+                                if (rdr.Read())
+                                {
+                                    try { targetLedgerId = Convert.ToInt64(rdr["LedgerID"]); } catch { }
+                                    try { targetLedgerName = rdr["LedgerName"].ToString(); } catch { }
+                                }
+                            }
                         }
                     }
                     catch { }

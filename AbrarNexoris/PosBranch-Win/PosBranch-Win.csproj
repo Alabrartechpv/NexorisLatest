@@ -945,12 +945,6 @@
     <Compile Include="Master\FrmBrand.Designer.cs">
       <DependentUpon>FrmBrand.cs</DependentUpon>
     </Compile>
-    <Compile Include="Master\FrmPaymodeMaster.cs">
-      <SubType>Form</SubType>
-    </Compile>
-    <Compile Include="Master\FrmPaymodeMaster.Designer.cs">
-      <DependentUpon>FrmPaymodeMaster.cs</DependentUpon>
-    </Compile>
     <Compile Include="Master\FrmCurrency.cs">
       <SubType>Form</SubType>
     </Compile>

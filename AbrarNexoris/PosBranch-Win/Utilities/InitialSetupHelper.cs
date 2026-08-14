@@ -118,9 +118,10 @@ namespace PosBranch_Win.Utilities
 
                 EnsureReturnLedgers(conn, companyId, branchId);
 
-                // Seed default Item Types and Paymodes for a fresh install
+                // Seed default Item Types, Paymodes, and Tax Percentages for a fresh install
                 EnsureItemTypeSeedData();
                 PaymodeRepository.EnsurePaymodeSeedData(conn);
+                Dropdowns.EnsureTaxSeedData(conn);
 
                 return true;
             }

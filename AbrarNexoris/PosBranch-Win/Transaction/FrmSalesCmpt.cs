@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
 using System.Drawing;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -10,8 +11,10 @@ using System.Windows.Forms;
 using Infragistics.Win.UltraWinEditors;
 using Infragistics.Win.Misc;
 using ModelClass;
+using ModelClass.Master;
 using ModelClass.TransactionModels;
 using Repository;
+using Repository.MasterRepositry;
 using Repository.TransactionRepository;
 
 namespace PosBranch_Win.Transaction
@@ -24,8 +27,13 @@ namespace PosBranch_Win.Transaction
         private bool _isCreditMode = false;
         private string _netAmount;
         private PaymentResult _paymentResult;
-        private string _selectedPaymentMethod = "Cash";
+        private string _selectedPaymentMethod = string.Empty;
         private bool _isProcessing = false;
+        private List<PaymodeModel> _availablePaymodes = new List<PaymodeModel>();
+        private readonly Dictionary<string, int> _paymodeIdByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, PaymodeModel> _paymodeByName = new Dictionary<string, PaymodeModel>(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<Keys, string> _paymodeShortcutMap = new Dictionary<Keys, string>();
+        private readonly Dictionary<string, Tuple<PictureBox, Label>> _paymodeButtonMap = new Dictionary<string, Tuple<PictureBox, Label>>(StringComparer.OrdinalIgnoreCase);
 
         // Split Payment Fields
         private List<SalesPaymentDetail> _paymentDetailsList = new List<SalesPaymentDetail>();
@@ -86,12 +94,14 @@ namespace PosBranch_Win.Transaction
         private void InitializePaymentDialog()
         {
             // Set form properties
-            this.FormBorderStyle = FormBorderStyle.FixedDialog;
-            this.MaximizeBox = false;
+            this.FormBorderStyle = FormBorderStyle.Sizable;
+            this.MaximizeBox = true;
             this.MinimizeBox = false;
+            this.MinimumSize = new Size(675, 480);
             this.StartPosition = FormStartPosition.CenterParent;
             this.ShowInTaskbar = false;
             this.TopMost = true;
+            ConfigurePaymodePanelAppearance();
 
             // Initialize UI
             InitializePaymentModes();
@@ -101,10 +111,6 @@ namespace PosBranch_Win.Transaction
             SetupEventHandlers();
             UpdateUIForPaymentMode();
         }
-
-        /// <summary>
-        /// Creates and configures the payment grid to display payment entries (IRS POS Style)
-        /// Using Infragistics UltraGrid
         /// </summary>
         private void CreatePaymentGrid()
         {
@@ -217,15 +223,20 @@ namespace PosBranch_Win.Transaction
                     if (band.Columns.Exists("PayMode"))
                     {
                         band.Columns["PayMode"].Header.Caption = "Pymt Mode";
-                        band.Columns["PayMode"].Width = 140;
+                        band.Columns["PayMode"].Width = 130;
                         band.Columns["PayMode"].CellAppearance.TextHAlign = Infragistics.Win.HAlign.Left;
-                        band.Columns["PayMode"].CellActivation = Infragistics.Win.UltraWinGrid.Activation.NoEdit;
+                        if (_paymodeValueList != null)
+                        {
+                            band.Columns["PayMode"].ValueList = _paymodeValueList;
+                            band.Columns["PayMode"].Style = Infragistics.Win.UltraWinGrid.ColumnStyle.DropDownList;
+                        }
+                        band.Columns["PayMode"].CellActivation = Infragistics.Win.UltraWinGrid.Activation.AllowEdit;
                     }
 
                     if (band.Columns.Exists("Amount"))
                     {
                         band.Columns["Amount"].Header.Caption = "Pymt Amt";
-                        band.Columns["Amount"].Width = 140;
+                        band.Columns["Amount"].Width = 120;
                         band.Columns["Amount"].Format = "0.00";
                         band.Columns["Amount"].CellAppearance.TextHAlign = Infragistics.Win.HAlign.Right;
                         band.Columns["Amount"].CellAppearance.FontData.Bold = Infragistics.Win.DefaultableBoolean.True;
@@ -235,7 +246,7 @@ namespace PosBranch_Win.Transaction
                     if (band.Columns.Exists("Reference"))
                     {
                         band.Columns["Reference"].Header.Caption = "Reference";
-                        band.Columns["Reference"].Width = 170;
+                        band.Columns["Reference"].Width = 220;
                         band.Columns["Reference"].CellActivation = Infragistics.Win.UltraWinGrid.Activation.AllowEdit; // Made editable
                     }
                 }
@@ -250,24 +261,38 @@ namespace PosBranch_Win.Transaction
             }
         }
 
+        private Infragistics.Win.ValueList _paymodeValueList;
+
         private void InitializePaymentModes()
         {
             try
             {
-                var dp = new Dropdowns();
-                var pm = dp.PaymodeDDl();
-                var payList = pm?.List ?? new List<PaymodeDDl>();
+                LoadAvailablePaymodes();
 
                 // Create DataTable for payment modes (exclude Credit for payment panel)
                 var paymentModesTable = new DataTable();
                 paymentModesTable.Columns.Add("PayModeId", typeof(int));
                 paymentModesTable.Columns.Add("PayModeName", typeof(string));
 
-                foreach (var item in payList)
+                _paymodeValueList = new Infragistics.Win.ValueList();
+                _paymodeIdByName.Clear();
+                _paymodeByName.Clear();
+                _paymodeShortcutMap.Clear();
+
+                foreach (var item in _availablePaymodes)
                 {
-                    if (item.PayModeName != null && !item.PayModeName.Equals("Credit", StringComparison.OrdinalIgnoreCase))
+                    if (string.IsNullOrWhiteSpace(item.PayModeName))
+                        continue;
+
+                    paymentModesTable.Rows.Add(item.PayModeID, item.PayModeName);
+                    _paymodeValueList.ValueListItems.Add(item.PayModeName);
+                    _paymodeIdByName[item.PayModeName] = item.PayModeID;
+                    _paymodeByName[item.PayModeName] = item;
+
+                    Keys shortcutKey = ParseFunctionKey(item.FunctionKey);
+                    if (shortcutKey != Keys.None && !_paymodeShortcutMap.ContainsKey(shortcutKey))
                     {
-                        paymentModesTable.Rows.Add(item.PayModeID, item.PayModeName);
+                        _paymodeShortcutMap.Add(shortcutKey, item.PayModeName);
                     }
                 }
 
@@ -278,11 +303,56 @@ namespace PosBranch_Win.Transaction
                 {
                     cmbPaymodefc.SelectedIndex = 0;
                 }
+
+                // Attach ValueList to UltraGrid PayMode column if available
+                if (ultraGridPayments != null && ultraGridPayments.DisplayLayout.Bands.Count > 0 &&
+                    ultraGridPayments.DisplayLayout.Bands[0].Columns.Exists("PayMode"))
+                {
+                    var band = ultraGridPayments.DisplayLayout.Bands[0];
+                    band.Columns["PayMode"].ValueList = _paymodeValueList;
+                    band.Columns["PayMode"].Style = Infragistics.Win.UltraWinGrid.ColumnStyle.DropDownList;
+                    band.Columns["PayMode"].CellActivation = Infragistics.Win.UltraWinGrid.Activation.AllowEdit;
+                }
+
+                CreateDynamicPaymodeButtons();
             }
             catch (Exception ex)
             {
                 ShowError($"Error loading payment modes: {ex.Message}");
             }
+        }
+
+        private void LoadAvailablePaymodes()
+        {
+            var setupRepo = new PaymodeRepository();
+            _availablePaymodes = setupRepo.GetAllPaymodes()
+                .Where(p => p != null
+                    && !p.IsHide
+                    && !string.IsNullOrWhiteSpace(p.PayModeName)
+                    && !p.PayModeName.Equals("Credit", StringComparison.OrdinalIgnoreCase)
+                    && !string.Equals(p.PaymodeType, "Credit", StringComparison.OrdinalIgnoreCase))
+                .OrderBy(p => GetFunctionKeyNumber(p.FunctionKey))
+                .ThenBy(p => p.PayModeID)
+                .ToList();
+
+            if (_availablePaymodes.Count > 0)
+                return;
+
+            var dp = new Dropdowns();
+            var pm = dp.PaymodeDDl();
+            _availablePaymodes = (pm?.List ?? Enumerable.Empty<PaymodeDDl>())
+                .Where(p => p != null
+                    && !string.IsNullOrWhiteSpace(p.PayModeName)
+                    && !p.PayModeName.Equals("Credit", StringComparison.OrdinalIgnoreCase))
+                .Select(p => new PaymodeModel
+                {
+                    PayModeID = p.PayModeID,
+                    PayModeName = p.PayModeName,
+                    FunctionKey = string.Empty,
+                    LedgerID = p.LedgerID
+                })
+                .OrderBy(p => p.PayModeID)
+                .ToList();
         }
 
         private void InitializeAmounts()
@@ -295,16 +365,317 @@ namespace PosBranch_Win.Transaction
             // Set button tooltips
             toolTip1.SetToolTip(ultraButton1, "Process payment and complete transaction (Enter)");
             toolTip1.SetToolTip(ultraButton2, "Cancel payment and return (Esc)");
+        }
 
-            // Set payment mode button tooltips
-            toolTip1.SetToolTip(pictureBox1, "Cash Payment (F1)");
-            toolTip1.SetToolTip(label13, "Cash Payment (F1)");
-            toolTip1.SetToolTip(pictureBox2, "Card Payment (F2)");
-            toolTip1.SetToolTip(label15, "Card Payment (F2)");
-            toolTip1.SetToolTip(pictureBox3, "Bank Transfer Payment (F3)");
-            toolTip1.SetToolTip(label14, "Bank Transfer Payment (F3)");
-            toolTip1.SetToolTip(pictureBox4, "UPI Payment (F4)");
-            toolTip1.SetToolTip(label16, "UPI Payment (F4)");
+        private void CreateDynamicPaymodeButtons()
+        {
+            panel1.SuspendLayout();
+            try
+            {
+                panel1.Controls.Clear();
+                _paymodeButtonMap.Clear();
+
+                const int panelWidth    = 155;
+                int validCount          = _availablePaymodes.Count(p => p != null && !string.IsNullOrWhiteSpace(p.PayModeName));
+                bool needsScroll        = validCount > 5;
+                panel1.AutoScroll       = needsScroll;
+
+                int scrollBarW          = needsScroll ? SystemInformation.VerticalScrollBarWidth : 0;
+                const int cardMargin    = 4;   // left & right margin from panel edge
+                const int badgeW        = 26;  // uniform F-key badge width
+                const int badgeH        = 18;  // uniform F-key badge height
+                const int iconSize      = 34;  // icon square size
+                const int iconLeft      = 5;   // icon x inside card
+                int cardWidth           = panelWidth - scrollBarW - (cardMargin * 2); // = 147px when no scrollbar
+
+                int panelHeight  = panel1.ClientSize.Height > 0 ? panel1.ClientSize.Height : 446;
+                int topMargin    = 6;
+                int bottomMargin = 6;
+                int usableHeight = panelHeight - topMargin - bottomMargin;
+
+                int cardGap = 6;
+                int calculatedHeight = validCount > 0 ? (usableHeight - ((validCount - 1) * cardGap)) / validCount : 62;
+                int cardHeight = Math.Max(62, Math.Min(80, calculatedHeight));
+
+                if (validCount > 1 && (validCount * cardHeight + (validCount - 1) * cardGap) < usableHeight)
+                {
+                    cardGap = Math.Max(4, (usableHeight - (validCount * cardHeight)) / (validCount - 1));
+                }
+
+                int top = topMargin;
+
+                foreach (var paymode in _availablePaymodes)
+                {
+                    string paymodeName = paymode.PayModeName;
+                    if (string.IsNullOrWhiteSpace(paymodeName))
+                        continue;
+
+                    int iconTop = (cardHeight - iconSize) / 2;
+
+                    // ── Card container ───────────────────────────────────────────
+                    var card = new Panel
+                    {
+                        BackColor   = Color.White,
+                        BorderStyle = BorderStyle.None,
+                        Cursor      = Cursors.Hand,
+                        Location    = new Point(cardMargin, top),
+                        Name        = $"pnlPaymode_{paymode.PayModeID}",
+                        Size        = new Size(cardWidth, cardHeight),
+                        Tag         = paymodeName
+                    };
+                    // Custom paint for normal card border (#D6DEE8)
+                    card.Paint += (s, pe) =>
+                    {
+                        using (var pen = new Pen(Color.FromArgb(214, 222, 232), 1))
+                            pe.Graphics.DrawRectangle(pen, 0, 0, card.Width - 1, card.Height - 1);
+                    };
+
+                    // ── Icon ─────────────────────────────────────────────────────
+                    var imageBox = new PictureBox
+                    {
+                        BackColor   = Color.Transparent,
+                        BorderStyle = BorderStyle.None,
+                        Cursor      = Cursors.Hand,
+                        Image       = CreatePaymodeImage(paymode),
+                        Location    = new Point(iconLeft, Math.Max(2, iconTop)),
+                        Name        = $"pbPaymode_{paymode.PayModeID}",
+                        Size        = new Size(iconSize, iconSize),
+                        SizeMode    = PictureBoxSizeMode.Zoom,
+                        TabStop     = false,
+                        Tag         = paymodeName
+                    };
+
+                    // ── F-key badge ────────────────────────────────────────────────
+                    string fKey = paymode.FunctionKey?.Trim().ToUpperInvariant() ?? string.Empty;
+                    int badgeX = cardWidth - badgeW - 4; // 117px inside card
+                    Label badgeLabel = null;
+                    if (!string.IsNullOrEmpty(fKey))
+                    {
+                        int badgeTop = (cardHeight - badgeH) / 2;
+                        badgeLabel = new Label
+                        {
+                            AutoSize   = false,
+                            BackColor  = Color.FromArgb(52, 120, 201), // #3478C9
+                            Cursor     = Cursors.Hand,
+                            Font       = new Font("Segoe UI", 7F, FontStyle.Bold),
+                            ForeColor  = Color.White,
+                            Location   = new Point(badgeX, badgeTop),
+                            Name       = $"lblFKey_{paymode.PayModeID}",
+                            Size       = new Size(badgeW, badgeH),
+                            TabStop    = false,
+                            Text       = fKey,
+                            TextAlign  = ContentAlignment.MiddleCenter,
+                            Tag        = paymodeName
+                        };
+                    }
+
+                    // ── Name label (Formatted for clean wrapping, e.g. BANK\nTRANSFER) ──
+                    int nameX     = iconLeft + iconSize + 4; // 43px
+                    int nameW     = (badgeLabel != null) ? (badgeX - nameX - 2) : (cardWidth - nameX - 4);
+                    string formattedName = paymodeName.Trim().Replace(" ", "\n").ToUpperInvariant();
+                    var nameLabel = new Label
+                    {
+                        AutoEllipsis = false,
+                        AutoSize     = false,
+                        BackColor    = Color.Transparent,
+                        Cursor       = Cursors.Hand,
+                        Font         = new Font("Segoe UI", 7.5F, FontStyle.Bold),
+                        ForeColor    = Color.FromArgb(40, 50, 65),
+                        Location     = new Point(nameX, 0),
+                        Name         = $"lblPaymode_{paymode.PayModeID}",
+                        Size         = new Size(nameW, cardHeight),
+                        TabStop      = false,
+                        Text         = formattedName,
+                        TextAlign    = ContentAlignment.MiddleLeft,
+                        UseMnemonic  = false,
+                        Tag          = paymodeName
+                    };
+
+                    // ── Click handlers ───────────────────────────────────────────
+                    EventHandler clickHandler = (s, e) => AddPaymentToGrid(paymodeName);
+                    card.Click      += clickHandler;
+                    imageBox.Click  += clickHandler;
+                    nameLabel.Click += clickHandler;
+                    if (badgeLabel != null) badgeLabel.Click += clickHandler;
+
+                    // ── Tooltip ──────────────────────────────────────────────────
+                    string tooltip = string.IsNullOrEmpty(fKey)
+                        ? $"{paymodeName} Payment"
+                        : $"{paymodeName} Payment ({fKey})";
+                    toolTip1.SetToolTip(card,       tooltip);
+                    toolTip1.SetToolTip(imageBox,   tooltip);
+                    toolTip1.SetToolTip(nameLabel,  tooltip);
+                    if (badgeLabel != null) toolTip1.SetToolTip(badgeLabel, tooltip);
+
+                    // ── Assemble ─────────────────────────────────────────────────
+                    card.Controls.Add(imageBox);
+                    card.Controls.Add(nameLabel);
+                    if (badgeLabel != null) card.Controls.Add(badgeLabel);
+
+                    AddPaymentButtonHoverEffect(card, imageBox, nameLabel, badgeLabel);
+                    panel1.Controls.Add(card);
+                    _paymodeButtonMap[paymodeName] = Tuple.Create(imageBox, nameLabel);
+
+                    top += cardHeight + cardGap;
+                }
+
+                if (needsScroll)
+                {
+                    panel1.AutoScrollMinSize = new Size(0, top + 6);
+                }
+                else
+                {
+                    panel1.AutoScrollMinSize = Size.Empty;
+                }
+            }
+            finally
+            {
+                panel1.ResumeLayout(true);
+            }
+        }
+
+        private void ConfigurePaymodePanelAppearance()
+        {
+            panel1.BackColor  = Color.FromArgb(248, 251, 255); // #F8FBFF
+            panel1.AutoScroll = true;
+            panel1.VerticalScroll.SmallChange = 30;
+            panel1.VerticalScroll.LargeChange = 120;
+        }
+
+        private void Panel1_Paint(object sender, PaintEventArgs e)
+        {
+            // Subtle right-edge separator (#D6DEE8)
+            using (var pen = new Pen(Color.FromArgb(214, 222, 232), 1))
+                e.Graphics.DrawLine(pen, panel1.Width - 1, 0, panel1.Width - 1, panel1.Height);
+        }
+
+        private void AddCardHoverEffect(Panel cardPanel, PictureBox imageBox, Label label)
+        {
+            // Legacy overload kept for compatibility — delegates to new overload
+            AddPaymentButtonHoverEffect(cardPanel, imageBox, label, null);
+        }
+
+        private string BuildPaymodeCaption(PaymodeModel paymode)
+        {
+            // Caption is now just the name; F-key is rendered as a separate badge
+            return paymode?.PayModeName?.ToUpperInvariant() ?? string.Empty;
+        }
+
+        private void AddPaymentButtonHoverEffect(Panel card, PictureBox img, Label lbl, Label badge)
+        {
+            Color normalBg = Color.White;
+            Color hoverBg  = Color.FromArgb(235, 242, 252);
+
+            var controls = new List<Control> { card, img, lbl };
+            if (badge != null) controls.Add(badge);
+
+            foreach (var ctrl in controls)
+            {
+                ctrl.MouseEnter += (s, e) => card.BackColor = hoverBg;
+                ctrl.MouseLeave += (s, e) =>
+                {
+                    if (!card.ClientRectangle.Contains(card.PointToClient(Control.MousePosition)))
+                        card.BackColor = normalBg;
+                };
+            }
+        }
+
+        private void ResetPaymentButton(string paymodeName)
+        {
+            // Implementation for button state reset
+        }
+
+        private void HighlightPaymentButton(string paymodeName)
+        {
+            // Implementation for button selection highlight
+        }
+
+        private Image CreatePaymodeImage(PaymodeModel paymode)
+        {
+            if (paymode?.Photo != null && paymode.Photo.Length > 0)
+            {
+                try
+                {
+                    using (var ms = new MemoryStream(paymode.Photo))
+                    using (var img = Image.FromStream(ms))
+                    {
+                        return new Bitmap(img);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Could not load paymode image for {paymode.PayModeName}: {ex.Message}");
+                }
+            }
+
+            return CreatePlaceholderPaymodeImage(paymode?.PayModeName);
+        }
+
+        private Image CreatePlaceholderPaymodeImage(string paymodeName)
+        {
+            var bitmap = new Bitmap(96, 64);
+            using (Graphics g = Graphics.FromImage(bitmap))
+            using (var backBrush = new SolidBrush(Color.FromArgb(235, 245, 255)))
+            using (var borderPen = new Pen(Color.FromArgb(66, 126, 219), 2))
+            using (var textBrush = new SolidBrush(Color.FromArgb(0, 86, 179)))
+            using (var font = new Font("Segoe UI", 18F, FontStyle.Bold))
+            {
+                g.Clear(Color.White);
+                g.FillRectangle(backBrush, 1, 1, bitmap.Width - 2, bitmap.Height - 2);
+                g.DrawRectangle(borderPen, 1, 1, bitmap.Width - 3, bitmap.Height - 3);
+                string initials = GetPaymodeInitials(paymodeName);
+                var format = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+                g.DrawString(initials, font, textBrush, new RectangleF(0, 0, bitmap.Width, bitmap.Height), format);
+            }
+            return bitmap;
+        }
+
+        private string GetPaymodeInitials(string paymodeName)
+        {
+            if (string.IsNullOrWhiteSpace(paymodeName))
+                return "PM";
+
+            var words = paymodeName.Split(new[] { ' ', '-', '_' }, StringSplitOptions.RemoveEmptyEntries);
+            if (words.Length == 1)
+                return words[0].Substring(0, Math.Min(2, words[0].Length)).ToUpperInvariant();
+
+            return string.Concat(words.Take(2).Select(w => w.Substring(0, 1))).ToUpperInvariant();
+        }
+
+
+        private Keys ParseFunctionKey(string functionKey)
+        {
+            if (string.IsNullOrWhiteSpace(functionKey))
+                return Keys.None;
+
+            string key = functionKey.Trim().ToUpperInvariant();
+            if (key.StartsWith("F") && int.TryParse(key.Substring(1), out int number) && number >= 1 && number <= 12)
+            {
+                return (Keys)((int)Keys.F1 + (number - 1));
+            }
+
+            return Keys.None;
+        }
+
+        private int GetFunctionKeyNumber(string functionKey)
+        {
+            if (string.IsNullOrWhiteSpace(functionKey))
+                return 99;
+
+            string key = functionKey.Trim().ToUpperInvariant();
+            if (key.StartsWith("F") && int.TryParse(key.Substring(1), out int number))
+                return number;
+
+            return 99;
+        }
+
+        private string GetDefaultPaymodeName()
+        {
+            var cashMode = _availablePaymodes.FirstOrDefault(p => p.PayModeName.Equals("Cash", StringComparison.OrdinalIgnoreCase));
+            if (cashMode != null)
+                return cashMode.PayModeName;
+
+            return _availablePaymodes.FirstOrDefault()?.PayModeName ?? string.Empty;
         }
 
         private void SetupEventHandlers()
@@ -319,32 +690,6 @@ namespace PosBranch_Win.Transaction
             this.KeyDown += FrmSalesCmpt_KeyDown;
             this.KeyPreview = true;
 
-            // IRS POS STYLE: Payment method buttons ADD to grid instead of just selecting
-            // Clicking adds a new row with the remaining balance
-            pictureBox1.Click += (s, e) => AddPaymentToGrid("Cash");
-            label13.Click += (s, e) => AddPaymentToGrid("Cash");
-            pictureBox2.Click += (s, e) => AddPaymentToGrid("Card");
-            label15.Click += (s, e) => AddPaymentToGrid("Card");
-            pictureBox3.Click += (s, e) => AddPaymentToGrid("Transfer");
-            label14.Click += (s, e) => AddPaymentToGrid("Transfer");
-            pictureBox4.Click += (s, e) => AddPaymentToGrid("UPI");
-            label16.Click += (s, e) => AddPaymentToGrid("UPI");
-
-            // Add hover effects to payment buttons
-            AddPaymentButtonHoverEffect(pictureBox1, label13);
-            AddPaymentButtonHoverEffect(pictureBox2, label15);
-            AddPaymentButtonHoverEffect(pictureBox3, label14);
-            AddPaymentButtonHoverEffect(pictureBox4, label16);
-
-            // Set cursor for clickable elements
-            pictureBox1.Cursor = Cursors.Hand;
-            pictureBox2.Cursor = Cursors.Hand;
-            pictureBox3.Cursor = Cursors.Hand;
-            pictureBox4.Cursor = Cursors.Hand;
-            label13.Cursor = Cursors.Hand;
-            label15.Cursor = Cursors.Hand;
-            label14.Cursor = Cursors.Hand;
-            label16.Cursor = Cursors.Hand;
             ultraButton1.Cursor = Cursors.Hand;
             ultraButton2.Cursor = Cursors.Hand;
 
@@ -389,8 +734,7 @@ namespace PosBranch_Win.Transaction
                 }
             }));
 
-            // Wire up Grid KeyDown event manually to ensure it's captured
-            this.ultraGridPayments.KeyDown += new KeyEventHandler(this.ultraGridPayments_KeyDown);
+            // Grid KeyDown is wired once in CreatePaymentGrid().
         }
 
         private void ultraGridPayments_KeyDown(object sender, KeyEventArgs e)
@@ -456,35 +800,19 @@ namespace PosBranch_Win.Transaction
         /// </summary>
         private void FrmSalesCmpt_KeyDown(object sender, KeyEventArgs e)
         {
-            // F1 = Cash
-            if (e.KeyCode == Keys.F1)
+            if (_paymodeShortcutMap.TryGetValue(e.KeyCode, out string paymodeName))
             {
-                AddPaymentToGrid("Cash");
+                AddPaymentToGrid(paymodeName);
                 e.Handled = true;
             }
-            // F2 = Card
-            else if (e.KeyCode == Keys.F2)
+            // Enter = Process Payment
+            else if (e.KeyCode == Keys.Enter)
             {
-                AddPaymentToGrid("Card");
-                e.Handled = true;
-            }
-            // F3 = Transfer
-            else if (e.KeyCode == Keys.F3)
-            {
-                AddPaymentToGrid("Transfer");
-                e.Handled = true;
-            }
-            // F4 = UPI
-            else if (e.KeyCode == Keys.F4)
-            {
-                AddPaymentToGrid("UPI");
-                e.Handled = true;
-            }
-            // Enter = Process Payment (only if not in grid edit mode)
-            else if (e.KeyCode == Keys.Enter && !ultraGridPayments.Focused)
-            {
-                ProcessPayment();
-                e.Handled = true;
+                if (ActiveControl != ultraGridPayments && !ultraGridPayments.Focused)
+                {
+                    ProcessPayment();
+                    e.Handled = true;
+                }
             }
             // Escape = Cancel
             else if (e.KeyCode == Keys.Escape)
@@ -557,6 +885,7 @@ namespace PosBranch_Win.Transaction
             if (ultraGridPayments.ActiveRow != null)
             {
                 ultraGridPayments.PerformAction(Infragistics.Win.UltraWinGrid.UltraGridAction.ExitEditMode);
+                ultraGridPayments.UpdateData();
                 SyncGridToPaymentList();
             }
 
@@ -570,6 +899,18 @@ namespace PosBranch_Win.Transaction
             // Check for zero or negative amounts in the list
             foreach (var payment in _paymentDetailsList)
             {
+                if (payment.PaymodeId <= 0 || string.IsNullOrWhiteSpace(payment.PaymodeName))
+                {
+                    ShowError("Please select a valid payment mode.");
+                    return false;
+                }
+
+                if (IsReferenceRequired(payment.PaymodeName) && string.IsNullOrWhiteSpace(payment.Reference))
+                {
+                    ShowError($"Reference is required for {payment.PaymodeName} payment.");
+                    return false;
+                }
+
                 if (payment.Amount <= 0)
                 {
                     ShowError($"Invalid payment amount: {payment.Amount:F2}. Payment must be greater than zero.");
@@ -664,7 +1005,7 @@ namespace PosBranch_Win.Transaction
                 string changeAmount = change.ToString("F2");
 
                 // Determine payment mode from list
-                string paymentMode = "Cash";
+                string paymentMode = GetDefaultPaymodeName();
                 string paymentReference = "";
 
                 if (IsSplitPayment())
@@ -725,13 +1066,6 @@ namespace PosBranch_Win.Transaction
         {
             _selectedPaymentMethod = modeName;
 
-            // Map display names to actual payment mode names in database
-            string searchName = modeName;
-            if (modeName.Equals("Transfer", StringComparison.OrdinalIgnoreCase))
-            {
-                searchName = "BankTransfer";
-            }
-
             // Search through the combobox items
             for (int i = 0; i < cmbPaymodefc.Items.Count; i++)
             {
@@ -749,13 +1083,7 @@ namespace PosBranch_Win.Transaction
                 }
 
                 // Try exact match first
-                if (itemText.Equals(searchName, StringComparison.OrdinalIgnoreCase))
-                {
-                    cmbPaymodefc.SelectedIndex = i;
-                    break;
-                }
-                // Try partial match (e.g., "BankTransfer" contains "Transfer")
-                else if (itemText.IndexOf(searchName, StringComparison.OrdinalIgnoreCase) >= 0)
+                if (itemText.Equals(modeName, StringComparison.OrdinalIgnoreCase))
                 {
                     cmbPaymodefc.SelectedIndex = i;
                     break;
@@ -772,89 +1100,95 @@ namespace PosBranch_Win.Transaction
 
         private void UpdatePaymentMethodSelection()
         {
-            // Reset all borders and backgrounds
-            ResetPaymentButton(pictureBox1, label13);
-            ResetPaymentButton(pictureBox2, label15);
-            ResetPaymentButton(pictureBox3, label14);
-            ResetPaymentButton(pictureBox4, label16);
+            foreach (var entry in _paymodeButtonMap.Values)
+            {
+                ResetPaymentButton(entry.Item1, entry.Item2);
+            }
 
-            // Highlight selected payment method
-            if (_selectedPaymentMethod.Equals("Cash", StringComparison.OrdinalIgnoreCase))
+            if (_paymodeButtonMap.TryGetValue(_selectedPaymentMethod, out var sel))
             {
-                HighlightPaymentButton(pictureBox1, label13);
-            }
-            else if (_selectedPaymentMethod.Equals("Card", StringComparison.OrdinalIgnoreCase))
-            {
-                HighlightPaymentButton(pictureBox2, label15);
-            }
-            else if (_selectedPaymentMethod.Equals("Transfer", StringComparison.OrdinalIgnoreCase))
-            {
-                HighlightPaymentButton(pictureBox3, label14);
-            }
-            else if (_selectedPaymentMethod.Equals("UPI", StringComparison.OrdinalIgnoreCase))
-            {
-                HighlightPaymentButton(pictureBox4, label16);
+                HighlightPaymentButton(sel.Item1, sel.Item2);
             }
         }
 
         private void ResetPaymentButton(PictureBox pictureBox, Label label)
         {
-            pictureBox.BackColor = Color.White;
-            pictureBox.BorderStyle = BorderStyle.FixedSingle;
-            label.BackColor = Color.Transparent;
-            label.ForeColor = Color.FromArgb(52, 58, 64);
+            if (pictureBox == null || label == null) return;
+            var card = pictureBox.Parent as Panel;
+            if (card == null) return;
+
+            // Remove selected border painter
+            card.Paint -= Card_PaintSelected;
+
+            // Normal Background & Text
+            card.BackColor = Color.White;
+            imageBox_BackColor(pictureBox, Color.Transparent);
+            label.ForeColor = Color.FromArgb(40, 50, 65);
+            label.Font      = new Font("Segoe UI", 8F, FontStyle.Bold); // normal weight
+
+            // F-key badge — restore normal badge color (#3478C9)
+            foreach (Control ctrl in card.Controls)
+            {
+                if (ctrl is Label badge && ctrl != label)
+                {
+                    badge.BackColor = Color.FromArgb(52, 120, 201); // #3478C9
+                    badge.ForeColor = Color.White;
+                }
+            }
+
+            // Repaint border to normal gray (#D6DEE8)
+            card.Invalidate();
+        }
+
+        /// <summary>Sets PictureBox.BackColor without throwing if parent is transparent.</summary>
+        private static void imageBox_BackColor(PictureBox pb, Color c)
+        {
+            try { pb.BackColor = c; } catch { }
         }
 
         private void HighlightPaymentButton(PictureBox pictureBox, Label label)
         {
-            pictureBox.BackColor = Color.FromArgb(220, 240, 255);
-            pictureBox.BorderStyle = BorderStyle.FixedSingle;
-            label.BackColor = Color.FromArgb(220, 240, 255);
-            label.ForeColor = Color.FromArgb(0, 86, 179);
+            if (pictureBox == null || label == null) return;
+            var card = pictureBox.Parent as Panel;
+            if (card == null) return;
+
+            // Selected background (#E8F2FF) & Text (#155A9C)
+            Color selBg   = Color.FromArgb(232, 242, 255); // #E8F2FF
+            card.BackColor  = selBg;
+            imageBox_BackColor(pictureBox, selBg);
+            label.ForeColor = Color.FromArgb(21, 90, 156);  // #155A9C
+            label.Font      = new Font("Segoe UI", 8F, FontStyle.Bold);
+
+            // F-key badge — keep strong blue (#3478C9)
+            foreach (Control ctrl in card.Controls)
+            {
+                if (ctrl is Label badge && ctrl != label)
+                {
+                    badge.BackColor = Color.FromArgb(52, 120, 201); // #3478C9
+                    badge.ForeColor = Color.White;
+                }
+            }
+
+            // Repaint border to 2px #3478C9 blue
+            card.Paint -= Card_PaintSelected;
+            card.Paint += Card_PaintSelected;
+            card.Invalidate();
+        }
+
+        private void Card_PaintSelected(object sender, System.Windows.Forms.PaintEventArgs e)
+        {
+            var card = sender as Panel;
+            if (card == null) return;
+            // Draw 2px blue border for selected card
+            using (var pen = new Pen(Color.FromArgb(66, 126, 219), 2))
+                e.Graphics.DrawRectangle(pen, 1, 1, card.Width - 3, card.Height - 3);
         }
 
         private void AddPaymentButtonHoverEffect(PictureBox pictureBox, Label label)
         {
-            // Store original colors
-            Color originalPicBoxColor = pictureBox.BackColor;
-            Color originalLabelColor = label.BackColor;
-            Color hoverColor = Color.FromArgb(240, 248, 255);
-
-            // PictureBox hover
-            pictureBox.MouseEnter += (s, e) =>
-            {
-                if (pictureBox.BackColor != Color.FromArgb(220, 240, 255))
-                {
-                    pictureBox.BackColor = hoverColor;
-                    label.BackColor = hoverColor;
-                }
-            };
-            pictureBox.MouseLeave += (s, e) =>
-            {
-                if (pictureBox.BackColor != Color.FromArgb(220, 240, 255))
-                {
-                    pictureBox.BackColor = Color.White;
-                    label.BackColor = Color.Transparent;
-                }
-            };
-
-            // Label hover
-            label.MouseEnter += (s, e) =>
-            {
-                if (pictureBox.BackColor != Color.FromArgb(220, 240, 255))
-                {
-                    pictureBox.BackColor = hoverColor;
-                    label.BackColor = hoverColor;
-                }
-            };
-            label.MouseLeave += (s, e) =>
-            {
-                if (pictureBox.BackColor != Color.FromArgb(220, 240, 255))
-                {
-                    pictureBox.BackColor = Color.White;
-                    label.BackColor = Color.Transparent;
-                }
-            };
+            // Legacy two-argument overload — delegates to new card-based overload
+            if (pictureBox?.Parent is Panel card)
+                AddPaymentButtonHoverEffect(card, pictureBox, label, null);
         }
 
         private void AddButtonHoverEffect(UltraButton button, bool isPrimary)
@@ -965,27 +1299,18 @@ namespace PosBranch_Win.Transaction
 
         private void UpdatePaymentReferenceHint()
         {
-            string paymentMode = cmbPaymodefc.Text?.ToLower() ?? "";
-            string hint = "Enter payment reference (optional)";
-
-            if (paymentMode.Contains("card"))
-            {
-                hint = "Enter card reference or transaction ID";
-            }
-            else if (paymentMode.Contains("transfer") || paymentMode.Contains("bank"))
-            {
-                hint = "Enter transfer reference or transaction ID";
-            }
-            else if (paymentMode.Contains("upi"))
-            {
-                hint = "Enter UPI transaction ID or reference";
-            }
-            else if (paymentMode.Contains("cheque"))
-            {
-                hint = "Enter cheque number";
-            }
+            string paymentMode = cmbPaymodefc.Text ?? string.Empty;
+            bool required = IsReferenceRequired(paymentMode);
+            string hint = required ? $"Enter {paymentMode} reference" : "Enter payment reference (optional)";
 
             toolTip1.SetToolTip(txtReffc, hint);
+        }
+
+        private bool IsReferenceRequired(string paymodeName)
+        {
+            return !string.IsNullOrWhiteSpace(paymodeName)
+                && _paymodeByName.TryGetValue(paymodeName, out var paymode)
+                && paymode.RequireFillInReference;
         }
 
         private void UpdateUIForPaymentMode()
@@ -1039,7 +1364,7 @@ namespace PosBranch_Win.Transaction
 
                 // Get payment mode details
                 int paymodeId = 1;
-                string paymodeName = "Cash";
+                string paymodeName = GetDefaultPaymodeName();
 
                 if (cmbPaymodefc.SelectedItem != null && cmbPaymodefc.SelectedItem.DataValue != null)
                 {
@@ -1191,8 +1516,7 @@ namespace PosBranch_Win.Transaction
         }
 
         /// <summary>
-        /// Initializes split payment mode by parsing the total amount and adding default Cash row
-        /// IRS POS STYLE: Default is Cash with full amount
+        /// Initializes split payment mode by parsing the total amount and adding a default payment row
         /// </summary>
         private void InitializeSplitPayment()
         {
@@ -1201,10 +1525,14 @@ namespace PosBranch_Win.Transaction
                 _totalAmount = total;
                 _remainingAmount = total;
 
-                // IRS POS STYLE: Add default Cash row with full amount
+                // IRS POS STYLE: Add default payment row with full amount
                 if (_totalAmount > 0)
                 {
-                    AddPaymentToGridInternal("Cash", _totalAmount, "");
+                    string defaultPaymode = GetDefaultPaymodeName();
+                    if (!string.IsNullOrWhiteSpace(defaultPaymode))
+                    {
+                        AddPaymentToGridInternal(defaultPaymode, _totalAmount, "");
+                    }
 
                     // Auto-focus the Amount cell for immediate editing
                     if (ultraGridPayments.Rows.Count > 0)
@@ -1229,10 +1557,19 @@ namespace PosBranch_Win.Transaction
 
         /// <summary>
         /// IRS POS STYLE: Adds a new payment row to the grid with remaining balance
-        /// Called when user clicks Cash/Card/Transfer/UPI buttons
+        /// Called when user clicks a configured payment mode button
         /// </summary>
         private void AddPaymentToGrid(string paymodeName)
         {
+            if (string.IsNullOrWhiteSpace(paymodeName))
+            {
+                ShowError("No active payment modes are configured.");
+                return;
+            }
+
+            _selectedPaymentMethod = paymodeName;
+            UpdatePaymentMethodSelection();
+
             // Sync any pending edits from grid FIRST
             if (ultraGridPayments.ActiveRow != null)
             {
@@ -1276,6 +1613,22 @@ namespace PosBranch_Win.Transaction
 
             // Update the display
             RefreshPaymentDisplay();
+
+            // Auto-focus target cell (Reference if required, otherwise Amount)
+            if (ultraGridPayments.Rows.Count > 0)
+            {
+                var targetRow = ultraGridPayments.Rows[ultraGridPayments.Rows.Count - 1];
+                ultraGridPayments.ActiveRow = targetRow;
+                this.ActiveControl = ultraGridPayments;
+                ultraGridPayments.Focus();
+
+                string targetCol = IsReferenceRequired(paymodeName) ? "Reference" : "Amount";
+                if (targetRow.Cells.Exists(targetCol))
+                {
+                    ultraGridPayments.ActiveCell = targetRow.Cells[targetCol];
+                    ultraGridPayments.PerformAction(Infragistics.Win.UltraWinGrid.UltraGridAction.EnterEditMode);
+                }
+            }
         }
 
         /// <summary>
@@ -1283,6 +1636,14 @@ namespace PosBranch_Win.Transaction
         /// </summary>
         private void AddPaymentToGridInternal(string paymodeName, decimal amount, string reference)
         {
+            if (string.IsNullOrWhiteSpace(paymodeName))
+            {
+                throw new InvalidOperationException("No active payment modes are configured.");
+            }
+
+            _selectedPaymentMethod = paymodeName;
+            UpdatePaymentMethodSelection();
+
             // Get PaymodeId from name
             int paymodeId = GetPaymodeIdByName(paymodeName);
 
@@ -1309,7 +1670,11 @@ namespace PosBranch_Win.Transaction
         /// </summary>
         private int GetPaymodeIdByName(string paymodeName)
         {
-            int foundId = 0;
+            if (string.IsNullOrWhiteSpace(paymodeName))
+                return 0;
+
+            if (_paymodeIdByName.TryGetValue(paymodeName, out int mappedId))
+                return mappedId;
 
             // Try to find in combo box
             if (cmbPaymodefc.DataSource is DataTable dt)
@@ -1317,52 +1682,15 @@ namespace PosBranch_Win.Transaction
                 foreach (DataRow row in dt.Rows)
                 {
                     string name = row["PayModeName"]?.ToString() ?? "";
-                    if (name.Equals(paymodeName, StringComparison.OrdinalIgnoreCase) ||
-                        name.Equals("Bank" + paymodeName, StringComparison.OrdinalIgnoreCase) ||
-                        (paymodeName == "Transfer" && name.Equals("BankTransfer", StringComparison.OrdinalIgnoreCase)))
+                    if (name.Equals(paymodeName, StringComparison.OrdinalIgnoreCase))
                     {
                         return Convert.ToInt32(row["PayModeId"]);
                     }
                 }
             }
 
-            // Fallback: Query from database directly
-            try
-            {
-                var dp = new Repository.Dropdowns();
-                var pm = dp.PaymodeDDl();
-                if (pm?.List != null)
-                {
-                    foreach (var item in pm.List)
-                    {
-                        if (item.PayModeName.Equals(paymodeName, StringComparison.OrdinalIgnoreCase) ||
-                            item.PayModeName.Equals("Bank" + paymodeName, StringComparison.OrdinalIgnoreCase) ||
-                            (paymodeName == "Transfer" && item.PayModeName.Equals("BankTransfer", StringComparison.OrdinalIgnoreCase)))
-                        {
-                            return item.PayModeID;
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"GetPaymodeIdByName: DB lookup failed: {ex.Message}");
-            }
-
-            // Default IDs based on YOUR database (PayMode table)
-            // 1=Credit, 2=Cash, 3=Card, 4=BankTransfer, 5=UPI, 6=Cheque
-            switch (paymodeName.ToLower())
-            {
-                case "cash": foundId = 2; break;      // Cash = ID 2
-                case "card": foundId = 3; break;      // Card = ID 3
-                case "transfer":
-                case "banktransfer": foundId = 4; break; // BankTransfer = ID 4
-                case "upi": foundId = 5; break;          // UPI = ID 5
-                default: foundId = 2; break;             // Default to Cash
-            }
-
-
-            return foundId;
+            System.Diagnostics.Debug.WriteLine($"GetPaymodeIdByName: unable to resolve paymode '{paymodeName}'.");
+            return 0;
         }
 
         /// <summary>
@@ -1392,6 +1720,14 @@ namespace PosBranch_Win.Transaction
             for (int i = 0; i < _paymentGridSource.Rows.Count && i < _paymentDetailsList.Count; i++)
             {
                 DataRow row = _paymentGridSource.Rows[i];
+
+                // Update payment mode from grid edit
+                string paymodeName = row["PayMode"]?.ToString() ?? "";
+                if (!string.IsNullOrWhiteSpace(paymodeName) && !_paymentDetailsList[i].PaymodeName.Equals(paymodeName, StringComparison.OrdinalIgnoreCase))
+                {
+                    _paymentDetailsList[i].PaymodeName = paymodeName;
+                    _paymentDetailsList[i].PaymodeId = GetPaymodeIdByName(paymodeName);
+                }
 
                 // Update amount from grid
                 if (decimal.TryParse(row["Amount"]?.ToString(), out decimal amount))
@@ -1512,8 +1848,7 @@ namespace PosBranch_Win.Transaction
             {
                 var item = cmbPaymodefc.Items[i];
                 string itemText = item.DisplayText ?? "";
-                if (itemText.Equals(paymodeName, StringComparison.OrdinalIgnoreCase) ||
-                    (paymodeName == "Transfer" && itemText.Contains("Transfer")))
+                if (itemText.Equals(paymodeName, StringComparison.OrdinalIgnoreCase))
                 {
                     cmbPaymodefc.SelectedIndex = i;
                     break;

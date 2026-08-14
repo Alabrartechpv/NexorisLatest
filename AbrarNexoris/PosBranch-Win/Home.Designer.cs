@@ -91,7 +91,6 @@ namespace PosBranch_Win
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolReasonMaster = new Infragistics.Win.UltraWinToolbars.ButtonTool("Reason");
             Infragistics.Win.UltraWinToolbars.RibbonGroup ribbonGroup15 = new Infragistics.Win.UltraWinToolbars.RibbonGroup("ribbonGroup2");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonTool45 = new Infragistics.Win.UltraWinToolbars.ButtonTool("Users");
-            Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolPaymode = new Infragistics.Win.UltraWinToolbars.ButtonTool("PaymodeMaster");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonTool133 = new Infragistics.Win.UltraWinToolbars.ButtonTool("General PM setup");
             Infragistics.Win.UltraWinToolbars.RibbonTab ribbonTab3 = new Infragistics.Win.UltraWinToolbars.RibbonTab("ribbon2");
             Infragistics.Win.UltraWinToolbars.RibbonGroup ribbonGroup16 = new Infragistics.Win.UltraWinToolbars.RibbonGroup("Sales");
@@ -366,8 +365,6 @@ namespace PosBranch_Win
             Infragistics.Win.Appearance appearance94 = new Infragistics.Win.Appearance();
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolShiftReconciliation = new Infragistics.Win.UltraWinToolbars.ButtonTool("ShiftReconciliationReport");
             Infragistics.Win.Appearance appearance95 = new Infragistics.Win.Appearance();
-            Infragistics.Win.UltraWinToolbars.ButtonTool buttonTool56 = new Infragistics.Win.UltraWinToolbars.ButtonTool("PaymodeMaster");
-            Infragistics.Win.Appearance appearance96 = new Infragistics.Win.Appearance();
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonTool134 = new Infragistics.Win.UltraWinToolbars.ButtonTool("Item Type");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonTool135 = new Infragistics.Win.UltraWinToolbars.ButtonTool("ButtonTool7");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonTool136 = new Infragistics.Win.UltraWinToolbars.ButtonTool("General PM setup");
@@ -651,10 +648,8 @@ namespace PosBranch_Win
             buttonToolReasonMaster});
             ribbonGroup15.Caption = "Utilities";
             buttonTool45.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
-            buttonToolPaymode.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
             ribbonGroup15.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
             buttonTool45,
-            buttonToolPaymode,
             buttonTool133});
             ribbonTab2.Groups.AddRange(new Infragistics.Win.UltraWinToolbars.RibbonGroup[] {
             ribbonGroup13,
@@ -1214,10 +1209,6 @@ namespace PosBranch_Win
             buttonToolShiftReconciliation.SharedPropsInternal.AppearancesLarge.Appearance = appearance95;
             buttonToolShiftReconciliation.SharedPropsInternal.Caption = "Counter Closing Report";
             buttonToolShiftReconciliation.SharedPropsInternal.DisplayStyle = Infragistics.Win.UltraWinToolbars.ToolDisplayStyle.ImageAndText;
-            appearance96.Image = ((object)(resources.GetObject("appearance96.Image")));
-            buttonTool56.SharedPropsInternal.AppearancesLarge.Appearance = appearance96;
-            buttonTool56.SharedPropsInternal.Caption = "Paymode Setup";
-            buttonTool56.SharedPropsInternal.DisplayStyle = Infragistics.Win.UltraWinToolbars.ToolDisplayStyle.ImageAndText;
             buttonTool134.SharedPropsInternal.Caption = "Item Type";
             buttonTool135.SharedPropsInternal.Caption = "ButtonTool7";
             buttonTool136.SharedPropsInternal.Caption = "General PM setup";
@@ -1324,7 +1315,6 @@ namespace PosBranch_Win
             buttonToolBankReconciliation,
             buttonToolBankStatement,
             buttonToolShiftReconciliation,
-            buttonTool56,
             buttonTool134,
             buttonTool135,
             buttonTool136,

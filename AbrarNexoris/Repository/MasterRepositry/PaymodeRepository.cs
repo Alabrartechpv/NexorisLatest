@@ -20,12 +20,15 @@ namespace Repository.MasterRepositry
             SqlConnection conn = DataConnection as SqlConnection;
             if (conn == null) return false;
 
+            bool openedHere = false;
             try
             {
                 if (conn.State != ConnectionState.Open)
                 {
                     conn.Open();
+                    openedHere = true;
                 }
+
                 isStorageEnsured = true;
                 return true;
             }
@@ -33,6 +36,11 @@ namespace Repository.MasterRepositry
             {
                 System.Diagnostics.Debug.WriteLine($"EnsureStorage check warning: {ex.Message}");
                 return false;
+            }
+            finally
+            {
+                if (openedHere && conn.State == ConnectionState.Open)
+                    conn.Close();
             }
         }
 
@@ -86,36 +94,51 @@ namespace Repository.MasterRepositry
                 {
                     while (reader.Read())
                     {
-                        string pmName = reader["PayModeName"]?.ToString();
-                        int rawLedgerId = reader["LedgerID"] != DBNull.Value ? Convert.ToInt32(reader["LedgerID"]) : 0;
-
-                        // Credit sales post to individual Customer Account ledgers dynamically at sale time, so static LedgerID is 0
-                        if (!string.IsNullOrEmpty(pmName) && string.Equals(pmName, "Credit", StringComparison.OrdinalIgnoreCase))
-                        {
-                            rawLedgerId = 0;
-                        }
-
-                        PaymodeModel item = new PaymodeModel
-                        {
-                            PayModeID = reader["PayModeID"] != DBNull.Value ? Convert.ToInt32(reader["PayModeID"]) : 0,
-                            PayModeName = pmName,
-                            Description = reader["Description"]?.ToString(),
-                            FunctionKey = reader["FunctionKey"]?.ToString(),
-                            PaymodeType = reader["PaymodeType"]?.ToString(),
-                            Category = reader["Category"]?.ToString(),
-                            FileName = reader["FileName"]?.ToString(),
-                            Photo = reader["Photo"] != DBNull.Value ? (byte[])reader["Photo"] : null,
-                            RequireFillInReference = reader["RequireFillInReference"] != DBNull.Value && Convert.ToBoolean(reader["RequireFillInReference"]),
-                            IsHide = reader["IsHide"] != DBNull.Value && Convert.ToBoolean(reader["IsHide"]),
-                            DontOpenDrawer = reader["DontOpenDrawer"] != DBNull.Value && Convert.ToBoolean(reader["DontOpenDrawer"]),
-                            LedgerID = rawLedgerId,
-                            LedgerName = rawLedgerId > 0 ? reader["LedgerName"]?.ToString() : null
-                        };
-                        list.Add(item);
+                        list.Add(MapPaymodeFromReader(reader));
                     }
                 }
             }
             return list;
+        }
+
+        private PaymodeModel MapPaymodeFromReader(SqlDataReader reader)
+        {
+            string pmName = reader["PayModeName"]?.ToString();
+            int rawLedgerId = reader["LedgerID"] != DBNull.Value ? Convert.ToInt32(reader["LedgerID"]) : 0;
+
+            if (!string.IsNullOrEmpty(pmName) && string.Equals(pmName, "Credit", StringComparison.OrdinalIgnoreCase))
+            {
+                rawLedgerId = 0;
+            }
+
+            bool hasLedgerName = HasColumn(reader, "LedgerName");
+
+            return new PaymodeModel
+            {
+                PayModeID = reader["PayModeID"] != DBNull.Value ? Convert.ToInt32(reader["PayModeID"]) : 0,
+                PayModeName = pmName,
+                Description = reader["Description"]?.ToString(),
+                FunctionKey = reader["FunctionKey"]?.ToString(),
+                PaymodeType = reader["PaymodeType"]?.ToString(),
+                Category = reader["Category"]?.ToString(),
+                FileName = reader["FileName"]?.ToString(),
+                Photo = reader["Photo"] != DBNull.Value ? (byte[])reader["Photo"] : null,
+                RequireFillInReference = reader["RequireFillInReference"] != DBNull.Value && Convert.ToBoolean(reader["RequireFillInReference"]),
+                IsHide = reader["IsHide"] != DBNull.Value && Convert.ToBoolean(reader["IsHide"]),
+                DontOpenDrawer = reader["DontOpenDrawer"] != DBNull.Value && Convert.ToBoolean(reader["DontOpenDrawer"]),
+                LedgerID = rawLedgerId,
+                LedgerName = (rawLedgerId > 0 && hasLedgerName) ? reader["LedgerName"]?.ToString() : null
+            };
+        }
+
+        private bool HasColumn(SqlDataReader reader, string columnName)
+        {
+            for (int i = 0; i < reader.FieldCount; i++)
+            {
+                if (string.Equals(reader.GetName(i), columnName, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            return false;
         }
 
         public static void EnsurePaymodeSeedData(SqlConnection conn)
@@ -232,22 +255,7 @@ namespace Repository.MasterRepositry
                     {
                         if (reader.Read())
                         {
-                            return new PaymodeModel
-                            {
-                                PayModeID = reader["PayModeID"] != DBNull.Value ? Convert.ToInt32(reader["PayModeID"]) : 0,
-                                PayModeName = reader["PayModeName"]?.ToString(),
-                                Description = reader["Description"]?.ToString(),
-                                FunctionKey = reader["FunctionKey"]?.ToString(),
-                                PaymodeType = reader["PaymodeType"]?.ToString(),
-                                Category = reader["Category"]?.ToString(),
-                                FileName = reader["FileName"]?.ToString(),
-                                Photo = reader["Photo"] != DBNull.Value ? (byte[])reader["Photo"] : null,
-                                RequireFillInReference = reader["RequireFillInReference"] != DBNull.Value && Convert.ToBoolean(reader["RequireFillInReference"]),
-                                IsHide = reader["IsHide"] != DBNull.Value && Convert.ToBoolean(reader["IsHide"]),
-                                DontOpenDrawer = reader["DontOpenDrawer"] != DBNull.Value && Convert.ToBoolean(reader["DontOpenDrawer"]),
-                                LedgerID = reader["LedgerID"] != DBNull.Value ? Convert.ToInt32(reader["LedgerID"]) : 0,
-                                LedgerName = reader["LedgerName"]?.ToString()
-                            };
+                            return MapPaymodeFromReader(reader);
                         }
                     }
                 }
@@ -282,10 +290,24 @@ namespace Repository.MasterRepositry
                     openedHere = true;
                 }
 
+                int effectiveLedgerId = model.LedgerID;
+                if (!string.IsNullOrEmpty(model.PayModeName) && string.Equals(model.PayModeName, "Credit", StringComparison.OrdinalIgnoreCase))
+                {
+                    effectiveLedgerId = 0;
+                }
+
+                bool isNew = (model.PayModeID <= 0);
+                if (isNew)
+                {
+                    List<PaymodeModel> existingList = FetchPaymodesFromConn(conn);
+                    int maxId = (existingList != null && existingList.Count > 0) ? existingList.Max(p => p.PayModeID) : 0;
+                    model.PayModeID = maxId + 1;
+                }
+
                 using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_GeneralPaymodeSetup, conn))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@_Operation", model.PayModeID > 0 ? "UPDATE" : "INSERT");
+                    cmd.Parameters.AddWithValue("@_Operation", isNew ? "INSERT" : "UPDATE");
                     cmd.Parameters.AddWithValue("@PayModeID", model.PayModeID);
                     cmd.Parameters.AddWithValue("@PayModeName", (object)model.PayModeName ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("@Description", (object)model.Description ?? DBNull.Value);
@@ -298,19 +320,17 @@ namespace Repository.MasterRepositry
                     photoParam.Value = (model.Photo != null && model.Photo.Length > 0) ? (object)model.Photo : DBNull.Value;
                     cmd.Parameters.Add(photoParam);
 
-                    int effectiveLedgerId = model.LedgerID;
-                    if (!string.IsNullOrEmpty(model.PayModeName) && string.Equals(model.PayModeName, "Credit", StringComparison.OrdinalIgnoreCase))
-                    {
-                        effectiveLedgerId = 0;
-                    }
-
                     cmd.Parameters.AddWithValue("@RequireFillInReference", model.RequireFillInReference);
                     cmd.Parameters.AddWithValue("@IsHide", model.IsHide);
                     cmd.Parameters.AddWithValue("@DontOpenDrawer", model.DontOpenDrawer);
                     cmd.Parameters.AddWithValue("@LedgerID", effectiveLedgerId > 0 ? (object)effectiveLedgerId : DBNull.Value);
 
                     object res = cmd.ExecuteScalar();
-                    return res != null && res != DBNull.Value ? Convert.ToInt32(res) : model.PayModeID;
+                    if (res != null && res != DBNull.Value && Convert.ToInt32(res) > 0)
+                    {
+                        return Convert.ToInt32(res);
+                    }
+                    return model.PayModeID;
                 }
             }
             catch (Exception ex)
@@ -402,3 +422,4 @@ namespace Repository.MasterRepositry
         }
     }
 }
+
