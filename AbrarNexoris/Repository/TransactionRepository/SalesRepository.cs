@@ -1698,11 +1698,85 @@ namespace Repository.TransactionRepository
                         adapt.Fill(ds);
                         if ((ds != null) && (ds.Tables.Count > 0) && (ds.Tables[0] != null) && (ds.Tables[0].Rows.Count > 0))
                         {
-                            var allHoldBills = ds.Tables[0].ToListOfObject<GetHoldBill>();
+                            List<GetHoldBill> holdBills = new List<GetHoldBill>();
+                            foreach (DataRow row in ds.Tables[0].Rows)
+                            {
+                                try
+                                {
+                                    DateTime billDate = DateTime.MinValue;
+                                    if (ds.Tables[0].Columns.Contains("BillDate") && row["BillDate"] != DBNull.Value)
+                                        billDate = Convert.ToDateTime(row["BillDate"]);
+                                    else if (ds.Tables[0].Columns.Contains("CreatedDate") && row["CreatedDate"] != DBNull.Value)
+                                        billDate = Convert.ToDateTime(row["CreatedDate"]);
+                                    else if (ds.Tables[0].Columns.Contains("BillTime") && row["BillTime"] != DBNull.Value)
+                                        billDate = Convert.ToDateTime(row["BillTime"]);
+                                    else if (ds.Tables[0].Columns.Contains("SysDate") && row["SysDate"] != DBNull.Value)
+                                        billDate = Convert.ToDateTime(row["SysDate"]);
 
-                            // Filter by BranchId to show all branch hold bills across counters (Counter 1, 2, 3, Admin)
-                            item.List = allHoldBills
-                                .Where(bill => bill.BranchId == SessionContext.BranchId)
+                                    int branchId = SessionContext.BranchId;
+                                    if (ds.Tables[0].Columns.Contains("BranchId") && row["BranchId"] != DBNull.Value)
+                                        branchId = Convert.ToInt32(row["BranchId"]);
+
+                                    int counterId = 0;
+                                    if (ds.Tables[0].Columns.Contains("CounterId") && row["CounterId"] != DBNull.Value)
+                                        counterId = Convert.ToInt32(row["CounterId"]);
+
+                                    int userId = 0;
+                                    if (ds.Tables[0].Columns.Contains("UserId") && row["UserId"] != DBNull.Value)
+                                        userId = Convert.ToInt32(row["UserId"]);
+
+                                    GetHoldBill bill = new GetHoldBill
+                                    {
+                                        BillNo = row["BillNo"] != DBNull.Value ? Convert.ToInt64(row["BillNo"]) : 0,
+                                        CustomerName = ds.Tables[0].Columns.Contains("CustomerName") && row["CustomerName"] != DBNull.Value ? row["CustomerName"].ToString() : "Default Customer",
+                                        NetAmount = ds.Tables[0].Columns.Contains("NetAmount") && row["NetAmount"] != DBNull.Value ? Convert.ToDouble(row["NetAmount"]) : 0,
+                                        SaleType = ds.Tables[0].Columns.Contains("SaleType") && row["SaleType"] != DBNull.Value ? row["SaleType"].ToString() : "Cash",
+                                        BranchId = branchId,
+                                        UserId = userId,
+                                        CounterId = counterId,
+                                        BillDate = billDate
+                                    };
+                                    holdBills.Add(bill);
+                                }
+                                catch { }
+                            }
+
+                            // Fallback: If BillDate was not returned by stored procedure POS_dropdown 'GetHold', fetch dates from SMaster
+                            var missingDateBills = holdBills.Where(b => b.BillDate == DateTime.MinValue && b.BillNo > 0).ToList();
+                            if (missingDateBills.Any())
+                            {
+                                try
+                                {
+                                    string billNosCsv = string.Join(",", missingDateBills.Select(b => b.BillNo));
+                                    string sqlDates = $"SELECT BillNo, BillDate FROM SMaster WHERE BranchId = @BranchId AND BillNo IN ({billNosCsv})";
+                                    using (SqlCommand cmdDates = new SqlCommand(sqlDates, (SqlConnection)DataConnection))
+                                    {
+                                        cmdDates.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
+                                        using (SqlDataReader rdr = cmdDates.ExecuteReader())
+                                        {
+                                            Dictionary<long, DateTime> dateDict = new Dictionary<long, DateTime>();
+                                            while (rdr.Read())
+                                            {
+                                                long bNo = Convert.ToInt64(rdr["BillNo"]);
+                                                DateTime bDate = rdr["BillDate"] != DBNull.Value ? Convert.ToDateTime(rdr["BillDate"]) : DateTime.MinValue;
+                                                dateDict[bNo] = bDate;
+                                            }
+                                            foreach (var b in holdBills)
+                                            {
+                                                if (b.BillDate == DateTime.MinValue && dateDict.ContainsKey(b.BillNo))
+                                                {
+                                                    b.BillDate = dateDict[b.BillNo];
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                catch { }
+                            }
+
+                            // Filter by BranchId to show all branch hold bills across counters
+                            item.List = holdBills
+                                .Where(bill => bill.BranchId == 0 || bill.BranchId == SessionContext.BranchId)
                                 .ToList();
                         }
                     }
