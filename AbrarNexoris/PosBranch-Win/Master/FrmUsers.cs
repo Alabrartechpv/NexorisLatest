@@ -4,10 +4,13 @@ using PosBranch_Win.DialogBox;
 using Repository;
 using Repository.MasterRepositry;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
+using System.Drawing;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
+using Infragistics.Win.UltraWinGrid;
 
 namespace PosBranch_Win.Master
 {
@@ -15,84 +18,200 @@ namespace PosBranch_Win.Master
     {
         private readonly Users users = new Users();
         private readonly UsersRepository operations = new UsersRepository();
+        private readonly Dropdowns dropdowns = new Dropdowns();
         private readonly EncryptionAndDecryptionHelper enc = new EncryptionAndDecryptionHelper();
+        private List<UsersDDl> _usersCache = new List<UsersDDl>();
         private int Id;
         private bool isEditMode;
 
         public FrmUsers()
         {
             InitializeComponent();
-            Resize += FrmUsers_Resize;
         }
 
         private void FrmUsers_Load(object sender, EventArgs e)
         {
             KeyPreview = true;
-            LayoutUserManagementForm();
+            WireEvents();
             RefreshUserLevel();
+            LoadUserGrid();
             SetFormMode(false);
         }
 
-        private void FrmUsers_Resize(object sender, EventArgs e)
+        private void WireEvents()
         {
-            LayoutUserManagementForm();
+            if (ultraGridUsers != null)
+            {
+                ultraGridUsers.ClickCell += UltraGridUsers_ClickCell;
+                ultraGridUsers.DoubleClickRow += UltraGridUsers_DoubleClickRow;
+                ultraGridUsers.KeyDown += UltraGridUsers_KeyDown;
+            }
+
+            if (ultraTextSearch != null)
+            {
+                ultraTextSearch.TextChanged += UltraTextSearch_TextChanged;
+                ultraTextSearch.KeyDown += UltraTextSearch_KeyDown;
+            }
+
+            if (textUserName != null)
+                textUserName.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { textPassword.Focus(); e.Handled = true; } };
+
+            if (textPassword != null)
+                textPassword.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { textEmail.Focus(); e.Handled = true; } };
+
+            if (textEmail != null)
+                textEmail.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { cmbUserLevel.Focus(); e.Handled = true; } };
+
+            if (cmbUserLevel != null)
+                cmbUserLevel.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { Save(); e.Handled = true; } };
         }
 
-        private void LayoutUserManagementForm()
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
-            if (ultraPanel1 == null || ultraGroupBoxEntry == null)
-                return;
+            if (keyData == Keys.F8)
+            {
+                Save();
+                return true;
+            }
+            if (keyData == Keys.F1 || keyData == (Keys.Control | Keys.N))
+            {
+                ClearForm();
+                return true;
+            }
+            if (keyData == (Keys.Control | Keys.B))
+            {
+                DeleteUser();
+                return true;
+            }
+            if (keyData == Keys.F4 || keyData == Keys.Escape)
+            {
+                Close();
+                return true;
+            }
 
-            int clientWidth = ultraPanel1.ClientArea.Width;
-            if (clientWidth <= 0)
-                return;
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
 
-            int formWidth = Math.Min(Math.Max(clientWidth - 96, 820), 1040);
-            int formHeight = 320;
-            int formLeft = Math.Max(24, (clientWidth - formWidth) / 2);
-            int formTop = ultraLabelTitle.Height + Math.Max(34, (ultraPanel1.ClientArea.Height - ultraLabelTitle.Height - formHeight) / 3);
+        private void UltraTextSearch_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter || e.KeyCode == Keys.Down)
+            {
+                if (ultraGridUsers != null && ultraGridUsers.Rows.Count > 0)
+                {
+                    ultraGridUsers.ActiveRow = ultraGridUsers.Rows[0];
+                    ultraGridUsers.Focus();
+                    e.Handled = true;
+                }
+            }
+        }
 
-            ultraGroupBoxEntry.SetBounds(formLeft, formTop, formWidth, formHeight);
+        private void UltraGridUsers_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                if (ultraGridUsers != null && ultraGridUsers.ActiveRow != null)
+                {
+                    SelectUserFromRow(ultraGridUsers.ActiveRow);
+                    textUserName.Focus();
+                    e.Handled = true;
+                }
+            }
+        }
 
-            int labelWidth = 100;
-            int inputHeight = 27;
-            int buttonWidth = 112;
-            int inputGap = 18;
-            int columnGap = 58;
-            int rowTop = 88;
-            int rowGap = 66;
-            int leftLabelX = 70;
-            int leftInputX = leftLabelX + labelWidth + inputGap;
-            int availableWidth = formWidth - leftInputX - 70;
-            int columnWidth = (availableWidth - columnGap) / 2;
-            int rightLabelX = leftInputX + columnWidth + columnGap;
-            int rightInputX = rightLabelX + labelWidth + inputGap;
-            int leftInputWidth = Math.Max(260, columnWidth);
-            int rightInputWidth = Math.Max(220, formWidth - rightInputX - 70);
+        private void LoadUserGrid()
+        {
+            try
+            {
+                var result = dropdowns.getUsersDDl();
+                _usersCache = (result?.List ?? Enumerable.Empty<UsersDDl>()).ToList();
+                BindGridData(_usersCache);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error loading user list: {ex.Message}");
+            }
+        }
 
-            labelModeStatus.SetBounds(leftLabelX, 38, 220, labelModeStatus.Height);
+        private void BindGridData(List<UsersDDl> list)
+        {
+            if (ultraGridUsers == null) return;
 
-            labelUserName.SetBounds(leftLabelX, rowTop + 3, labelWidth, labelUserName.Height);
-            textUserName.SetBounds(leftInputX, rowTop, leftInputWidth, inputHeight);
-            labelRequiredName.SetBounds(leftInputX - 18, rowTop + 3, labelRequiredName.Width, labelRequiredName.Height);
+            ultraGridUsers.DataSource = null;
+            ultraGridUsers.DataSource = list;
 
-            labelEmail.SetBounds(leftLabelX, rowTop + rowGap + 3, labelWidth, labelEmail.Height);
-            textEmail.SetBounds(leftInputX, rowTop + rowGap, leftInputWidth, inputHeight);
+            if (ultraGridUsers.DisplayLayout.Bands.Count > 0)
+            {
+                UltraGridBand band = ultraGridUsers.DisplayLayout.Bands[0];
+                if (band.Columns.Exists("UserID"))
+                {
+                    band.Columns["UserID"].Header.Caption = "User ID";
+                    band.Columns["UserID"].Width = 100;
+                }
+                if (band.Columns.Exists("UserName"))
+                {
+                    band.Columns["UserName"].Header.Caption = "User Name";
+                    band.Columns["UserName"].Width = 300;
+                }
+            }
+        }
 
-            labelPassword.SetBounds(rightLabelX, rowTop + 3, labelWidth, labelPassword.Height);
-            textPassword.SetBounds(rightInputX, rowTop, rightInputWidth, inputHeight);
-            labelRequiredPassword.SetBounds(rightInputX - 18, rowTop + 3, labelRequiredPassword.Width, labelRequiredPassword.Height);
-            chkShowPassword.SetBounds(rightInputX, rowTop + 33, 130, chkShowPassword.Height);
+        private void UltraTextSearch_TextChanged(object sender, EventArgs e)
+        {
+            try
+            {
+                string search = ultraTextSearch.Text.Trim().ToLower();
+                if (string.IsNullOrEmpty(search))
+                {
+                    BindGridData(_usersCache);
+                }
+                else
+                {
+                    var filtered = _usersCache.Where(u =>
+                        (u.UserName != null && u.UserName.ToLower().Contains(search)) ||
+                        u.UserID.ToString().Contains(search)
+                    ).ToList();
+                    BindGridData(filtered);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Search error: {ex.Message}");
+            }
+        }
 
-            labelUserLevel.SetBounds(rightLabelX, rowTop + rowGap + 3, labelWidth, labelUserLevel.Height);
-            cmbUserLevel.SetBounds(rightInputX, rowTop + rowGap, rightInputWidth, inputHeight);
-            labelRequiredLevel.SetBounds(rightInputX - 18, rowTop + rowGap + 3, labelRequiredLevel.Width, labelRequiredLevel.Height);
+        private void UltraGridUsers_ClickCell(object sender, ClickCellEventArgs e)
+        {
+            if (e.Cell != null && e.Cell.Row != null)
+            {
+                SelectUserFromRow(e.Cell.Row);
+            }
+        }
 
-            int footerTop = formHeight - 56;
-            labelRequiredNote.SetBounds(leftLabelX, footerTop, 150, labelRequiredNote.Height);
-            labelShortcutHint.SetBounds(leftLabelX, footerTop + 24, 190, labelShortcutHint.Height);
-            btnUsersList.SetBounds(formWidth - buttonWidth - 70, footerTop + 2, buttonWidth, 31);
-            btnClearForm.SetBounds(formWidth - (buttonWidth * 2) - 84, footerTop + 2, buttonWidth, 31);
+        private void UltraGridUsers_DoubleClickRow(object sender, DoubleClickRowEventArgs e)
+        {
+            if (e.Row != null)
+            {
+                SelectUserFromRow(e.Row);
+            }
+        }
+
+        private void SelectUserFromRow(UltraGridRow row)
+        {
+            try
+            {
+                if (row.Cells.Exists("UserID") && row.Cells["UserID"].Value != null)
+                {
+                    int userId = Convert.ToInt32(row.Cells["UserID"].Value);
+                    if (userId > 0)
+                    {
+                        LoadUser(userId);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error selecting user row: {ex.Message}");
+            }
         }
 
         public void RefreshUserLevel()
@@ -108,7 +227,7 @@ namespace PosBranch_Win.Master
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error loading roles: {ex.Message}");
-                MessageBox.Show("Error loading user roles. Please check the database connection.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Error loading user roles. Please check database connection.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -130,6 +249,8 @@ namespace PosBranch_Win.Master
             return int.TryParse(DataBase.BranchId, out branchId) ? branchId : 0;
         }
 
+        #region Ribbon Actions & Public Interface
+
         public void Save()
         {
             if (isEditMode)
@@ -138,15 +259,29 @@ namespace PosBranch_Win.Master
                 SaveUser();
         }
 
-        public void UpdateRecord()
-        {
-            UpdateUser();
-        }
+        public void SaveRecord() => Save();
+        public void SaveData() => Save();
+        public void RibbonSave() => Save();
 
-        public void DeleteRecord()
-        {
-            DeleteUser();
-        }
+        public new void Update() => UpdateUser();
+        public void UpdateRecord() => UpdateUser();
+        public void UpdateData() => UpdateUser();
+
+        public void Delete() => DeleteUser();
+        public void DeleteRecord() => DeleteUser();
+        public void RibbonDeleteInvoice() => DeleteUser();
+
+        public void Clear() => ClearForm();
+        public void ClearFields() => ClearForm();
+        public void ClearRecord() => ClearForm();
+        public void RibbonClear() => ClearForm();
+
+        public void New() => ClearForm();
+        public void NewRecord() => ClearForm();
+
+        public void CloseForm() => Close();
+
+        #endregion
 
         public void ClearForm()
         {
@@ -184,6 +319,7 @@ namespace PosBranch_Win.Master
             }
 
             ClearForm();
+            LoadUserGrid();
         }
 
         private void UpdateUser()
@@ -209,6 +345,7 @@ namespace PosBranch_Win.Master
             operations.Update(users);
             MessageBox.Show("User Update Success", "Update", MessageBoxButtons.OK, MessageBoxIcon.Information);
             ClearForm();
+            LoadUserGrid();
         }
 
         private void DeleteUser()
@@ -233,6 +370,7 @@ namespace PosBranch_Win.Master
             {
                 MessageBox.Show("Record deleted successfully.", "Delete", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 ClearForm();
+                LoadUserGrid();
             }
             else
             {
@@ -295,7 +433,6 @@ namespace PosBranch_Win.Master
             else
             {
                 userLevelId = selectedRoleId;
-                MessageBox.Show($"Warning: UserLevelID not found for RoleID {selectedRoleId}. Using RoleID as fallback.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
 
             return true;
@@ -327,7 +464,15 @@ namespace PosBranch_Win.Master
                 Id = usr.UserID;
                 textUserName.Text = usr.UserName ?? "";
                 textEmail.Text = usr.Email ?? "";
-                textPassword.Text = usr.Password ?? "";
+                
+                try
+                {
+                    textPassword.Text = enc.Decrypt(usr.Password, true);
+                }
+                catch
+                {
+                    textPassword.Text = usr.Password ?? "";
+                }
 
                 if (usr.UserLevelID > 0 && cmbUserLevel.DataSource is System.Collections.Generic.List<Role> roles)
                 {
@@ -366,10 +511,6 @@ namespace PosBranch_Win.Master
             textPassword.PasswordChar = chkShowPassword.Checked ? '\0' : '*';
         }
 
-        private void btnClearForm_Click(object sender, EventArgs e)
-        {
-            ClearForm();
-        }
 
         private void FrmUsers_KeyDown(object sender, KeyEventArgs e)
         {
@@ -383,10 +524,6 @@ namespace PosBranch_Win.Master
             }
         }
 
-        private void btnUsersList_Click(object sender, EventArgs e)
-        {
-            OpenUsersList();
-        }
 
         private void textEmail_Validating(object sender, CancelEventArgs e)
         {
@@ -397,7 +534,7 @@ namespace PosBranch_Win.Master
 
             if (!expression.IsMatch(textEmail.Text.Trim()))
             {
-                MessageBox.Show("E-mail address format is not correct.", "MojoCRM", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("E-mail address format is not correct.", "Validation Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 textEmail.Focus();
             }
         }
