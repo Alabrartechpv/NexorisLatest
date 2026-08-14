@@ -195,6 +195,7 @@ namespace PosBranch_Win.Dashboard
             RegisterMetricIcon(iconProfit, AccentOrange, MetricIconKind.Profit);
             RegisterMetricIcon(iconItems, AccentTeal, MetricIconKind.Box);
             ConfigureItemMapControls();
+            SetupHoldCard();
         }
 
         private void ConfigureQuickDateCombo()
@@ -360,6 +361,12 @@ namespace PosBranch_Win.Dashboard
             ApplyChangeColor(lblAverageChange, summary.AverageOrderValueChangePercent);
             ApplyChangeColor(lblProfitChange, summary.ProfitChangePercent);
             ApplyChangeColor(lblItemsChange, summary.ItemsSoldChangePercent);
+
+            if (lblHoldItems != null && lblHoldAmount != null)
+            {
+                lblHoldItems.Text = summary.HoldItemsQty.ToString("N0", _culture);
+                lblHoldAmount.Text = Money(summary.HoldAmount) + $" ({summary.HoldOrders} Bills)";
+            }
 
             gridTopQty.DataSource = null;
             gridTopQty.Rows.Clear();
@@ -541,6 +548,116 @@ namespace PosBranch_Win.Dashboard
             close.BringToFront();
             popup.Controls.Add(card);
             popup.ShowDialog(this);
+        }
+
+        private Panel cardHoldItem;
+        private PictureBox iconHold;
+        private Label lblHoldTitle;
+        private Label lblHoldItems;
+        private Label lblHoldAmount;
+
+        private void SetupHoldCard()
+        {
+            if (metricsLayout == null) return;
+
+            metricsLayout.ColumnCount = 6;
+            metricsLayout.ColumnStyles.Clear();
+            for (int i = 0; i < 6; i++)
+            {
+                metricsLayout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 16.66F));
+            }
+
+            cardHoldItem = new Panel
+            {
+                BackColor = CardBackColor,
+                Dock = DockStyle.Fill,
+                Margin = new Padding(0, 0, 12, 0),
+                Name = "cardHoldItem",
+                TabIndex = 5
+            };
+
+            iconHold = new PictureBox
+            {
+                BackColor = Color.Transparent,
+                Location = new Point(16, 26),
+                Size = new Size(46, 46),
+                SizeMode = PictureBoxSizeMode.CenterImage
+            };
+
+            lblHoldTitle = new Label
+            {
+                AutoSize = true,
+                Font = new Font("Segoe UI Semibold", 8.5F, FontStyle.Bold),
+                ForeColor = TextBlue,
+                Location = new Point(76, 18),
+                Text = "Hold Item"
+            };
+
+            lblHoldItems = new Label
+            {
+                Font = new Font("Segoe UI Semibold", 13F, FontStyle.Bold),
+                ForeColor = TextBlue,
+                Location = new Point(76, 39),
+                Size = new Size(130, 26),
+                Text = "0"
+            };
+
+            lblHoldAmount = new Label
+            {
+                Font = new Font("Segoe UI", 8F),
+                ForeColor = AccentOrange,
+                Location = new Point(76, 68),
+                Size = new Size(130, 20),
+                Text = "Rs 0.00 (0 Bills)"
+            };
+
+            cardHoldItem.Controls.Add(iconHold);
+            cardHoldItem.Controls.Add(lblHoldTitle);
+            cardHoldItem.Controls.Add(lblHoldItems);
+            cardHoldItem.Controls.Add(lblHoldAmount);
+
+            metricsLayout.Controls.Add(cardHoldItem, 5, 0);
+
+            RegisterCardPaint(cardHoldItem);
+            RegisterMetricIcon(iconHold, AccentOrange, MetricIconKind.Wallet);
+
+            WireHoldItemDrilldown();
+        }
+
+        private void WireHoldItemDrilldown()
+        {
+            if (cardHoldItem != null)
+            {
+                cardHoldItem.Cursor = Cursors.Hand;
+                cardHoldItem.Click -= HoldItemCard_Click;
+                cardHoldItem.Click += HoldItemCard_Click;
+
+                foreach (Control control in cardHoldItem.Controls)
+                {
+                    control.Cursor = Cursors.Hand;
+                    control.Click -= HoldItemCard_Click;
+                    control.Click += HoldItemCard_Click;
+                }
+            }
+        }
+
+        private void HoldItemCard_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                DataTable rows;
+                using (SalesAnalyticsRepository repository = new SalesAnalyticsRepository())
+                {
+                    rows = repository.GetHoldItemsDetails(_fromDate, _toDate);
+                }
+
+                ShowStockTransactionGridPopup("Held Items & Hold Bills - " + FormatDateRange(), rows);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Hold items could not be loaded.\n\n" + ex.Message,
+                    "Hold Items", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
 
         private DataGridView CreatePopupGrid(DataTable rows)

@@ -13,6 +13,7 @@ namespace Repository.SettingsRepo
             DataTable result = ExecuteTable("GET", fromDate, toDate, userName, action, itemSearch);
             AppendRecoveredPurchaseRows(result, fromDate, toDate, userName, action, itemSearch);
             ApplyActivityLogMetadata(result, fromDate, toDate);
+            ResolveMissingStockPartyNames(result);
             ApplyActivityQuantitySnapshots(result);
             NormalizePurchaseReturnMovements(result);
             result = SortActivityTable(result);
@@ -665,6 +666,7 @@ WHERE PReturnNo = @PReturnNo
                 CopyIfColumnExists(row, metadata, "ActivityType");
                 CopyIfColumnExists(row, metadata, "ActivityQty");
                 CopyIfColumnExists(row, metadata, "ActivityBarcode");
+                CopyIfColumnExists(row, metadata, "PartyName");
             }
         }
 
@@ -742,7 +744,8 @@ SELECT
     UserId,
     CounterName,
     CounterId,
-    CounterSessionId
+    CounterSessionId,
+    PartyName
 FROM ActivityRows;";
         }
 
@@ -762,6 +765,10 @@ FROM ActivityRows;";
             string barcodeExpression = ColumnExists(tableName, "Barcode")
                 ? "CAST(Barcode AS nvarchar(100))"
                 : "CAST(NULL AS nvarchar(100))";
+
+            string partyNameExpression = ColumnExists(tableName, "PartyName")
+                ? "CAST(PartyName AS nvarchar(250))"
+                : "CAST(NULL AS nvarchar(250))";
 
             if (!string.IsNullOrWhiteSpace(unionSql))
             {
@@ -783,7 +790,8 @@ UNION ALL
         CAST(UserId AS int) AS UserId,
         CAST(CounterName AS nvarchar(150)) AS CounterName,
         CAST(CounterId AS int) AS CounterId,
-        CAST(CounterSessionId AS bigint) AS CounterSessionId
+        CAST(CounterSessionId AS bigint) AS CounterSessionId,
+        " + partyNameExpression + @" AS PartyName
     FROM dbo." + tableName + @"
     WHERE CreatedOn >= @FromDate
       AND CreatedOn < DATEADD(DAY, 1, @ToDate)
@@ -992,6 +1000,7 @@ SELECT ISNULL(@Latest, CONVERT(datetime, '19000101', 112));", (SqlConnection)Dat
             EnsureColumn(table, "ActivityType", typeof(string));
             EnsureColumn(table, "ActivityQty", typeof(decimal));
             EnsureColumn(table, "ActivityBarcode", typeof(string));
+            EnsureColumn(table, "PartyName", typeof(string));
         }
 
         private static void EnsureColumn(DataTable table, string columnName, Type dataType)
@@ -1017,7 +1026,145 @@ SELECT ISNULL(@Latest, CONVERT(datetime, '19000101', 112));", (SqlConnection)Dat
             table.Columns.Add("CounterName", typeof(string));
             table.Columns.Add("CounterId", typeof(int));
             table.Columns.Add("CounterSessionId", typeof(long));
+            table.Columns.Add("PartyName", typeof(string));
             return table;
+        }
+
+        private void ResolveMissingStockPartyNames(DataTable table)
+        {
+            if (table == null || table.Rows.Count == 0) return;
+            EnsureColumn(table, "PartyName", typeof(string));
+
+            List<DataRow> missingRows = new List<DataRow>();
+            foreach (DataRow row in table.Rows)
+            {
+                string party = Convert.ToString(row["PartyName"]);
+                if (string.IsNullOrWhiteSpace(party))
+                {
+                    missingRows.Add(row);
+                }
+            }
+
+            if (missingRows.Count == 0) return;
+
+            ConnectionState originalState = DataConnection.State;
+            try
+            {
+                if (DataConnection.State != ConnectionState.Open)
+                {
+                    DataConnection.Open();
+                }
+
+                foreach (DataRow row in missingRows)
+                {
+                    string action = Convert.ToString(row["Action"]) ?? string.Empty;
+                    long transNo = ToLong(row, "TransactionNo");
+                    if (transNo <= 0) continue;
+
+                    string party = string.Empty;
+
+                    if (action.IndexOf("Sales Return", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        if (TableExists("SReturnMaster"))
+                        {
+                            using (SqlCommand cmd = new SqlCommand(@"
+SELECT TOP 1 ISNULL(NULLIF(CustomerName, ''), NULLIF(LedgerName, ''))
+FROM dbo.SReturnMaster
+WHERE SReturnNo = @TransNo
+  AND (@CompanyId = 0 OR ISNULL(CompanyId, 0) = @CompanyId)
+  AND (@BranchId = 0 OR ISNULL(BranchID, 0) = @BranchId)
+  AND (@FinYearId = 0 OR ISNULL(FinYearId, 0) = @FinYearId);", (SqlConnection)DataConnection))
+                            {
+                                cmd.Parameters.AddWithValue("@TransNo", transNo);
+                                cmd.Parameters.AddWithValue("@CompanyId", SessionContext.CompanyId);
+                                cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
+                                cmd.Parameters.AddWithValue("@FinYearId", SessionContext.FinYearId);
+                                object val = cmd.ExecuteScalar();
+                                if (val != null && val != DBNull.Value) party = Convert.ToString(val);
+                            }
+                        }
+                    }
+                    else if (action.IndexOf("Sales", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        if (TableExists("SMaster"))
+                        {
+                            using (SqlCommand cmd = new SqlCommand(@"
+SELECT TOP 1 ISNULL(CustomerName, '')
+FROM dbo.SMaster
+WHERE BillNo = @TransNo
+  AND (@CompanyId = 0 OR ISNULL(CompanyId, 0) = @CompanyId)
+  AND (@BranchId = 0 OR ISNULL(BranchId, 0) = @BranchId)
+  AND (@FinYearId = 0 OR ISNULL(FinYearId, 0) = @FinYearId);", (SqlConnection)DataConnection))
+                            {
+                                cmd.Parameters.AddWithValue("@TransNo", transNo);
+                                cmd.Parameters.AddWithValue("@CompanyId", SessionContext.CompanyId);
+                                cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
+                                cmd.Parameters.AddWithValue("@FinYearId", SessionContext.FinYearId);
+                                object val = cmd.ExecuteScalar();
+                                if (val != null && val != DBNull.Value) party = Convert.ToString(val);
+                            }
+                        }
+                    }
+                    else if (action.IndexOf("Purchase Return", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        if (TableExists("PReturnMaster"))
+                        {
+                            using (SqlCommand cmd = new SqlCommand(@"
+SELECT TOP 1 ISNULL(NULLIF(VendorName, ''), NULLIF(SupplierName, ''))
+FROM dbo.PReturnMaster
+WHERE PReturnNo = @TransNo
+  AND (@CompanyId = 0 OR ISNULL(CompanyId, 0) = @CompanyId)
+  AND (@BranchId = 0 OR ISNULL(BranchID, 0) = @BranchId)
+  AND (@FinYearId = 0 OR ISNULL(FinYearId, 0) = @FinYearId);", (SqlConnection)DataConnection))
+                            {
+                                cmd.Parameters.AddWithValue("@TransNo", transNo);
+                                cmd.Parameters.AddWithValue("@CompanyId", SessionContext.CompanyId);
+                                cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
+                                cmd.Parameters.AddWithValue("@FinYearId", SessionContext.FinYearId);
+                                object val = cmd.ExecuteScalar();
+                                if (val != null && val != DBNull.Value) party = Convert.ToString(val);
+                            }
+                        }
+                    }
+                    else if (action.IndexOf("Purchase", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        if (TableExists("PMaster"))
+                        {
+                            using (SqlCommand cmd = new SqlCommand(@"
+SELECT TOP 1 ISNULL(VendorName, '')
+FROM dbo.PMaster
+WHERE PurchaseNo = @TransNo
+  AND (@CompanyId = 0 OR ISNULL(CompanyId, 0) = @CompanyId)
+  AND (@BranchId = 0 OR ISNULL(BranchId, 0) = @BranchId)
+  AND (@FinYearId = 0 OR ISNULL(FinYearId, 0) = @FinYearId);", (SqlConnection)DataConnection))
+                            {
+                                cmd.Parameters.AddWithValue("@TransNo", transNo);
+                                cmd.Parameters.AddWithValue("@CompanyId", SessionContext.CompanyId);
+                                cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
+                                cmd.Parameters.AddWithValue("@FinYearId", SessionContext.FinYearId);
+                                object val = cmd.ExecuteScalar();
+                                if (val != null && val != DBNull.Value) party = Convert.ToString(val);
+                            }
+                        }
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(party))
+                    {
+                        row["PartyName"] = party;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Error resolving missing stock party names: " + ex.Message);
+            }
+            finally
+            {
+                if (originalState != ConnectionState.Open && DataConnection.State == ConnectionState.Open)
+                {
+                    DataConnection.Close();
+                }
+            }
         }
 
         private static string GetMetadataAction(string action)

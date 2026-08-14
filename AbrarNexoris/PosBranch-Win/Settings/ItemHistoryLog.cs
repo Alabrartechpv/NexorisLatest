@@ -359,6 +359,8 @@ namespace PosBranch_Win.Settings
             table.Columns.Add("TransactionNo", typeof(string));
             table.Columns.Add("InvoiceNo", typeof(string));
             table.Columns.Add("PartyName", typeof(string));
+            table.Columns.Add("Vendor", typeof(string));
+            table.Columns.Add("Customer", typeof(string));
             table.Columns.Add("ActivityDetails", typeof(string));
             table.Columns.Add("CounterName", typeof(string));
             table.Columns.Add("CounterSessionId", typeof(string));
@@ -419,7 +421,26 @@ namespace PosBranch_Win.Settings
             row["WalkinPrice"] = FirstDecimal(source, "WalkinPrice");
             row["TransactionNo"] = FirstText(source, "TransactionNo", "DocNo", "PurchaseNo", "SalesBillNo");
             row["InvoiceNo"] = FirstText(source, "InvoiceNo");
-            row["PartyName"] = FirstText(source, "PartyName", "SupplierName", "CustomerName");
+            string partyName = FirstText(source, "PartyName", "SupplierName", "CustomerName", "VendorName", "Vendor", "Customer");
+            row["PartyName"] = partyName;
+
+            string actionStr = Convert.ToString(row["Action"]) ?? string.Empty;
+            if (actionStr.IndexOf("Purchase", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                row["Vendor"] = partyName;
+                row["Customer"] = string.Empty;
+            }
+            else if (actionStr.IndexOf("Sales", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                row["Customer"] = partyName;
+                row["Vendor"] = string.Empty;
+            }
+            else
+            {
+                row["Vendor"] = string.Empty;
+                row["Customer"] = string.Empty;
+            }
+
             row["ActivityDetails"] = FirstText(source, "ActivityDetails", "Reason", "Comments", "Remarks");
             row["CounterName"] = FirstText(source, "CounterName");
             row["CounterSessionId"] = FirstText(source, "CounterSessionId");
@@ -450,6 +471,8 @@ namespace PosBranch_Win.Settings
             SetColumn("WalkinPrice", "Walkin Price", 100);
             SetColumn("TransactionNo", "Doc No", 100);
             SetColumn("InvoiceNo", "Invoice No", 120);
+            SetColumn("Vendor", "Vendor", 160);
+            SetColumn("Customer", "Customer", 160);
             SetColumn("PartyName", "Party", 160);
             SetColumn("ActivityDetails", "Details", 360);
             SetColumn("CounterName", "Counter", 130);
@@ -676,7 +699,45 @@ namespace PosBranch_Win.Settings
                 return;
             }
 
-            MessageBox.Show(BuildBriefActivityDetails(gridActivity.Rows[e.RowIndex]), "Activity Details", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            DataGridViewRow row = gridActivity.Rows[e.RowIndex];
+            string details = string.Empty;
+
+            try
+            {
+                long transNo = 0L;
+                long.TryParse(CellText(row, "TransactionNo"), out transNo);
+
+                using (var repo = new ItemHistoryLogRepository())
+                {
+                    details = repo.GetTransactionActivityDetails(
+                        CellText(row, "Action"),
+                        transNo,
+                        CellText(row, "ItemNo"),
+                        CellText(row, "ItemName"),
+                        CellText(row, "Barcode"),
+                        CellText(row, "ActivityDetails"),
+                        FirstNonEmpty(CellText(row, "PartyName"), CellText(row, "Vendor"), CellText(row, "Customer")),
+                        CellText(row, "UserName"),
+                        CellText(row, "CreatedOn"),
+                        CellText(row, "Qty"),
+                        CellText(row, "UnitCost"),
+                        CellText(row, "RetailPrice"),
+                        CellText(row, "WalkinPrice"),
+                        CellText(row, "UOM"));
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("gridActivity_CellContentClick error: " + ex.Message);
+                details = Convert.ToString(row.Cells["ActivityDetails"].Value);
+            }
+
+            if (string.IsNullOrWhiteSpace(details))
+            {
+                details = "No additional details available for this log entry.";
+            }
+
+            MessageBox.Show(details, "Activity Details", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         private void btnItemSearchBrowse_Click(object sender, EventArgs e)
@@ -992,7 +1053,11 @@ namespace PosBranch_Win.Settings
 
             foreach (DataRow row in table.Rows)
             {
-                row["ActivityDetails"] = BuildBriefActivityDetails(row);
+                string existingDetails = Convert.ToString(row["ActivityDetails"]);
+                if (string.IsNullOrWhiteSpace(existingDetails))
+                {
+                    row["ActivityDetails"] = BuildBriefActivityDetails(row);
+                }
             }
         }
 
@@ -1080,26 +1145,37 @@ namespace PosBranch_Win.Settings
 
             AppendLine(builder, "Action", displayAction);
             AppendLine(builder, "Item", BuildItemCaption(itemCaption, itemNo, barcode));
-            AppendLine(builder, GetDocumentLabel(displayAction), transactionNo);
-            AppendLine(builder, "Invoice", invoiceNo);
-            AppendLine(builder, GetPartyLabel(displayAction), partyName);
-            AppendLine(builder, "Qty", BuildQtyCaption(qty, uom));
-            AppendLine(builder, "Stock In", stockIn);
-            AppendLine(builder, "Stock Out", stockOut);
-            AppendLine(builder, "Stock Change", qtyDifference);
-            AppendLine(builder, "Unit Cost", unitCost);
-            AppendLine(builder, "Retail Price", retailPrice);
-            AppendLine(builder, "Walkin Price", walkinPrice);
-            AppendLine(builder, "User", userName);
-            AppendLine(builder, "Counter", BuildCounterCaption(counterName, counterSessionId));
-            AppendLine(builder, "Date", createdOn);
+
+            bool isItemMasterLog = action.IndexOf("Item", StringComparison.OrdinalIgnoreCase) >= 0;
+
+            if (!isItemMasterLog)
+            {
+                AppendLine(builder, GetDocumentLabel(displayAction), transactionNo);
+                AppendLine(builder, "Invoice", invoiceNo);
+                AppendLine(builder, GetPartyLabel(displayAction), partyName);
+                AppendLine(builder, "Qty", BuildQtyCaption(qty, uom));
+                AppendLine(builder, "Stock In", stockIn);
+                AppendLine(builder, "Stock Out", stockOut);
+                AppendLine(builder, "Stock Change", qtyDifference);
+                AppendLine(builder, "Unit Cost", unitCost);
+                AppendLine(builder, "Retail Price", retailPrice);
+                AppendLine(builder, "Walkin Price", walkinPrice);
+            }
+
+            if (!string.IsNullOrWhiteSpace(userName)) AppendLine(builder, "User", userName);
+            if (!string.IsNullOrWhiteSpace(counterName) || !string.IsNullOrWhiteSpace(counterSessionId))
+                AppendLine(builder, "Counter", BuildCounterCaption(counterName, counterSessionId));
+            if (!string.IsNullOrWhiteSpace(createdOn)) AppendLine(builder, "Date", createdOn);
 
             string filteredDetails = FilterActivityDetails(rawDetails);
             if (!string.IsNullOrWhiteSpace(filteredDetails) && !LooksLikeBriefDetails(filteredDetails))
             {
                 builder.AppendLine();
-                builder.AppendLine(IsUpdate(action) ? "Updated:" : "Notes:");
-                builder.Append(NormalizeDetailSection(filteredDetails, IsUpdate(action)));
+                string normalized = NormalizeDetailSection(filteredDetails, IsUpdate(action));
+                if (!string.IsNullOrWhiteSpace(normalized))
+                {
+                    builder.Append(normalized);
+                }
             }
 
             return builder.ToString().Trim();
@@ -1183,20 +1259,7 @@ namespace PosBranch_Win.Settings
         private static string FilterActivityDetails(string details)
         {
             if (string.IsNullOrWhiteSpace(details)) return details;
-
-            var lines = details.Split(new[] { "\r\n", "\r", "\n" }, StringSplitOptions.None);
-            var filtered = new StringBuilder();
-            foreach (var line in lines)
-            {
-                string trimmed = line.TrimStart('-', ' ');
-                if (trimmed.StartsWith("Unit '", StringComparison.OrdinalIgnoreCase) &&
-                    (trimmed.Contains("Retail Price changed") || trimmed.Contains("Walkin Price changed")))
-                {
-                    continue;
-                }
-                filtered.AppendLine(line);
-            }
-            return filtered.ToString().TrimEnd();
+            return details.Trim();
         }
 
         private static string NormalizeDetailSection(string details, bool isUpdate)
