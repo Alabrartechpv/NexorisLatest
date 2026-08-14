@@ -378,15 +378,19 @@ namespace Repository.TransactionRepository
                             objPricesettingsStock.MDStaffPrice = existingPrices.MDStaffPrice;
                             objPricesettingsStock.MDMinPrice = existingPrices.MDMinPrice;
 
-                            // Purchases update stock only. Preserve Item Master unit costs so a
-                            // purchase made in a packing unit cannot overwrite the saved UOM cost.
+                            // Calculate weighted average cost based on existing stock and new purchase
                             float existingCost = (float)existingPrices.Cost;
-                            objPricesettingsStock.SingleItemCost = existingCost;
-                            System.Diagnostics.Debug.WriteLine($"CREATE Purchase - Preserving Item Master Cost={existingCost} for ItemId={objPricesettingsStock.ItemID}, UnitId={objPricesettingsStock.UnitId}");
+                            float existingStock = (float)existingPrices.Stock;
+                            float purchaseCost = baseCost > 0 ? baseCost : cost;
+                            float totalPurchaseQty = gridQty + free;
+
+                            float calculatedAvgCost = CalculateAverageCost(existingCost, existingStock, purchaseCost, totalPurchaseQty);
+                            objPricesettingsStock.SingleItemCost = calculatedAvgCost;
+                            System.Diagnostics.Debug.WriteLine($"CREATE Purchase - Calculated Weighted Average Cost={calculatedAvgCost} (OldCost={existingCost}, OldStock={existingStock}, PurchCost={purchaseCost}, PurchQty={totalPurchaseQty}) for ItemId={objPricesettingsStock.ItemID}, UnitId={objPricesettingsStock.UnitId}");
 
                             List<PurchaseStockUpdateOnPricesettings> UpdatePriceSettingsWithStock = DataConnection.Query<PurchaseStockUpdateOnPricesettings>(STOREDPROCEDURE.POS_PurchaseInvoice_PriceSettings, objPricesettingsStock, trans, commandType: CommandType.StoredProcedure).ToList<PurchaseStockUpdateOnPricesettings>();
 
-                            UpdateItemMasterCostDirectly(objPricesettingsStock.ItemID, objPricesettingsStock.UnitId, existingCost, trans);
+                            UpdateItemMasterCostDirectly(objPricesettingsStock.ItemID, objPricesettingsStock.UnitId, calculatedAvgCost, packingValue, trans);
                         }
                         catch (Exception ex)
                         {
@@ -754,22 +758,30 @@ namespace Repository.TransactionRepository
                                 System.Diagnostics.Debug.WriteLine($"UPDATE Purchase STEP1 DELETE - ItemId={objPricesettingsStock.ItemID}, OldQty={oldPurchaseQty}, OldFree={oldPurchaseFree}, OldCost={oldPurchaseCost}, Packing={packingValue}");
                             }
 
-                            // We must PRESERVE the existing average cost (BaseCost) during an UPDATE.
-                            // The user specifically requested that modifying an existing purchase should NOT 
-                            // change the base cost / average cost of the item.
-                            float preservedOriginalCost = (float)existingPrices.Cost;
-                            objPricesettingsStock.SingleItemCost = preservedOriginalCost;
-                            System.Diagnostics.Debug.WriteLine($"UPDATE Purchase - Preserving original BaseCost={preservedOriginalCost} for ItemId={objPricesettingsStock.ItemID}");
+                            // Calculate weighted average cost for UPDATE operation
+                            float currentCost = (float)existingPrices.Cost;
+                            float currentStock = (float)existingPrices.Stock;
+                            float newPurchaseCost = baseCost > 0 ? baseCost : cost;
+                            float newPurchaseQty = gridQty + free;
+
+                            float calculatedAvgCost = currentCost;
+                            if (oldDetail != null)
+                            {
+                                calculatedAvgCost = CalculateAverageCostForUpdate(currentCost, currentStock, oldPurchaseCost, oldPurchaseQty + oldPurchaseFree, newPurchaseCost, newPurchaseQty);
+                            }
+                            else
+                            {
+                                calculatedAvgCost = CalculateAverageCost(currentCost, currentStock, newPurchaseCost, newPurchaseQty);
+                            }
+
+                            objPricesettingsStock.SingleItemCost = calculatedAvgCost;
+                            System.Diagnostics.Debug.WriteLine($"UPDATE Purchase - Calculated Weighted Average Cost={calculatedAvgCost} for ItemId={objPricesettingsStock.ItemID}, UnitId={objPricesettingsStock.UnitId}");
 
                             // Step 2: Call SP with CREATE to add new stock
                             objPricesettingsStock._Operation = "CREATE";
                             List<PurchaseStockUpdateOnPricesettings> UpdatePriceSettingsWithStock = DataConnection.Query<PurchaseStockUpdateOnPricesettings>(STOREDPROCEDURE.POS_PurchaseInvoice_PriceSettings, objPricesettingsStock, trans, commandType: CommandType.StoredProcedure).ToList<PurchaseStockUpdateOnPricesettings>();
 
-                            System.Diagnostics.Debug.WriteLine($"UPDATE Purchase STEP2 CREATE - ItemId={objPricesettingsStock.ItemID}, NewQty={gridQty}, NewFree={free}, NewCost={cost}, Packing={packingValue}");
-
-                            // Explicitly overwrite whatever the stored procedure did with the preserved original cost
-                            // This ensures the BaseCost remains exactly what it was before this purchase update
-                            UpdateItemMasterCostDirectly(objPricesettingsStock.ItemID, objPricesettingsStock.UnitId, preservedOriginalCost, trans);
+                            UpdateItemMasterCostDirectly(objPricesettingsStock.ItemID, objPricesettingsStock.UnitId, calculatedAvgCost, packingValue, trans);
                         }
                         catch (Exception ex)
                         {
@@ -1306,26 +1318,31 @@ namespace Repository.TransactionRepository
         /// Updates ItemMaster cost directly in PriceSettings table
         /// This ensures our calculated average cost is saved even if stored procedure recalculates
         /// </summary>
-        private void UpdateItemMasterCostDirectly(int itemId, int unitId, float calculatedCost, IDbTransaction transaction)
+        private void UpdateItemMasterCostDirectly(int itemId, int unitId, float calculatedCost, int packing, IDbTransaction transaction)
         {
             try
             {
+                int packingVal = packing > 0 ? packing : 1;
+                float baseUnitCost = calculatedCost / packingVal;
+
+                // Update base unit and all packing units proportional to their packing factor
                 var updateQuery = @"
                     UPDATE PriceSettings 
-                    SET Cost = @Cost
+                    SET Cost = CASE 
+                        WHEN ISNULL(Packing, 1) > 0 THEN @BaseUnitCost * ISNULL(Packing, 1)
+                        ELSE @BaseUnitCost 
+                    END
                     WHERE BranchId = @BranchId 
-                        AND ItemId = @ItemId 
-                        AND UnitId = @UnitId";
+                        AND ItemId = @ItemId";
 
                 DataConnection.Execute(updateQuery, new
                 {
-                    Cost = calculatedCost,
+                    BaseUnitCost = baseUnitCost,
                     BranchId = Convert.ToInt32(DataBase.BranchId),
-                    ItemId = itemId,
-                    UnitId = unitId
+                    ItemId = itemId
                 }, transaction);
 
-                System.Diagnostics.Debug.WriteLine($"Updated ItemMaster cost for ItemId={itemId}, UnitId={unitId} to {calculatedCost}");
+                System.Diagnostics.Debug.WriteLine($"Updated ItemMaster cost for ItemId={itemId} (BaseUnitCost={baseUnitCost}) directly in PriceSettings.");
             }
             catch (Exception ex)
             {
