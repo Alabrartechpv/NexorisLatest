@@ -223,7 +223,7 @@ namespace PosBranch_Win.Transaction
                     if (band.Columns.Exists("PayMode"))
                     {
                         band.Columns["PayMode"].Header.Caption = "Pymt Mode";
-                        band.Columns["PayMode"].Width = 140;
+                        band.Columns["PayMode"].Width = 130;
                         band.Columns["PayMode"].CellAppearance.TextHAlign = Infragistics.Win.HAlign.Left;
                         if (_paymodeValueList != null)
                         {
@@ -236,7 +236,7 @@ namespace PosBranch_Win.Transaction
                     if (band.Columns.Exists("Amount"))
                     {
                         band.Columns["Amount"].Header.Caption = "Pymt Amt";
-                        band.Columns["Amount"].Width = 140;
+                        band.Columns["Amount"].Width = 120;
                         band.Columns["Amount"].Format = "0.00";
                         band.Columns["Amount"].CellAppearance.TextHAlign = Infragistics.Win.HAlign.Right;
                         band.Columns["Amount"].CellAppearance.FontData.Bold = Infragistics.Win.DefaultableBoolean.True;
@@ -246,7 +246,7 @@ namespace PosBranch_Win.Transaction
                     if (band.Columns.Exists("Reference"))
                     {
                         band.Columns["Reference"].Header.Caption = "Reference";
-                        band.Columns["Reference"].Width = 170;
+                        band.Columns["Reference"].Width = 220;
                         band.Columns["Reference"].CellActivation = Infragistics.Win.UltraWinGrid.Activation.AllowEdit; // Made editable
                     }
                 }
@@ -375,26 +375,42 @@ namespace PosBranch_Win.Transaction
                 panel1.Controls.Clear();
                 _paymodeButtonMap.Clear();
 
-                // panel1 is DockStyle.Left, Designer width = 155px.
-                // Usable card width: 155 - 14 (scrollbar reserve) - 2*4 (left/right margin) = 133px
                 const int panelWidth    = 155;
-                const int scrollBarW    = 14;
+                int validCount          = _availablePaymodes.Count(p => p != null && !string.IsNullOrWhiteSpace(p.PayModeName));
+                bool needsScroll        = validCount > 5;
+                panel1.AutoScroll       = needsScroll;
+
+                int scrollBarW          = needsScroll ? SystemInformation.VerticalScrollBarWidth : 0;
                 const int cardMargin    = 4;   // left & right margin from panel edge
-                const int cardHeight    = 62;  // compact horizontal row height
-                const int cardGap       = 4;   // vertical gap between cards
-                const int iconSize      = 36;  // icon square size
+                const int badgeW        = 26;  // uniform F-key badge width
+                const int badgeH        = 18;  // uniform F-key badge height
+                const int iconSize      = 34;  // icon square size
                 const int iconLeft      = 5;   // icon x inside card
-                const int iconTop       = 13;  // icon y inside card (centered in 62px)
-                const int badgeW        = 28;  // uniform F-key badge width
-                const int badgeH        = 20;  // uniform F-key badge height
-                int cardWidth = panelWidth - scrollBarW - cardMargin * 2; // = 133
-                int top = 6;
+                int cardWidth           = panelWidth - scrollBarW - (cardMargin * 2); // = 147px when no scrollbar
+
+                int panelHeight  = panel1.ClientSize.Height > 0 ? panel1.ClientSize.Height : 446;
+                int topMargin    = 6;
+                int bottomMargin = 6;
+                int usableHeight = panelHeight - topMargin - bottomMargin;
+
+                int cardGap = 6;
+                int calculatedHeight = validCount > 0 ? (usableHeight - ((validCount - 1) * cardGap)) / validCount : 62;
+                int cardHeight = Math.Max(62, Math.Min(80, calculatedHeight));
+
+                if (validCount > 1 && (validCount * cardHeight + (validCount - 1) * cardGap) < usableHeight)
+                {
+                    cardGap = Math.Max(4, (usableHeight - (validCount * cardHeight)) / (validCount - 1));
+                }
+
+                int top = topMargin;
 
                 foreach (var paymode in _availablePaymodes)
                 {
                     string paymodeName = paymode.PayModeName;
                     if (string.IsNullOrWhiteSpace(paymodeName))
                         continue;
+
+                    int iconTop = (cardHeight - iconSize) / 2;
 
                     // ── Card container ───────────────────────────────────────────
                     var card = new Panel
@@ -421,7 +437,7 @@ namespace PosBranch_Win.Transaction
                         BorderStyle = BorderStyle.None,
                         Cursor      = Cursors.Hand,
                         Image       = CreatePaymodeImage(paymode),
-                        Location    = new Point(iconLeft, iconTop),
+                        Location    = new Point(iconLeft, Math.Max(2, iconTop)),
                         Name        = $"pbPaymode_{paymode.PayModeID}",
                         Size        = new Size(iconSize, iconSize),
                         SizeMode    = PictureBoxSizeMode.Zoom,
@@ -429,13 +445,13 @@ namespace PosBranch_Win.Transaction
                         Tag         = paymodeName
                     };
 
-                    // ── F-key badge (Uniform 28x20 size) ───────────────────────────
+                    // ── F-key badge ────────────────────────────────────────────────
                     string fKey = paymode.FunctionKey?.Trim().ToUpperInvariant() ?? string.Empty;
-                    int badgeX = cardWidth - badgeW - 4; // 101px
+                    int badgeX = cardWidth - badgeW - 4; // 117px inside card
                     Label badgeLabel = null;
                     if (!string.IsNullOrEmpty(fKey))
                     {
-                        int badgeTop = (cardHeight - badgeH) / 2; // 21px
+                        int badgeTop = (cardHeight - badgeH) / 2;
                         badgeLabel = new Label
                         {
                             AutoSize   = false,
@@ -454,7 +470,7 @@ namespace PosBranch_Win.Transaction
                     }
 
                     // ── Name label (Formatted for clean wrapping, e.g. BANK\nTRANSFER) ──
-                    int nameX     = iconLeft + iconSize + 4; // 45px
+                    int nameX     = iconLeft + iconSize + 4; // 43px
                     int nameW     = (badgeLabel != null) ? (badgeX - nameX - 2) : (cardWidth - nameX - 4);
                     string formattedName = paymodeName.Trim().Replace(" ", "\n").ToUpperInvariant();
                     var nameLabel = new Label
@@ -463,7 +479,7 @@ namespace PosBranch_Win.Transaction
                         AutoSize     = false,
                         BackColor    = Color.Transparent,
                         Cursor       = Cursors.Hand,
-                        Font         = new Font("Segoe UI", 8F, FontStyle.Bold),
+                        Font         = new Font("Segoe UI", 7.5F, FontStyle.Bold),
                         ForeColor    = Color.FromArgb(40, 50, 65),
                         Location     = new Point(nameX, 0),
                         Name         = $"lblPaymode_{paymode.PayModeID}",
@@ -503,7 +519,14 @@ namespace PosBranch_Win.Transaction
                     top += cardHeight + cardGap;
                 }
 
-                panel1.AutoScrollMinSize = new Size(0, top + 6);
+                if (needsScroll)
+                {
+                    panel1.AutoScrollMinSize = new Size(0, top + 6);
+                }
+                else
+                {
+                    panel1.AutoScrollMinSize = Size.Empty;
+                }
             }
             finally
             {
@@ -1590,6 +1613,22 @@ namespace PosBranch_Win.Transaction
 
             // Update the display
             RefreshPaymentDisplay();
+
+            // Auto-focus target cell (Reference if required, otherwise Amount)
+            if (ultraGridPayments.Rows.Count > 0)
+            {
+                var targetRow = ultraGridPayments.Rows[ultraGridPayments.Rows.Count - 1];
+                ultraGridPayments.ActiveRow = targetRow;
+                this.ActiveControl = ultraGridPayments;
+                ultraGridPayments.Focus();
+
+                string targetCol = IsReferenceRequired(paymodeName) ? "Reference" : "Amount";
+                if (targetRow.Cells.Exists(targetCol))
+                {
+                    ultraGridPayments.ActiveCell = targetRow.Cells[targetCol];
+                    ultraGridPayments.PerformAction(Infragistics.Win.UltraWinGrid.UltraGridAction.EnterEditMode);
+                }
+            }
         }
 
         /// <summary>

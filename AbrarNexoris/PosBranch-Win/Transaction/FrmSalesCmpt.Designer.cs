@@ -126,7 +126,7 @@ namespace PosBranch_Win.Transaction
             // 
             appearance2.BackColor = System.Drawing.Color.Transparent;
             this.ultraPanel1.Appearance = appearance2;
-            this.ultraPanel1.BorderStyle = Infragistics.Win.UIElementBorderStyle.WindowsVista;
+            this.ultraPanel1.BorderStyle = Infragistics.Win.UIElementBorderStyle.None;
             // 
             // ultraPanel1.ClientArea
             // 
@@ -150,7 +150,7 @@ namespace PosBranch_Win.Transaction
             appearance3.TextVAlignAsString = "Middle";
             this.ultraButton2.Appearance = appearance3;
             this.ultraButton2.ButtonStyle = Infragistics.Win.UIElementButtonStyle.Flat;
-            this.ultraButton2.Location = new System.Drawing.Point(232, 13);
+            this.ultraButton2.Location = new System.Drawing.Point(241, 16);
             this.ultraButton2.Name = "ultraButton2";
             this.ultraButton2.Size = new System.Drawing.Size(120, 45);
             this.ultraButton2.TabIndex = 1;
@@ -170,7 +170,7 @@ namespace PosBranch_Win.Transaction
             appearance4.TextVAlignAsString = "Middle";
             this.ultraButton1.Appearance = appearance4;
             this.ultraButton1.ButtonStyle = Infragistics.Win.UIElementButtonStyle.Flat;
-            this.ultraButton1.Location = new System.Drawing.Point(96, 13);
+            this.ultraButton1.Location = new System.Drawing.Point(96, 16);
             this.ultraButton1.Name = "ultraButton1";
             this.ultraButton1.Size = new System.Drawing.Size(120, 45);
             this.ultraButton1.TabIndex = 0;
@@ -183,7 +183,7 @@ namespace PosBranch_Win.Transaction
             this.label9.BackColor = System.Drawing.Color.Transparent;
             this.label9.Font = new System.Drawing.Font("Segoe UI", 16F, System.Drawing.FontStyle.Bold);
             this.label9.ForeColor = System.Drawing.Color.DimGray;
-            this.label9.Location = new System.Drawing.Point(170, 298);
+            this.label9.Location = new System.Drawing.Point(170, 310);
             this.label9.Name = "label9";
             this.label9.Size = new System.Drawing.Size(91, 30);
             this.label9.TabIndex = 3;
@@ -192,9 +192,9 @@ namespace PosBranch_Win.Transaction
             // panel3
             // 
             appearance5.BackColor = System.Drawing.Color.Transparent;
-            appearance5.BorderColor = System.Drawing.Color.Black;
+            appearance5.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(182)))), ((int)(((byte)(200)))), ((int)(((byte)(224)))));
             this.panel3.Appearance = appearance5;
-            this.panel3.BorderStyle = Infragistics.Win.UIElementBorderStyle.WindowsVista;
+            this.panel3.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
             // 
             // panel3.ClientArea
             // 
@@ -340,7 +340,6 @@ namespace PosBranch_Win.Transaction
             // 
             // panel1
             // 
-            this.panel1.AutoScroll = true;
             this.panel1.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(248)))), ((int)(((byte)(251)))), ((int)(((byte)(255)))));
             this.panel1.Controls.Add(this.pictureBox1);
             this.panel1.Controls.Add(this.label13);
@@ -353,7 +352,6 @@ namespace PosBranch_Win.Transaction
             this.panel1.Dock = System.Windows.Forms.DockStyle.Left;
             this.panel1.Location = new System.Drawing.Point(0, 0);
             this.panel1.Name = "panel1";
-            this.panel1.Padding = new System.Windows.Forms.Padding(5);
             this.panel1.Size = new System.Drawing.Size(155, 446);
             this.panel1.TabIndex = 0;
             // 
@@ -500,6 +498,9 @@ namespace PosBranch_Win.Transaction
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(661, 448);
             this.Controls.Add(this.uplBody);
+            this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
+            this.MaximizeBox = false;
+            this.MinimizeBox = false;
             this.Name = "FrmSalesCmpt";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "Payment";
