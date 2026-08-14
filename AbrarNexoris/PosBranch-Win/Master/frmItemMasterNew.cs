@@ -157,6 +157,19 @@ namespace PosBranch_Win.Master
             return int.TryParse((value ?? string.Empty).Trim(), out parsed) ? parsed : (int?)null;
         }
 
+        private class PriceSnapshot
+        {
+            public decimal UnitCost { get; set; }
+            public decimal MarkUpPer { get; set; }
+            public decimal RetailPrice { get; set; }
+            public decimal WalkinPrice { get; set; }
+            public decimal CreditPrice { get; set; }
+            public decimal MRP { get; set; }
+            public decimal CardPrice { get; set; }
+            public decimal StaffPrice { get; set; }
+            public decimal MinPrice { get; set; }
+        }
+
         private PriceSnapshot GetCurrentBasePriceSnapshot(int itemId)
         {
             try
@@ -181,8 +194,14 @@ namespace PosBranch_Win.Master
                 return new PriceSnapshot
                 {
                     UnitCost = Convert.ToDecimal(basePrice.Cost),
+                    MarkUpPer = Convert.ToDecimal(basePrice.MarginPer),
                     RetailPrice = Convert.ToDecimal(basePrice.WholeSalePrice),
-                    WalkinPrice = Convert.ToDecimal(basePrice.RetailPrice)
+                    WalkinPrice = Convert.ToDecimal(basePrice.RetailPrice),
+                    CreditPrice = Convert.ToDecimal(basePrice.CreditPrice),
+                    MRP = Convert.ToDecimal(basePrice.MRP),
+                    CardPrice = Convert.ToDecimal(basePrice.CardPrice),
+                    StaffPrice = Convert.ToDecimal(basePrice.StaffPrice),
+                    MinPrice = Convert.ToDecimal(basePrice.MinPrice)
                 };
             }
             catch (Exception ex)
@@ -218,6 +237,7 @@ namespace PosBranch_Win.Master
             var details = new List<string>();
             
             string itemName = txt_description?.Text?.Trim() ?? string.Empty;
+            string localLang = txt_LocalLanguage?.Text?.Trim() ?? string.Empty;
             string barcode = string.Empty;
             try
             {
@@ -227,10 +247,8 @@ namespace PosBranch_Win.Master
             catch { }
 
             details.Add($"- Item Name: {itemName}");
+            if (!string.IsNullOrEmpty(localLang)) details.Add($"- Local Language Name: {localLang}");
             
-            string baseUnit = txt_BaseUnit?.Text?.Trim() ?? string.Empty;
-            if (!string.IsNullOrEmpty(baseUnit)) details.Add($"- Base Unit: {baseUnit}");
-
             string itemType = txt_ItemType?.Text?.Trim() ?? string.Empty;
             if (!string.IsNullOrEmpty(itemType)) details.Add($"- Item Type: {itemType}");
 
@@ -240,11 +258,41 @@ namespace PosBranch_Win.Master
             string group = txt_Group?.Text?.Trim() ?? string.Empty;
             if (!string.IsNullOrEmpty(group)) details.Add($"- Group: {group}");
 
+            string brand = txt_Brand?.Text?.Trim() ?? string.Empty;
+            if (!string.IsNullOrEmpty(brand)) details.Add($"- Brand: {brand}");
+
             string hsn = textBox4?.Text?.Trim() ?? string.Empty;
             if (!string.IsNullOrEmpty(hsn)) details.Add($"- HSN: {hsn}");
 
+            string customerType = txt_CustomerType?.Text?.Trim() ?? string.Empty;
+            if (!string.IsNullOrEmpty(customerType)) details.Add($"- Customer Type: {customerType}");
+
+            string baseUnit = txt_BaseUnit?.Text?.Trim() ?? string.Empty;
+            if (!string.IsNullOrEmpty(baseUnit)) details.Add($"- Base Unit: {baseUnit}");
+
+            string orderCycle = ultraOrderCycle?.Text?.Trim() ?? string.Empty;
+            if (!string.IsNullOrEmpty(orderCycle)) details.Add($"- Order Cycle Days: {orderCycle}");
+
+            string size = ultraBoxQty?.Text?.Trim() ?? string.Empty;
+            if (!string.IsNullOrEmpty(size)) details.Add($"- Size: {size}");
+
+            string status = GetSelectedItemStatus() ?? "Active";
+            details.Add($"- Item Status: {status}");
+
             decimal? unitCost = ParseNullableDecimal(Txt_UnitCost?.Text);
-            if (unitCost.HasValue) details.Add($"- Unit Cost: {FormatPrice(unitCost.Value)}");
+            if (unitCost.HasValue) details.Add($"- Unit Cost (txt_unitcost): {FormatPrice(unitCost.Value)}");
+
+            decimal? markup = ParseNullableDecimal(textBox1?.Text);
+            if (markup.HasValue) details.Add($"- Mark Up %: {markup.Value:0.00}");
+
+            bool openPrice = ultraCheckEditor2 != null && ultraCheckEditor2.Checked;
+            if (openPrice) details.Add("- Open Price: Yes");
+
+            bool nonDiscount = ultraCheckEditor1 != null && ultraCheckEditor1.Checked;
+            if (nonDiscount) details.Add("- Non-Discount Item: Yes");
+
+            bool isPerishable = ultraIsPerishable != null && ultraIsPerishable.Checked;
+            if (isPerishable) details.Add("- Is Perishable: Yes");
 
             decimal? retailPrice = ParseNullableDecimal(txt_Retail?.Text);
             if (retailPrice.HasValue) details.Add($"- Retail Price: {FormatPrice(retailPrice.Value)}");
@@ -252,8 +300,29 @@ namespace PosBranch_Win.Master
             decimal? walkinPrice = ParseNullableDecimal(txt_walkin?.Text);
             if (walkinPrice.HasValue) details.Add($"- Walkin Price: {FormatPrice(walkinPrice.Value)}");
 
-            string status = GetSelectedItemStatus() ?? "Active";
-            details.Add($"- Item Status: {status}");
+            decimal? creditPrice = ParseNullableDecimal(txt_CEP?.Text);
+            if (creditPrice.HasValue) details.Add($"- Credit Price: {FormatPrice(creditPrice.Value)}");
+
+            decimal? mrp = ParseNullableDecimal(txt_Mrp?.Text);
+            if (mrp.HasValue) details.Add($"- MRP: {FormatPrice(mrp.Value)}");
+
+            decimal? cardPrice = ParseNullableDecimal(txt_CardP?.Text);
+            if (cardPrice.HasValue) details.Add($"- Card Price: {FormatPrice(cardPrice.Value)}");
+
+            decimal? staffPrice = ParseNullableDecimal(txt_SF?.Text);
+            if (staffPrice.HasValue) details.Add($"- Staff Price: {FormatPrice(staffPrice.Value)}");
+
+            decimal? minPrice = ParseNullableDecimal(txt_MinP?.Text);
+            if (minPrice.HasValue) details.Add($"- Min Price: {FormatPrice(minPrice.Value)}");
+
+            decimal? qty = ParseNullableDecimal(txt_qty?.Text);
+            if (qty.HasValue) details.Add($"- Quantity: {qty.Value}");
+
+            decimal? available = ParseNullableDecimal(txt_available?.Text);
+            if (available.HasValue) details.Add($"- Available Stock: {available.Value}");
+
+            decimal? hold = ParseNullableDecimal(txt_hold?.Text);
+            if (hold.HasValue) details.Add($"- On Hold Stock: {hold.Value}");
 
             // Include any added units in ultraGrid1/Ult_Price
             try
@@ -270,8 +339,9 @@ namespace PosBranch_Win.Master
                         decimal newCost = ParseNullableDecimal(row.Cells["Cost"].Value?.ToString()) ?? 0m;
                         decimal newRetail = ParseNullableDecimal(row.Cells["RetailPrice"].Value?.ToString()) ?? 0m;
                         decimal newWalkin = ParseNullableDecimal(row.Cells["WholeSalePrice"].Value?.ToString()) ?? 0m;
+                        decimal newMRP = ParseNullableDecimal(row.Cells["MRP"].Value?.ToString()) ?? 0m;
 
-                        details.Add($"- Added Unit '{unitName}': Packing = {newPacking}, Cost = {FormatPrice(newCost)}, Retail Price = {FormatPrice(newRetail)}, Walkin Price = {FormatPrice(newWalkin)}");
+                        details.Add($"- Added Unit '{unitName}': Packing = {newPacking}, Cost = {FormatPrice(newCost)}, Retail Price = {FormatPrice(newRetail)}, Walkin Price = {FormatPrice(newWalkin)}, MRP = {FormatPrice(newMRP)}");
                     }
                 }
             }
@@ -294,9 +364,16 @@ namespace PosBranch_Win.Master
         {
             var changes = new List<string>();
 
-            AddPriceChange(changes, "Unit Cost", oldPrice?.UnitCost, ParseNullableDecimal(Txt_UnitCost?.Text));
+            // 1. Compare Base Prices & Unit Cost
+            AddPriceChange(changes, "Unit Cost (txt_unitcost)", oldPrice?.UnitCost, ParseNullableDecimal(Txt_UnitCost?.Text));
             AddPriceChange(changes, "Retail Price", oldPrice?.RetailPrice, ParseNullableDecimal(txt_Retail?.Text));
             AddPriceChange(changes, "Walkin Price", oldPrice?.WalkinPrice, ParseNullableDecimal(txt_walkin?.Text));
+            AddPriceChange(changes, "Credit Price", oldPrice?.CreditPrice, ParseNullableDecimal(txt_CEP?.Text));
+            AddPriceChange(changes, "MRP", oldPrice?.MRP, ParseNullableDecimal(txt_Mrp?.Text));
+            AddPriceChange(changes, "Card Price", oldPrice?.CardPrice, ParseNullableDecimal(txt_CardP?.Text));
+            AddPriceChange(changes, "Staff Price", oldPrice?.StaffPrice, ParseNullableDecimal(txt_SF?.Text));
+            AddPriceChange(changes, "Min Price", oldPrice?.MinPrice, ParseNullableDecimal(txt_MinP?.Text));
+            AddPriceChange(changes, "Mark Up %", oldPrice?.MarkUpPer, ParseNullableDecimal(textBox1?.Text));
 
             bool nameChanged = false;
             string oldName = string.Empty;
@@ -306,6 +383,7 @@ namespace PosBranch_Win.Master
             {
                 if (oldItem != null)
                 {
+                    // Description / Item Name
                     string newDesc = txt_description?.Text?.Trim() ?? string.Empty;
                     string oldDesc = oldItem.Description?.Trim() ?? string.Empty;
                     if (newDesc != oldDesc)
@@ -315,43 +393,73 @@ namespace PosBranch_Win.Master
                         newName = newDesc;
                     }
 
+                    // Local Language Name
+                    string newLocalLang = txt_LocalLanguage?.Text?.Trim() ?? string.Empty;
+                    string oldLocalLang = oldItem.NameInLocalLanguage?.Trim() ?? string.Empty;
+                    if (!string.Equals(newLocalLang, oldLocalLang, StringComparison.OrdinalIgnoreCase))
+                    {
+                        changes.Add($"Local Language Name changed from '{oldLocalLang}' to '{newLocalLang}'");
+                    }
+
+                    // Base Unit
                     string newBaseUnit = txt_BaseUnit?.Text?.Trim() ?? string.Empty;
                     string oldBaseUnit = oldItem.UnitName?.Trim() ?? string.Empty;
-                    if (newBaseUnit != oldBaseUnit)
+                    if (!string.Equals(newBaseUnit, oldBaseUnit, StringComparison.OrdinalIgnoreCase))
                     {
                         changes.Add($"Base Unit changed from '{oldBaseUnit}' to '{newBaseUnit}'");
                     }
 
+                    // Item Type
                     string newType = txt_ItemType?.Text?.Trim() ?? string.Empty;
                     string oldType = oldItem.ItemType?.Trim() ?? string.Empty;
-                    if (newType != oldType)
+                    if (!string.Equals(newType, oldType, StringComparison.OrdinalIgnoreCase))
                     {
                         changes.Add($"Item Type changed from '{oldType}' to '{newType}'");
                     }
 
+                    // Category
                     string newCategory = txt_Category?.Text?.Trim() ?? string.Empty;
                     string oldCategory = oldItem.CategoryName?.Trim() ?? string.Empty;
-                    if (newCategory != oldCategory)
+                    if (!string.Equals(newCategory, oldCategory, StringComparison.OrdinalIgnoreCase))
                     {
                         changes.Add($"Category changed from '{oldCategory}' to '{newCategory}'");
                     }
 
+                    // Group
                     string newGroup = txt_Group?.Text?.Trim() ?? string.Empty;
                     string oldGroup = oldItem.GroupName?.Trim() ?? string.Empty;
-                    if (newGroup != oldGroup)
+                    if (!string.Equals(newGroup, oldGroup, StringComparison.OrdinalIgnoreCase))
                     {
                         changes.Add($"Group changed from '{oldGroup}' to '{newGroup}'");
                     }
 
+                    // Brand
+                    string newBrand = txt_Brand?.Text?.Trim() ?? string.Empty;
+                    string oldBrand = oldItem.BrandName?.Trim() ?? string.Empty;
+                    if (!string.Equals(newBrand, oldBrand, StringComparison.OrdinalIgnoreCase))
+                    {
+                        changes.Add($"Brand changed from '{oldBrand}' to '{newBrand}'");
+                    }
+
+                    // HSN
                     string newHsn = textBox4?.Text?.Trim() ?? string.Empty;
                     string oldHsn = oldItem.HSNCode?.Trim() ?? string.Empty;
-                    if (newHsn != oldHsn)
+                    if (!string.Equals(newHsn, oldHsn, StringComparison.OrdinalIgnoreCase))
                     {
                         changes.Add($"HSN changed from '{oldHsn}' to '{newHsn}'");
                     }
 
+                    // Customer Type
+                    string newCustType = txt_CustomerType?.Text?.Trim() ?? string.Empty;
+                    string oldCustType = oldItem.ForCustomerType?.Trim() ?? string.Empty;
+                    if (!string.Equals(newCustType, oldCustType, StringComparison.OrdinalIgnoreCase))
+                    {
+                        changes.Add($"Customer Type changed from '{oldCustType}' to '{newCustType}'");
+                    }
+
+                    // Item Status
                     string newStatus = GetSelectedItemStatus() ?? string.Empty;
-                    if (newStatus != oldStatus)
+                    if (!string.Equals(newStatus, oldStatus, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(oldStatus))
                     {
                         changes.Add($"Item Status changed from '{oldStatus}' to '{newStatus}'");
                     }
@@ -371,6 +479,11 @@ namespace PosBranch_Win.Master
                             decimal newCost = ParseNullableDecimal(row.Cells["Cost"].Value?.ToString()) ?? 0m;
                             decimal newRetail = ParseNullableDecimal(row.Cells["RetailPrice"].Value?.ToString()) ?? 0m;
                             decimal newWalkin = ParseNullableDecimal(row.Cells["WholeSalePrice"].Value?.ToString()) ?? 0m;
+                            decimal newMRP = ParseNullableDecimal(row.Cells["MRP"].Value?.ToString()) ?? 0m;
+                            decimal newCard = ParseNullableDecimal(row.Cells["CardPrice"].Value?.ToString()) ?? 0m;
+                            decimal newStaff = ParseNullableDecimal(row.Cells["StaffPrice"].Value?.ToString()) ?? 0m;
+                            decimal newMin = ParseNullableDecimal(row.Cells["MinPrice"].Value?.ToString()) ?? 0m;
+                            decimal newTaxPer = ParseNullableDecimal(row.Cells["TaxPer"].Value?.ToString()) ?? 0m;
 
                             var oldSetting = oldItem.List.FirstOrDefault(x => string.Equals(x.Unit?.Trim(), unitName, StringComparison.OrdinalIgnoreCase));
                             if (oldSetting != null)
@@ -393,15 +506,15 @@ namespace PosBranch_Win.Master
 
                                 AddUnitPriceChange(changes, unitName, "Retail Price", Convert.ToDecimal(oldSetting.WholeSalePrice), newRetail);
                                 AddUnitPriceChange(changes, unitName, "Walkin Price", Convert.ToDecimal(oldSetting.RetailPrice), newWalkin);
-                                AddUnitPriceChange(changes, unitName, "MRP", Convert.ToDecimal(oldSetting.MRP), ParseNullableDecimal(row.Cells["MRP"].Value?.ToString()) ?? 0m);
-                                AddUnitPriceChange(changes, unitName, "Card Price", Convert.ToDecimal(oldSetting.CardPrice), ParseNullableDecimal(row.Cells["CardPrice"].Value?.ToString()) ?? 0m);
-                                AddUnitPriceChange(changes, unitName, "Staff Price", Convert.ToDecimal(oldSetting.StaffPrice), ParseNullableDecimal(row.Cells["StaffPrice"].Value?.ToString()) ?? 0m);
-                                AddUnitPriceChange(changes, unitName, "Min Price", Convert.ToDecimal(oldSetting.MinPrice), ParseNullableDecimal(row.Cells["MinPrice"].Value?.ToString()) ?? 0m);
-                                AddUnitPriceChange(changes, unitName, "Tax %", Convert.ToDecimal(oldSetting.TaxPer), ParseNullableDecimal(row.Cells["TaxPer"].Value?.ToString()) ?? 0m);
+                                AddUnitPriceChange(changes, unitName, "MRP", Convert.ToDecimal(oldSetting.MRP), newMRP);
+                                AddUnitPriceChange(changes, unitName, "Card Price", Convert.ToDecimal(oldSetting.CardPrice), newCard);
+                                AddUnitPriceChange(changes, unitName, "Staff Price", Convert.ToDecimal(oldSetting.StaffPrice), newStaff);
+                                AddUnitPriceChange(changes, unitName, "Min Price", Convert.ToDecimal(oldSetting.MinPrice), newMin);
+                                AddUnitPriceChange(changes, unitName, "Tax %", Convert.ToDecimal(oldSetting.TaxPer), newTaxPer);
                             }
                             else
                             {
-                                changes.Add($"Added Unit '{unitName}': Packing = {newPacking}, Cost = {FormatPrice(newCost)}, Retail Price = {FormatPrice(newRetail)}, Walkin Price = {FormatPrice(newWalkin)}");
+                                changes.Add($"Added new Unit '{unitName}': Packing = {newPacking}, Cost = {FormatPrice(newCost)}, Retail Price = {FormatPrice(newRetail)}, Walkin Price = {FormatPrice(newWalkin)}, MRP = {FormatPrice(newMRP)}");
                             }
                         }
 
@@ -409,9 +522,9 @@ namespace PosBranch_Win.Master
                         foreach (var oldSetting in oldItem.List)
                         {
                             string oldUnit = oldSetting.Unit?.Trim();
-                            if (!string.IsNullOrEmpty(oldUnit) && !matchedOldUnits.Contains(oldUnit))
+                            if (!string.IsNullOrEmpty(oldUnit) && !matchedOldUnits.Contains(oldUnit) && !string.Equals(oldUnit, oldItem.UnitName?.Trim(), StringComparison.OrdinalIgnoreCase))
                             {
-                                changes.Add($"Removed Unit '{oldUnit}'");
+                                changes.Add($"Removed / Deleted Unit '{oldUnit}'");
                             }
                         }
                     }
@@ -448,7 +561,7 @@ namespace PosBranch_Win.Master
 
             if (changes.Count > 0)
             {
-                sb.AppendLine("Updated:");
+                sb.AppendLine("Updates:");
                 foreach (var change in changes)
                 {
                     sb.AppendLine($"- {change}");
@@ -485,13 +598,6 @@ namespace PosBranch_Win.Master
         private static string FormatPrice(decimal value)
         {
             return value.ToString("0.####");
-        }
-
-        private class PriceSnapshot
-        {
-            public decimal UnitCost { get; set; }
-            public decimal RetailPrice { get; set; }
-            public decimal WalkinPrice { get; set; }
         }
 
         /// <summary>
@@ -1903,6 +2009,12 @@ namespace PosBranch_Win.Master
                 BeginInvoke((MethodInvoker)delegate { WireBarcodeRefreshMouseEvents(txtBarcodeForNewItem); });
             }
 
+            if (Txt_UnitCost != null)
+            {
+                WireUnitCostRefreshMouseEvents(Txt_UnitCost);
+                BeginInvoke((MethodInvoker)delegate { WireUnitCostRefreshMouseEvents(Txt_UnitCost); });
+            }
+
             // Ensure grid MarginPer reflects master profit margin at startup
             SyncUltPriceMarginPerFromMaster();
 
@@ -2392,6 +2504,8 @@ namespace PosBranch_Win.Master
 
         /// <summary>
         /// Handler for FrmPurchase price update event - refreshes price grid from database if the updated item matches current item
+        /// <summary>
+        /// Real-time event handler when prices/costs are updated from FrmPurchase
         /// </summary>
         private void OnPriceSettingsUpdatedHandler(int updatedItemId)
         {
@@ -2400,14 +2514,14 @@ namespace PosBranch_Win.Master
                 // Only refresh if the updated item matches the currently loaded item
                 if (CurrentItemId > 0 && CurrentItemId == updatedItemId)
                 {
-                    // Use Invoke to ensure we're on the UI thread
+                    // Use Invoke to ensure we're on the UI thread and reload all form fields (including Txt_UnitCost)
                     if (this.InvokeRequired)
                     {
-                        this.Invoke(new Action(() => RefreshPriceGridFromDatabase(updatedItemId)));
+                        this.Invoke(new Action(() => LoadItemById(updatedItemId)));
                     }
                     else
                     {
-                        RefreshPriceGridFromDatabase(updatedItemId);
+                        LoadItemById(updatedItemId);
                     }
                 }
             }
@@ -2440,6 +2554,12 @@ namespace PosBranch_Win.Master
 
                 if (getItem == null || getItem.List == null || getItem.List.Length == 0)
                     return;
+
+                // Update Txt_UnitCost field with the latest base unit cost from database
+                if (Txt_UnitCost != null && getItem.List[0] != null)
+                {
+                    Txt_UnitCost.Text = getItem.List[0].Cost.ToString("0.000");
+                }
 
                 // Create DataTable for Ult_Price with proper column types
                 DataTable dtPrice = new DataTable();
@@ -3835,6 +3955,28 @@ namespace PosBranch_Win.Master
             foreach (Control child in control.Controls)
             {
                 WireBarcodeRefreshMouseEvents(child);
+            }
+        }
+
+        private void WireUnitCostRefreshMouseEvents(Control control)
+        {
+            if (control == null)
+            {
+                return;
+            }
+
+            control.Click -= Txt_UnitCost_Click;
+            control.Click += Txt_UnitCost_Click;
+            control.MouseClick -= Txt_UnitCost_MouseClick;
+            control.MouseClick += Txt_UnitCost_MouseClick;
+            control.MouseDown -= Txt_UnitCost_MouseDown;
+            control.MouseDown += Txt_UnitCost_MouseDown;
+            control.GotFocus -= Txt_UnitCost_Click;
+            control.GotFocus += Txt_UnitCost_Click;
+
+            foreach (Control child in control.Controls)
+            {
+                WireUnitCostRefreshMouseEvents(child);
             }
         }
         private void SetMainBarcodeEditability(bool allowEdit, string barcode = null)
@@ -5816,6 +5958,7 @@ namespace PosBranch_Win.Master
 
                     // Update all profit margins after loading item data
                     UpdateAllProfitMargins();
+                    RecalculateMarkupPercentage(true);
 
                     // Note: Barcode in ultraGrid1 acts as independent alias barcode (no sync with txt_barcode)
 
@@ -7430,6 +7573,88 @@ namespace PosBranch_Win.Master
                 System.Diagnostics.Debug.WriteLine($"Error refreshing item from barcode mouse down: {ex.Message}");
             }
         }
+
+        private DateTime lastUnitCostRefreshClickTime = DateTime.MinValue;
+
+        private void Txt_UnitCost_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                RefreshCurrentItemFromUnitCostClick();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error refreshing item from unit cost click: {ex.Message}");
+            }
+        }
+
+        private void Txt_UnitCost_MouseClick(object sender, MouseEventArgs e)
+        {
+            try
+            {
+                RefreshCurrentItemFromUnitCostClick();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error refreshing item from unit cost mouse click: {ex.Message}");
+            }
+        }
+
+        private void Txt_UnitCost_MouseDown(object sender, MouseEventArgs e)
+        {
+            try
+            {
+                RefreshCurrentItemFromUnitCostClick();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error refreshing item from unit cost mouse down: {ex.Message}");
+            }
+        }
+
+        private void RefreshCurrentItemFromUnitCostClick()
+        {
+            if (isLoadingItem)
+            {
+                return;
+            }
+
+            DateTime now = DateTime.Now;
+            if ((now - lastUnitCostRefreshClickTime).TotalMilliseconds < 300)
+            {
+                return;
+            }
+
+            int loadedId = CurrentItemId > 0 ? CurrentItemId : (ItemMaster != null ? ItemMaster.ItemId : 0);
+
+            // If an item is ALREADY loaded into the form, clicking inside Txt_UnitCost must NOT re-trigger LoadItemById from DB!
+            // Re-triggering LoadItemById on an already loaded item resets textBox1 (Markup %) to 0.00 and overwrites active form edits.
+            if (loadedId > 0)
+            {
+                RecalculateMarkupPercentage();
+                UpdateAllProfitMargins();
+                return;
+            }
+
+            // Fallback: If NO item is currently loaded, search by barcode in txt_barcode and load item
+            var txtBarcodeCtrl = GetMainBarcodeEditor();
+            string barcode = (txtBarcodeCtrl?.Text ?? string.Empty).Trim();
+            int itemId = 0;
+            if (!string.IsNullOrWhiteSpace(barcode))
+            {
+                itemId = FindItemIdByAnyBarcode(barcode);
+            }
+
+            if (itemId <= 0)
+            {
+                return;
+            }
+
+            lastUnitCostRefreshClickTime = now;
+
+            // Reload the item completely from database to update all fields
+            LoadItemById(itemId);
+        }
         private void RefreshCurrentItemFromBarcodeClick()
         {
             if (isLoadingItem)
@@ -7443,19 +7668,27 @@ namespace PosBranch_Win.Master
                 return;
             }
 
-            int itemId = 0;
-            if (ItemMaster != null && ItemMaster.ItemId > 0)
-            {
-                itemId = ItemMaster.ItemId;
-            }
-            else if (CurrentItemId > 0)
-            {
-                itemId = CurrentItemId;
-            }
-
             var txtBarcodeCtrl = GetMainBarcodeEditor();
             string barcode = (txtBarcodeCtrl?.Text ?? string.Empty).Trim();
-            if (itemId <= 0 && !string.IsNullOrWhiteSpace(barcode))
+
+            int loadedId = CurrentItemId > 0 ? CurrentItemId : (ItemMaster != null ? ItemMaster.ItemId : 0);
+
+            // If an item is ALREADY loaded into the form and matches current barcode or loadedId > 0,
+            // clicking inside txt_barcode must NOT re-trigger LoadItemById from DB!
+            // Re-triggering LoadItemById on an already loaded item resets textBox1 (Markup %) to 0.00 and overwrites active form edits.
+            if (loadedId > 0)
+            {
+                int barcodeItemId = !string.IsNullOrWhiteSpace(barcode) ? FindItemIdByAnyBarcode(barcode) : 0;
+                if (barcodeItemId <= 0 || barcodeItemId == loadedId)
+                {
+                    RecalculateMarkupPercentage();
+                    UpdateAllProfitMargins();
+                    return;
+                }
+            }
+
+            int itemId = 0;
+            if (!string.IsNullOrWhiteSpace(barcode))
             {
                 itemId = FindItemIdByAnyBarcode(barcode);
             }
@@ -7466,7 +7699,10 @@ namespace PosBranch_Win.Master
             }
 
             lastBarcodeRefreshClickTime = now;
+
+            // Reload the item completely from database to update all fields
             LoadItemById(itemId);
+
             BeginInvoke((MethodInvoker)delegate
             {
                 var refreshedBarcodeCtrl = GetMainBarcodeEditor();
@@ -11191,12 +11427,12 @@ namespace PosBranch_Win.Master
         }
 
         // Method to recalculate markup percentage in textBox1
-        private void RecalculateMarkupPercentage()
+        private void RecalculateMarkupPercentage(bool ignoreLoadingFlag = false)
         {
             try
             {
-                if (isLoadingItem) return; // don't recalc while loading
-                if (textBox1 != null && !string.IsNullOrWhiteSpace(Txt_UnitCost.Text) && !string.IsNullOrWhiteSpace(txt_Retail.Text))
+                if (isLoadingItem && !ignoreLoadingFlag) return; // don't recalc while loading unless explicitly requested
+                if (textBox1 != null && !string.IsNullOrWhiteSpace(Txt_UnitCost?.Text) && !string.IsNullOrWhiteSpace(txt_Retail?.Text))
                 {
                     float unitCost;
                     float retailPrice;

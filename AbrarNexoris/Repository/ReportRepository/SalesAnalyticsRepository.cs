@@ -3,6 +3,7 @@ using ModelClass;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlClient;
 using System.Linq;
 
 namespace Repository.ReportRepository
@@ -76,6 +77,7 @@ ELSE
     FROM SMaster
     WHERE BranchId = @BranchId AND CompanyId = @CompanyId AND FinYearId = @FinYearId
       AND ISNULL(CancelFlag, 0) = 0
+      AND ISNULL(Status, '') <> 'Hold'
       AND BillDate >= @FromDate AND BillDate < @ToDate;";
 
             SalesAnalyticsSummary summary = DataConnection.QueryFirstOrDefault<SalesAnalyticsSummary>(sql, BuildParameters(fromDate, toDate)) ?? new SalesAnalyticsSummary();
@@ -83,7 +85,114 @@ ELSE
             summary.TotalProfit = ReadTotalProfit(fromDate, toDate);
             summary.AverageOrderValue = summary.TotalOrders > 0 ? summary.TotalSales / summary.TotalOrders : 0;
             summary.ProfitMarginPercent = summary.TotalSales > 0 ? (summary.TotalProfit / summary.TotalSales) * 100M : 0;
+            
+            ReadHoldSummary(fromDate, toDate, summary);
             return summary;
+        }
+
+        private void ReadHoldSummary(DateTime fromDate, DateTime toDate, SalesAnalyticsSummary summary)
+        {
+            if (summary == null) return;
+            DateTime exclusiveTo = toDate.Date.AddDays(1);
+
+            string sql = @"
+IF OBJECT_ID('SMaster', 'U') IS NULL
+    SELECT CAST(0 AS int) AS HoldOrders, CAST(0 AS decimal(18,2)) AS HoldAmount
+ELSE
+    SELECT
+        COUNT(DISTINCT sm.BillNo) AS HoldOrders,
+        ISNULL(SUM(ISNULL(sm.NetAmount, 0)), 0) AS HoldAmount
+    FROM SMaster sm
+    WHERE (@BranchId = 0 OR ISNULL(sm.BranchId, 0) = @BranchId)
+      AND (@CompanyId = 0 OR ISNULL(sm.CompanyId, 0) = @CompanyId)
+      AND ISNULL(sm.CancelFlag, 0) = 0
+      AND (ISNULL(sm.Status, '') = 'Hold' OR ISNULL(sm.Status, '') = 'HOLD' OR sm.Status LIKE '%Hold%')
+      AND sm.BillDate >= @FromDate AND sm.BillDate < @ExclusiveTo;";
+
+            var parameters = new DynamicParameters();
+            parameters.Add("@BranchId", SessionContext.BranchId);
+            parameters.Add("@CompanyId", SessionContext.CompanyId);
+            parameters.Add("@FromDate", fromDate.Date);
+            parameters.Add("@ExclusiveTo", exclusiveTo);
+
+            var holdInfo = DataConnection.QueryFirstOrDefault<dynamic>(sql, parameters);
+            if (holdInfo != null)
+            {
+                summary.HoldOrders = Convert.ToInt32(holdInfo.HoldOrders ?? 0);
+                summary.HoldAmount = Convert.ToDecimal(holdInfo.HoldAmount ?? 0m);
+            }
+
+            string qtySql = @"
+IF OBJECT_ID('SDetails', 'U') IS NULL OR OBJECT_ID('SMaster', 'U') IS NULL
+    SELECT CAST(0 AS decimal(18,2))
+ELSE
+    SELECT ISNULL(SUM(ISNULL(sd.Qty, 0)), 0)
+    FROM SDetails sd
+    INNER JOIN SMaster sm ON sm.BillNo = sd.BillNo AND sm.BranchId = sd.BranchId AND sm.CompanyId = sd.CompanyId
+    WHERE (@BranchId = 0 OR ISNULL(sm.BranchId, 0) = @BranchId)
+      AND (@CompanyId = 0 OR ISNULL(sm.CompanyId, 0) = @CompanyId)
+      AND ISNULL(sm.CancelFlag, 0) = 0
+      AND (ISNULL(sm.Status, '') = 'Hold' OR ISNULL(sm.Status, '') = 'HOLD' OR sm.Status LIKE '%Hold%')
+      AND sm.BillDate >= @FromDate AND sm.BillDate < @ExclusiveTo;";
+
+            summary.HoldItemsQty = DataConnection.QueryFirstOrDefault<decimal>(qtySql, parameters);
+        }
+
+        public DataTable GetHoldItemsDetails(DateTime fromDate, DateTime toDate)
+        {
+            DataTable table = new DataTable();
+            DateTime exclusiveTo = toDate.Date.AddDays(1);
+            try
+            {
+                if (DataConnection.State != ConnectionState.Open)
+                    DataConnection.Open();
+
+                string sql = @"
+IF OBJECT_ID('SMaster', 'U') IS NULL OR OBJECT_ID('SDetails', 'U') IS NULL
+    SELECT TOP 0 CAST(0 AS bigint) AS [Bill No], CAST(GETDATE() AS datetime) AS [Date & Time], CAST('' AS nvarchar(150)) AS [Customer],
+           CAST('' AS nvarchar(200)) AS [Item Name], CAST('' AS nvarchar(50)) AS [Barcode], CAST('' AS nvarchar(50)) AS [Unit],
+           CAST(0 AS decimal(18,2)) AS [Qty], CAST(0 AS decimal(18,2)) AS [Unit Price], CAST(0 AS decimal(18,2)) AS [Total Amount],
+           CAST('' AS nvarchar(100)) AS [Billed By]
+ELSE
+    SELECT
+        sm.BillNo AS [Bill No],
+        sm.BillDate AS [Date & Time],
+        ISNULL(NULLIF(sm.CustomerName, ''), 'Walk-in Customer') AS [Customer],
+        ISNULL(sd.ItemName, 'Hold Bill Header') AS [Item Name],
+        ISNULL(sd.Barcode, '') AS [Barcode],
+        ISNULL(sd.Unit, '') AS [Unit],
+        ISNULL(sd.Qty, 0) AS [Qty],
+        ISNULL(sd.UnitPrice, 0) AS [Unit Price],
+        ISNULL(sd.TotalAmount, sm.NetAmount) AS [Total Amount],
+        ISNULL(u.UserName, CASE WHEN ISNULL(sm.UserId, 0) = 0 THEN '' ELSE 'User ' + CONVERT(nvarchar(20), sm.UserId) END) AS [Billed By]
+    FROM SMaster sm
+    LEFT JOIN Users u ON u.UserID = sm.UserId
+    LEFT JOIN SDetails sd ON sd.BillNo = sm.BillNo AND sd.BranchId = sm.BranchId AND sd.CompanyId = sm.CompanyId
+    WHERE (@BranchId = 0 OR ISNULL(sm.BranchId, 0) = @BranchId)
+      AND (@CompanyId = 0 OR ISNULL(sm.CompanyId, 0) = @CompanyId)
+      AND ISNULL(sm.CancelFlag, 0) = 0
+      AND (ISNULL(sm.Status, '') = 'Hold' OR ISNULL(sm.Status, '') = 'HOLD' OR sm.Status LIKE '%Hold%')
+      AND sm.BillDate >= @FromDate AND sm.BillDate < @ExclusiveTo
+    ORDER BY sm.BillDate DESC, sm.BillNo DESC, ISNULL(sd.SlNo, 0) ASC;";
+
+                using (SqlCommand cmd = new SqlCommand(sql, (SqlConnection)DataConnection))
+                {
+                    cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
+                    cmd.Parameters.AddWithValue("@CompanyId", SessionContext.CompanyId);
+                    cmd.Parameters.AddWithValue("@FromDate", fromDate.Date);
+                    cmd.Parameters.AddWithValue("@ExclusiveTo", exclusiveTo);
+
+                    using (SqlDataAdapter adapter = new SqlDataAdapter(cmd))
+                    {
+                        adapter.Fill(table);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("GetHoldItemsDetails error: " + ex.Message);
+            }
+            return table;
         }
 
         private decimal ReadTotalProfit(DateTime fromDate, DateTime toDate)
@@ -97,6 +206,7 @@ ELSE
     INNER JOIN SMaster sm ON sm.BillNo = sd.BillNo AND sm.BranchId = sd.BranchId AND sm.CompanyId = sd.CompanyId AND sm.FinYearId = sd.FinYearId
     WHERE sm.BranchId = @BranchId AND sm.CompanyId = @CompanyId AND sm.FinYearId = @FinYearId
       AND ISNULL(sm.CancelFlag, 0) = 0
+      AND ISNULL(sm.Status, '') <> 'Hold'
       AND sm.BillDate >= @FromDate AND sm.BillDate < @ToDate;";
 
             return DataConnection.QueryFirstOrDefault<decimal>(sql, BuildParameters(fromDate, toDate));
@@ -113,6 +223,7 @@ ELSE
     INNER JOIN SMaster sm ON sm.BillNo = sd.BillNo AND sm.BranchId = sd.BranchId AND sm.CompanyId = sd.CompanyId AND sm.FinYearId = sd.FinYearId
     WHERE sm.BranchId = @BranchId AND sm.CompanyId = @CompanyId AND sm.FinYearId = @FinYearId
       AND ISNULL(sm.CancelFlag, 0) = 0
+      AND ISNULL(sm.Status, '') <> 'Hold'
       AND sm.BillDate >= @FromDate AND sm.BillDate < @ToDate;";
             return DataConnection.QueryFirstOrDefault<decimal>(sql, BuildParameters(fromDate, toDate));
         }
@@ -150,6 +261,7 @@ ELSE
     FROM SMaster
     WHERE BranchId = @BranchId AND CompanyId = @CompanyId AND FinYearId = @FinYearId
       AND ISNULL(CancelFlag, 0) = 0
+      AND ISNULL(Status, '') <> 'Hold'
       AND BillDate >= @FromDate AND BillDate < @ToDate
     GROUP BY CAST(BillDate AS date);";
 
@@ -191,6 +303,7 @@ ELSE
     INNER JOIN SMaster sm ON sm.BillNo = sd.BillNo AND sm.BranchId = sd.BranchId AND sm.CompanyId = sd.CompanyId AND sm.FinYearId = sd.FinYearId
     WHERE sm.BranchId = @BranchId AND sm.CompanyId = @CompanyId AND sm.FinYearId = @FinYearId
       AND ISNULL(sm.CancelFlag, 0) = 0
+      AND ISNULL(sm.Status, '') <> 'Hold'
       AND sm.BillDate >= @FromDate AND sm.BillDate < @ToDate
     GROUP BY sd.ItemName
     ORDER BY " + sortColumn + @" DESC;";
@@ -213,6 +326,7 @@ ELSE
     INNER JOIN SMaster sm ON sm.BillNo = sd.BillNo AND sm.BranchId = sd.BranchId AND sm.CompanyId = sd.CompanyId AND sm.FinYearId = sd.FinYearId
     WHERE sm.BranchId = @BranchId AND sm.CompanyId = @CompanyId AND sm.FinYearId = @FinYearId
       AND ISNULL(sm.CancelFlag, 0) = 0
+      AND ISNULL(sm.Status, '') <> 'Hold'
       AND sm.BillDate >= @FromDate AND sm.BillDate < @ToDate
     GROUP BY sd.ItemName
     ORDER BY Amount DESC;";
@@ -520,6 +634,10 @@ END;";
         public decimal AverageOrderValueChangePercent { get; set; }
         public decimal ProfitChangePercent { get; set; }
         public decimal ItemsSoldChangePercent { get; set; }
+
+        public int HoldOrders { get; set; }
+        public decimal HoldAmount { get; set; }
+        public decimal HoldItemsQty { get; set; }
     }
 
     public class SalesTrendPoint

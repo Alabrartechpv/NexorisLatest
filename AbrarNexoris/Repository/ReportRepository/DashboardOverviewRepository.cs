@@ -111,11 +111,13 @@ ELSE SELECT COUNT(1) FROM ItemMaster WHERE CompanyId = @CompanyId;");
 
         private decimal ReadTotal(string tableName, string dateColumn, string amountColumn, string branchColumn, DateTime fromDate, DateTime toDate)
         {
+            string statusFilter = string.Equals(tableName, "SMaster", StringComparison.OrdinalIgnoreCase) ? " AND ISNULL(Status, '') <> 'Hold'" : string.Empty;
             string sql = $@"
 IF OBJECT_ID('{tableName}', 'U') IS NULL SELECT CAST(0 AS decimal(18,2))
 ELSE SELECT ISNULL(SUM(ISNULL({amountColumn}, 0)), 0)
 FROM {tableName}
 WHERE {branchColumn} = @BranchId AND CompanyId = @CompanyId AND FinYearId = @FinYearId
+  AND ISNULL(CancelFlag, 0) = 0{statusFilter}
   AND {dateColumn} >= @FromDate AND {dateColumn} < @ToDate;";
             return ReadSafeDecimal(sql, fromDate, toDate);
         }
@@ -134,11 +136,13 @@ WHERE BranchID = @BranchId AND CompanyID = @CompanyId AND FinYearID = @FinYearId
 
         private int ReadCount(string tableName, string dateColumn, string branchColumn, DateTime fromDate, DateTime toDate)
         {
+            string statusFilter = string.Equals(tableName, "SMaster", StringComparison.OrdinalIgnoreCase) ? " AND ISNULL(Status, '') <> 'Hold'" : string.Empty;
             string sql = $@"
 IF OBJECT_ID('{tableName}', 'U') IS NULL SELECT 0
 ELSE SELECT COUNT(1)
 FROM {tableName}
 WHERE {branchColumn} = @BranchId AND CompanyId = @CompanyId AND FinYearId = @FinYearId
+  AND ISNULL(CancelFlag, 0) = 0{statusFilter}
   AND {dateColumn} >= @FromDate AND {dateColumn} < @ToDate;";
             return ReadSafeInt(sql, fromDate, toDate);
         }
