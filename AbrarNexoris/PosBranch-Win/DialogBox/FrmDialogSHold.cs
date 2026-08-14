@@ -398,7 +398,7 @@ namespace PosBranch_Win.DialogBox
             {
                 e.Layout.Bands[0].Columns.Cast<UltraGridColumn>().ToList().ForEach(c => c.Hidden = true);
 
-                string[] columnsToShow = { "BillNo", "CustomerName", "NetAmount" };
+                string[] columnsToShow = { "BillNo", "BillDate", "CustomerName", "CounterId", "NetAmount" };
                 for (int i = 0; i < columnsToShow.Length; i++)
                 {
                     string colKey = columnsToShow[i];
@@ -411,16 +411,27 @@ namespace PosBranch_Win.DialogBox
                         {
                             case "BillNo":
                                 col.Header.Caption = "Bill No";
-                                col.Width = 100;
+                                col.Width = 90;
+                                break;
+                            case "BillDate":
+                                col.Header.Caption = "Date & Time";
+                                col.Width = 135;
+                                col.Format = "dd-MM-yyyy HH:mm";
+                                col.CellAppearance.TextHAlign = HAlign.Center;
                                 break;
                             case "CustomerName":
                                 col.Header.Caption = "Customer Name";
-                                col.Width = 350;
+                                col.Width = 220;
                                 col.CellAppearance.TextHAlign = HAlign.Left;
+                                break;
+                            case "CounterId":
+                                col.Header.Caption = "Counter";
+                                col.Width = 65;
+                                col.CellAppearance.TextHAlign = HAlign.Center;
                                 break;
                             case "NetAmount":
                                 col.Header.Caption = "Net Amount";
-                                col.Width = 150;
+                                col.Width = 110;
                                 col.Format = "N2";
                                 col.CellAppearance.TextHAlign = HAlign.Right;
                                 break;

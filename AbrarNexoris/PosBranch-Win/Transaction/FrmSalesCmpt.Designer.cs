@@ -119,7 +119,7 @@ namespace PosBranch_Win.Transaction
             this.uplBody.Dock = System.Windows.Forms.DockStyle.Fill;
             this.uplBody.Location = new System.Drawing.Point(0, 0);
             this.uplBody.Name = "uplBody";
-            this.uplBody.Size = new System.Drawing.Size(661, 448);
+            this.uplBody.Size = new System.Drawing.Size(661, 436);
             this.uplBody.TabIndex = 2;
             // 
             // ultraPanel1
@@ -132,7 +132,7 @@ namespace PosBranch_Win.Transaction
             // 
             this.ultraPanel1.ClientArea.Controls.Add(this.ultraButton2);
             this.ultraPanel1.ClientArea.Controls.Add(this.ultraButton1);
-            this.ultraPanel1.Location = new System.Drawing.Point(161, 366);
+            this.ultraPanel1.Location = new System.Drawing.Point(159, 359);
             this.ultraPanel1.Name = "ultraPanel1";
             this.ultraPanel1.Size = new System.Drawing.Size(495, 80);
             this.ultraPanel1.TabIndex = 32;
@@ -183,7 +183,7 @@ namespace PosBranch_Win.Transaction
             this.label9.BackColor = System.Drawing.Color.Transparent;
             this.label9.Font = new System.Drawing.Font("Segoe UI", 16F, System.Drawing.FontStyle.Bold);
             this.label9.ForeColor = System.Drawing.Color.DimGray;
-            this.label9.Location = new System.Drawing.Point(170, 310);
+            this.label9.Location = new System.Drawing.Point(168, 310);
             this.label9.Name = "label9";
             this.label9.Size = new System.Drawing.Size(91, 30);
             this.label9.TabIndex = 3;
@@ -199,7 +199,7 @@ namespace PosBranch_Win.Transaction
             // panel3.ClientArea
             // 
             this.panel3.ClientArea.Controls.Add(this.ultraGridPayments);
-            this.panel3.Location = new System.Drawing.Point(161, 104);
+            this.panel3.Location = new System.Drawing.Point(159, 104);
             this.panel3.Name = "panel3";
             this.panel3.Size = new System.Drawing.Size(495, 165);
             this.panel3.TabIndex = 2;
@@ -223,7 +223,7 @@ namespace PosBranch_Win.Transaction
             // ultraPanel12.ClientArea
             // 
             this.ultraPanel12.ClientArea.Controls.Add(this.ultraPanel11);
-            this.ultraPanel12.Location = new System.Drawing.Point(264, 280);
+            this.ultraPanel12.Location = new System.Drawing.Point(262, 280);
             this.ultraPanel12.Name = "ultraPanel12";
             this.ultraPanel12.Size = new System.Drawing.Size(253, 69);
             this.ultraPanel12.TabIndex = 31;
@@ -264,7 +264,7 @@ namespace PosBranch_Win.Transaction
             this.panel2.BackColor = System.Drawing.Color.Transparent;
             this.panel2.Controls.Add(this.ultraPanel13);
             this.panel2.Controls.Add(this.Total);
-            this.panel2.Location = new System.Drawing.Point(161, 0);
+            this.panel2.Location = new System.Drawing.Point(159, 0);
             this.panel2.Name = "panel2";
             this.panel2.Size = new System.Drawing.Size(495, 102);
             this.panel2.TabIndex = 1;
@@ -335,7 +335,7 @@ namespace PosBranch_Win.Transaction
             this.pnlSeparator.Dock = System.Windows.Forms.DockStyle.Left;
             this.pnlSeparator.Location = new System.Drawing.Point(155, 0);
             this.pnlSeparator.Name = "pnlSeparator";
-            this.pnlSeparator.Size = new System.Drawing.Size(1, 446);
+            this.pnlSeparator.Size = new System.Drawing.Size(1, 434);
             this.pnlSeparator.TabIndex = 33;
             // 
             // panel1
@@ -352,7 +352,7 @@ namespace PosBranch_Win.Transaction
             this.panel1.Dock = System.Windows.Forms.DockStyle.Left;
             this.panel1.Location = new System.Drawing.Point(0, 0);
             this.panel1.Name = "panel1";
-            this.panel1.Size = new System.Drawing.Size(155, 446);
+            this.panel1.Size = new System.Drawing.Size(155, 434);
             this.panel1.TabIndex = 0;
             // 
             // pictureBox1
@@ -496,14 +496,16 @@ namespace PosBranch_Win.Transaction
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(661, 448);
+            this.ClientSize = new System.Drawing.Size(661, 436);
             this.Controls.Add(this.uplBody);
             this.FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
             this.Name = "FrmSalesCmpt";
-            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
+            this.ShowInTaskbar = false;
+            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent;
             this.Text = "Payment";
+            this.TopMost = true;
             this.Load += new System.EventHandler(this.FrmSalesCmpt_Load);
             this.uplBody.ClientArea.ResumeLayout(false);
             this.uplBody.ClientArea.PerformLayout();
