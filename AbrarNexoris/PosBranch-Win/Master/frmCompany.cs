@@ -97,14 +97,26 @@ namespace PosBranch_Win.Master
         private void FrmCompany_Load(object sender, EventArgs e)
         {
             PerformResponsiveLayout();
-            // Try to load the latest company or first one in the list
             try
             {
-                var companies = _companyRepo.GetCompanyDropdownList();
-                if (companies.Any())
+                int targetCompanyId = 0;
+                if (AppSession.CompanyID > 0)
                 {
-                    int companyId = companies.Max(c => c.CompanyID);
-                    LoadCompanyData(companyId);
+                    targetCompanyId = AppSession.CompanyID;
+                }
+                else
+                {
+                    var companies = _companyRepo.GetCompanyDropdownList();
+                    if (companies != null && companies.Any())
+                    {
+                        targetCompanyId = companies.Max(c => c.CompanyID);
+                    }
+                }
+
+                if (targetCompanyId > 0)
+                {
+                    LoadCompanyData(targetCompanyId);
+                    _isEditMode = true;
                 }
                 else
                 {
@@ -891,17 +903,23 @@ namespace PosBranch_Win.Master
                 }
 
                 // Check result and show appropriate message
-                if (result == "SUCCESS")
+                if (result == "SUCCESS" || int.TryParse(result, out _))
                 {
                     MessageBox.Show("Company information saved successfully.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
-                    // Update the global session before clearing the form
+                    // Update the global session
                     AppSession.LoadCompanyInfo(_currentCompany);
 
-                    // Clear the form to allow adding a new company
-                    ClearControls();
-                    _currentCompany = new CompanyModel();
-                    _isEditMode = false;
+                    // Retain loaded company in edit mode rather than wiping form controls
+                    if (int.TryParse(result, out int newCompanyId))
+                    {
+                        _currentCompany.CompanyID = newCompanyId;
+                    }
+                    _isEditMode = true;
+                    if (_currentCompany.CompanyID > 0)
+                    {
+                        LoadCompanyData(_currentCompany.CompanyID);
+                    }
                 }
                 else if (result == "NAME EXISTS")
                 {
