@@ -313,9 +313,9 @@ namespace PosBranch_Win.Transaction
             this.ultraPictureBox3.BorderShadowColor = System.Drawing.Color.Empty;
             this.ultraPictureBox3.Cursor = System.Windows.Forms.Cursors.Hand;
             this.ultraPictureBox3.Image = ((object)(resources.GetObject("ultraPictureBox3.Image")));
-            this.ultraPictureBox3.Location = new System.Drawing.Point(5, 7);
+            this.ultraPictureBox3.Location = new System.Drawing.Point(5, 9);
             this.ultraPictureBox3.Name = "ultraPictureBox3";
-            this.ultraPictureBox3.Size = new System.Drawing.Size(14, 17);
+            this.ultraPictureBox3.Size = new System.Drawing.Size(19, 15);
             this.ultraPictureBox3.TabIndex = 197;
             // 
             // ultraPanel11
@@ -485,7 +485,7 @@ namespace PosBranch_Win.Transaction
             this.button2.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.button2.ForeColor = System.Drawing.Color.Aquamarine;
             this.button2.ImageKey = "(none)";
-            this.button2.Location = new System.Drawing.Point(969, 130);
+            this.button2.Location = new System.Drawing.Point(968, 130);
             this.button2.Name = "button2";
             this.button2.Size = new System.Drawing.Size(23, 22);
             this.button2.TabIndex = 133;

@@ -3576,7 +3576,7 @@ namespace PosBranch_Win.Master
             this.btnIemLoad_ById.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.btnIemLoad_ById.ForeColor = System.Drawing.SystemColors.Window;
             this.btnIemLoad_ById.ImageAlign = System.Drawing.ContentAlignment.TopLeft;
-            this.btnIemLoad_ById.Location = new System.Drawing.Point(598, 45);
+            this.btnIemLoad_ById.Location = new System.Drawing.Point(597, 45);
             this.btnIemLoad_ById.Name = "btnIemLoad_ById";
             this.btnIemLoad_ById.Size = new System.Drawing.Size(25, 23);
             this.btnIemLoad_ById.TabIndex = 199;
@@ -3686,7 +3686,7 @@ namespace PosBranch_Win.Master
             this.btn_Add_Custm.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btn_Add_Custm.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.btn_Add_Custm.ForeColor = System.Drawing.Color.Transparent;
-            this.btn_Add_Custm.Location = new System.Drawing.Point(595, 72);
+            this.btn_Add_Custm.Location = new System.Drawing.Point(596, 72);
             this.btn_Add_Custm.Name = "btn_Add_Custm";
             this.btn_Add_Custm.Size = new System.Drawing.Size(28, 26);
             this.btn_Add_Custm.TabIndex = 201;
@@ -3771,7 +3771,7 @@ namespace PosBranch_Win.Master
             this.btn_ItemLoad.Font = new System.Drawing.Font("Microsoft JhengHei", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.btn_ItemLoad.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(0)))), ((int)(((byte)(0)))), ((int)(((byte)(0)))));
             this.btn_ItemLoad.Image = ((System.Drawing.Image)(resources.GetObject("btn_ItemLoad.Image")));
-            this.btn_ItemLoad.Location = new System.Drawing.Point(596, 4);
+            this.btn_ItemLoad.Location = new System.Drawing.Point(595, 4);
             this.btn_ItemLoad.Name = "btn_ItemLoad";
             this.btn_ItemLoad.Size = new System.Drawing.Size(34, 33);
             this.btn_ItemLoad.TabIndex = 3;
