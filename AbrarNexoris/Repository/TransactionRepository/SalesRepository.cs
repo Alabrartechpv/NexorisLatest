@@ -1700,9 +1700,9 @@ namespace Repository.TransactionRepository
                         {
                             var allHoldBills = ds.Tables[0].ToListOfObject<GetHoldBill>();
 
-                            // Filter by BranchId and CounterId to ensure data separation between counters/branches (Admins bypass; include Admin sales with CounterId 0)
+                            // Filter by BranchId to show all branch hold bills across counters (Counter 1, 2, 3, Admin)
                             item.List = allHoldBills
-                                .Where(bill => bill.BranchId == SessionContext.BranchId && (isAdmin || bill.CounterId == SessionContext.CounterId || bill.CounterId == 0))
+                                .Where(bill => bill.BranchId == SessionContext.BranchId)
                                 .ToList();
                         }
                     }
@@ -1823,10 +1823,8 @@ namespace Repository.TransactionRepository
                                 }
                             }
 
-                            // Filter by CounterId in C# as double-safety (Admins bypass; include Admin sales with CounterId 0)
-                            item.List = bills
-                                .Where(bill => isAdmin || bill.CounterId == SessionContext.CounterId || bill.CounterId == 0)
-                                .ToList();
+                            // Return all branch sales bills across counters (Counter 1, 2, 3, Admin)
+                            item.List = bills;
                         }
                         else
                         {
