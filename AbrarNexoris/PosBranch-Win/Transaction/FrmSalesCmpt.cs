@@ -93,14 +93,7 @@ namespace PosBranch_Win.Transaction
         #region Initialization
         private void InitializePaymentDialog()
         {
-            // Set form properties
-            this.FormBorderStyle = FormBorderStyle.Sizable;
-            this.MaximizeBox = true;
-            this.MinimizeBox = false;
-            this.MinimumSize = new Size(675, 480);
-            this.StartPosition = FormStartPosition.CenterParent;
-            this.ShowInTaskbar = false;
-            this.TopMost = true;
+            this.WindowState = FormWindowState.Normal;
             ConfigurePaymodePanelAppearance();
 
             // Initialize UI
