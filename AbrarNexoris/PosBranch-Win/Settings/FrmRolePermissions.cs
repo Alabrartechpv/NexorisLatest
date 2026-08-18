@@ -1,4 +1,4 @@
-﻿using ModelClass;
+using ModelClass;
 using ModelClass.Master;
 using Repository.MasterRepositry;
 using System;
@@ -32,11 +32,89 @@ namespace PosBranch_Win.Settings
             // Set form appearance
             this.Text = "Role Permission Management";
 
+            // Configure DataGridView
+            ConfigureGrid();
+
+            // Load categories filter dropdown
+            LoadCategoryFilter();
+
             // Load roles into combo box
             LoadRoles();
 
-            // Configure DataGridView
-            ConfigureGrid();
+            // Apply explicit button colors
+            ApplyButtonStyles();
+
+            // Event handlers for filtering
+            cmbCategoryFilter.SelectedIndexChanged += (s, ev) => ApplyFilter();
+            txtSearchForm.TextChanged += (s, ev) => ApplyFilter();
+            btnGrantViewAll.Click += BtnGrantViewAll_Click;
+
+            LanguageManager.ApplyLanguageToForm(this);
+        }
+
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
+            ApplyButtonStyles();
+            if (_selectedRoleId <= 0 && cmbRoles.Items.Count > 0)
+            {
+                cmbRoles.SelectedIndex = 0;
+                cmbRoles_SelectedIndexChanged(cmbRoles, EventArgs.Empty);
+            }
+        }
+
+        private void ApplyButtonStyles()
+        {
+            pnlButtons.BackColor = Color.FromArgb(230, 240, 250);
+
+            btnSave.FlatStyle = FlatStyle.Flat;
+            btnSave.FlatAppearance.BorderSize = 0;
+            btnSave.BackColor = Color.FromArgb(0, 120, 215);
+            btnSave.ForeColor = Color.White;
+            btnSave.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
+
+            btnGrantViewAll.FlatStyle = FlatStyle.Flat;
+            btnGrantViewAll.FlatAppearance.BorderSize = 0;
+            btnGrantViewAll.BackColor = Color.FromArgb(23, 162, 184);
+            btnGrantViewAll.ForeColor = Color.White;
+            btnGrantViewAll.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
+
+            btnGrantAll.FlatStyle = FlatStyle.Flat;
+            btnGrantAll.FlatAppearance.BorderSize = 0;
+            btnGrantAll.BackColor = Color.FromArgb(40, 167, 69);
+            btnGrantAll.ForeColor = Color.White;
+            btnGrantAll.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
+
+            btnRevokeAll.FlatStyle = FlatStyle.Flat;
+            btnRevokeAll.FlatAppearance.BorderSize = 0;
+            btnRevokeAll.BackColor = Color.FromArgb(220, 53, 69);
+            btnRevokeAll.ForeColor = Color.White;
+            btnRevokeAll.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
+
+            btnRefresh.FlatStyle = FlatStyle.Flat;
+            btnRefresh.FlatAppearance.BorderSize = 0;
+            btnRefresh.BackColor = Color.FromArgb(108, 117, 125);
+            btnRefresh.ForeColor = Color.White;
+            btnRefresh.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
+
+            btnClose.FlatStyle = FlatStyle.Flat;
+            btnClose.FlatAppearance.BorderSize = 0;
+            btnClose.BackColor = Color.FromArgb(52, 58, 64);
+            btnClose.ForeColor = Color.White;
+            btnClose.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
+        }
+
+        private void LoadCategoryFilter()
+        {
+            cmbCategoryFilter.Items.Clear();
+            cmbCategoryFilter.Items.Add("All Categories");
+            cmbCategoryFilter.Items.Add("Master");
+            cmbCategoryFilter.Items.Add("Transaction");
+            cmbCategoryFilter.Items.Add("Accounts");
+            cmbCategoryFilter.Items.Add("Reports");
+            cmbCategoryFilter.Items.Add("Settings");
+            cmbCategoryFilter.Items.Add("Utilities");
+            cmbCategoryFilter.SelectedIndex = 0;
         }
 
         /// <summary>
@@ -47,13 +125,15 @@ namespace PosBranch_Win.Settings
             try
             {
                 var roles = _permRepo.GetAllRoles();
-                cmbRoles.DataSource = roles;
+                cmbRoles.DataSource = null;
                 cmbRoles.DisplayMember = "RoleName";
                 cmbRoles.ValueMember = "RoleID";
+                cmbRoles.DataSource = roles;
 
-                if (roles.Count > 0)
+                if (roles != null && roles.Count > 0)
                 {
                     cmbRoles.SelectedIndex = 0;
+                    cmbRoles_SelectedIndexChanged(cmbRoles, EventArgs.Empty);
                 }
             }
             catch (Exception ex)
@@ -159,7 +239,26 @@ namespace PosBranch_Win.Settings
         /// </summary>
         private void cmbRoles_SelectedIndexChanged(object sender, EventArgs e)
         {
-            if (cmbRoles.SelectedValue != null && cmbRoles.SelectedValue is int roleId)
+            int roleId = 0;
+
+            if (cmbRoles.SelectedValue != null)
+            {
+                if (cmbRoles.SelectedValue is int idInt)
+                {
+                    roleId = idInt;
+                }
+                else if (int.TryParse(cmbRoles.SelectedValue.ToString(), out int parsedId))
+                {
+                    roleId = parsedId;
+                }
+            }
+
+            if (roleId <= 0 && cmbRoles.SelectedItem is Role r)
+            {
+                roleId = r.RoleID;
+            }
+
+            if (roleId > 0)
             {
                 _selectedRoleId = roleId;
                 LoadPermissionsForRole(roleId);
@@ -175,16 +274,42 @@ namespace PosBranch_Win.Settings
             try
             {
                 _currentPermissions = _permRepo.GetFormsWithPermissions(roleId);
-                dgvPermissions.DataSource = null;
-                dgvPermissions.DataSource = _currentPermissions;
-
-                lblStatus.Text = $"Loaded {_currentPermissions.Count} forms for role: {cmbRoles.Text}";
+                ApplyFilter();
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Error loading permissions: {ex.Message}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }
+
+        private void ApplyFilter()
+        {
+            if (_currentPermissions == null) return;
+
+            string selectedCategory = cmbCategoryFilter.SelectedItem?.ToString() ?? "All Categories";
+            string searchText = txtSearchForm.Text?.Trim().ToLower() ?? "";
+
+            var filtered = _currentPermissions.Where(p =>
+            {
+                bool matchCat = selectedCategory == "All Categories" ||
+                                string.Equals(p.Category?.Trim(), selectedCategory.Trim(), StringComparison.OrdinalIgnoreCase);
+                bool matchSearch = string.IsNullOrEmpty(searchText) ||
+                                   (p.FormName != null && p.FormName.ToLower().Contains(searchText)) ||
+                                   (p.FormKey != null && p.FormKey.ToLower().Contains(searchText));
+                return matchCat && matchSearch;
+            }).ToList();
+
+            dgvPermissions.DataSource = null;
+            dgvPermissions.DataSource = filtered;
+
+            string roleText = cmbRoles.Text;
+            if (string.IsNullOrWhiteSpace(roleText) && cmbRoles.SelectedItem is Role r)
+            {
+                roleText = r.RoleName;
+            }
+
+            lblStatus.Text = $"Showing {filtered.Count} of {_currentPermissions.Count} forms for role: {roleText}";
         }
 
         /// <summary>
@@ -226,6 +351,15 @@ namespace PosBranch_Win.Settings
             }
         }
 
+        private void BtnGrantViewAll_Click(object sender, EventArgs e)
+        {
+            foreach (DataGridViewRow row in dgvPermissions.Rows)
+            {
+                row.Cells["CanView"].Value = true;
+            }
+            lblStatus.Text = "View permission granted for displayed forms. Click Save to apply.";
+        }
+
         /// <summary>
         /// Grants all permissions to the selected role
         /// </summary>
@@ -238,7 +372,7 @@ namespace PosBranch_Win.Settings
                 row.Cells["CanEdit"].Value = true;
                 row.Cells["CanDelete"].Value = true;
             }
-            lblStatus.Text = "All permissions granted. Click Save to apply.";
+            lblStatus.Text = "All permissions granted for displayed forms. Click Save to apply.";
         }
 
         /// <summary>
@@ -253,7 +387,7 @@ namespace PosBranch_Win.Settings
                 row.Cells["CanEdit"].Value = false;
                 row.Cells["CanDelete"].Value = false;
             }
-            lblStatus.Text = "All permissions revoked. Click Save to apply.";
+            lblStatus.Text = "All permissions revoked for displayed forms. Click Save to apply.";
         }
 
         /// <summary>

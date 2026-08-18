@@ -282,21 +282,16 @@ namespace PosBranch_Win.Master
             int selectedRoleId = Convert.ToInt32(cmbUserLevel.Value ?? 0);
             if (selectedRoleId <= 0)
             {
-                MessageBox.Show("No role selected.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Please select a valid user role.", "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                cmbUserLevel.Focus();
                 return false;
             }
 
             RolePermissionRepository roleRepo = new RolePermissionRepository();
             var selectedRole = roleRepo.GetAllRoles().FirstOrDefault(r => r.RoleID == selectedRoleId);
-            if (selectedRole != null && selectedRole.UserLevelID.HasValue)
-            {
-                userLevelId = selectedRole.UserLevelID.Value;
-            }
-            else
-            {
-                userLevelId = selectedRoleId;
-                MessageBox.Show($"Warning: UserLevelID not found for RoleID {selectedRoleId}. Using RoleID as fallback.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            }
+            userLevelId = (selectedRole != null && selectedRole.UserLevelID.HasValue && selectedRole.UserLevelID.Value > 0)
+                ? selectedRole.UserLevelID.Value
+                : selectedRoleId;
 
             return true;
         }

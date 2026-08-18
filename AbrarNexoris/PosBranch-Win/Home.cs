@@ -644,6 +644,9 @@ namespace PosBranch_Win
                 // Apply theme to all controls in the new form
                 ApplyThemeToControls(formToOpen.Controls, currentThemeColor);
 
+                // Apply active language to the newly opened form
+                LanguageManager.ApplyLanguageToForm(formToOpen);
+
                 // Add the form to the tab page
                 newTab.TabPage.Controls.Add(formToOpen);
 
@@ -918,6 +921,9 @@ namespace PosBranch_Win
                 // Apply theme to all controls in the new form
                 ApplyThemeToControls(formToOpen.Controls, currentThemeColor);
 
+                // Apply active language to the newly opened form
+                LanguageManager.ApplyLanguageToForm(formToOpen);
+
                 // Create new tab
                 string uniqueKey = $"Tab_{DateTime.Now.Ticks}_{tabName}";
                 var newTab = tabControlMain.Tabs.Add(uniqueKey, tabName);
@@ -1014,6 +1020,43 @@ namespace PosBranch_Win
             toolStripStatusUserValLabel3.Text = DataBase.UserName;
             InitializeCustomStatusBar();
             ultraRadialMenu1.Show(this, new Point(Bounds.Right, Bounds.Top));
+
+            // Initialize Language Manager listener
+            LanguageManager.LanguageChanged += (s, ev) =>
+            {
+                try
+                {
+                    if (this.IsDisposed || !this.IsHandleCreated) return;
+                    this.BeginInvoke(new Action(() =>
+                    {
+                        LanguageManager.ApplyLanguageToRibbon(this.ultraToolbarsManager1);
+                        LanguageManager.ApplyLanguageToForm(this);
+                        foreach (Infragistics.Win.UltraWinTabControl.UltraTab tab in tabControlMain.Tabs)
+                        {
+                            if (tab != null)
+                            {
+                                string origTab = LanguageManager.GetString(tab.Text, tab.Text);
+                                tab.Text = origTab;
+
+                                foreach (Control c in tab.TabPage.Controls)
+                                {
+                                    if (c is Form tabForm)
+                                    {
+                                        LanguageManager.ApplyLanguageToForm(tabForm);
+                                    }
+                                    else if (c != null)
+                                    {
+                                        LanguageManager.ApplyLanguageToControls(c.Controls);
+                                    }
+                                }
+                            }
+                        }
+                    }));
+                }
+                catch { }
+            };
+            LanguageManager.ApplyLanguageToRibbon(this.ultraToolbarsManager1);
+            LanguageManager.ApplyLanguageToForm(this);
 
             // Initialize Report Navigator sidebar
             InitializeReportNavigator();
@@ -2568,6 +2611,13 @@ namespace PosBranch_Win
             {
                 FrmRolePermissions rolePerms = new FrmRolePermissions();
                 OpenFormInTab(rolePerms, "Role Permissions");
+            }
+
+            // App Language Settings
+            if (toolKey == "AppLanguage" || toolKey == "LanguageSettings" || toolKey == "Language")
+            {
+                Settings.FrmLanguageSettings langSettings = new Settings.FrmLanguageSettings();
+                OpenFormInTab(langSettings, "App Language");
             }
 
             // Report Navigator Toggle

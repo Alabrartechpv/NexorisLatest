@@ -174,6 +174,9 @@ namespace PosBranch_Win
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonTool43 = new Infragistics.Win.UltraWinToolbars.ButtonTool("ActivityLog ");
             Infragistics.Win.UltraWinToolbars.RibbonGroup ribbonGroup36 = new Infragistics.Win.UltraWinToolbars.RibbonGroup("YearClosingGroup");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolFinancialYearClosing = new Infragistics.Win.UltraWinToolbars.ButtonTool("FinancialYearClosing");
+            Infragistics.Win.UltraWinToolbars.RibbonGroup ribbonGroupAppLanguage = new Infragistics.Win.UltraWinToolbars.RibbonGroup("ribbonGroupAppLanguage");
+            Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolAppLanguage = new Infragistics.Win.UltraWinToolbars.ButtonTool("AppLanguage");
+            Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolAppLanguageShared = new Infragistics.Win.UltraWinToolbars.ButtonTool("AppLanguage");
             Infragistics.Win.UltraWinToolbars.RibbonTab ribbonTab9 = new Infragistics.Win.UltraWinToolbars.RibbonTab("ribbon8");
             Infragistics.Win.UltraWinToolbars.RibbonGroup ribbonGroup37 = new Infragistics.Win.UltraWinToolbars.RibbonGroup("ManualBalance");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolManualPB_Instance = new Infragistics.Win.UltraWinToolbars.ButtonTool("ManualPartyBalance");
@@ -858,13 +861,18 @@ namespace PosBranch_Win
             buttonToolFinancialYearClosing.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
             ribbonGroup36.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
             buttonToolFinancialYearClosing});
+            ribbonGroupAppLanguage.Caption = "App Language";
+            buttonToolAppLanguage.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
+            ribbonGroupAppLanguage.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
+            buttonToolAppLanguage});
             ribbonTab8.Groups.AddRange(new Infragistics.Win.UltraWinToolbars.RibbonGroup[] {
             ribbonGroup31,
             ribbonGroup32,
             ribbonGroup33,
             ribbonGroup34,
             ribbonGroup35,
-            ribbonGroup36});
+            ribbonGroup36,
+            ribbonGroupAppLanguage});
             ribbonTab9.Caption = "Manual Balance";
             ribbonGroup37.Caption = "Manual Party Balance";
             buttonToolManualPB_Instance.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
@@ -1058,6 +1066,11 @@ namespace PosBranch_Win
             buttonToolFinancialYearClosingShared.SharedPropsInternal.AppearancesLarge.Appearance = appearance60;
             buttonToolFinancialYearClosingShared.SharedPropsInternal.Caption = "Year Closing";
             buttonToolFinancialYearClosingShared.SharedPropsInternal.DisplayStyle = Infragistics.Win.UltraWinToolbars.ToolDisplayStyle.ImageAndText;
+            Infragistics.Win.Appearance appearanceAppLang = new Infragistics.Win.Appearance();
+            appearanceAppLang.Image = global::PosBranch_Win.Properties.Resources.languages__2_;
+            buttonToolAppLanguageShared.SharedPropsInternal.AppearancesLarge.Appearance = appearanceAppLang;
+            buttonToolAppLanguageShared.SharedPropsInternal.Caption = "App Language";
+            buttonToolAppLanguageShared.SharedPropsInternal.DisplayStyle = Infragistics.Win.UltraWinToolbars.ToolDisplayStyle.ImageAndText;
             appearance61.Image = ((object)(resources.GetObject("appearance61.Image")));
             buttonToolExcelImportShared.SharedPropsInternal.AppearancesLarge.Appearance = appearance61;
             appearance62.Image = ((object)(resources.GetObject("appearance62.Image")));
@@ -1276,6 +1289,7 @@ namespace PosBranch_Win
             buttonTool105,
             buttonTool107,
             buttonToolFinancialYearClosingShared,
+            buttonToolAppLanguageShared,
             buttonToolExcelImportShared,
             buttonTool109,
             buttonTool111,

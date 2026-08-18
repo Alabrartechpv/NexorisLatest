@@ -1,4 +1,4 @@
-﻿namespace PosBranch_Win.Settings
+namespace PosBranch_Win.Settings
 {
     partial class FrmRolePermissions
     {
@@ -20,6 +20,10 @@
             this.pnlRoleSelection = new System.Windows.Forms.Panel();
             this.cmbRoles = new System.Windows.Forms.ComboBox();
             this.lblRole = new System.Windows.Forms.Label();
+            this.lblCategoryFilter = new System.Windows.Forms.Label();
+            this.cmbCategoryFilter = new System.Windows.Forms.ComboBox();
+            this.lblSearchForm = new System.Windows.Forms.Label();
+            this.txtSearchForm = new System.Windows.Forms.TextBox();
             this.pnlGrid = new System.Windows.Forms.Panel();
             this.dgvPermissions = new System.Windows.Forms.DataGridView();
             this.pnlButtons = new System.Windows.Forms.Panel();
@@ -27,6 +31,7 @@
             this.btnRefresh = new System.Windows.Forms.Button();
             this.btnRevokeAll = new System.Windows.Forms.Button();
             this.btnGrantAll = new System.Windows.Forms.Button();
+            this.btnGrantViewAll = new System.Windows.Forms.Button();
             this.btnSave = new System.Windows.Forms.Button();
             this.pnlStatus = new System.Windows.Forms.Panel();
             this.lblStatus = new System.Windows.Forms.Label();
@@ -63,35 +68,77 @@
             // pnlRoleSelection
             // 
             this.pnlRoleSelection.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(240)))), ((int)(((byte)(248)))), ((int)(((byte)(255)))));
+            this.pnlRoleSelection.Controls.Add(this.txtSearchForm);
+            this.pnlRoleSelection.Controls.Add(this.lblSearchForm);
+            this.pnlRoleSelection.Controls.Add(this.cmbCategoryFilter);
+            this.pnlRoleSelection.Controls.Add(this.lblCategoryFilter);
             this.pnlRoleSelection.Controls.Add(this.cmbRoles);
             this.pnlRoleSelection.Controls.Add(this.lblRole);
             this.pnlRoleSelection.Dock = System.Windows.Forms.DockStyle.Top;
             this.pnlRoleSelection.Location = new System.Drawing.Point(0, 50);
             this.pnlRoleSelection.Name = "pnlRoleSelection";
             this.pnlRoleSelection.Padding = new System.Windows.Forms.Padding(20, 10, 20, 10);
-            this.pnlRoleSelection.Size = new System.Drawing.Size(800, 50);
+            this.pnlRoleSelection.Size = new System.Drawing.Size(950, 50);
             this.pnlRoleSelection.TabIndex = 1;
             // 
             // cmbRoles
             // 
             this.cmbRoles.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
-            this.cmbRoles.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.cmbRoles.Font = new System.Drawing.Font("Segoe UI", 9.5F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.cmbRoles.FormattingEnabled = true;
-            this.cmbRoles.Location = new System.Drawing.Point(120, 12);
+            this.cmbRoles.Location = new System.Drawing.Point(100, 12);
             this.cmbRoles.Name = "cmbRoles";
-            this.cmbRoles.Size = new System.Drawing.Size(250, 25);
+            this.cmbRoles.Size = new System.Drawing.Size(160, 25);
             this.cmbRoles.TabIndex = 1;
             this.cmbRoles.SelectedIndexChanged += new System.EventHandler(this.cmbRoles_SelectedIndexChanged);
             // 
             // lblRole
             // 
             this.lblRole.AutoSize = true;
-            this.lblRole.Font = new System.Drawing.Font("Segoe UI", 10F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.lblRole.Location = new System.Drawing.Point(20, 15);
+            this.lblRole.Font = new System.Drawing.Font("Segoe UI", 9.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblRole.Location = new System.Drawing.Point(15, 15);
             this.lblRole.Name = "lblRole";
-            this.lblRole.Size = new System.Drawing.Size(86, 19);
+            this.lblRole.Size = new System.Drawing.Size(80, 17);
             this.lblRole.TabIndex = 0;
             this.lblRole.Text = "Select Role:";
+            // 
+            // lblCategoryFilter
+            // 
+            this.lblCategoryFilter.AutoSize = true;
+            this.lblCategoryFilter.Font = new System.Drawing.Font("Segoe UI", 9.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblCategoryFilter.Location = new System.Drawing.Point(275, 15);
+            this.lblCategoryFilter.Name = "lblCategoryFilter";
+            this.lblCategoryFilter.Size = new System.Drawing.Size(69, 17);
+            this.lblCategoryFilter.TabIndex = 2;
+            this.lblCategoryFilter.Text = "Category:";
+            // 
+            // cmbCategoryFilter
+            // 
+            this.cmbCategoryFilter.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
+            this.cmbCategoryFilter.Font = new System.Drawing.Font("Segoe UI", 9.5F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.cmbCategoryFilter.FormattingEnabled = true;
+            this.cmbCategoryFilter.Location = new System.Drawing.Point(348, 12);
+            this.cmbCategoryFilter.Name = "cmbCategoryFilter";
+            this.cmbCategoryFilter.Size = new System.Drawing.Size(160, 25);
+            this.cmbCategoryFilter.TabIndex = 3;
+            // 
+            // lblSearchForm
+            // 
+            this.lblSearchForm.AutoSize = true;
+            this.lblSearchForm.Font = new System.Drawing.Font("Segoe UI", 9.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblSearchForm.Location = new System.Drawing.Point(525, 15);
+            this.lblSearchForm.Name = "lblSearchForm";
+            this.lblSearchForm.Size = new System.Drawing.Size(52, 17);
+            this.lblSearchForm.TabIndex = 4;
+            this.lblSearchForm.Text = "Search:";
+            // 
+            // txtSearchForm
+            // 
+            this.txtSearchForm.Font = new System.Drawing.Font("Segoe UI", 9.5F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.txtSearchForm.Location = new System.Drawing.Point(582, 12);
+            this.txtSearchForm.Name = "txtSearchForm";
+            this.txtSearchForm.Size = new System.Drawing.Size(200, 24);
+            this.txtSearchForm.TabIndex = 5;
             // 
             // pnlGrid
             // 
@@ -118,11 +165,12 @@
             this.pnlButtons.Controls.Add(this.btnRefresh);
             this.pnlButtons.Controls.Add(this.btnRevokeAll);
             this.pnlButtons.Controls.Add(this.btnGrantAll);
+            this.pnlButtons.Controls.Add(this.btnGrantViewAll);
             this.pnlButtons.Controls.Add(this.btnSave);
             this.pnlButtons.Dock = System.Windows.Forms.DockStyle.Bottom;
             this.pnlButtons.Location = new System.Drawing.Point(0, 450);
             this.pnlButtons.Name = "pnlButtons";
-            this.pnlButtons.Size = new System.Drawing.Size(800, 60);
+            this.pnlButtons.Size = new System.Drawing.Size(950, 60);
             this.pnlButtons.TabIndex = 3;
             // 
             // btnClose
@@ -133,10 +181,10 @@
             this.btnClose.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnClose.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.btnClose.ForeColor = System.Drawing.Color.White;
-            this.btnClose.Location = new System.Drawing.Point(695, 15);
+            this.btnClose.Location = new System.Drawing.Point(845, 15);
             this.btnClose.Name = "btnClose";
             this.btnClose.Size = new System.Drawing.Size(85, 32);
-            this.btnClose.TabIndex = 4;
+            this.btnClose.TabIndex = 5;
             this.btnClose.Text = "Close";
             this.btnClose.UseVisualStyleBackColor = false;
             this.btnClose.Click += new System.EventHandler(this.btnClose_Click);
@@ -148,10 +196,10 @@
             this.btnRefresh.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnRefresh.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.btnRefresh.ForeColor = System.Drawing.Color.White;
-            this.btnRefresh.Location = new System.Drawing.Point(380, 15);
+            this.btnRefresh.Location = new System.Drawing.Point(525, 15);
             this.btnRefresh.Name = "btnRefresh";
             this.btnRefresh.Size = new System.Drawing.Size(85, 32);
-            this.btnRefresh.TabIndex = 3;
+            this.btnRefresh.TabIndex = 4;
             this.btnRefresh.Text = "Refresh";
             this.btnRefresh.UseVisualStyleBackColor = false;
             this.btnRefresh.Click += new System.EventHandler(this.btnRefresh_Click);
@@ -163,10 +211,10 @@
             this.btnRevokeAll.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnRevokeAll.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.btnRevokeAll.ForeColor = System.Drawing.Color.White;
-            this.btnRevokeAll.Location = new System.Drawing.Point(285, 15);
+            this.btnRevokeAll.Location = new System.Drawing.Point(420, 15);
             this.btnRevokeAll.Name = "btnRevokeAll";
-            this.btnRevokeAll.Size = new System.Drawing.Size(85, 32);
-            this.btnRevokeAll.TabIndex = 2;
+            this.btnRevokeAll.Size = new System.Drawing.Size(95, 32);
+            this.btnRevokeAll.TabIndex = 3;
             this.btnRevokeAll.Text = "Revoke All";
             this.btnRevokeAll.UseVisualStyleBackColor = false;
             this.btnRevokeAll.Click += new System.EventHandler(this.btnRevokeAll_Click);
@@ -178,13 +226,27 @@
             this.btnGrantAll.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnGrantAll.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.btnGrantAll.ForeColor = System.Drawing.Color.White;
-            this.btnGrantAll.Location = new System.Drawing.Point(190, 15);
+            this.btnGrantAll.Location = new System.Drawing.Point(315, 15);
             this.btnGrantAll.Name = "btnGrantAll";
-            this.btnGrantAll.Size = new System.Drawing.Size(85, 32);
-            this.btnGrantAll.TabIndex = 1;
+            this.btnGrantAll.Size = new System.Drawing.Size(95, 32);
+            this.btnGrantAll.TabIndex = 2;
             this.btnGrantAll.Text = "Grant All";
             this.btnGrantAll.UseVisualStyleBackColor = false;
             this.btnGrantAll.Click += new System.EventHandler(this.btnGrantAll_Click);
+            // 
+            // btnGrantViewAll
+            // 
+            this.btnGrantViewAll.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(23)))), ((int)(((byte)(162)))), ((int)(((byte)(184)))));
+            this.btnGrantViewAll.FlatAppearance.BorderSize = 0;
+            this.btnGrantViewAll.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnGrantViewAll.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.btnGrantViewAll.ForeColor = System.Drawing.Color.White;
+            this.btnGrantViewAll.Location = new System.Drawing.Point(195, 15);
+            this.btnGrantViewAll.Name = "btnGrantViewAll";
+            this.btnGrantViewAll.Size = new System.Drawing.Size(110, 32);
+            this.btnGrantViewAll.TabIndex = 1;
+            this.btnGrantViewAll.Text = "Grant View Only";
+            this.btnGrantViewAll.UseVisualStyleBackColor = false;
             // 
             // btnSave
             // 
@@ -257,10 +319,15 @@
         private System.Windows.Forms.Panel pnlRoleSelection;
         private System.Windows.Forms.ComboBox cmbRoles;
         private System.Windows.Forms.Label lblRole;
+        private System.Windows.Forms.Label lblCategoryFilter;
+        private System.Windows.Forms.ComboBox cmbCategoryFilter;
+        private System.Windows.Forms.Label lblSearchForm;
+        private System.Windows.Forms.TextBox txtSearchForm;
         private System.Windows.Forms.Panel pnlGrid;
         private System.Windows.Forms.DataGridView dgvPermissions;
         private System.Windows.Forms.Panel pnlButtons;
         private System.Windows.Forms.Button btnSave;
+        private System.Windows.Forms.Button btnGrantViewAll;
         private System.Windows.Forms.Button btnGrantAll;
         private System.Windows.Forms.Button btnRevokeAll;
         private System.Windows.Forms.Button btnRefresh;

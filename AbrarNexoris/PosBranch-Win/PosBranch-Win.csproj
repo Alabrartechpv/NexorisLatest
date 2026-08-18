@@ -1137,6 +1137,13 @@
     <Compile Include="Settings\FrmFinancialYearClosing.Designer.cs">
       <DependentUpon>FrmFinancialYearClosing.cs</DependentUpon>
     </Compile>
+    <Compile Include="Settings\FrmLanguageSettings.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Settings\FrmLanguageSettings.Designer.cs">
+      <DependentUpon>FrmLanguageSettings.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Settings\LanguageManager.cs" />
     <Compile Include="Reportrpt\Sales_Daily.cs">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
