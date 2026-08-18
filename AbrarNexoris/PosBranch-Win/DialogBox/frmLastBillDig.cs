@@ -47,7 +47,7 @@ namespace PosBranch_Win.DialogBox
         private void InitializeUi()
         {
             comboBox1.Items.Clear();
-            comboBox1.Items.AddRange(new object[] { "All", "Bill No", "Customer Name", "Payment Mode" });
+            comboBox1.Items.AddRange(new object[] { "All", "Bill No", "Customer Name", "Counter", "Payment Mode" });
             comboBox1.SelectedIndex = 0;
 
             comboBox2.Items.Clear();
@@ -165,12 +165,13 @@ namespace PosBranch_Win.DialogBox
                 column.Hidden = true;
             }
 
-            ShowColumn(e.Layout.Bands[0], "BillNo", "Bill No", 90, HAlign.Center);
-            ShowColumn(e.Layout.Bands[0], "BillDate", "Date", 95, HAlign.Center, "dd-MM-yyyy");
-            ShowColumn(e.Layout.Bands[0], "CustomerName", "Customer", 220, HAlign.Left);
-            ShowColumn(e.Layout.Bands[0], "PaymodeName", "Payment", 110, HAlign.Left);
-            ShowColumn(e.Layout.Bands[0], "NetAmount", "Amount", 110, HAlign.Right, "N2");
-            ShowColumn(e.Layout.Bands[0], "Status", "Status", 90, HAlign.Center);
+            ShowColumn(e.Layout.Bands[0], "BillNo", "Bill No", 80, HAlign.Center);
+            ShowColumn(e.Layout.Bands[0], "BillDate", "Date & Time", 130, HAlign.Center, "dd-MM-yyyy HH:mm");
+            ShowColumn(e.Layout.Bands[0], "CustomerName", "Customer", 170, HAlign.Left);
+            ShowColumn(e.Layout.Bands[0], "CounterId", "Counter", 65, HAlign.Center);
+            ShowColumn(e.Layout.Bands[0], "PaymodeName", "Payment", 90, HAlign.Left);
+            ShowColumn(e.Layout.Bands[0], "NetAmount", "Amount", 95, HAlign.Right, "N2");
+            ShowColumn(e.Layout.Bands[0], "Status", "Status", 80, HAlign.Center);
         }
 
         private void ShowColumn(UltraGridBand band, string key, string caption, int width, HAlign align, string format = null)
@@ -245,7 +246,8 @@ SELECT TOP 200
     ISNULL(sm.SubTotal, 0) AS SubTotal,
     ISNULL(sm.NetAmount, 0) AS NetAmount,
     ISNULL(sm.ReceivedAmount, 0) AS ReceivedAmount,
-    ISNULL(sm.[Status], '') AS [Status]
+    ISNULL(sm.[Status], '') AS [Status],
+    ISNULL(sm.CounterId, 0) AS CounterId
 FROM SMaster sm
 WHERE sm.BranchId = @BranchId
   AND sm.CompanyId = @CompanyId
@@ -276,7 +278,8 @@ ORDER BY sm.BillNo DESC";
                                 SubTotal = reader["SubTotal"] != DBNull.Value ? Convert.ToDouble(reader["SubTotal"]) : 0,
                                 NetAmount = reader["NetAmount"] != DBNull.Value ? Convert.ToDouble(reader["NetAmount"]) : 0,
                                 ReceivedAmount = reader["ReceivedAmount"] != DBNull.Value ? Convert.ToDouble(reader["ReceivedAmount"]) : 0,
-                                Status = reader["Status"]?.ToString() ?? string.Empty
+                                Status = reader["Status"]?.ToString() ?? string.Empty,
+                                CounterId = reader["CounterId"] != DBNull.Value ? Convert.ToInt32(reader["CounterId"]) : 0
                             });
                         }
                     }
@@ -312,11 +315,14 @@ ORDER BY sm.BillNo DESC";
                             return bill.BillNo.ToString().Contains(searchText);
                         case "Customer Name":
                             return (bill.CustomerName ?? string.Empty).ToLowerInvariant().Contains(searchText);
+                        case "Counter":
+                            return bill.CounterId.ToString().Contains(searchText);
                         case "Payment Mode":
                             return (bill.PaymodeName ?? string.Empty).ToLowerInvariant().Contains(searchText);
                         default:
                             return bill.BillNo.ToString().Contains(searchText) ||
                                    (bill.CustomerName ?? string.Empty).ToLowerInvariant().Contains(searchText) ||
+                                   bill.CounterId.ToString().Contains(searchText) ||
                                    (bill.PaymodeName ?? string.Empty).ToLowerInvariant().Contains(searchText);
                     }
                 });

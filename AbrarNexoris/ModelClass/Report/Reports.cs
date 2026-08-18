@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -20,6 +20,7 @@ namespace ModelClass.Report
         public double NetAmount { get; set; }
         public double ReceivedAmount { get; set; }
         public string Status { get; set; }
+        public int CounterId { get; set; }
     }
 
     /// <summary>

@@ -398,7 +398,7 @@ namespace PosBranch_Win.DialogBox
             {
                 e.Layout.Bands[0].Columns.Cast<UltraGridColumn>().ToList().ForEach(c => c.Hidden = true);
 
-                string[] columnsToShow = { "BillNo", "CustomerName", "NetAmount" };
+                string[] columnsToShow = { "BillNo", "BillDate", "CustomerName", "CounterId", "NetAmount" };
                 for (int i = 0; i < columnsToShow.Length; i++)
                 {
                     string colKey = columnsToShow[i];
@@ -411,16 +411,27 @@ namespace PosBranch_Win.DialogBox
                         {
                             case "BillNo":
                                 col.Header.Caption = "Bill No";
-                                col.Width = 100;
+                                col.Width = 90;
+                                break;
+                            case "BillDate":
+                                col.Header.Caption = "Date & Time";
+                                col.Width = 135;
+                                col.Format = "dd-MM-yyyy HH:mm";
+                                col.CellAppearance.TextHAlign = HAlign.Center;
                                 break;
                             case "CustomerName":
                                 col.Header.Caption = "Customer Name";
-                                col.Width = 350;
+                                col.Width = 220;
                                 col.CellAppearance.TextHAlign = HAlign.Left;
+                                break;
+                            case "CounterId":
+                                col.Header.Caption = "Counter";
+                                col.Width = 85;
+                                col.CellAppearance.TextHAlign = HAlign.Center;
                                 break;
                             case "NetAmount":
                                 col.Header.Caption = "Net Amount";
-                                col.Width = 150;
+                                col.Width = 110;
                                 col.Format = "N2";
                                 col.CellAppearance.TextHAlign = HAlign.Right;
                                 break;
@@ -446,7 +457,7 @@ namespace PosBranch_Win.DialogBox
         private void InitializeSearchFilterComboBox()
         {
             comboBox1.Items.Clear();
-            comboBox1.Items.AddRange(new object[] { "All", "Bill No", "Customer Name" });
+            comboBox1.Items.AddRange(new object[] { "All", "Bill No", "Customer Name", "Counter" });
             comboBox1.SelectedIndex = 0;
             comboBox1.SelectedIndexChanged += (s, e) => FilterData();
             textBoxsearch.TextChanged += (s, e) => FilterData();
@@ -472,9 +483,12 @@ namespace PosBranch_Win.DialogBox
                                 return b.BillNo.ToString().ToLower().Contains(searchText);
                             case "Customer Name":
                                 return b.CustomerName?.ToLower().Contains(searchText) ?? false;
+                            case "Counter":
+                                return b.CounterId.ToString().ToLower().Contains(searchText);
                             default: // "All"
                                 return b.BillNo.ToString().ToLower().Contains(searchText) ||
-                                       (b.CustomerName?.ToLower().Contains(searchText) ?? false);
+                                       (b.CustomerName?.ToLower().Contains(searchText) ?? false) ||
+                                       b.CounterId.ToString().ToLower().Contains(searchText);
                         }
                     });
                 }
@@ -496,7 +510,7 @@ namespace PosBranch_Win.DialogBox
         private void InitializeColumnOrderComboBox()
         {
             comboBox2.Items.Clear();
-            comboBox2.Items.AddRange(new object[] { "Bill No", "Customer Name", "Net Amount" });
+            comboBox2.Items.AddRange(new object[] { "Bill No", "Date", "Customer Name", "Counter", "Net Amount" });
             comboBox2.SelectedIndex = 0;
             comboBox2.SelectedIndexChanged += (s, e) => ReorderColumns(comboBox2.SelectedItem?.ToString() ?? "Bill No");
         }
@@ -506,12 +520,14 @@ namespace PosBranch_Win.DialogBox
             if (ultraGrid1.DisplayLayout.Bands.Count == 0) return;
             ultraGrid1.SuspendLayout();
 
-            List<string> columnsToShow = new List<string> { "BillNo", "CustomerName", "NetAmount" };
+            List<string> columnsToShow = new List<string> { "BillNo", "BillDate", "CustomerName", "CounterId", "NetAmount" };
 
             Dictionary<string, string> columnMap = new Dictionary<string, string>
             {
                 { "Bill No", "BillNo" },
+                { "Date", "BillDate" },
                 { "Customer Name", "CustomerName" },
+                { "Counter", "CounterId" },
                 { "Net Amount", "NetAmount" }
             };
             
