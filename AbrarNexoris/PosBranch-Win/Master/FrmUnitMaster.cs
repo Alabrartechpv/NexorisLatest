@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
@@ -165,47 +165,83 @@ namespace PosBranch_Win.Master
 
         private void ConfigureButtonStates()
         {
-            btnSave.Enabled = false;
-            btnUpdate.Enabled = false;
-            btnDelete.Enabled = false;
-            btnClear.Enabled = false;
-
-            System.Diagnostics.Debug.WriteLine("Button states configured: All disabled");
+            // Ribbon toolbar integration active
         }
 
         private void EnableEditButtons()
         {
-            btnSave.Enabled = false;
-            btnUpdate.Enabled = true;
-            btnDelete.Enabled = true;
-            btnClear.Enabled = true;
-
-            System.Diagnostics.Debug.WriteLine("Edit buttons enabled: Update, Delete, Clear");
-
-            // Show button states in debug output
-            System.Diagnostics.Debug.WriteLine($"Button states - Save: {btnSave.Enabled}, Update: {btnUpdate.Enabled}, Delete: {btnDelete.Enabled}, Clear: {btnClear.Enabled}");
+            // Edit mode active for selected unit
         }
 
         private void WireUpEvents()
         {
-            // Button events
-            btnNew.Click += BtnNew_Click;
-            btnSave.Click += btnSave_Click;
-            btnUpdate.Click += BtnUpdate_Click;
-            btnDelete.Click += BtnDelete_Click;
-            btnClear.Click += BtnClear_Click;
-            btnClose.Click += BtnClose_Click;
-
             // Grid events
             ultraGridUnits.ClickCell += UltraGridUnits_ClickCell;
             ultraGridUnits.DoubleClickRow += UltraGridUnits_DoubleClickRow;
             ultraGridUnits.InitializeLayout += UltraGridUnits_InitializeLayout;
+            ultraGridUnits.KeyDown += UltraGridUnits_KeyDown;
 
             // Search events
             ultraTextSearch.TextChanged += UltraTextSearch_TextChanged;
+            ultraTextSearch.KeyDown += UltraTextSearch_KeyDown;
+
+            // Text editor events
+            ultraTextUnitName.KeyDown += (s, e) => { if (e.KeyCode == Keys.Enter) { PerformSaveOrUpdate(); e.Handled = true; } };
 
             // Form events
             this.Load += FrmUnitMaster_Load;
+        }
+
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            if (keyData == Keys.F8)
+            {
+                PerformSaveOrUpdate();
+                return true;
+            }
+            if (keyData == Keys.F1 || keyData == (Keys.Control | Keys.N))
+            {
+                PerformClear();
+                return true;
+            }
+            if (keyData == (Keys.Control | Keys.B))
+            {
+                PerformDelete();
+                return true;
+            }
+            if (keyData == Keys.F4 || keyData == Keys.Escape)
+            {
+                Close();
+                return true;
+            }
+
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
+
+        private void UltraTextSearch_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter || e.KeyCode == Keys.Down)
+            {
+                if (ultraGridUnits != null && ultraGridUnits.Rows.Count > 0)
+                {
+                    ultraGridUnits.ActiveRow = ultraGridUnits.Rows[0];
+                    ultraGridUnits.Focus();
+                    e.Handled = true;
+                }
+            }
+        }
+
+        private void UltraGridUnits_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                if (ultraGridUnits.ActiveRow != null)
+                {
+                    LoadUnitToForm(ultraGridUnits.ActiveRow);
+                    ultraTextUnitName.Focus();
+                    e.Handled = true;
+                }
+            }
         }
 
         private void FrmUnitMaster_Load(object sender, EventArgs e)
@@ -336,19 +372,56 @@ namespace PosBranch_Win.Master
             }
         }
 
-        private void BtnNew_Click(object sender, EventArgs e)
+        #region Ribbon Actions & Public Methods
+
+        public void Save() => PerformSaveOrUpdate();
+        public void SaveRecord() => PerformSaveOrUpdate();
+        public void SaveData() => PerformSaveOrUpdate();
+        public void RibbonSave() => PerformSaveOrUpdate();
+        public void btnSave_Click(object sender, EventArgs e) => PerformSaveOrUpdate();
+
+        public void New() => PerformNew();
+        public void NewRecord() => PerformNew();
+        public void BtnNew_Click(object sender, EventArgs e) => PerformNew();
+
+        public new void Update() => PerformUpdate();
+        public void UpdateRecord() => PerformUpdate();
+        public void UpdateData() => PerformUpdate();
+        public void BtnUpdate_Click(object sender, EventArgs e) => PerformUpdate();
+
+        public void Delete() => PerformDelete();
+        public void DeleteRecord() => PerformDelete();
+        public void RibbonDeleteInvoice() => PerformDelete();
+        public void BtnDelete_Click(object sender, EventArgs e) => PerformDelete();
+
+        public void Clear() => ClearForm();
+        public void ClearFields() => ClearForm();
+        public void ClearRecord() => ClearForm();
+        public void RibbonClear() => ClearForm();
+        public void BtnClear_Click(object sender, EventArgs e) => ClearForm();
+
+        public void CloseForm() => this.Close();
+        public void BtnClose_Click(object sender, EventArgs e) => this.Close();
+
+        public void PerformSaveOrUpdate()
+        {
+            if (_isEditMode || (_currentUnit != null && _currentUnit.UnitID > 0))
+            {
+                PerformUpdate();
+            }
+            else
+            {
+                PerformSave();
+            }
+        }
+
+        public void PerformNew()
         {
             try
             {
                 ClearForm();
                 _isEditMode = false;
                 _currentUnit = new UnitMaster();
-
-                btnSave.Enabled = true;
-                btnUpdate.Enabled = false;
-                btnDelete.Enabled = false;
-                btnClear.Enabled = true;
-
                 ultraTextUnitName.Focus();
             }
             catch (Exception ex)
@@ -357,7 +430,7 @@ namespace PosBranch_Win.Master
             }
         }
 
-        private void btnSave_Click(object sender, EventArgs e)
+        public void PerformSave()
         {
             try
             {
@@ -373,7 +446,6 @@ namespace PosBranch_Win.Master
                         MessageBox.Show("Unit saved successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         RefreshGridData();
                         ClearForm();
-                        ConfigureButtonStates();
                     }
                     else
                     {
@@ -387,19 +459,14 @@ namespace PosBranch_Win.Master
             }
         }
 
-        private void BtnUpdate_Click(object sender, EventArgs e)
+        public void PerformUpdate()
         {
             try
             {
-                // Debug: Check if button is actually being clicked
-                System.Diagnostics.Debug.WriteLine("Update button clicked");
-
                 if (ValidateForm())
                 {
                     _currentUnit = GetFormData();
                     _currentUnit._Operation = "Update";
-
-                    System.Diagnostics.Debug.WriteLine($"Updating unit: ID={_currentUnit.UnitID}, Name={_currentUnit.UnitName}");
 
                     UnitMaster result = _unitRepository.UpdateUnit(_currentUnit);
 
@@ -408,7 +475,6 @@ namespace PosBranch_Win.Master
                         MessageBox.Show("Unit updated successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
                         RefreshGridData();
                         ClearForm();
-                        ConfigureButtonStates();
                     }
                     else
                     {
@@ -418,26 +484,19 @@ namespace PosBranch_Win.Master
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Update error: {ex.Message}");
                 MessageBox.Show($"Error updating unit: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
-        private void BtnDelete_Click(object sender, EventArgs e)
+        public void PerformDelete()
         {
             try
             {
-                // Debug: Check if button is actually being clicked
-                System.Diagnostics.Debug.WriteLine("Delete button clicked");
-                System.Diagnostics.Debug.WriteLine($"Current unit: {_currentUnit?.UnitID}, {_currentUnit?.UnitName}");
-
                 if (_currentUnit != null && _currentUnit.UnitID > 0)
                 {
                     if (MessageBox.Show("Are you sure you want to delete this unit?", "Confirm Delete",
                         MessageBoxButtons.YesNo, MessageBoxIcon.Question) == DialogResult.Yes)
                     {
-                        System.Diagnostics.Debug.WriteLine($"Deleting unit ID: {_currentUnit.UnitID}");
-
                         UnitMaster result = _unitRepository.DeleteUnit(_currentUnit.UnitID);
 
                         if (result != null)
@@ -445,7 +504,6 @@ namespace PosBranch_Win.Master
                             MessageBox.Show("Unit deleted successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
                             RefreshGridData();
                             ClearForm();
-                            ConfigureButtonStates();
                         }
                         else
                         {
@@ -460,16 +518,16 @@ namespace PosBranch_Win.Master
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Delete error: {ex.Message}");
                 MessageBox.Show($"Error deleting unit: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
-        private void BtnClear_Click(object sender, EventArgs e)
+        public void PerformClear()
         {
             ClearForm();
-            ConfigureButtonStates();
         }
+
+        #endregion
 
         private void BtnSearch_Click(object sender, EventArgs e)
         {
@@ -506,11 +564,6 @@ namespace PosBranch_Win.Master
             {
                 MessageBox.Show($"Error searching units: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
-        }
-
-        private void BtnClose_Click(object sender, EventArgs e)
-        {
-            this.Close();
         }
 
         private void UltraGridUnits_ClickCell(object sender, Infragistics.Win.UltraWinGrid.ClickCellEventArgs e)
@@ -687,14 +740,14 @@ namespace PosBranch_Win.Master
             }
         }
 
-        private void ClearForm()
+        public void ClearForm()
         {
             try
             {
                 ultraTextUnitName.Text = "";
                 _currentUnit = new UnitMaster();
                 _isEditMode = false;
-                this.Text = "Unit Master - Modern UI";
+                this.Text = "Unit Master";
             }
             catch (Exception ex)
             {

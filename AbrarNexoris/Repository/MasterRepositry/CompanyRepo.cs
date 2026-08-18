@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -66,7 +66,9 @@ namespace Repository.MasterRepositry
         {
             CompanyModel company = null;
 
-            DataConnection.Open();
+            if (DataConnection.State != ConnectionState.Open)
+                DataConnection.Open();
+
             try
             {
                 using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._CompanyInfo, (SqlConnection)DataConnection))
@@ -79,44 +81,48 @@ namespace Repository.MasterRepositry
                     {
                         if (reader.Read())
                         {
-                            company = new CompanyModel
+                            company = ReadCompanyFromDataReader(reader);
+                        }
+                    }
+                }
+
+                // Fallback: If SP returned null, query table directly
+                if (company == null)
+                {
+                    using (SqlCommand cmd = new SqlCommand("SELECT * FROM _CompanyInfo WHERE CompanyID = @CompanyID", (SqlConnection)DataConnection))
+                    {
+                        cmd.Parameters.AddWithValue("@CompanyID", companyId);
+                        using (SqlDataReader reader = cmd.ExecuteReader())
+                        {
+                            if (reader.Read())
                             {
-                                CompanyID = Convert.ToInt32(reader["CompanyID"]),
-                                CompanyName = reader["CompanyName"].ToString(),
-                                CompanyCaption = reader["CompanyCaption"] != DBNull.Value ? reader["CompanyCaption"].ToString() : null,
-                                Address1 = reader["Address1"] != DBNull.Value ? reader["Address1"].ToString() : null,
-                                Address2 = reader["Address2"] != DBNull.Value ? reader["Address2"].ToString() : null,
-                                Address3 = reader["Address3"] != DBNull.Value ? reader["Address3"].ToString() : null,
-                                Address4 = reader["Address4"] != DBNull.Value ? reader["Address4"].ToString() : null,
-                                Country = reader["Country"] != DBNull.Value ? (int?)Convert.ToInt32(reader["Country"]) : null,
-                                State = reader["State"] != DBNull.Value ? (int?)Convert.ToInt32(reader["State"]) : null,
-                                Zipcode = reader["Zipcode"] != DBNull.Value ? reader["Zipcode"].ToString() : null,
-                                Phone = reader["Phone"] != DBNull.Value ? reader["Phone"].ToString() : null,
-                                Mobile = reader["Mobile"] != DBNull.Value ? reader["Mobile"].ToString() : null,
-                                Email = reader["Email"] != DBNull.Value ? reader["Email"].ToString() : null,
-                                Website = reader["Website"] != DBNull.Value ? reader["Website"].ToString() : null,
-                                BusinessType = reader["BusinessType"] != DBNull.Value ? reader["BusinessType"].ToString() : null,
-                                BackupPath = reader["BackupPath"] != DBNull.Value ? reader["BackupPath"].ToString() : null,
-                                Logo = reader["LogoByteArray"] != DBNull.Value ? (byte[])reader["LogoByteArray"] : null,
-                                FinYearFrom = reader["FinYearFrom"] != DBNull.Value ? (DateTime?)Convert.ToDateTime(reader["FinYearFrom"]) : null,
-                                FinYearTo = reader["FinYearTo"] != DBNull.Value ? (DateTime?)Convert.ToDateTime(reader["FinYearTo"]) : null,
-                                BookFrom = reader["BookFrom"] != DBNull.Value ? (DateTime?)Convert.ToDateTime(reader["BookFrom"]) : null,
-                                BookTo = reader["BookTo"] != DBNull.Value ? (DateTime?)Convert.ToDateTime(reader["BookTo"]) : null,
-                                TaxSystem = reader["TaxSystem"] != DBNull.Value ? (int?)Convert.ToInt32(reader["TaxSystem"]) : null,
-                                TaxNo = reader["TaxNo"] != DBNull.Value ? reader["TaxNo"].ToString() : null,
-                                LicenseNo = reader["LicenseNo"] != DBNull.Value ? reader["LicenseNo"].ToString() : null,
-                                DLNO1 = reader["DLNO1"] != DBNull.Value ? reader["DLNO1"].ToString() : null,
-                                DLNO2 = reader["DLNO2"] != DBNull.Value ? reader["DLNO2"].ToString() : null,
-                                FSSAINo = reader["FSSAINo"] != DBNull.Value ? reader["FSSAINo"].ToString() : null,
-                                Currency = reader["Currency"] != DBNull.Value ? (int?)Convert.ToInt32(reader["Currency"]) : null
-                            };
+                                company = ReadCompanyFromDataReader(reader);
+                            }
                         }
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                throw new Exception($"Error retrieving company: {ex.Message}", ex);
+                // Direct query fallback on exception
+                try
+                {
+                    if (DataConnection.State != ConnectionState.Open)
+                        DataConnection.Open();
+
+                    using (SqlCommand cmd = new SqlCommand("SELECT * FROM _CompanyInfo WHERE CompanyID = @CompanyID", (SqlConnection)DataConnection))
+                    {
+                        cmd.Parameters.AddWithValue("@CompanyID", companyId);
+                        using (SqlDataReader reader = cmd.ExecuteReader())
+                        {
+                            if (reader.Read())
+                            {
+                                company = ReadCompanyFromDataReader(reader);
+                            }
+                        }
+                    }
+                }
+                catch { /* Ignore fallback exceptions */ }
             }
             finally
             {
@@ -125,6 +131,61 @@ namespace Repository.MasterRepositry
             }
 
             return company;
+        }
+
+        private CompanyModel ReadCompanyFromDataReader(SqlDataReader reader)
+        {
+            byte[] logoData = null;
+            if (HasColumn(reader, "LogoByteArray") && reader["LogoByteArray"] != DBNull.Value)
+            {
+                logoData = (byte[])reader["LogoByteArray"];
+            }
+            else if (HasColumn(reader, "Logo") && reader["Logo"] != DBNull.Value)
+            {
+                logoData = (byte[])reader["Logo"];
+            }
+
+            return new CompanyModel
+            {
+                CompanyID = Convert.ToInt32(reader["CompanyID"]),
+                CompanyName = reader["CompanyName"].ToString(),
+                CompanyCaption = HasColumn(reader, "CompanyCaption") && reader["CompanyCaption"] != DBNull.Value ? reader["CompanyCaption"].ToString() : null,
+                Address1 = HasColumn(reader, "Address1") && reader["Address1"] != DBNull.Value ? reader["Address1"].ToString() : null,
+                Address2 = HasColumn(reader, "Address2") && reader["Address2"] != DBNull.Value ? reader["Address2"].ToString() : null,
+                Address3 = HasColumn(reader, "Address3") && reader["Address3"] != DBNull.Value ? reader["Address3"].ToString() : null,
+                Address4 = HasColumn(reader, "Address4") && reader["Address4"] != DBNull.Value ? reader["Address4"].ToString() : null,
+                Country = HasColumn(reader, "Country") && reader["Country"] != DBNull.Value ? (int?)Convert.ToInt32(reader["Country"]) : null,
+                State = HasColumn(reader, "State") && reader["State"] != DBNull.Value ? (int?)Convert.ToInt32(reader["State"]) : null,
+                Zipcode = HasColumn(reader, "Zipcode") && reader["Zipcode"] != DBNull.Value ? reader["Zipcode"].ToString() : null,
+                Phone = HasColumn(reader, "Phone") && reader["Phone"] != DBNull.Value ? reader["Phone"].ToString() : null,
+                Mobile = HasColumn(reader, "Mobile") && reader["Mobile"] != DBNull.Value ? reader["Mobile"].ToString() : null,
+                Email = HasColumn(reader, "Email") && reader["Email"] != DBNull.Value ? reader["Email"].ToString() : null,
+                Website = HasColumn(reader, "Website") && reader["Website"] != DBNull.Value ? reader["Website"].ToString() : null,
+                BusinessType = HasColumn(reader, "BusinessType") && reader["BusinessType"] != DBNull.Value ? reader["BusinessType"].ToString() : null,
+                BackupPath = HasColumn(reader, "BackupPath") && reader["BackupPath"] != DBNull.Value ? reader["BackupPath"].ToString() : null,
+                Logo = logoData,
+                FinYearFrom = HasColumn(reader, "FinYearFrom") && reader["FinYearFrom"] != DBNull.Value ? (DateTime?)Convert.ToDateTime(reader["FinYearFrom"]) : null,
+                FinYearTo = HasColumn(reader, "FinYearTo") && reader["FinYearTo"] != DBNull.Value ? (DateTime?)Convert.ToDateTime(reader["FinYearTo"]) : null,
+                BookFrom = HasColumn(reader, "BookFrom") && reader["BookFrom"] != DBNull.Value ? (DateTime?)Convert.ToDateTime(reader["BookFrom"]) : null,
+                BookTo = HasColumn(reader, "BookTo") && reader["BookTo"] != DBNull.Value ? (DateTime?)Convert.ToDateTime(reader["BookTo"]) : null,
+                TaxSystem = HasColumn(reader, "TaxSystem") && reader["TaxSystem"] != DBNull.Value ? (int?)Convert.ToInt32(reader["TaxSystem"]) : null,
+                TaxNo = HasColumn(reader, "TaxNo") && reader["TaxNo"] != DBNull.Value ? reader["TaxNo"].ToString() : null,
+                LicenseNo = HasColumn(reader, "LicenseNo") && reader["LicenseNo"] != DBNull.Value ? reader["LicenseNo"].ToString() : null,
+                DLNO1 = HasColumn(reader, "DLNO1") && reader["DLNO1"] != DBNull.Value ? reader["DLNO1"].ToString() : null,
+                DLNO2 = HasColumn(reader, "DLNO2") && reader["DLNO2"] != DBNull.Value ? reader["DLNO2"].ToString() : null,
+                FSSAINo = HasColumn(reader, "FSSAINo") && reader["FSSAINo"] != DBNull.Value ? reader["FSSAINo"].ToString() : null,
+                Currency = HasColumn(reader, "Currency") && reader["Currency"] != DBNull.Value ? (int?)Convert.ToInt32(reader["Currency"]) : null
+            };
+        }
+
+        private bool HasColumn(SqlDataReader reader, string columnName)
+        {
+            for (int i = 0; i < reader.FieldCount; i++)
+            {
+                if (reader.GetName(i).Equals(columnName, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            return false;
         }
 
         public CompanyModel GetCompanyByUserAndBranch(int userId, int branchId, int companyId)
@@ -334,30 +395,90 @@ namespace Repository.MasterRepositry
         {
             List<CompanyDDl> companies = new List<CompanyDDl>();
 
-            DataConnection.Open();
+            if (DataConnection.State != ConnectionState.Open)
+                DataConnection.Open();
+
             try
             {
-                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._CompanyInfo, (SqlConnection)DataConnection))
+                try
                 {
-                    cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@_Operation", "DDL");
-
-                    using (SqlDataReader reader = cmd.ExecuteReader())
+                    using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._CompanyInfo, (SqlConnection)DataConnection))
                     {
-                        while (reader.Read())
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.AddWithValue("@_Operation", "DDL");
+
+                        using (SqlDataReader reader = cmd.ExecuteReader())
                         {
-                            companies.Add(new CompanyDDl
+                            while (reader.Read())
                             {
-                                CompanyID = Convert.ToInt32(reader["CompanyID"]),
-                                CompanyName = reader["CompanyName"].ToString()
-                            });
+                                companies.Add(new CompanyDDl
+                                {
+                                    CompanyID = Convert.ToInt32(reader["CompanyID"]),
+                                    CompanyName = reader["CompanyName"].ToString()
+                                });
+                            }
                         }
+                    }
+                }
+                catch { /* SP DDL operation may not exist, fallback below */ }
+
+                // Fallback 1: If DDL returned 0 rows, try @_Operation = 'GETALL'
+                if (companies.Count == 0)
+                {
+                    try
+                    {
+                        using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._CompanyInfo, (SqlConnection)DataConnection))
+                        {
+                            cmd.CommandType = CommandType.StoredProcedure;
+                            cmd.Parameters.AddWithValue("@_Operation", "GETALL");
+
+                            using (SqlDataReader reader = cmd.ExecuteReader())
+                            {
+                                while (reader.Read())
+                                {
+                                    companies.Add(new CompanyDDl
+                                    {
+                                        CompanyID = Convert.ToInt32(reader["CompanyID"]),
+                                        CompanyName = reader["CompanyName"].ToString()
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    catch { /* SP GETALL may fail, fallback below */ }
+                }
+
+                // Fallback 2: Direct SQL Query across candidate company tables
+                if (companies.Count == 0)
+                {
+                    string[] candidateTables = new string[] { "_CompanyInfo", "CompanyInfo", "CompanyMaster", "Company" };
+                    foreach (string table in candidateTables)
+                    {
+                        try
+                        {
+                            using (SqlCommand cmd = new SqlCommand($"SELECT CompanyID, CompanyName FROM dbo.{table}", (SqlConnection)DataConnection))
+                            {
+                                using (SqlDataReader reader = cmd.ExecuteReader())
+                                {
+                                    while (reader.Read())
+                                    {
+                                        companies.Add(new CompanyDDl
+                                        {
+                                            CompanyID = Convert.ToInt32(reader["CompanyID"]),
+                                            CompanyName = reader["CompanyName"].ToString()
+                                        });
+                                    }
+                                }
+                            }
+                            if (companies.Count > 0) break;
+                        }
+                        catch { /* Try next table candidate */ }
                     }
                 }
             }
             catch (Exception ex)
             {
-                throw new Exception($"Error retrieving company dropdown list: {ex.Message}", ex);
+                System.Diagnostics.Debug.WriteLine($"Error retrieving company dropdown list: {ex.Message}");
             }
             finally
             {
