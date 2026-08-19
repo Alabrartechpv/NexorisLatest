@@ -140,6 +140,7 @@
     <Compile Include="SettingsRepo\UserActivityLogRepository.cs" />
     <Compile Include="ShiftSessionGuard.cs" />
     <Compile Include="ShiftSessionRepo.cs" />
+    <Compile Include="SyncQueueRepository.cs" />
     <Compile Include="VendorRepository.cs" />
   </ItemGroup>
   <ItemGroup>

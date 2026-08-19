@@ -220,6 +220,7 @@ namespace Repository.TransactionRepository
                         // Add missing parameters for IsPaid and IsSyncd
                         cmd.Parameters.AddWithValue("IsPaid", sales.IsPaid);
                         cmd.Parameters.AddWithValue("IsSyncd", sales.IsSyncd);
+                        cmd.Parameters.AddWithValue("TransactionGuid", sales.TransactionGuid.HasValue ? (object)sales.TransactionGuid.Value : DBNull.Value);
 
                         // Execute and check result
                         using (SqlDataAdapter da = new SqlDataAdapter(cmd))
@@ -491,6 +492,29 @@ namespace Repository.TransactionRepository
                     // Payment details will be saved separately by the calling code
                     // The PaymentReference contains a marker to indicate split payment was used
                 }
+
+                // ATOMIC SYNC QUEUE ENQUEUE (via Stored Procedure POS_SyncQueue)
+                try
+                {
+                    if (!sales.TransactionGuid.HasValue || sales.TransactionGuid == Guid.Empty)
+                    {
+                        sales.TransactionGuid = Guid.NewGuid();
+                    }
+
+                    SyncQueueRepository.EnqueueTransaction(
+                        DataConnection,
+                        trans,
+                        sales.BranchId > 0 ? sales.BranchId : SessionContext.BranchId,
+                        "SALES",
+                        sales.BillNo.ToString(),
+                        sales.TransactionGuid.Value,
+                        "CREATE");
+                }
+                catch (Exception syncEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[SalesRepository.SaveSales] SyncQueue enqueue warning: {syncEx.Message}");
+                }
+
                 trans.Commit();
             }
             catch (Exception ex)
@@ -778,6 +802,7 @@ namespace Repository.TransactionRepository
                         // Add missing parameters for IsPaid and IsSyncd
                         cmd.Parameters.AddWithValue("IsPaid", sales.IsPaid);
                         cmd.Parameters.AddWithValue("IsSyncd", sales.IsSyncd);
+                        cmd.Parameters.AddWithValue("TransactionGuid", sales.TransactionGuid.HasValue ? (object)sales.TransactionGuid.Value : DBNull.Value);
 
                         // Execute and check result
                         using (SqlDataAdapter da = new SqlDataAdapter(cmd))
@@ -1059,6 +1084,30 @@ namespace Repository.TransactionRepository
                 else
                 {
                 }
+
+                // ATOMIC SYNC QUEUE ENQUEUE (UPDATE via Stored Procedure POS_SyncQueue)
+                try
+                {
+                    if (!sales.TransactionGuid.HasValue || sales.TransactionGuid == Guid.Empty)
+                    {
+                        int branchId = sales.BranchId > 0 ? sales.BranchId : SessionContext.BranchId;
+                        sales.TransactionGuid = SyncQueueRepository.GetExistingGuid(DataConnection, trans, branchId, "SALES", sales.BillNo.ToString()) ?? Guid.NewGuid();
+                    }
+
+                    SyncQueueRepository.EnqueueTransaction(
+                        DataConnection,
+                        trans,
+                        sales.BranchId > 0 ? sales.BranchId : SessionContext.BranchId,
+                        "SALES",
+                        sales.BillNo.ToString(),
+                        sales.TransactionGuid ?? Guid.NewGuid(),
+                        "UPDATE");
+                }
+                catch (Exception syncEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[SalesRepository.UpdateSales] SyncQueue enqueue warning: {syncEx.Message}");
+                }
+
                 trans.Commit();
             }
             catch (Exception ex)

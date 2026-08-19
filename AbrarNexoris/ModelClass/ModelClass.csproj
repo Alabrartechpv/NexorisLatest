@@ -127,6 +127,7 @@
     <Compile Include="TransactionModels\StockAdjustmentModel.cs" />
     <Compile Include="TransactionModels\StockAdjustmentReasonModel.cs" />
     <Compile Include="TransactionModels\StockTransferModel.cs" />
+    <Compile Include="TransactionModels\SyncQueueModel.cs" />
     <Compile Include="TransactionModels\VoucherModel4Trn.cs" />
   </ItemGroup>
   <ItemGroup />

@@ -65,6 +65,7 @@ namespace ModelClass.TransactionModels
         public double BillCost { get; set; } = 0; // Bill cost/production cost
         public bool IsPaid { get; set; } = false; // Payment status
         public bool IsSyncd { get; set; } = false; // Sync status for mobile/cloud
+        public Guid? TransactionGuid { get; set; } // Central Sync Correlation GUID
     }
     public class SalesDetails
     {

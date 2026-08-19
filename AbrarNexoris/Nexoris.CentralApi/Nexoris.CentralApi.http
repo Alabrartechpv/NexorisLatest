@@ -1,0 +1,90 @@
+@Nexoris.CentralApi_HostAddress = http://localhost:5000
+
+### 1. Health Check Endpoint
+GET {{Nexoris.CentralApi_HostAddress}}/api/v1/health
+Accept: application/json
+
+###
+
+### 2. Ingest New Sales Transaction (Batch)
+POST {{Nexoris.CentralApi_HostAddress}}/api/v1/sync/transactions
+Content-Type: application/json
+X-Branch-Id: 1
+X-Api-Key: MNG_SECURE_API_KEY_2026
+
+{
+  "branchId": 1,
+  "batchId": "b1b2c3d4-0001-0002-0003-000000000001",
+  "transactions": [
+    {
+      "transactionGuid": "99999999-aaaa-bbbb-cccc-111111111111",
+      "entityType": "SALES",
+      "operation": "CREATE",
+      "version": 1,
+      "sMaster": {
+        "billNo": 101,
+        "billDate": "2026-08-19T12:30:00",
+        "companyId": 1,
+        "finYearId": 1,
+        "counterId": 1,
+        "customerName": "STUDY TEST CUSTOMER",
+        "ledgerID": 101,
+        "paymodeId": 1,
+        "paymodeName": "CASH",
+        "subTotal": 100.00,
+        "discountAmt": 0.00,
+        "taxAmt": 0.00,
+        "netAmount": 100.00,
+        "userId": 1,
+        "status": "Complete"
+      },
+      "sDetails": [
+        {
+          "slNO": 1,
+          "itemId": 12,
+          "barcode": "03",
+          "itemName": "BRITANIA TIGER",
+          "qty": 2.0,
+          "unitPrice": 50.0,
+          "amount": 100.0,
+          "discountAmount": 0.0,
+          "taxAmt": 0.0,
+          "totalAmount": 100.0,
+          "unitId": 1
+        }
+      ],
+      "vouchers": [
+        {
+          "branchVoucherId": 1101,
+          "ledgerID": 1,
+          "ledgerName": "CASH IN HAND",
+          "debit": 100.0,
+          "credit": 0.0,
+          "narration": "Sales Bill #101"
+        },
+        {
+          "branchVoucherId": 1101,
+          "ledgerID": 5,
+          "ledgerName": "SALES A/C",
+          "debit": 0.0,
+          "credit": 100.0,
+          "narration": "Sales Bill #101"
+        }
+      ]
+    }
+  ]
+}
+
+###
+
+### 3. Test Invalid API Key (Expects 403 Forbidden)
+POST {{Nexoris.CentralApi_HostAddress}}/api/v1/sync/transactions
+Content-Type: application/json
+X-Branch-Id: 1
+X-Api-Key: WRONG_KEY_HERE
+
+{
+  "branchId": 1,
+  "batchId": "test-batch",
+  "transactions": []
+}
