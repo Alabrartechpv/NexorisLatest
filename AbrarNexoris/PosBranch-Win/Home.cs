@@ -2837,6 +2837,12 @@ namespace PosBranch_Win
                 return true;
             }
 
+            if (ctrl && keyCode == Keys.D)
+            {
+                OpenItemMasterDialog();
+                return true;
+            }
+
             if (keyCode == Keys.Escape && !ctrl && !alt)
             {
                 // Check if an UltraGrid cell is actively in edit mode
@@ -2894,6 +2900,18 @@ namespace PosBranch_Win
             }
 
             return base.ProcessCmdKey(ref msg, keyData);
+        }
+
+        public void OpenItemMasterDialog()
+        {
+            try
+            {
+                PosBranch_Win.DialogBox.FrmItemReferencePopup.ShowPopup(this);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error opening Item Reference Popup: {ex.Message}");
+            }
         }
 
         private bool IsTextInputControlFocused()
