@@ -300,13 +300,14 @@ namespace PosBranch_Win.Master
 
         private void SaveUser()
         {
-            if (!ValidateUserInput(out int companyId, out int branchId, out int userLevelId))
+            if (!ValidateUserInput(out int companyId, out int branchId, out int userLevelId, out string userLevelName))
                 return;
 
             users.UserID = 0;
             users.CompanyID = companyId;
             users.BranchID = branchId;
             users.UserLevelID = userLevelId;
+            users.UserLevel = userLevelName;
             users.UserName = textUserName.Text.Trim();
             users.Password = enc.Encrypt(textPassword.Text, true);
             users.Email = textEmail.Text.Trim();
@@ -330,13 +331,14 @@ namespace PosBranch_Win.Master
                 return;
             }
 
-            if (!ValidateUserInput(out int companyId, out int branchId, out int userLevelId))
+            if (!ValidateUserInput(out int companyId, out int branchId, out int userLevelId, out string userLevelName))
                 return;
 
             users.UserID = Id;
             users.CompanyID = companyId;
             users.BranchID = branchId;
             users.UserLevelID = userLevelId;
+            users.UserLevel = userLevelName;
             users.UserName = textUserName.Text.Trim();
             users.Email = textEmail.Text.Trim();
             users.Password = enc.Encrypt(textPassword.Text, true);
@@ -378,11 +380,12 @@ namespace PosBranch_Win.Master
             }
         }
 
-        private bool ValidateUserInput(out int companyId, out int branchId, out int userLevelId)
+        private bool ValidateUserInput(out int companyId, out int branchId, out int userLevelId, out string userLevelName)
         {
             companyId = GetCurrentCompanyId();
             branchId = GetCurrentBranchId();
             userLevelId = 0;
+            userLevelName = "";
 
             if (string.IsNullOrWhiteSpace(textUserName.Text))
             {
@@ -425,17 +428,11 @@ namespace PosBranch_Win.Master
                 return false;
             }
 
+            userLevelId = selectedRoleId;
+
             RolePermissionRepository roleRepo = new RolePermissionRepository();
-            var selectedRole = roleRepo.GetAllRoles().FirstOrDefault(r => r.RoleID == selectedRoleId);
-            if (selectedRole != null && selectedRole.UserLevelID.HasValue)
-            {
-                userLevelId = selectedRole.UserLevelID.Value;
-            }
-            else
-            {
-                userLevelId = selectedRoleId;
-                MessageBox.Show($"Warning: UserLevelID not found for RoleID {selectedRoleId}. Using RoleID as fallback.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            }
+            var matchedRole = roleRepo.GetAllRoles().FirstOrDefault(r => r.RoleID == selectedRoleId);
+            userLevelName = matchedRole != null ? matchedRole.RoleName : cmbUserLevel.Text;
 
             return true;
         }

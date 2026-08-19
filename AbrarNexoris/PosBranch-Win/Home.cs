@@ -588,6 +588,19 @@ namespace PosBranch_Win
         {
             try
             {
+                if (!SessionContext.IsAdmin && formToOpen != null)
+                {
+                    string formTypeName = formToOpen.GetType().Name;
+                    bool allowed = SessionContext.CanView(tabName) || SessionContext.CanView(formTypeName);
+                    if (!allowed)
+                    {
+                        MessageBox.Show($"Access Denied: You do not have permission to access '{tabName}'. Please contact your administrator.",
+                            "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        try { formToOpen.Dispose(); } catch { }
+                        return;
+                    }
+                }
+
                 LogFormEntry(tabName);
                 // Auto-close Report Navigator when any form is opened, unless the user pinned it.
                 if (_isReportNavigatorVisible && !_isReportNavigatorPinned) HideReportNavigator();
@@ -856,6 +869,19 @@ namespace PosBranch_Win
         {
             try
             {
+                if (!SessionContext.IsAdmin && formToOpen != null)
+                {
+                    string formTypeName = formToOpen.GetType().Name;
+                    bool allowed = SessionContext.CanView(tabName) || SessionContext.CanView(formTypeName);
+                    if (!allowed)
+                    {
+                        MessageBox.Show($"Access Denied: You do not have permission to access '{tabName}'. Please contact your administrator.",
+                            "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        try { formToOpen.Dispose(); } catch { }
+                        return;
+                    }
+                }
+
                 LogFormEntry(tabName);
                 // Auto-close Report Navigator when any form is opened, unless the user pinned it.
                 if (_isReportNavigatorVisible && !_isReportNavigatorPinned) HideReportNavigator();
@@ -1645,18 +1671,18 @@ namespace PosBranch_Win
         /// Applies role-based permissions to toolbar buttons.
         /// Disables buttons that the user does not have CanView permission for.
         /// </summary>
-        private void ApplyRolePermissions()
+        public void ApplyRolePermissions()
         {
             try
             {
-                // Get all tools from the toolbar manager
+                bool isAdmin = SessionContext.IsAdmin;
+
+                // 1. Iterate Shared Tools
                 foreach (Infragistics.Win.UltraWinToolbars.ToolBase tool in ultraToolbarsManager1.Tools)
                 {
                     try
                     {
                         string toolKey = tool.Key?.Trim();
-
-                        // Check if this is a global action tool that should always be enabled
                         bool isGlobalAction = toolKey == "Save" ||
                                              toolKey == "Delet" ||
                                              toolKey == "Clear" ||
@@ -1671,27 +1697,72 @@ namespace PosBranch_Win
                                              toolKey == "LastBill" ||
                                              toolKey == "Database";
 
-                        bool hasPermission = SessionContext.IsAdmin || isGlobalAction || SessionContext.CanView(toolKey) || SessionContext.CanView(tool.Key);
+                        bool hasPermission = isAdmin || isGlobalAction || SessionContext.CanView(toolKey) || SessionContext.CanView(tool.Key);
                         
                         if (tool.SharedProps != null)
                         {
                             tool.SharedProps.Enabled = hasPermission;
+                            if (!isAdmin && !isGlobalAction)
+                            {
+                                tool.SharedProps.Visible = hasPermission;
+                            }
                         }
-
-                        System.Diagnostics.Debug.WriteLine($"Tool '{tool.Key}': Enabled={hasPermission}");
                     }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Error applying permission to tool '{tool?.Key}': {ex.Message}");
-                    }
+                    catch { }
                 }
 
-                System.Diagnostics.Debug.WriteLine($"Applied permissions to {ultraToolbarsManager1.Tools.Count} toolbar items");
+                // 2. Iterate Ribbon Tabs & Groups to update UI Ribbon buttons directly
+                if (ultraToolbarsManager1.Ribbon != null && ultraToolbarsManager1.Ribbon.Tabs != null)
+                {
+                    foreach (Infragistics.Win.UltraWinToolbars.RibbonTab tab in ultraToolbarsManager1.Ribbon.Tabs)
+                    {
+                        try
+                        {
+                            bool tabHasVisibleTools = false;
+
+                            foreach (Infragistics.Win.UltraWinToolbars.RibbonGroup group in tab.Groups)
+                            {
+                                try
+                                {
+                                    bool groupHasVisibleTools = false;
+
+                                    foreach (Infragistics.Win.UltraWinToolbars.ToolBase tool in group.Tools)
+                                    {
+                                        try
+                                        {
+                                            string toolKey = tool.Key?.Trim();
+                                            bool isGlobalAction = toolKey == "Save" || toolKey == "Delet" || toolKey == "Clear" ||
+                                                                 toolKey == "Remove" || toolKey == "Exit" || toolKey == "Report" ||
+                                                                 toolKey == "LogOff" || toolKey == "LogIn" || toolKey == "ReOrder" ||
+                                                                 toolKey == "Overview" || toolKey == "Hold" || toolKey == "LastBill" ||
+                                                                 toolKey == "Database";
+
+                                            bool hasPermission = isAdmin || isGlobalAction || SessionContext.CanView(toolKey) || SessionContext.CanView(tool.Key);
+                                            
+                                            tool.SharedProps.Visible = true;
+                                            tool.SharedProps.Enabled = hasPermission;
+                                            if (tool.InstanceProps != null)
+                                            {
+                                                tool.InstanceProps.Visible = Infragistics.Win.DefaultableBoolean.True;
+                                            }
+                                        }
+                                        catch { }
+                                    }
+
+                                    group.Visible = true;
+                                }
+                                catch { }
+                            }
+
+                            tab.Visible = true;
+                        }
+                        catch { }
+                    }
+                }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error applying role permissions: {ex.Message}");
-                // Continue without disabling buttons on error
             }
         }
 
@@ -1862,6 +1933,21 @@ namespace PosBranch_Win
 
                     if (!EnsureTransactionAllowed(activeForm))
                         return;
+
+                    if (!SessionContext.IsAdmin)
+                    {
+                        string formTypeName = activeForm.GetType().Name;
+                        string formTitle = activeForm.Text ?? formTypeName;
+                        bool canAdd = SessionContext.CanAdd(formTypeName) || SessionContext.CanAdd(formTitle);
+                        bool canEdit = SessionContext.CanEdit(formTypeName) || SessionContext.CanEdit(formTitle);
+
+                        if (!canAdd && !canEdit)
+                        {
+                            MessageBox.Show("Access Denied: You do not have permission to Save or Edit in this form.",
+                                "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            return;
+                        }
+                    }
 
                     bool saved = false;
 
@@ -2036,6 +2122,18 @@ namespace PosBranch_Win
                         return;
                     }
 
+                    if (!SessionContext.IsAdmin)
+                    {
+                        string formTypeName = activeForm.GetType().Name;
+                        string formTitle = activeForm.Text ?? formTypeName;
+                        if (!SessionContext.CanDelete(formTypeName) && !SessionContext.CanDelete(formTitle))
+                        {
+                            MessageBox.Show("Access Denied: You do not have permission to Delete in this form.",
+                                "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            return;
+                        }
+                    }
+
                     bool deleted = false;
                     string formName = activeForm.GetType().Name;
 
@@ -2131,7 +2229,7 @@ namespace PosBranch_Win
             if (e.Tool.Key == "Pos")
             {
                 frmPos frmPos = new frmPos();
-                OpenFormInTab(frmPos, "POS");
+                OpenFormInTabSafe(frmPos, "POS");
             }
 
             if (e.Tool.Key == "Sales")
@@ -2143,17 +2241,17 @@ namespace PosBranch_Win
             if (e.Tool.Key == "Sales Return")
             {
                 frmSalesReturn frmsalesreturn = new frmSalesReturn();
-                OpenFormInTab(frmsalesreturn, "Sales Return");
+                OpenFormInTabSafe(frmsalesreturn, "Sales Return");
             }
             if (e.Tool.Key == "Branch")
             {
                 FrmBranch frmbranch = new FrmBranch();
-                OpenFormInTab(frmbranch, "Branch");
+                OpenFormInTabSafe(frmbranch, "Branch");
             }
             if (e.Tool.Key == "Category")
             {
                 Master.FrmCategory frmcategory = new Master.FrmCategory();
-                OpenFormInTab(frmcategory, "Category");
+                OpenFormInTabSafe(frmcategory, "Category");
             }
             if (e.Tool.Key == "Reason")
             {
@@ -2162,128 +2260,128 @@ namespace PosBranch_Win
             if (e.Tool.Key == "Group")
             {
                 Master.FrmGroup frmcategory = new Master.FrmGroup();
-                OpenFormInTab(frmcategory, "Group");
+                OpenFormInTabSafe(frmcategory, "Group");
             }
             if (e.Tool.Key == "ItemMaster")
             {
                 // FrmItemMaster ItemMaster = new FrmItemMaster();
                 frmItemMasterNew ItemMaster = new frmItemMasterNew();
-                OpenFormInTab(ItemMaster, "Item Master");
+                OpenFormInTabSafe(ItemMaster, "Item Master");
             }
             if (e.Tool.Key == "Line")
             {
                 frmLine line = new frmLine();
-                OpenFormInTab(line, "Line");
+                OpenFormInTabSafe(line, "Line");
             }
             if (e.Tool.Key == "Company")
             {
                 frmCompany compa = new frmCompany();
-                OpenFormInTab(compa, "Company");
+                OpenFormInTabSafe(compa, "Company");
             }
             if (e.Tool.Key == "Rack")
             {
                 frmRack rack = new frmRack();
-                OpenFormInTab(rack, "Rack");
+                OpenFormInTabSafe(rack, "Rack");
             }
             if (e.Tool.Key == "Row")
             {
                 FrmRow Row = new FrmRow();
-                OpenFormInTab(Row, "Row");
+                OpenFormInTabSafe(Row, "Row");
             }
             if (e.Tool.Key == "State")
             {
                 FrmState state = new FrmState();
-                OpenFormInTab(state, "State");
+                OpenFormInTabSafe(state, "State");
             }
             if (e.Tool.Key == "Brand")
             {
                 FrmBrand Brand = new FrmBrand();
-                OpenFormInTab(Brand, "Brand");
+                OpenFormInTabSafe(Brand, "Brand");
             }
             if (e.Tool.Key == "Customer")
             {
                 FrmCustomer Customer = new FrmCustomer();
-                OpenFormInTab(Customer, "Customer");
+                OpenFormInTabSafe(Customer, "Customer");
             }
             if (e.Tool.Key == "Vendor")
             {
                 Accounts.FrmVendor vendor = new FrmVendor();
-                OpenFormInTab(vendor, "Vendor");
+                OpenFormInTabSafe(vendor, "Vendor");
             }
             if (e.Tool.Key == "Ledger")
             {
                 Accounts.FrmLedgers ledgers = new FrmLedgers();
-                OpenFormInTab(ledgers, "Ledger");
+                OpenFormInTabSafe(ledgers, "Ledger");
             }
             if (e.Tool.Key == "AccountGroup")
             {
                 Accounts.FrmAccountGroup AccountGroup = new FrmAccountGroup();
-                OpenFormInTab(AccountGroup, "AccountGroup");
+                OpenFormInTabSafe(AccountGroup, "AccountGroup");
             }
             if (e.Tool.Key == "Receipt")
             {
                 Accounts.FrmReceipt receipt = new FrmReceipt();
-                OpenFormInTab(receipt, "Receipt");
+                OpenFormInTabSafe(receipt, "Receipt");
             }
             if (e.Tool.Key == "ManualPartyBalance")
             {
                 PosBranch_Win.Accounts.FrmManualPartyBalance frmManualBalance = new PosBranch_Win.Accounts.FrmManualPartyBalance();
-                OpenFormInTab(frmManualBalance, "Manual Party Balance");
+                OpenFormInTabSafe(frmManualBalance, "Manual Party Balance");
             }
             if (e.Tool.Key == "TradingPLAccount")
             {
                 PosBranch_Win.Reports.FinancialReports.FrmTradingPLAccount tradingAccount = new PosBranch_Win.Reports.FinancialReports.FrmTradingPLAccount();
-                OpenFormInTab(tradingAccount, "Trading Account");
+                OpenFormInTabSafe(tradingAccount, "Trading Account");
             }
             if (e.Tool.Key == "TradingAccount")
             {
                 PosBranch_Win.Reports.FinancialReports.FrmTradingPLAccount tradingAccount = new PosBranch_Win.Reports.FinancialReports.FrmTradingPLAccount();
-                OpenFormInTab(tradingAccount, "Trading Account");
+                OpenFormInTabSafe(tradingAccount, "Trading Account");
             }
             if (e.Tool.Key == "ProfitLossAccount")
             {
                 PosBranch_Win.Reports.FinancialReports.FrmProfitLossAccount plAccount = new PosBranch_Win.Reports.FinancialReports.FrmProfitLossAccount();
-                OpenFormInTab(plAccount, "Profit & Loss Account");
+                OpenFormInTabSafe(plAccount, "Profit & Loss Account");
             }
             if (e.Tool.Key == "BalanceSheet")
             {
                 PosBranch_Win.Reports.FinancialReports.FrmBalanceSheet bsReport = new PosBranch_Win.Reports.FinancialReports.FrmBalanceSheet();
-                OpenFormInTab(bsReport, "Balance Sheet");
+                OpenFormInTabSafe(bsReport, "Balance Sheet");
             }
             if (e.Tool.Key == "TrialBalance")
             {
                 PosBranch_Win.Reports.FinancialReports.FrmTrialBalance tbReport = new PosBranch_Win.Reports.FinancialReports.FrmTrialBalance();
-                OpenFormInTab(tbReport, "Trial Balance");
+                OpenFormInTabSafe(tbReport, "Trial Balance");
             }
             if (e.Tool.Key == "CashBankBook")
             {
                 PosBranch_Win.Reports.FinancialReports.FrmCashBankBook cbBook = new PosBranch_Win.Reports.FinancialReports.FrmCashBankBook();
-                OpenFormInTab(cbBook, "Cash & Bank Book");
+                OpenFormInTabSafe(cbBook, "Cash & Bank Book");
             }
             if (e.Tool.Key == "DayBook")
             {
                 PosBranch_Win.Reports.FinancialReports.FrmDayBook dbBook = new PosBranch_Win.Reports.FinancialReports.FrmDayBook();
-                OpenFormInTab(dbBook, "Day Book");
+                OpenFormInTabSafe(dbBook, "Day Book");
             }
             if (e.Tool.Key == "Payment")
             {
                 Accounts.FrmPayment payment = new FrmPayment();
-                OpenFormInTab(payment, "Payment");
+                OpenFormInTabSafe(payment, "Payment");
             }
             if (e.Tool.Key == "GeneralPayment")
             {
                 Accounts.FrmGeneralPayment payment = new FrmGeneralPayment();
-                OpenFormInTab(payment, "General Payment");
+                OpenFormInTabSafe(payment, "General Payment");
             }
             if (e.Tool.Key == "GeneralReceipt")
             {
                 Accounts.FrmGeneralReceipt receipt = new FrmGeneralReceipt();
-                OpenFormInTab(receipt, "General Receipt");
+                OpenFormInTabSafe(receipt, "General Receipt");
             }
             if (e.Tool.Key == "BankReconciliation")
             {
                 Accounts.FrmBankReconciliation bankRec = new Accounts.FrmBankReconciliation();
-                OpenFormInTab(bankRec, "Bank Reconciliation");
+                OpenFormInTabSafe(bankRec, "Bank Reconciliation");
             }
             if (e.Tool.Key == "General PM setup" || e.Tool.Key == "GeneralPMsetup" || e.Tool.Key == "General Paymode Setup" || e.Tool.Key == "PaymodeSetup" || e.Tool.Key == "PaymodeMaster" || e.Tool.Key == "Paymode")
             {
@@ -2293,93 +2391,93 @@ namespace PosBranch_Win
             if (e.Tool.Key == "BankStatementReport")
             {
                 PosBranch_Win.Reports.FinancialReports.FrmBankStatementReport bankStatement = new PosBranch_Win.Reports.FinancialReports.FrmBankStatementReport();
-                OpenFormInTab(bankStatement, "Bank Statement");
+                OpenFormInTabSafe(bankStatement, "Bank Statement");
             }
             if (e.Tool.Key == "ShiftReconciliationReport")
             {
                 PosBranch_Win.Reports.FinancialReports.FrmShiftReconciliationReport shiftReport = new PosBranch_Win.Reports.FinancialReports.FrmShiftReconciliationReport();
-                OpenFormInTab(shiftReport, "Shift Report");
+                OpenFormInTabSafe(shiftReport, "Shift Report");
             }
             if (e.Tool.Key == "Contra")
             {
                 Accounts.FrmContra contra = new FrmContra();
-                OpenFormInTab(contra, "Contra");
+                OpenFormInTabSafe(contra, "Contra");
             }
             if (e.Tool.Key == "Journal")
             {
                 Accounts.FrmJournal journal = new FrmJournal();
-                OpenFormInTab(journal, "Journal");
+                OpenFormInTabSafe(journal, "Journal");
             }
             if (e.Tool.Key == "ChartOfAccount")
             {
                 //ChartOfAccount.FrmChartOfAccount chartOfAcc = new ChartOfAccount.FrmChartOfAccount();
                 ChartOfAccount.FrmChartOfAcc chartOfAcc = new ChartOfAccount.FrmChartOfAcc();
-                OpenFormInTab(chartOfAcc, "ChartOfAccount");
+                OpenFormInTabSafe(chartOfAcc, "ChartOfAccount");
             }
             if (e.Tool.Key == "DebitNote")
             {
                 Accounts.FrmDebitNote debitNote = new FrmDebitNote();
-                OpenFormInTab(debitNote, "DebitNote");
+                OpenFormInTabSafe(debitNote, "DebitNote");
             }
             if (e.Tool.Key == "CreditNote")
             {
                 Accounts.FrmCreditNote creditNote = new FrmCreditNote();
-                OpenFormInTab(creditNote, "CreditNote");
+                OpenFormInTabSafe(creditNote, "CreditNote");
             }
             if (e.Tool.Key == "ManualPartyBalanceReport")
             {
                 PosBranch_Win.Reports.FinancialReports.FrmManualPartyBalanceReport manualPartyBalanceReport = new PosBranch_Win.Reports.FinancialReports.FrmManualPartyBalanceReport();
-                OpenFormInTab(manualPartyBalanceReport, "Manual Party Balance Report");
+                OpenFormInTabSafe(manualPartyBalanceReport, "Manual Party Balance Report");
             }
             if (e.Tool.Key == "CombinedPartyBalanceReport")
             {
                 PosBranch_Win.Reports.FinancialReports.FrmCombinedPartyBalanceReport combinedPartyBalanceReport = new PosBranch_Win.Reports.FinancialReports.FrmCombinedPartyBalanceReport();
-                OpenFormInTab(combinedPartyBalanceReport, "Combined Party Balance Report");
+                OpenFormInTabSafe(combinedPartyBalanceReport, "Combined Party Balance Report");
             }
             if (e.Tool.Key == "Users")
             {
                 FrmUsers users = new FrmUsers();
-                OpenFormInTab(users, "Users");
+                OpenFormInTabSafe(users, "Users");
             }
             if (e.Tool.Key == "Purchase")
             {
                 FrmPurchase purchase = new FrmPurchase();
-                OpenFormInTab(purchase, "Purchase");
+                OpenFormInTabSafe(purchase, "Purchase");
             }
             if (e.Tool.Key == "Purchase Order")
             {
                 frmPurchaseOrder purchaseOrder = new frmPurchaseOrder();
-                OpenFormInTab(purchaseOrder, "Purchase Order");
+                OpenFormInTabSafe(purchaseOrder, "Purchase Order");
             }
             if (e.Tool.Key == "Purchase R/n")
             {
                 frmPurchaseReturn preturn = new frmPurchaseReturn();
-                OpenFormInTab(preturn, "Purchase Return");
+                OpenFormInTabSafe(preturn, "Purchase Return");
             }
             if (e.Tool.Key == "Country")
             {
                 FrmCountry country = new FrmCountry();
-                OpenFormInTab(country, "Country");
+                OpenFormInTabSafe(country, "Country");
             }
             if (e.Tool.Key == "Currency" || e.Tool.Key == "currency")
             {
                 FrmCurrency currencyForm = new FrmCurrency();
-                OpenFormInTab(currencyForm, "Currency");
+                OpenFormInTabSafe(currencyForm, "Currency");
             }
             if (e.Tool.Key == "stockadjustment")
             {
                 FrmStockAdjustment stokadj = new FrmStockAdjustment();
-                OpenFormInTab(stokadj, "Stock Adjustment");
+                OpenFormInTabSafe(stokadj, "Stock Adjustment");
             }
             if (e.Tool.Key == "stocktransfer")
             {
                 FrmStockTransfer stoktransfer = new FrmStockTransfer();
-                OpenFormInTab(stoktransfer, "Stock Transfer");
+                OpenFormInTabSafe(stoktransfer, "Stock Transfer");
             }
             if (e.Tool.Key == "frmvendor")
             {
                 FrmVendor vendor = new FrmVendor();
-                OpenFormInTab(vendor, "Vendor");
+                OpenFormInTabSafe(vendor, "Vendor");
             }
             if (e.Tool.Key == "Goods Received")
             {

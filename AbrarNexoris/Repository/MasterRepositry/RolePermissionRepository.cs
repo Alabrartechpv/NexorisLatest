@@ -20,31 +20,92 @@ namespace Repository.MasterRepositry
         /// <returns>List of RolePermission objects</returns>
         public List<RolePermission> GetPermissionsByRoleId(int roleId)
         {
-            List<RolePermission> permissions = new List<RolePermission>();
-            DataConnection.Open();
+            List<RolePermission> savedPermissions = new List<RolePermission>();
+
+            // Resolve all matching role IDs (e.g., both RoleID=4 and UserLevelID=3 for Cashier)
+            List<int> targetRoleIds = new List<int> { roleId };
+            try
+            {
+                var allRoles = GetAllRoles();
+                var currentRole = allRoles.FirstOrDefault(r => r.RoleID == roleId || (r.UserLevelID.HasValue && r.UserLevelID.Value == roleId));
+                if (currentRole != null && !string.IsNullOrWhiteSpace(currentRole.RoleName))
+                {
+                    var matchingRoles = allRoles.Where(r => string.Equals(r.RoleName, currentRole.RoleName, StringComparison.OrdinalIgnoreCase));
+                    foreach (var mr in matchingRoles)
+                    {
+                        if (mr.RoleID > 0 && !targetRoleIds.Contains(mr.RoleID)) targetRoleIds.Add(mr.RoleID);
+                        if (mr.UserLevelID.HasValue && mr.UserLevelID.Value > 0 && !targetRoleIds.Contains(mr.UserLevelID.Value)) targetRoleIds.Add(mr.UserLevelID.Value);
+                    }
+                }
+            }
+            catch { }
+
+            string idListStr = string.Join(",", targetRoleIds);
 
             try
             {
                 EnsureActivityLogPermissionForm();
 
-                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_RolePermission, (SqlConnection)DataConnection))
-                {
-                    cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@RoleID", roleId);
-                    cmd.Parameters.AddWithValue("@FormID", 0);
-                    cmd.Parameters.AddWithValue("@CanView", 0);
-                    cmd.Parameters.AddWithValue("@CanAdd", 0);
-                    cmd.Parameters.AddWithValue("@CanEdit", 0);
-                    cmd.Parameters.AddWithValue("@CanDelete", 0);
-                    cmd.Parameters.AddWithValue("@_Operation", "GETBYROLE");
+                if (DataConnection.State != ConnectionState.Open) DataConnection.Open();
 
+                // 1. Query saved rows from dbo.RolePermissions DB table matching any target role ID
+                using (SqlCommand cmd = new SqlCommand($@"
+IF OBJECT_ID('dbo.RolePermissions', 'U') IS NOT NULL
+BEGIN
+    DECLARE @HasFormKey BIT = CASE WHEN EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.RolePermissions') AND name = 'FormKey') THEN 1 ELSE 0 END;
+    DECLARE @HasFormName BIT = CASE WHEN EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.RolePermissions') AND name = 'FormName') THEN 1 ELSE 0 END;
+
+    IF @HasFormKey = 1 AND @HasFormName = 1
+    BEGIN
+        SELECT RoleID, FormID, FormKey, FormName, CanView, CanAdd, CanEdit, CanDelete 
+        FROM dbo.RolePermissions 
+        WHERE RoleID IN ({idListStr});
+    END
+    ELSE
+    BEGIN
+        SELECT RoleID, FormID, '' AS FormKey, '' AS FormName, CanView, CanAdd, CanEdit, CanDelete 
+        FROM dbo.RolePermissions 
+        WHERE RoleID IN ({idListStr});
+    END
+END", (SqlConnection)DataConnection))
+                {
                     using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
                     {
                         DataSet ds = new DataSet();
                         adapt.Fill(ds);
-                        if ((ds != null) && (ds.Tables.Count > 0) && (ds.Tables[0] != null))
+                        if (ds != null && ds.Tables.Count > 0 && ds.Tables[0] != null && ds.Tables[0].Rows.Count > 0)
                         {
-                            permissions = ds.Tables[0].ToListOfObject<RolePermission>();
+                            savedPermissions = ds.Tables[0].ToListOfObject<RolePermission>();
+                        }
+                    }
+                }
+
+                // 2. If direct table query returned no rows, try stored procedure GETBYROLE
+                if (savedPermissions == null || savedPermissions.Count == 0)
+                {
+                    foreach (int tid in targetRoleIds)
+                    {
+                        using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_RolePermission, (SqlConnection)DataConnection))
+                        {
+                            cmd.CommandType = CommandType.StoredProcedure;
+                            cmd.Parameters.AddWithValue("@RoleID", tid);
+                            cmd.Parameters.AddWithValue("@FormID", 0);
+                            cmd.Parameters.AddWithValue("@CanView", 0);
+                            cmd.Parameters.AddWithValue("@CanAdd", 0);
+                            cmd.Parameters.AddWithValue("@CanEdit", 0);
+                            cmd.Parameters.AddWithValue("@CanDelete", 0);
+                            cmd.Parameters.AddWithValue("@_Operation", "GETBYROLE");
+
+                            using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
+                            {
+                                DataSet ds = new DataSet();
+                                adapt.Fill(ds);
+                                if ((ds != null) && (ds.Tables.Count > 0) && (ds.Tables[0] != null) && (ds.Tables[0].Rows.Count > 0))
+                                {
+                                    savedPermissions = ds.Tables[0].ToListOfObject<RolePermission>();
+                                    if (savedPermissions.Count > 0) break;
+                                }
+                            }
                         }
                     }
                 }
@@ -52,7 +113,6 @@ namespace Repository.MasterRepositry
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error getting permissions: {ex.Message}");
-                throw;
             }
             finally
             {
@@ -60,7 +120,116 @@ namespace Repository.MasterRepositry
                     DataConnection.Close();
             }
 
-            return permissions;
+            // Check if role is Admin
+            string roleName = "";
+            try
+            {
+                var roleObj = GetAllRoles().FirstOrDefault(r => r.RoleID == roleId);
+                if (roleObj != null) roleName = roleObj.RoleName ?? "";
+            }
+            catch { }
+
+            bool isAdmin = string.Equals(roleName, "Admin", StringComparison.OrdinalIgnoreCase) ||
+                           string.Equals(roleName, "Administrator", StringComparison.OrdinalIgnoreCase);
+
+            // Merge saved permissions with complete 88 static form definitions
+            var resultPermissions = new List<RolePermission>();
+            var staticForms = GetStaticFormPermissionsList();
+
+            foreach (var sf in staticForms)
+            {
+                var saved = savedPermissions?.FirstOrDefault(p => p.FormID == sf.FormID ||
+                    (!string.IsNullOrEmpty(p.FormKey) && string.Equals(p.FormKey, sf.FormKey, StringComparison.OrdinalIgnoreCase)));
+
+                if (saved != null)
+                {
+                    resultPermissions.Add(new RolePermission
+                    {
+                        RoleID = roleId,
+                        FormID = sf.FormID,
+                        FormKey = sf.FormKey,
+                        FormName = sf.FormName,
+                        CanView = saved.CanView,
+                        CanAdd = saved.CanAdd,
+                        CanEdit = saved.CanEdit,
+                        CanDelete = saved.CanDelete
+                    });
+                }
+                else
+                {
+                    // Default to FALSE for non-admin, TRUE for admin
+                    resultPermissions.Add(new RolePermission
+                    {
+                        RoleID = roleId,
+                        FormID = sf.FormID,
+                        FormKey = sf.FormKey,
+                        FormName = sf.FormName,
+                        CanView = isAdmin,
+                        CanAdd = isAdmin,
+                        CanEdit = isAdmin,
+                        CanDelete = isAdmin
+                    });
+                }
+            }
+
+            return resultPermissions;
+        }
+
+        private List<RolePermission> GenerateDefaultPermissionsForRole(int roleId)
+        {
+            var result = new List<RolePermission>();
+            var allForms = GetStaticFormPermissionsList();
+
+            string roleName = "";
+            try
+            {
+                var roleObj = GetAllRoles().FirstOrDefault(r => r.RoleID == roleId);
+                if (roleObj != null) roleName = roleObj.RoleName ?? "";
+            }
+            catch { }
+
+            bool isAdminRole = string.Equals(roleName, "Admin", StringComparison.OrdinalIgnoreCase) ||
+                               string.Equals(roleName, "Administrator", StringComparison.OrdinalIgnoreCase);
+
+            foreach (var f in allForms)
+            {
+                bool canView = isAdminRole;
+                bool canAdd = isAdminRole;
+                bool canEdit = isAdminRole;
+                bool canDelete = isAdminRole;
+
+                result.Add(new RolePermission
+                {
+                    RoleID = roleId,
+                    FormID = f.FormID,
+                    FormKey = f.FormKey,
+                    FormName = f.FormName,
+                    CanView = canView,
+                    CanAdd = canAdd,
+                    CanEdit = canEdit,
+                    CanDelete = canDelete
+                });
+            }
+
+            // Asynchronously save these initial default permissions to database so admin UI reflects them
+            try
+            {
+                var gridList = result.Select(r => new FormPermissionGrid
+                {
+                    FormID = r.FormID,
+                    FormKey = r.FormKey,
+                    FormName = r.FormName,
+                    CanView = r.CanView,
+                    CanAdd = r.CanAdd,
+                    CanEdit = r.CanEdit,
+                    CanDelete = r.CanDelete
+                }).ToList();
+
+                SavePermissions(roleId, gridList);
+            }
+            catch { }
+
+            return result;
         }
 
         /// <summary>
@@ -100,6 +269,21 @@ namespace Repository.MasterRepositry
             {
                 if (DataConnection.State == ConnectionState.Open)
                     DataConnection.Close();
+            }
+
+            if (roleId <= 0 && !string.IsNullOrWhiteSpace(roleName))
+            {
+                try
+                {
+                    string clean = roleName.Trim();
+                    var matchingRole = GetAllRoles().FirstOrDefault(r => 
+                        string.Equals(r.RoleName, clean, StringComparison.OrdinalIgnoreCase) ||
+                        r.RoleID.ToString() == clean ||
+                        (r.UserLevelID.HasValue && r.UserLevelID.Value.ToString() == clean));
+
+                    if (matchingRole != null) roleId = matchingRole.RoleID;
+                }
+                catch { }
             }
 
             return roleId;
@@ -155,21 +339,25 @@ namespace Repository.MasterRepositry
         {
             List<Role> roles = new List<Role>();
 
-            // 0. Ensure default roles exist in dbo.Roles DB table to satisfy FK_RolePermissions_Roles constraint
+            // 0. Ensure default roles and IDs exist in database
             EnsureRolesSeededInDatabase();
 
-            // 1. Query dbo.Roles table directly if present
+            // 1. Query roles prioritizing dbo.UserLevel table matching exact database UserLevelID
             try
             {
                 if (DataConnection.State != ConnectionState.Open) DataConnection.Open();
 
                 using (SqlCommand cmd = new SqlCommand(@"
-IF OBJECT_ID('dbo.Roles', 'U') IS NOT NULL
+IF OBJECT_ID('dbo.UserLevel', 'U') IS NOT NULL
 BEGIN
-    SELECT RoleID, RoleName FROM dbo.Roles 
-    WHERE (EXISTS(SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Roles') AND name = 'IsDelete') AND IsDelete = 0)
-       OR NOT EXISTS(SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Roles') AND name = 'IsDelete')
-    ORDER BY RoleID;
+    SELECT UserLevelID AS RoleID, UserLevel AS RoleName, UserLevelID 
+    FROM dbo.UserLevel 
+    WHERE ISNULL(UserLevel, '') <> ''
+    ORDER BY UserLevelID;
+END
+ELSE IF OBJECT_ID('dbo.Roles', 'U') IS NOT NULL
+BEGIN
+    SELECT RoleID, RoleName, UserLevelID FROM dbo.Roles ORDER BY RoleID;
 END", (SqlConnection)DataConnection))
                 {
                     using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
@@ -185,7 +373,7 @@ END", (SqlConnection)DataConnection))
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error querying dbo.Roles directly: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Error querying roles: {ex.Message}");
             }
             finally
             {
@@ -193,104 +381,24 @@ END", (SqlConnection)DataConnection))
                     DataConnection.Close();
             }
 
-            // 2. Try stored procedure GETALLROLES
+            // Fallback: If list is empty, supply default roles
             if (roles == null || roles.Count == 0)
             {
-                try
+                roles = new List<Role>
                 {
-                    if (DataConnection.State != ConnectionState.Open) DataConnection.Open();
-
-                    using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_RolePermission, (SqlConnection)DataConnection))
-                    {
-                        cmd.CommandType = CommandType.StoredProcedure;
-                        cmd.Parameters.AddWithValue("@RoleID", 0);
-                        cmd.Parameters.AddWithValue("@FormID", 0);
-                        cmd.Parameters.AddWithValue("@CanView", 0);
-                        cmd.Parameters.AddWithValue("@CanAdd", 0);
-                        cmd.Parameters.AddWithValue("@CanEdit", 0);
-                        cmd.Parameters.AddWithValue("@CanDelete", 0);
-                        cmd.Parameters.AddWithValue("@_Operation", "GETALLROLES");
-
-                        using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
-                        {
-                            DataSet ds = new DataSet();
-                            adapt.Fill(ds);
-                            if ((ds != null) && (ds.Tables.Count > 0) && (ds.Tables[0] != null))
-                            {
-                                var fetched = ds.Tables[0].ToListOfObject<Role>();
-                                if (fetched != null && fetched.Count > 0)
-                                {
-                                    roles.AddRange(fetched);
-                                }
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Error getting roles from SP: {ex.Message}");
-                }
-                finally
-                {
-                    if (DataConnection.State == ConnectionState.Open)
-                        DataConnection.Close();
-                }
+                    new Role { RoleID = 1, RoleName = "Admin", UserLevelID = 1 },
+                    new Role { RoleID = 2, RoleName = "Manager", UserLevelID = 2 },
+                    new Role { RoleID = 3, RoleName = "Cashier", UserLevelID = 3 },
+                    new Role { RoleID = 4, RoleName = "Administrator", UserLevelID = 4 },
+                    new Role { RoleID = 5, RoleName = "Supervisor", UserLevelID = 5 },
+                    new Role { RoleID = 6, RoleName = "Sales Man", UserLevelID = 6 },
+                    new Role { RoleID = 7, RoleName = "Accountant", UserLevelID = 7 },
+                    new Role { RoleID = 8, RoleName = "Inventory Manager", UserLevelID = 8 },
+                    new Role { RoleID = 9, RoleName = "Standard User", UserLevelID = 9 }
+                };
             }
 
-            // 3. Query Dropdowns UserLevel
-            try
-            {
-                var userLevels = new Dropdowns().UserLevelDDl();
-                if (userLevels != null && userLevels.List != null)
-                {
-                    foreach (var u in userLevels.List)
-                    {
-                        if (u != null && !string.IsNullOrWhiteSpace(u.UserLevel))
-                        {
-                            roles.Add(new Role { RoleID = u.UserLevelID, RoleName = u.UserLevel.Trim() });
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Fallback roles from UserLevel error: {ex.Message}");
-            }
-
-            // 4. Always include standard system roles
-            var defaultRoles = new List<Role>
-            {
-                new Role { RoleID = 1, RoleName = "Administrator" },
-                new Role { RoleID = 2, RoleName = "Manager" },
-                new Role { RoleID = 3, RoleName = "Supervisor" },
-                new Role { RoleID = 4, RoleName = "Cashier" },
-                new Role { RoleID = 5, RoleName = "Sales Man" },
-                new Role { RoleID = 6, RoleName = "Accountant" },
-                new Role { RoleID = 7, RoleName = "Inventory Manager" },
-                new Role { RoleID = 8, RoleName = "Standard User" }
-            };
-            roles.AddRange(defaultRoles);
-
-            // 5. Deduplicate roles by RoleName and assign UserLevelID
-            var uniqueRoles = new List<Role>();
-            var seenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            int nextId = 100;
-            foreach (var r in roles)
-            {
-                if (r == null || string.IsNullOrWhiteSpace(r.RoleName)) continue;
-                string cleanName = r.RoleName.Trim();
-                if (seenNames.Add(cleanName))
-                {
-                    r.RoleName = cleanName;
-                    if (r.RoleID <= 0) r.RoleID = nextId++;
-                    if (!r.UserLevelID.HasValue || r.UserLevelID.Value <= 0)
-                        r.UserLevelID = r.RoleID;
-                    uniqueRoles.Add(r);
-                }
-            }
-
-            return uniqueRoles;
+            return roles;
         }
 
         /// <summary>
@@ -300,92 +408,29 @@ END", (SqlConnection)DataConnection))
         /// <returns>List of FormPermissionGrid objects</returns>
         public List<FormPermissionGrid> GetFormsWithPermissions(int roleId)
         {
-            List<FormPermissionGrid> forms = new List<FormPermissionGrid>();
+            var rolePerms = GetPermissionsByRoleId(roleId);
+            var staticList = GetStaticFormPermissionsList();
+            var resultGrid = new List<FormPermissionGrid>();
 
-            try
+            foreach (var p in rolePerms)
             {
-                if (DataConnection.State != ConnectionState.Open) DataConnection.Open();
-                EnsureActivityLogPermissionForm();
+                var sf = staticList.FirstOrDefault(s => s.FormID == p.FormID ||
+                    (!string.IsNullOrEmpty(s.FormKey) && string.Equals(s.FormKey, p.FormKey, StringComparison.OrdinalIgnoreCase)));
 
-                if (DataConnection.State != ConnectionState.Open) DataConnection.Open();
-                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_RolePermission, (SqlConnection)DataConnection))
+                resultGrid.Add(new FormPermissionGrid
                 {
-                    cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@RoleID", roleId);
-                    cmd.Parameters.AddWithValue("@FormID", 0);
-                    cmd.Parameters.AddWithValue("@CanView", 0);
-                    cmd.Parameters.AddWithValue("@CanAdd", 0);
-                    cmd.Parameters.AddWithValue("@CanEdit", 0);
-                    cmd.Parameters.AddWithValue("@CanDelete", 0);
-                    cmd.Parameters.AddWithValue("@_Operation", "GETALLFORMS");
-
-                    using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
-                    {
-                        DataSet ds = new DataSet();
-                        adapt.Fill(ds);
-                        if ((ds != null) && (ds.Tables.Count > 0) && (ds.Tables[0] != null))
-                        {
-                            forms = ds.Tables[0].ToListOfObject<FormPermissionGrid>();
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error getting forms with permissions: {ex.Message}");
-            }
-            finally
-            {
-                if (DataConnection.State == ConnectionState.Open)
-                    DataConnection.Close();
+                    FormID = p.FormID,
+                    FormKey = p.FormKey,
+                    FormName = p.FormName,
+                    Category = sf != null && !string.IsNullOrWhiteSpace(sf.Category) ? sf.Category : "General",
+                    CanView = p.CanView,
+                    CanAdd = p.CanAdd,
+                    CanEdit = p.CanEdit,
+                    CanDelete = p.CanDelete
+                });
             }
 
-            // Fallback: Query Forms table directly
-            if (forms == null || forms.Count == 0)
-            {
-                try
-                {
-                    if (DataConnection.State != ConnectionState.Open) DataConnection.Open();
-                    using (SqlCommand cmd = new SqlCommand(@"
-SELECT FormID, FormKey, FormName, ISNULL(Category, 'General') AS Category, 
-       CAST(1 AS BIT) AS CanView, CAST(1 AS BIT) AS CanAdd, CAST(1 AS BIT) AS CanEdit, CAST(1 AS BIT) AS CanDelete
-FROM Forms", (SqlConnection)DataConnection))
-                    {
-                        using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
-                        {
-                            DataSet ds = new DataSet();
-                            adapt.Fill(ds);
-                            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
-                            {
-                                forms = ds.Tables[0].ToListOfObject<FormPermissionGrid>();
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Fallback forms query error: {ex.Message}");
-                }
-                finally
-                {
-                    if (DataConnection.State == ConnectionState.Open)
-                        DataConnection.Close();
-                }
-            }
-
-            // Fallback 2: Return static list of all 88 forms
-            if (forms == null || forms.Count == 0)
-            {
-                forms = GetStaticFormPermissionsList();
-            }
-
-            // Ensure no null Category properties
-            foreach (var f in forms)
-            {
-                if (string.IsNullOrWhiteSpace(f.Category)) f.Category = "General";
-            }
-
-            return forms;
+            return resultGrid;
         }
 
         private static List<FormPermissionGrid> GetStaticFormPermissionsList()
@@ -560,9 +605,13 @@ BEGIN
 
     EXEC sp_executesql @Sql;
 
-    IF @HasUserLevelID = 1
+    IF @HasUserLevelID = 1 AND OBJECT_ID('dbo.UserLevel', 'U') IS NOT NULL
     BEGIN
-        EXEC sp_executesql N'UPDATE dbo.Roles SET UserLevelID = RoleID WHERE UserLevelID IS NULL OR UserLevelID = 0;';
+        EXEC sp_executesql N'
+        UPDATE r
+        SET r.UserLevelID = u.UserLevelID
+        FROM dbo.Roles r
+        INNER JOIN dbo.UserLevel u ON UPPER(RTRIM(LTRIM(r.RoleName))) = UPPER(RTRIM(LTRIM(u.UserLevel)));';
     END;
     DROP TABLE #DefaultRoles;
 END", (SqlConnection)DataConnection))
@@ -794,40 +843,154 @@ END", (SqlConnection)DataConnection))
             }
         }
 
+        private void EnsureRolePermissionColumnsExist()
+        {
+            try
+            {
+                if (DataConnection.State != ConnectionState.Open) DataConnection.Open();
+
+                using (SqlCommand cmd = new SqlCommand(@"
+IF OBJECT_ID('dbo.RolePermissions', 'U') IS NOT NULL
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.RolePermissions') AND name = 'FormKey')
+    BEGIN
+        ALTER TABLE dbo.RolePermissions ADD FormKey NVARCHAR(100) NULL;
+    END
+    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.RolePermissions') AND name = 'FormName')
+    BEGIN
+        ALTER TABLE dbo.RolePermissions ADD FormName NVARCHAR(200) NULL;
+    END
+END", (SqlConnection)DataConnection))
+                {
+                    cmd.ExecuteNonQuery();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"EnsureRolePermissionColumnsExist warning: {ex.Message}");
+            }
+        }
+
         /// <summary>
         /// Saves multiple permissions for a role (bulk save for admin UI)
         /// </summary>
         public string SavePermissions(int roleId, List<FormPermissionGrid> permissions)
         {
             EnsureRolesSeededInDatabase();
+            EnsureRolePermissionColumnsExist();
 
-            if (DataConnection.State != ConnectionState.Open) DataConnection.Open();
-            var trans = DataConnection.BeginTransaction();
+            if (permissions == null || permissions.Count == 0) return "Success";
+
+            List<int> targetRoleIds = new List<int> { roleId };
+            try
+            {
+                var allRoles = GetAllRoles();
+                var currentRole = allRoles.FirstOrDefault(r => r.RoleID == roleId || (r.UserLevelID.HasValue && r.UserLevelID.Value == roleId));
+                if (currentRole != null && !string.IsNullOrWhiteSpace(currentRole.RoleName))
+                {
+                    var matchingRoles = allRoles.Where(r => string.Equals(r.RoleName, currentRole.RoleName, StringComparison.OrdinalIgnoreCase));
+                    foreach (var mr in matchingRoles)
+                    {
+                        if (mr.RoleID > 0 && !targetRoleIds.Contains(mr.RoleID)) targetRoleIds.Add(mr.RoleID);
+                        if (mr.UserLevelID.HasValue && mr.UserLevelID.Value > 0 && !targetRoleIds.Contains(mr.UserLevelID.Value)) targetRoleIds.Add(mr.UserLevelID.Value);
+                    }
+                }
+            }
+            catch { }
 
             try
             {
-                foreach (var perm in permissions)
+                if (DataConnection.State != ConnectionState.Open) DataConnection.Open();
+
+                // Clean SQL UPSERT into dbo.RolePermissions (or dbo.POS_RolePermissions) table
+                using (SqlCommand cmd = new SqlCommand(@"
+IF OBJECT_ID('dbo.RolePermissions', 'U') IS NOT NULL
+BEGIN
+    DECLARE @HasFK BIT = CASE WHEN EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.RolePermissions') AND name = 'FormKey') THEN 1 ELSE 0 END;
+    DECLARE @HasFN BIT = CASE WHEN EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.RolePermissions') AND name = 'FormName') THEN 1 ELSE 0 END;
+
+    IF @HasFK = 1 AND @HasFN = 1
+    BEGIN
+        EXEC sp_executesql N'
+        IF EXISTS (SELECT 1 FROM dbo.RolePermissions WHERE RoleID = @RoleID AND FormID = @FormID)
+        BEGIN
+            UPDATE dbo.RolePermissions
+            SET CanView = @CanView, CanAdd = @CanAdd, CanEdit = @CanEdit, CanDelete = @CanDelete,
+                FormKey = @FormKey, FormName = @FormName
+            WHERE RoleID = @RoleID AND FormID = @FormID;
+        END
+        ELSE
+        BEGIN
+            INSERT INTO dbo.RolePermissions (RoleID, FormID, FormKey, FormName, CanView, CanAdd, CanEdit, CanDelete)
+            VALUES (@RoleID, @FormID, @FormKey, @FormName, @CanView, @CanAdd, @CanEdit, @CanDelete);
+        END',
+        N'@RoleID INT, @FormID INT, @FormKey NVARCHAR(100), @FormName NVARCHAR(200), @CanView BIT, @CanAdd BIT, @CanEdit BIT, @CanDelete BIT',
+        @RoleID = @RoleID, @FormID = @FormID, @FormKey = @FormKey, @FormName = @FormName, @CanView = @CanView, @CanAdd = @CanAdd, @CanEdit = @CanEdit, @CanDelete = @CanDelete;
+    END
+    ELSE
+    BEGIN
+        EXEC sp_executesql N'
+        IF EXISTS (SELECT 1 FROM dbo.RolePermissions WHERE RoleID = @RoleID AND FormID = @FormID)
+        BEGIN
+            UPDATE dbo.RolePermissions
+            SET CanView = @CanView, CanAdd = @CanAdd, CanEdit = @CanEdit, CanDelete = @CanDelete
+            WHERE RoleID = @RoleID AND FormID = @FormID;
+        END
+        ELSE
+        BEGIN
+            INSERT INTO dbo.RolePermissions (RoleID, FormID, CanView, CanAdd, CanEdit, CanDelete)
+            VALUES (@RoleID, @FormID, @CanView, @CanAdd, @CanEdit, @CanDelete);
+        END',
+        N'@RoleID INT, @FormID INT, @CanView BIT, @CanAdd BIT, @CanEdit BIT, @CanDelete BIT',
+        @RoleID = @RoleID, @FormID = @FormID, @CanView = @CanView, @CanAdd = @CanAdd, @CanEdit = @CanEdit, @CanDelete = @CanDelete;
+    END
+END
+ELSE IF OBJECT_ID('dbo.POS_RolePermissions', 'U') IS NOT NULL
+BEGIN
+    IF EXISTS (SELECT 1 FROM dbo.POS_RolePermissions WHERE RoleID = @RoleID AND FormID = @FormID)
+    BEGIN
+        UPDATE dbo.POS_RolePermissions
+        SET CanView = @CanView, CanAdd = @CanAdd, CanEdit = @CanEdit, CanDelete = @CanDelete
+        WHERE RoleID = @RoleID AND FormID = @FormID;
+    END
+    ELSE
+    BEGIN
+        INSERT INTO dbo.POS_RolePermissions (RoleID, FormID, CanView, CanAdd, CanEdit, CanDelete)
+        VALUES (@RoleID, @FormID, @CanView, @CanAdd, @CanEdit, @CanDelete);
+    END
+END", (SqlConnection)DataConnection))
                 {
-                    using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_RolePermission, (SqlConnection)DataConnection, (SqlTransaction)trans))
+                    cmd.Parameters.Add("@RoleID", SqlDbType.Int);
+                    cmd.Parameters.Add("@FormID", SqlDbType.Int);
+                    cmd.Parameters.Add("@FormKey", SqlDbType.NVarChar, 100);
+                    cmd.Parameters.Add("@FormName", SqlDbType.NVarChar, 200);
+                    cmd.Parameters.Add("@CanView", SqlDbType.Bit);
+                    cmd.Parameters.Add("@CanAdd", SqlDbType.Bit);
+                    cmd.Parameters.Add("@CanEdit", SqlDbType.Bit);
+                    cmd.Parameters.Add("@CanDelete", SqlDbType.Bit);
+
+                    foreach (var tid in targetRoleIds)
                     {
-                        cmd.CommandType = CommandType.StoredProcedure;
-                        cmd.Parameters.AddWithValue("@RoleID", roleId);
-                        cmd.Parameters.AddWithValue("@FormID", perm.FormID);
-                        cmd.Parameters.AddWithValue("@CanView", perm.CanView);
-                        cmd.Parameters.AddWithValue("@CanAdd", perm.CanAdd);
-                        cmd.Parameters.AddWithValue("@CanEdit", perm.CanEdit);
-                        cmd.Parameters.AddWithValue("@CanDelete", perm.CanDelete);
-                        cmd.Parameters.AddWithValue("@_Operation", "SAVE");
-                        cmd.ExecuteNonQuery();
+                        foreach (var perm in permissions)
+                        {
+                            cmd.Parameters["@RoleID"].Value = tid;
+                            cmd.Parameters["@FormID"].Value = perm.FormID;
+                            cmd.Parameters["@FormKey"].Value = perm.FormKey ?? "";
+                            cmd.Parameters["@FormName"].Value = perm.FormName ?? "";
+                            cmd.Parameters["@CanView"].Value = perm.CanView;
+                            cmd.Parameters["@CanAdd"].Value = perm.CanAdd;
+                            cmd.Parameters["@CanEdit"].Value = perm.CanEdit;
+                            cmd.Parameters["@CanDelete"].Value = perm.CanDelete;
+
+                            cmd.ExecuteNonQuery();
+                        }
                     }
                 }
 
-                trans.Commit();
                 return "Success";
             }
             catch (Exception ex)
             {
-                trans.Rollback();
                 System.Diagnostics.Debug.WriteLine($"Error saving permissions: {ex.Message}");
                 throw;
             }

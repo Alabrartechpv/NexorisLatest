@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -12,6 +12,7 @@ namespace ModelClass.Master
         public int CompanyID { get; set; }
         public int BranchID { get; set; }
         public int UserLevelID { get; set; }
+        public string UserLevel { get; set; }
         public string UserName { get; set; }
         public string Password { get; set; }
         public string Email { get; set; }

@@ -353,6 +353,7 @@ namespace PosBranch_Win
                                     this.Close();
                                 }
                             };
+                            hm.ApplyRolePermissions();
                             hm.Show();
                             this.Hide();
                         }
@@ -524,23 +525,65 @@ namespace PosBranch_Win
             {
                 using (var permRepo = new RolePermissionRepository())
                 {
-                    int roleId = permRepo.GetRoleIdByName(userLevel);
+                    var allRoles = permRepo.GetAllRoles();
+                    int roleId = 0;
+                    string matchedRoleName = userLevel;
+
+                    // 1. Try parsing userLevel as integer ID
+                    if (!string.IsNullOrWhiteSpace(userLevel) && int.TryParse(userLevel.Trim(), out int parsedId))
+                    {
+                        var roleObj = allRoles.FirstOrDefault(r => r.RoleID == parsedId || r.UserLevelID == parsedId);
+                        if (roleObj != null)
+                        {
+                            roleId = roleObj.RoleID;
+                            matchedRoleName = roleObj.RoleName;
+                        }
+                    }
+
+                    // 2. Try matching userLevel as RoleName string
+                    if (roleId <= 0 && !string.IsNullOrWhiteSpace(userLevel))
+                    {
+                        var roleObj = allRoles.FirstOrDefault(r => string.Equals(r.RoleName, userLevel.Trim(), StringComparison.OrdinalIgnoreCase));
+                        if (roleObj != null)
+                        {
+                            roleId = roleObj.RoleID;
+                            matchedRoleName = roleObj.RoleName;
+                        }
+                    }
+
+                    // 3. Fallback: Lookup UserLevelID from database table
                     if (roleId <= 0 && userId > 0)
                     {
-                        int userLevelId = GetUserLevelIdFromUsersTable(userId);
-                        if (userLevelId > 0)
-                            roleId = permRepo.GetRoleIdByUserLevelId(userLevelId);
+                        int dbUserLevelId = GetUserLevelIdFromUsersTable(userId);
+                        if (dbUserLevelId > 0)
+                        {
+                            var roleObj = allRoles.FirstOrDefault(r => r.RoleID == dbUserLevelId || r.UserLevelID == dbUserLevelId);
+                            if (roleObj != null)
+                            {
+                                roleId = roleObj.RoleID;
+                                matchedRoleName = roleObj.RoleName;
+                            }
+                            else
+                            {
+                                roleId = dbUserLevelId;
+                            }
+                        }
                     }
 
                     if (roleId > 0)
                     {
-                        var permissions = permRepo.GetPermissionsByRoleId(roleId);
                         SessionContext.RoleId = roleId;
+                        SessionContext.UserLevel = matchedRoleName; // Crucial: Ensures SessionContext.IsAdmin evaluates correctly!
+
+                        var permissions = permRepo.GetPermissionsByRoleId(roleId);
                         SessionContext.LoadPermissions(permissions);
                     }
                 }
             }
-            catch (Exception) { }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error loading role permissions: {ex.Message}");
+            }
         }
 
         private int GetUserLevelIdFromUsersTable(int userId)

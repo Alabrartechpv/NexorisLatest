@@ -730,13 +730,95 @@ namespace ModelClass
             {
                 foreach (var p in permissions)
                 {
-                    if (!string.IsNullOrEmpty(p.FormKey))
+                    if (p == null) continue;
+
+                    if (!string.IsNullOrWhiteSpace(p.FormKey))
                     {
-                        _permissions[p.FormKey] = p;
+                        string key = p.FormKey.Trim();
+                        _permissions[key] = p;
+                        _permissions[key.Replace(" ", "").ToLowerInvariant()] = p;
+
+                        // Add class name and tool key aliases for known keys
+                        string cleanKey = key.ToLowerInvariant();
+                        if (cleanKey == "itemmaster")
+                        {
+                            _permissions["frmitemmasternew"] = p;
+                            _permissions["frmitemmaster"] = p;
+                            _permissions["itemmaster"] = p;
+                            _permissions["item master"] = p;
+                        }
+                        else if (cleanKey == "sales")
+                        {
+                            _permissions["frmsalesinvoice"] = p;
+                            _permissions["sales invoice"] = p;
+                            _permissions["sales"] = p;
+                        }
+                        else if (cleanKey == "salesreturn")
+                        {
+                            _permissions["frmsalesreturn"] = p;
+                            _permissions["sales return"] = p;
+                            _permissions["salesreturn"] = p;
+                        }
+                        else if (cleanKey == "purchase")
+                        {
+                            _permissions["frmpurchase"] = p;
+                            _permissions["purchase invoice"] = p;
+                            _permissions["purchase"] = p;
+                        }
+                        else if (cleanKey == "purchasereturn")
+                        {
+                            _permissions["frmpurchasereturn"] = p;
+                            _permissions["purchase return"] = p;
+                            _permissions["purchase r/n"] = p;
+                            _permissions["purchasereturn"] = p;
+                        }
+                        else if (cleanKey == "purchaseorder")
+                        {
+                            _permissions["frmpurchaseorder"] = p;
+                            _permissions["purchase order"] = p;
+                            _permissions["purchaseorder"] = p;
+                        }
+                        else if (cleanKey == "pos")
+                        {
+                            _permissions["frmpos"] = p;
+                            _permissions["pos terminal"] = p;
+                            _permissions["pos"] = p;
+                        }
+                        else if (cleanKey == "grn")
+                        {
+                            _permissions["goods received"] = p;
+                            _permissions["goods received notes"] = p;
+                            _permissions["good received notes (grn)"] = p;
+                            _permissions["grn"] = p;
+                        }
+                        else if (cleanKey == "stockadjustment")
+                        {
+                            _permissions["frmstockadjustment"] = p;
+                            _permissions["stock adjustment"] = p;
+                            _permissions["stockadjustment"] = p;
+                        }
+                        else if (cleanKey == "stocktransfer")
+                        {
+                            _permissions["frmstocktransfer"] = p;
+                            _permissions["stock transfer"] = p;
+                            _permissions["stocktransfer"] = p;
+                        }
+                        else if (cleanKey == "users")
+                        {
+                            _permissions["frmusers"] = p;
+                            _permissions["users & accounts"] = p;
+                            _permissions["users"] = p;
+                        }
+                    }
+                    if (!string.IsNullOrWhiteSpace(p.FormName))
+                    {
+                        string name = p.FormName.Trim();
+                        _permissions[name] = p;
+                        _permissions[name.Replace(" ", "").ToLowerInvariant()] = p;
                     }
                 }
             }
-            System.Diagnostics.Debug.WriteLine($"Loaded {_permissions.Count} permissions for role ID {RoleId}");
+            System.Diagnostics.Debug.WriteLine($"Loaded {_permissions.Count} permission entries for role ID {RoleId}");
         }
 
         /// <summary>
@@ -749,8 +831,7 @@ namespace ModelClass
                 if (string.IsNullOrWhiteSpace(UserLevel)) return false;
                 string ul = UserLevel.Trim();
                 return ul.Equals("Admin", StringComparison.OrdinalIgnoreCase) ||
-                       ul.Equals("Administrator", StringComparison.OrdinalIgnoreCase) ||
-                       ul.IndexOf("admin", StringComparison.OrdinalIgnoreCase) >= 0;
+                       ul.Equals("Administrator", StringComparison.OrdinalIgnoreCase);
             }
         }
 
@@ -762,39 +843,98 @@ namespace ModelClass
         public static bool CanView(string formKey)
         {
             if (string.IsNullOrEmpty(formKey)) return false;
-            // Admin always has full access (fallback)
             if (IsAdmin) return true;
-            return _permissions.TryGetValue(formKey, out var p) && p.CanView;
+            if (_permissions == null || _permissions.Count == 0) return false;
+
+            string key = formKey.Trim();
+            if (_permissions.TryGetValue(key, out var p) && p != null)
+                return p.CanView;
+
+            string normKey = key.Replace(" ", "").ToLowerInvariant();
+            if (_permissions.TryGetValue(normKey, out var pNorm) && pNorm != null)
+                return pNorm.CanView;
+
+            foreach (var kvp in _permissions)
+            {
+                if (kvp.Value == null) continue;
+                if (string.Equals(kvp.Key, key, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(kvp.Value.FormKey, key, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(kvp.Value.FormName, key, StringComparison.OrdinalIgnoreCase))
+                {
+                    return kvp.Value.CanView;
+                }
+            }
+
+            return false;
         }
 
-        /// <summary>
-        /// Checks if the current user has Add permission for the specified form
-        /// </summary>
         public static bool CanAdd(string formKey)
         {
             if (string.IsNullOrEmpty(formKey)) return false;
             if (IsAdmin) return true;
-            return _permissions.TryGetValue(formKey, out var p) && p.CanAdd;
+            if (_permissions == null || _permissions.Count == 0) return false;
+
+            if (_permissions.TryGetValue(formKey, out var p) && p != null)
+                return p.CanAdd;
+
+            string cleanKey = formKey.Trim();
+            foreach (var kvp in _permissions)
+            {
+                if (kvp.Value == null) continue;
+                if (string.Equals(kvp.Key, cleanKey, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(kvp.Value.FormName, cleanKey, StringComparison.OrdinalIgnoreCase))
+                {
+                    return kvp.Value.CanAdd;
+                }
+            }
+
+            return false;
         }
 
-        /// <summary>
-        /// Checks if the current user has Edit permission for the specified form
-        /// </summary>
         public static bool CanEdit(string formKey)
         {
             if (string.IsNullOrEmpty(formKey)) return false;
             if (IsAdmin) return true;
-            return _permissions.TryGetValue(formKey, out var p) && p.CanEdit;
+            if (_permissions == null || _permissions.Count == 0) return false;
+
+            if (_permissions.TryGetValue(formKey, out var p) && p != null)
+                return p.CanEdit;
+
+            string cleanKey = formKey.Trim();
+            foreach (var kvp in _permissions)
+            {
+                if (kvp.Value == null) continue;
+                if (string.Equals(kvp.Key, cleanKey, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(kvp.Value.FormName, cleanKey, StringComparison.OrdinalIgnoreCase))
+                {
+                    return kvp.Value.CanEdit;
+                }
+            }
+
+            return false;
         }
 
-        /// <summary>
-        /// Checks if the current user has Delete permission for the specified form
-        /// </summary>
         public static bool CanDelete(string formKey)
         {
             if (string.IsNullOrEmpty(formKey)) return false;
             if (IsAdmin) return true;
-            return _permissions.TryGetValue(formKey, out var p) && p.CanDelete;
+            if (_permissions == null || _permissions.Count == 0) return false;
+
+            if (_permissions.TryGetValue(formKey, out var p) && p != null)
+                return p.CanDelete;
+
+            string cleanKey = formKey.Trim();
+            foreach (var kvp in _permissions)
+            {
+                if (kvp.Value == null) continue;
+                if (string.Equals(kvp.Key, cleanKey, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(kvp.Value.FormName, cleanKey, StringComparison.OrdinalIgnoreCase))
+                {
+                    return kvp.Value.CanDelete;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>

@@ -326,10 +326,14 @@ namespace PosBranch_Win.Settings
 
             try
             {
-                // Update the list from the grid
-                _currentPermissions = (List<FormPermissionGrid>)dgvPermissions.DataSource;
+                if (_currentPermissions == null || _currentPermissions.Count == 0)
+                {
+                    MessageBox.Show("No permissions available to save.", "Validation",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
 
-                // Save to database
+                // Save master permissions list to database
                 string result = _permRepo.SavePermissions(_selectedRoleId, _currentPermissions);
 
                 if (result == "Success")
