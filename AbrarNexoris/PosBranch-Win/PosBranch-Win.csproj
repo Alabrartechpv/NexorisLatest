@@ -668,6 +668,12 @@
     <Compile Include="DialogBox\frmdialForItemMaster.Designer.cs">
       <DependentUpon>frmdialForItemMaster.cs</DependentUpon>
     </Compile>
+    <Compile Include="DialogBox\FrmItemReferencePopup.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="DialogBox\FrmItemReferencePopup.Designer.cs">
+      <DependentUpon>FrmItemReferencePopup.cs</DependentUpon>
+    </Compile>
     <Compile Include="DialogBox\FrmDialogSHold.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -1569,6 +1575,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="DialogBox\frmdialForItemMaster.resx">
       <DependentUpon>frmdialForItemMaster.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="DialogBox\FrmItemReferencePopup.resx">
+      <DependentUpon>FrmItemReferencePopup.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="DialogBox\FrmDialogSHold.resx">
       <DependentUpon>FrmDialogSHold.cs</DependentUpon>

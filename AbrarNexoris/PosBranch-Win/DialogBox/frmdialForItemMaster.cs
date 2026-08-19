@@ -1226,14 +1226,25 @@ namespace PosBranch_Win.DialogBox
                 ultraGrid1.DisplayLayout.Override.AllowColSizing = Infragistics.Win.UltraWinGrid.AllowColSizing.Free;
                 ultraGrid1.DisplayLayout.Override.AllowColSwapping = Infragistics.Win.UltraWinGrid.AllowColSwapping.WithinBand;
 
-                ultraGrid1.DisplayLayout.GroupByBox.Hidden = true;
-                ultraGrid1.DisplayLayout.GroupByBox.Prompt = string.Empty;
+                // GroupByBox styled exactly like frmvendorpurchasereport.cs
+                ultraGrid1.DisplayLayout.GroupByBox.Hidden = false;
+                ultraGrid1.DisplayLayout.GroupByBox.BandLabelAppearance.BackColor = Color.FromArgb(67, 118, 184);
+                ultraGrid1.DisplayLayout.GroupByBox.BandLabelAppearance.ForeColor = Color.White;
+                ultraGrid1.DisplayLayout.GroupByBox.BandLabelAppearance.FontData.Bold = Infragistics.Win.DefaultableBoolean.True;
+                ultraGrid1.DisplayLayout.GroupByBox.PromptAppearance.BackColor = Color.FromArgb(93, 151, 214);
+                ultraGrid1.DisplayLayout.GroupByBox.PromptAppearance.BackColor2 = Color.FromArgb(67, 118, 184);
+                ultraGrid1.DisplayLayout.GroupByBox.PromptAppearance.BackGradientStyle = Infragistics.Win.GradientStyle.Horizontal;
+                ultraGrid1.DisplayLayout.GroupByBox.PromptAppearance.ForeColor = Color.White;
+                ultraGrid1.DisplayLayout.GroupByBox.Prompt = "Drag a column header here to group by that column";
+                ultraGrid1.DisplayLayout.GroupByBox.Appearance.BackColor = Color.FromArgb(109, 167, 226);
+                ultraGrid1.DisplayLayout.GroupByBox.Appearance.BackColor2 = Color.FromArgb(69, 125, 190);
+                ultraGrid1.DisplayLayout.GroupByBox.Appearance.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
 
-                // Grid background matching frmPurchaseReturn.cs
+                // Grid background matching frmvendorpurchasereport.cs
                 ultraGrid1.DisplayLayout.Appearance.BackColor = Color.FromArgb(232, 246, 255);
                 ultraGrid1.DisplayLayout.Appearance.BackColor2 = Color.FromArgb(232, 246, 255);
                 ultraGrid1.DisplayLayout.Appearance.BackGradientStyle = Infragistics.Win.GradientStyle.None;
-                ultraGrid1.DisplayLayout.Appearance.BorderColor = Color.FromArgb(197, 217, 241);
+                ultraGrid1.DisplayLayout.Appearance.BorderColor = Color.FromArgb(118, 154, 198);
                 ultraGrid1.DisplayLayout.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
 
                 ultraGrid1.DisplayLayout.Override.BorderStyleRow = Infragistics.Win.UIElementBorderStyle.Solid;
@@ -1252,7 +1263,7 @@ namespace PosBranch_Win.DialogBox
                 ultraGrid1.DisplayLayout.Override.MinRowHeight = 24;
                 ultraGrid1.DisplayLayout.Override.DefaultRowHeight = 24;
 
-                // Cell Header appearance matching frmPurchaseReturn.cs (Image 2)
+                // Cell Header appearance matching frmvendorpurchasereport.cs
                 ultraGrid1.DisplayLayout.Override.HeaderStyle = Infragistics.Win.HeaderStyle.Standard;
                 ultraGrid1.DisplayLayout.Override.HeaderAppearance.BackColor = Color.FromArgb(93, 151, 214);
                 ultraGrid1.DisplayLayout.Override.HeaderAppearance.BackColor2 = Color.FromArgb(67, 118, 184);
@@ -1267,7 +1278,7 @@ namespace PosBranch_Win.DialogBox
                 ultraGrid1.DisplayLayout.Override.HeaderAppearance.ThemedElementAlpha = Infragistics.Win.Alpha.Transparent;
                 ultraGrid1.DisplayLayout.Override.WrapHeaderText = Infragistics.Win.DefaultableBoolean.False;
 
-                // Row Selector Header styling matching frmPurchaseReturn.cs (Image 2)
+                // Row Selector Header styling matching frmvendorpurchasereport.cs
                 ultraGrid1.DisplayLayout.Override.RowSelectors = Infragistics.Win.DefaultableBoolean.True;
                 ultraGrid1.DisplayLayout.Override.RowSelectorWidth = 20;
                 ultraGrid1.DisplayLayout.Override.RowSelectorNumberStyle = Infragistics.Win.UltraWinGrid.RowSelectorNumberStyle.RowIndex;
@@ -1276,30 +1287,31 @@ namespace PosBranch_Win.DialogBox
                 ultraGrid1.DisplayLayout.Override.RowSelectorAppearance.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
                 ultraGrid1.DisplayLayout.Override.RowSelectorAppearance.BorderColor = Color.FromArgb(118, 154, 198);
                 ultraGrid1.DisplayLayout.Override.RowSelectorAppearance.ForeColor = Color.White;
+                ultraGrid1.DisplayLayout.Override.RowSelectorAppearance.FontData.Bold = Infragistics.Win.DefaultableBoolean.True;
                 ultraGrid1.DisplayLayout.Override.RowSelectorAppearance.TextHAlign = Infragistics.Win.HAlign.Center;
 
                 ultraGrid1.DisplayLayout.Override.ActiveRowAppearance.Image = null;
                 ultraGrid1.DisplayLayout.Override.SelectedRowAppearance.Image = null;
                 ultraGrid1.DisplayLayout.Override.RowSelectorAppearance.Image = null;
 
-                // Normal & Alternate Rows matching frmPurchaseReturn.cs
+                // Normal & Alternate Rows matching frmvendorpurchasereport.cs
                 ultraGrid1.DisplayLayout.Override.RowAppearance.BackColor = Color.White;
                 ultraGrid1.DisplayLayout.Override.RowAppearance.ForeColor = Color.FromArgb(10, 31, 79);
                 ultraGrid1.DisplayLayout.Override.RowAppearance.BorderColor = Color.FromArgb(197, 217, 241);
-                ultraGrid1.DisplayLayout.Override.RowAlternateAppearance.BackColor = Color.FromArgb(245, 250, 255);
+                ultraGrid1.DisplayLayout.Override.RowAlternateAppearance.BackColor = Color.FromArgb(246, 250, 255);
                 ultraGrid1.DisplayLayout.Override.RowAlternateAppearance.BorderColor = Color.FromArgb(197, 217, 241);
 
-                // Item Highlighter (Selected & Active Row) matching Image 2
-                ultraGrid1.DisplayLayout.Override.SelectedRowAppearance.BackColor = Color.FromArgb(173, 216, 255);
-                ultraGrid1.DisplayLayout.Override.SelectedRowAppearance.BackColor2 = Color.FromArgb(173, 216, 255);
+                // Active & Selected Row Palette matching frmvendorpurchasereport.cs (gridSelectedBlue = 126, 126, 245)
+                ultraGrid1.DisplayLayout.Override.SelectedRowAppearance.BackColor = Color.FromArgb(126, 126, 245);
+                ultraGrid1.DisplayLayout.Override.SelectedRowAppearance.BackColor2 = Color.FromArgb(126, 126, 245);
                 ultraGrid1.DisplayLayout.Override.SelectedRowAppearance.BackGradientStyle = Infragistics.Win.GradientStyle.None;
-                ultraGrid1.DisplayLayout.Override.SelectedRowAppearance.ForeColor = Color.FromArgb(10, 31, 79);
+                ultraGrid1.DisplayLayout.Override.SelectedRowAppearance.ForeColor = Color.White;
                 ultraGrid1.DisplayLayout.Override.SelectedRowAppearance.FontData.Bold = Infragistics.Win.DefaultableBoolean.False;
 
-                ultraGrid1.DisplayLayout.Override.ActiveRowAppearance.BackColor = Color.FromArgb(173, 216, 255);
-                ultraGrid1.DisplayLayout.Override.ActiveRowAppearance.BackColor2 = Color.FromArgb(173, 216, 255);
+                ultraGrid1.DisplayLayout.Override.ActiveRowAppearance.BackColor = Color.FromArgb(126, 126, 245);
+                ultraGrid1.DisplayLayout.Override.ActiveRowAppearance.BackColor2 = Color.FromArgb(126, 126, 245);
                 ultraGrid1.DisplayLayout.Override.ActiveRowAppearance.BackGradientStyle = Infragistics.Win.GradientStyle.None;
-                ultraGrid1.DisplayLayout.Override.ActiveRowAppearance.ForeColor = Color.FromArgb(10, 31, 79);
+                ultraGrid1.DisplayLayout.Override.ActiveRowAppearance.ForeColor = Color.White;
                 ultraGrid1.DisplayLayout.Override.ActiveRowAppearance.FontData.Bold = Infragistics.Win.DefaultableBoolean.False;
 
                 ultraGrid1.DisplayLayout.Override.CellAppearance.BorderColor = Color.FromArgb(197, 217, 241);
