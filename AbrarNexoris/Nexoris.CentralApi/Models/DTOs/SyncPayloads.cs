@@ -16,7 +16,7 @@ namespace Nexoris.CentralApi.Models.DTOs
         public string EntityType { get; set; } = "SALES"; // 'SALES', 'SALES_RETURN', etc.
         public string Operation { get; set; } = "CREATE";  // 'CREATE', 'UPDATE', 'CANCEL'
         public int Version { get; set; } = 1;
-        public SMasterSyncDto? SMaster { get; set; }
+        public SMasterSyncDto SMaster { get; set; }
         public List<SDetailsSyncDto> SDetails { get; set; } = new List<SDetailsSyncDto>();
         public List<VoucherSyncDto> Vouchers { get; set; } = new List<VoucherSyncDto>();
     }
@@ -47,6 +47,7 @@ namespace Nexoris.CentralApi.Models.DTOs
         public string Barcode { get; set; }
         public string ItemName { get; set; }
         public decimal Qty { get; set; }
+        public decimal Packing { get; set; } = 1.0m;
         public decimal UnitPrice { get; set; }
         public decimal Amount { get; set; }
         public decimal? DiscountAmount { get; set; }
