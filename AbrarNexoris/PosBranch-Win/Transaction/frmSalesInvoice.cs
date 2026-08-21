@@ -348,6 +348,15 @@ namespace PosBranch_Win.Transaction
             // Setup UltraGrid for items display
             ultraGrid1.DisplayLayout.Override.CellClickAction = CellClickAction.EditAndSelectText;
             ultraGrid1.DisplayLayout.Override.SelectTypeRow = SelectType.Single;
+            ultraGrid1.KeyPress += RestrictGridNumericKeyPress;
+            ultraGrid1.ControlAdded += (s, e) =>
+            {
+                if (e.Control is TextBox tb)
+                {
+                    tb.KeyPress -= NumericTextBox_KeyPress;
+                    tb.KeyPress += NumericTextBox_KeyPress;
+                }
+            };
 
             // Connect UltraGrid events
             ConnectUltraGridEvents();
@@ -1507,6 +1516,29 @@ namespace PosBranch_Win.Transaction
         {
             try
             {
+                if (e.KeyCode == Keys.Q && !e.Control && !e.Alt && !e.Shift)
+                {
+                    string qtyCol = GetQuantityColumnName(ultraGrid1);
+                    if (ultraGrid1.ActiveCell == null || !ultraGrid1.ActiveCell.IsInEditMode || ultraGrid1.ActiveCell.Column.Key == qtyCol || string.IsNullOrWhiteSpace(ultraGrid1.ActiveCell.Text))
+                    {
+                        e.SuppressKeyPress = true;
+                        e.Handled = true;
+                        FocusAndScrollQuantityCell(ultraGrid1);
+                        return;
+                    }
+                }
+                else if (e.KeyCode == Keys.C && !e.Control && !e.Alt && !e.Shift)
+                {
+                    string costCol = GetCostColumnName(ultraGrid1);
+                    if (ultraGrid1.ActiveCell == null || !ultraGrid1.ActiveCell.IsInEditMode || ultraGrid1.ActiveCell.Column.Key == costCol || string.IsNullOrWhiteSpace(ultraGrid1.ActiveCell.Text))
+                    {
+                        e.SuppressKeyPress = true;
+                        e.Handled = true;
+                        FocusAndScrollCostCell(ultraGrid1);
+                        return;
+                    }
+                }
+
                 if (e.KeyCode == Keys.Delete)
                 {
                     // Check if there's a selected row
@@ -1640,12 +1672,205 @@ namespace PosBranch_Win.Transaction
             dialogTimer.Stop();
         }
 
+        public static bool IsNumericGridColumn(string columnKey)
+        {
+            if (string.IsNullOrEmpty(columnKey)) return false;
+            string key = columnKey.Trim().ToLower();
+            return key == "qty" || key == "quantity" || key == "kuantiti" ||
+                   key == "cost" || key == "kos" || key == "unitprice" || key == "sellingprice" ||
+                   key == "netamt" || key == "netamount" || key == "net amount" || key == "jumlah bersih" ||
+                   key == "gross" || key == "grossamount" || key == "taxamt" || key == "taxper" ||
+                   key == "discamt" || key == "discper" || key == "amount" || key == "totalamount" ||
+                   key == "slno" || key == "packing" || key == "marginper" || key == "newbasecost" ||
+                   key == "roundoff";
+        }
+
+        private void RestrictGridNumericKeyPress(object sender, KeyPressEventArgs e)
+        {
+            UltraGrid grid = sender as UltraGrid;
+            if (grid != null && grid.ActiveCell != null)
+            {
+                string colKey = grid.ActiveCell.Column.Key;
+                if (IsNumericGridColumn(colKey))
+                {
+                    if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar) && e.KeyChar != '.' && e.KeyChar != '-')
+                    {
+                        e.Handled = true;
+                    }
+                    else if (e.KeyChar == '.' && grid.ActiveCell.Text != null && grid.ActiveCell.Text.Contains("."))
+                    {
+                        if (grid.ActiveCell.SelLength == 0)
+                        {
+                            e.Handled = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        private void NumericTextBox_KeyPress(object sender, KeyPressEventArgs e)
+        {
+            if (ultraGrid1.ActiveCell != null && IsNumericGridColumn(ultraGrid1.ActiveCell.Column.Key))
+            {
+                if (!char.IsControl(e.KeyChar) && !char.IsDigit(e.KeyChar) && e.KeyChar != '.' && e.KeyChar != '-')
+                {
+                    e.Handled = true;
+                }
+                else if (e.KeyChar == '.' && sender is TextBox tb && tb.Text != null && tb.Text.Contains("."))
+                {
+                    if (tb.SelectionLength == 0 || (tb.SelectedText != null && !tb.SelectedText.Contains(".")))
+                    {
+                        e.Handled = true;
+                    }
+                }
+            }
+        }
+
+        private string GetQuantityColumnName(UltraGrid grid)
+        {
+            if (grid == null || grid.DisplayLayout == null || grid.DisplayLayout.Bands.Count == 0)
+                return "Qty";
+            var band = grid.DisplayLayout.Bands[0];
+            if (band.Columns.Exists("Qty")) return "Qty";
+            if (band.Columns.Exists("Quantity")) return "Quantity";
+            if (band.Columns.Exists("Kuantiti")) return "Kuantiti";
+            return "Qty";
+        }
+
+        private void FocusAndScrollQuantityCell(UltraGrid grid)
+        {
+            if (grid == null || grid.Rows.Count == 0) return;
+
+            try
+            {
+                string qtyCol = GetQuantityColumnName(grid);
+
+                int targetRowIndex = 0;
+                if (grid.ActiveCell != null && grid.ActiveCell.Column.Key == qtyCol && grid.ActiveRow != null)
+                {
+                    targetRowIndex = (grid.ActiveRow.Index + 1) % grid.Rows.Count;
+                }
+                else if (grid.ActiveRow != null)
+                {
+                    targetRowIndex = grid.ActiveRow.Index;
+                }
+
+                UltraGridRow targetRow = grid.Rows[targetRowIndex];
+                grid.ActiveRow = targetRow;
+                targetRow.Selected = true;
+
+                if (grid.ActiveRowScrollRegion != null)
+                {
+                    grid.ActiveRowScrollRegion.ScrollRowIntoView(targetRow);
+                }
+
+                if (targetRow.Cells.Exists(qtyCol))
+                {
+                    grid.Focus();
+                    grid.ActiveCell = targetRow.Cells[qtyCol];
+                    grid.PerformAction(Infragistics.Win.UltraWinGrid.UltraGridAction.EnterEditMode);
+                    if (grid.ActiveCell != null && grid.ActiveCell.IsInEditMode)
+                    {
+                        grid.ActiveCell.SelStart = 0;
+                        grid.ActiveCell.SelLength = grid.ActiveCell.Text?.Length ?? 0;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error focusing quantity cell: {ex.Message}");
+            }
+        }
+
+        private string GetCostColumnName(UltraGrid grid)
+        {
+            if (grid == null || grid.DisplayLayout == null || grid.DisplayLayout.Bands.Count == 0)
+                return "UnitPrice";
+            var band = grid.DisplayLayout.Bands[0];
+            if (band.Columns.Exists("Cost")) return "Cost";
+            if (band.Columns.Exists("Kos")) return "Kos";
+            if (band.Columns.Exists("UnitPrice")) return "UnitPrice";
+            if (band.Columns.Exists("SellingPrice")) return "SellingPrice";
+            if (band.Columns.Exists("Amount")) return "Amount";
+            return "UnitPrice";
+        }
+
+        private void FocusAndScrollCostCell(UltraGrid grid)
+        {
+            if (grid == null || grid.Rows.Count == 0) return;
+
+            try
+            {
+                string costCol = GetCostColumnName(grid);
+
+                int targetRowIndex = 0;
+                if (grid.ActiveCell != null && grid.ActiveCell.Column.Key == costCol && grid.ActiveRow != null)
+                {
+                    targetRowIndex = (grid.ActiveRow.Index + 1) % grid.Rows.Count;
+                }
+                else if (grid.ActiveRow != null)
+                {
+                    targetRowIndex = grid.ActiveRow.Index;
+                }
+
+                UltraGridRow targetRow = grid.Rows[targetRowIndex];
+                grid.ActiveRow = targetRow;
+                targetRow.Selected = true;
+
+                if (grid.ActiveRowScrollRegion != null)
+                {
+                    grid.ActiveRowScrollRegion.ScrollRowIntoView(targetRow);
+                }
+
+                if (targetRow.Cells.Exists(costCol))
+                {
+                    grid.Focus();
+                    grid.ActiveCell = targetRow.Cells[costCol];
+                    grid.PerformAction(Infragistics.Win.UltraWinGrid.UltraGridAction.EnterEditMode);
+                    if (grid.ActiveCell != null && grid.ActiveCell.IsInEditMode)
+                    {
+                        grid.ActiveCell.SelStart = 0;
+                        grid.ActiveCell.SelLength = grid.ActiveCell.Text?.Length ?? 0;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error focusing cost cell: {ex.Message}");
+            }
+        }
+
         private void txtBarcode_KeyDown(object sender, KeyEventArgs e)
         {
             HideReceiptPanel();
 
             if (HandleArrowKeyNavigation(e))
                 return;
+
+            if (e.KeyCode == Keys.Q && !e.Control && !e.Alt)
+            {
+                string text = txtBarcode.Text != null ? txtBarcode.Text.Trim() : "";
+                if (string.IsNullOrEmpty(text) || string.Equals(text, "q", StringComparison.OrdinalIgnoreCase))
+                {
+                    e.SuppressKeyPress = true;
+                    e.Handled = true;
+                    txtBarcode.Clear();
+                    FocusAndScrollQuantityCell(ultraGrid1);
+                    return;
+                }
+            }
+            else if (e.KeyCode == Keys.C && !e.Control && !e.Alt)
+            {
+                string text = txtBarcode.Text != null ? txtBarcode.Text.Trim() : "";
+                if (string.IsNullOrEmpty(text) || string.Equals(text, "c", StringComparison.OrdinalIgnoreCase))
+                {
+                    e.SuppressKeyPress = true;
+                    e.Handled = true;
+                    txtBarcode.Clear();
+                    FocusAndScrollCostCell(ultraGrid1);
+                    return;
+                }
+            }
 
             // Ctrl+L = Last Bill (open frmLastBills)
             if (e.Control && e.KeyCode == Keys.L)
@@ -1661,7 +1886,6 @@ namespace PosBranch_Win.Transaction
                 HandleBarcodeEnterKey();
                 return;
             }
-            // ... (rest of the original method for F7, etc. remains unchanged)
         }
 
         private bool HandleArrowKeyNavigation(KeyEventArgs e)
