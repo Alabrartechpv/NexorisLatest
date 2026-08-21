@@ -534,6 +534,40 @@ namespace Repository.TransactionRepository
                     CreateTaxVoucherEntries(objVoucher, taxAmountsByPercentage, ObjPurchaseMaster.PurchaseNo, ObjPurchaseMaster.Remarks, trans, ref nextSlNo);
                 }
 
+                // ATOMIC SYNC QUEUE ENQUEUE (via Stored Procedure POS_SyncQueue)
+                try
+                {
+                    if (ObjPurchaseMaster.TransactionGuid == Guid.Empty)
+                    {
+                        ObjPurchaseMaster.TransactionGuid = Guid.NewGuid();
+                    }
+
+                    DataConnection.Execute(
+                        "UPDATE dbo.PMaster SET TransactionGuid = @TransactionGuid WHERE PurchaseNo = @PurchaseNo AND FinYearId = @FinYearId",
+                        new { ObjPurchaseMaster.TransactionGuid, ObjPurchaseMaster.PurchaseNo, ObjPurchaseMaster.FinYearId },
+                        transaction: trans);
+
+                    DataConnection.Execute(
+                        "UPDATE dbo.PDetails SET TransactionGuid = @TransactionGuid WHERE PurchaseNo = @PurchaseNo AND FinYearId = @FinYearId",
+                        new { ObjPurchaseMaster.TransactionGuid, ObjPurchaseMaster.PurchaseNo, ObjPurchaseMaster.FinYearId },
+                        transaction: trans);
+
+                    SyncQueueRepository.EnqueueTransaction(
+                        DataConnection,
+                        trans,
+                        targetBranchId,
+                        "PURCHASE",
+                        ObjPurchaseMaster.PurchaseNo.ToString(),
+                        ObjPurchaseMaster.TransactionGuid,
+                        "CREATE",
+                        1
+                    );
+                }
+                catch (Exception syncEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[PurchaseInvoiceRepository.SavePurchaseInvoice] SyncQueue enqueue warning: {syncEx.Message}");
+                }
+
                 trans.Commit();
 
 
@@ -985,6 +1019,41 @@ namespace Repository.TransactionRepository
                     CreateTaxVoucherEntries(ObjVoucher, taxAmountsByPercentage, ObjPmaster.PurchaseNo, ObjPmaster.Remarks, trans, ref nextSlNo);
                 }
 
+                // ATOMIC SYNC QUEUE ENQUEUE (UPDATE via Stored Procedure POS_SyncQueue)
+                try
+                {
+                    int targetBranchId = SessionContext.BranchId > 0 ? SessionContext.BranchId : 1;
+                    if (ObjPmaster.TransactionGuid == Guid.Empty)
+                    {
+                        ObjPmaster.TransactionGuid = SyncQueueRepository.GetExistingGuid(DataConnection, trans, targetBranchId, "PURCHASE", ObjPmaster.PurchaseNo.ToString()) ?? Guid.NewGuid();
+                    }
+
+                    DataConnection.Execute(
+                        "UPDATE dbo.PMaster SET TransactionGuid = @TransactionGuid WHERE PurchaseNo = @PurchaseNo AND FinYearId = @FinYearId",
+                        new { ObjPmaster.TransactionGuid, ObjPmaster.PurchaseNo, FinYearId = originalFinYearId },
+                        transaction: trans);
+
+                    DataConnection.Execute(
+                        "UPDATE dbo.PDetails SET TransactionGuid = @TransactionGuid WHERE PurchaseNo = @PurchaseNo AND FinYearId = @FinYearId",
+                        new { ObjPmaster.TransactionGuid, ObjPmaster.PurchaseNo, FinYearId = originalFinYearId },
+                        transaction: trans);
+
+                    SyncQueueRepository.EnqueueTransaction(
+                        DataConnection,
+                        trans,
+                        targetBranchId,
+                        "PURCHASE",
+                        ObjPmaster.PurchaseNo.ToString(),
+                        ObjPmaster.TransactionGuid,
+                        "UPDATE",
+                        1
+                    );
+                }
+                catch (Exception syncEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[PurchaseInvoiceRepository.UpdatePurchase] SyncQueue enqueue warning: {syncEx.Message}");
+                }
+
                 trans.Commit();
             }
             catch (Exception ex)
@@ -1131,6 +1200,26 @@ namespace Repository.TransactionRepository
                 {
                     // The stored procedure should return "SUCCESS"
                     result = results[0].ToString();
+                }
+
+                // ATOMIC SYNC QUEUE ENQUEUE (CANCEL/DELETE via Stored Procedure POS_SyncQueue)
+                try
+                {
+                    Guid deleteGuid = SyncQueueRepository.GetExistingGuid(DataConnection, trans, branchId, "PURCHASE", purchaseNo.ToString()) ?? Guid.NewGuid();
+                    SyncQueueRepository.EnqueueTransaction(
+                        DataConnection,
+                        trans,
+                        branchId,
+                        "PURCHASE",
+                        purchaseNo.ToString(),
+                        deleteGuid,
+                        "CANCEL",
+                        1
+                    );
+                }
+                catch (Exception syncEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[PurchaseInvoiceRepository.DeletePurchaseInvoice] SyncQueue enqueue warning: {syncEx.Message}");
                 }
 
                 // Commit the transaction

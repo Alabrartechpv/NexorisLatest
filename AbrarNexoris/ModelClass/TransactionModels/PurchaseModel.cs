@@ -58,6 +58,7 @@ namespace ModelClass.TransactionModels
         public string BilledBy { get; set; }
         public string TrnsType { get; set; }
         public double NetTotal { get; set; }
+        public Guid TransactionGuid { get; set; }
         public string _Operation { get; set; }
     }
     public class PurchaseDetails
@@ -102,6 +103,7 @@ namespace ModelClass.TransactionModels
         public string Barcode { get; set; }
         public double SingleItemCost { get; set; }
         public string TrnsType { get; set; }
+        public Guid TransactionGuid { get; set; }
         public string _Operation { get; set; }
 
     }
