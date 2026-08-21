@@ -340,5 +340,65 @@ namespace Nexoris.SyncService.Services
                 await UpdateQueueStatusAsync(r.TransactionGuid, syncStatus, r.ErrorMessage);
             }
         }
+
+        public async Task<List<PriceSettingsSyncDto>> GetLocalPriceSettingsAsync(int branchId)
+        {
+            var list = new List<PriceSettingsSyncDto>();
+            try
+            {
+                using (var conn = new SqlConnection(_connectionString))
+                {
+                    await conn.OpenAsync();
+
+                    const string sql = @"
+                        SELECT 
+                            CompanyId, FinYearId, BranchId, BranchName, ItemId, UnitId, Unit, 
+                            Packing, Cost, MarginPer, MarginAmt, TaxPer, TaxAmt, RetailPrice, 
+                            WholeSalePrice, CreditPrice, CardPrice, Stock, StockValue, ReOrder, 
+                            BarCode, TaxType, OpnStk, OpnValue, IsBaseUnit, MRP
+                        FROM dbo.PriceSettings
+                        WHERE (@BranchId <= 0 OR BranchId = @BranchId)";
+
+                    var rows = await conn.QueryAsync<dynamic>(sql, new { BranchId = branchId });
+                    foreach (var r in rows)
+                    {
+                        list.Add(new PriceSettingsSyncDto
+                        {
+                            CompanyId = r.CompanyId != null ? (int?)r.CompanyId : null,
+                            FinYearId = r.FinYearId != null ? (int?)r.FinYearId : null,
+                            BranchId = r.BranchId != null ? (int)r.BranchId : branchId,
+                            BranchName = r.BranchName != null ? (string)r.BranchName : string.Empty,
+                            ItemId = (int)r.ItemId,
+                            UnitId = r.UnitId != null ? (int)r.UnitId : 1,
+                            Unit = r.Unit != null ? (string)r.Unit : string.Empty,
+                            Packing = r.Packing != null ? Convert.ToDecimal(r.Packing) : 1.0m,
+                            Cost = r.Cost != null ? Convert.ToDecimal(r.Cost) : 0m,
+                            MarginPer = r.MarginPer != null ? Convert.ToDecimal(r.MarginPer) : 0m,
+                            MarginAmt = r.MarginAmt != null ? Convert.ToDecimal(r.MarginAmt) : 0m,
+                            TaxPer = r.TaxPer != null ? Convert.ToDecimal(r.TaxPer) : 0m,
+                            TaxAmt = r.TaxAmt != null ? Convert.ToDecimal(r.TaxAmt) : 0m,
+                            RetailPrice = r.RetailPrice != null ? Convert.ToDecimal(r.RetailPrice) : 0m,
+                            WholeSalePrice = r.WholeSalePrice != null ? Convert.ToDecimal(r.WholeSalePrice) : 0m,
+                            CreditPrice = r.CreditPrice != null ? Convert.ToDecimal(r.CreditPrice) : 0m,
+                            CardPrice = r.CardPrice != null ? Convert.ToDecimal(r.CardPrice) : 0m,
+                            Stock = r.Stock != null ? Convert.ToDecimal(r.Stock) : 0m,
+                            StockValue = r.StockValue != null ? Convert.ToDecimal(r.StockValue) : 0m,
+                            ReOrder = r.ReOrder != null ? Convert.ToDecimal(r.ReOrder) : 0m,
+                            BarCode = r.BarCode != null ? (string)r.BarCode : string.Empty,
+                            TaxType = r.TaxType != null ? (string)r.TaxType : string.Empty,
+                            OpnStk = r.OpnStk != null ? Convert.ToDecimal(r.OpnStk) : 0m,
+                            OpnValue = r.OpnValue != null ? Convert.ToDecimal(r.OpnValue) : 0m,
+                            IsBaseUnit = r.IsBaseUnit != null ? (string)r.IsBaseUnit : "Y",
+                            MRP = r.MRP != null ? Convert.ToDecimal(r.MRP) : 0m
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(string.Format("[ERROR] Failed to read local PriceSettings for Branch {0}: {1}", branchId, ex.Message));
+            }
+            return list;
+        }
     }
 }

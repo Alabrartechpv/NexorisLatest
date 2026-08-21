@@ -72,5 +72,72 @@ namespace Nexoris.SyncService.Services
                 return null;
             }
         }
+        public async Task<BranchStatusResponse> GetBranchStatusAsync(int branchId)
+        {
+            try
+            {
+                string url = _settings.CentralApiUrl.TrimEnd('/') + "/api/v1/sync/branch-status";
+                using (var msg = new HttpRequestMessage(HttpMethod.Get, url))
+                {
+                    msg.Headers.Add("X-Branch-Id", branchId.ToString());
+                    msg.Headers.Add("X-Api-Key", _settings.ApiKey);
+
+                    using (var response = await _httpClient.SendAsync(msg))
+                    {
+                        if (response.IsSuccessStatusCode)
+                        {
+                            string json = await response.Content.ReadAsStringAsync();
+                            return JsonConvert.DeserializeObject<BranchStatusResponse>(json);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine(string.Format("[WARN] Failed to fetch branch status from Central API: {0}", ex.Message));
+                Console.ResetColor();
+            }
+            return null;
+        }
+
+        public async Task<MasterDataSyncResponse> PushMasterDataAsync(MasterDataSyncRequest request)
+        {
+            try
+            {
+                string url = _settings.CentralApiUrl.TrimEnd('/') + "/api/v1/sync/master-data";
+                using (var msg = new HttpRequestMessage(HttpMethod.Post, url))
+                {
+                    msg.Headers.Add("X-Branch-Id", request.BranchId.ToString());
+                    msg.Headers.Add("X-Api-Key", _settings.ApiKey);
+
+                    string json = JsonConvert.SerializeObject(request);
+                    msg.Content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                    using (var response = await _httpClient.SendAsync(msg))
+                    {
+                        if (response.IsSuccessStatusCode)
+                        {
+                            string resultJson = await response.Content.ReadAsStringAsync();
+                            return JsonConvert.DeserializeObject<MasterDataSyncResponse>(resultJson);
+                        }
+                        else
+                        {
+                            string err = await response.Content.ReadAsStringAsync();
+                            Console.ForegroundColor = ConsoleColor.Red;
+                            Console.WriteLine(string.Format("[ERROR] Master data sync failed ({0}): {1}", response.StatusCode, err));
+                            Console.ResetColor();
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine(string.Format("[ERROR] Failed to push master data to Central API: {0}", ex.Message));
+                Console.ResetColor();
+            }
+            return null;
+        }
     }
 }

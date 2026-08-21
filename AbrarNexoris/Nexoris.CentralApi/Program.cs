@@ -125,7 +125,79 @@ namespace Nexoris.CentralApi
                     return;
                 }
 
-                // ROUTE 2: POST /api/v1/sync/transactions
+                // ROUTE 2: GET /api/v1/sync/branch-status
+                if (req.HttpMethod == "GET" && path.Contains("/sync/branch-status"))
+                {
+                    string branchIdHeader = req.Headers["X-Branch-Id"];
+                    string apiKey = req.Headers["X-Api-Key"];
+
+                    if (string.IsNullOrEmpty(branchIdHeader) || !int.TryParse(branchIdHeader, out int branchId) || string.IsNullOrEmpty(apiKey))
+                    {
+                        await WriteJsonResponseAsync(res, new { Error = "Missing or invalid X-Branch-Id or X-Api-Key headers." }, 401);
+                        return;
+                    }
+
+                    bool isValidKey = await _syncService.ValidateBranchKeyAsync(branchId, apiKey);
+                    if (!isValidKey)
+                    {
+                        await WriteJsonResponseAsync(res, new { Error = "Forbidden: Invalid API key for branch." }, 403);
+                        return;
+                    }
+
+                    var statusResult = await _syncService.GetBranchStatusAsync(branchId);
+                    await WriteJsonResponseAsync(res, statusResult, 200);
+                    return;
+                }
+
+                // ROUTE 3: POST /api/v1/sync/master-data (Initial Onboarding & Master Sync)
+                if (req.HttpMethod == "POST" && path.Contains("/sync/master-data"))
+                {
+                    string branchIdHeader = req.Headers["X-Branch-Id"];
+                    string apiKey = req.Headers["X-Api-Key"];
+
+                    if (string.IsNullOrEmpty(branchIdHeader) || !int.TryParse(branchIdHeader, out int branchId) || string.IsNullOrEmpty(apiKey))
+                    {
+                        await WriteJsonResponseAsync(res, new { Error = "Missing or invalid X-Branch-Id or X-Api-Key headers." }, 401);
+                        return;
+                    }
+
+                    bool isValidKey = await _syncService.ValidateBranchKeyAsync(branchId, apiKey);
+                    if (!isValidKey)
+                    {
+                        await WriteJsonResponseAsync(res, new { Error = "Forbidden: Invalid API key for branch." }, 403);
+                        return;
+                    }
+
+                    string requestBody;
+                    using (var reader = new StreamReader(req.InputStream, req.ContentEncoding))
+                    {
+                        requestBody = await reader.ReadToEndAsync();
+                    }
+
+                    var masterRequest = JsonConvert.DeserializeObject<MasterDataSyncRequest>(requestBody);
+                    if (masterRequest == null || masterRequest.PriceSettings == null)
+                    {
+                        await WriteJsonResponseAsync(res, new { Error = "Invalid JSON payload." }, 400);
+                        return;
+                    }
+
+                    Console.ForegroundColor = ConsoleColor.Magenta;
+                    Console.WriteLine(string.Format("[ONBOARDING] [{0}] Received Master Data payload from Branch {1} ({2} items)...",
+                        DateTime.Now.ToString("HH:mm:ss"), branchId, masterRequest.PriceSettings.Count));
+                    Console.ResetColor();
+
+                    var masterResult = await _syncService.IngestMasterDataAsync(masterRequest);
+
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine(string.Format("[OK]          [{0}] Master Data Synced: {1} items saved.",
+                        DateTime.Now.ToString("HH:mm:ss"), masterResult.SyncedItemCount));
+                    Console.ResetColor();
+
+                    await WriteJsonResponseAsync(res, masterResult, 200);
+                    return;
+                }
+
+                // ROUTE 4: POST /api/v1/sync/transactions
                 if (req.HttpMethod == "POST" && path.Contains("/sync/transactions"))
                 {
                     string branchIdHeader = req.Headers["X-Branch-Id"];

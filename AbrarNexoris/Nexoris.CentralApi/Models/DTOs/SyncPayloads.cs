@@ -148,4 +148,58 @@ namespace Nexoris.CentralApi.Models.DTOs
         public long? CentralTransactionId { get; set; }
         public string ErrorMessage { get; set; }
     }
+
+    public class BranchStatusResponse
+    {
+        public int BranchId { get; set; }
+        public bool IsActive { get; set; }
+        public bool InitialSyncRequired { get; set; }
+        public int ExistingItemCount { get; set; }
+        public DateTime ServerUtc { get; set; } = DateTime.UtcNow;
+    }
+
+    public class MasterDataSyncRequest
+    {
+        public int BranchId { get; set; }
+        public List<PriceSettingsSyncDto> PriceSettings { get; set; } = new List<PriceSettingsSyncDto>();
+    }
+
+    public class PriceSettingsSyncDto
+    {
+        public int? CompanyId { get; set; }
+        public int? FinYearId { get; set; }
+        public int BranchId { get; set; }
+        public string BranchName { get; set; }
+        public int ItemId { get; set; }
+        public int UnitId { get; set; }
+        public string Unit { get; set; }
+        public decimal Packing { get; set; } = 1.0m;
+        public decimal Cost { get; set; }
+        public decimal MarginPer { get; set; }
+        public decimal MarginAmt { get; set; }
+        public decimal TaxPer { get; set; }
+        public decimal TaxAmt { get; set; }
+        public decimal RetailPrice { get; set; }
+        public decimal WholeSalePrice { get; set; }
+        public decimal CreditPrice { get; set; }
+        public decimal CardPrice { get; set; }
+        public decimal Stock { get; set; }
+        public decimal StockValue { get; set; }
+        public decimal ReOrder { get; set; }
+        public string BarCode { get; set; }
+        public string TaxType { get; set; }
+        public decimal OpnStk { get; set; }
+        public decimal OpnValue { get; set; }
+        public string IsBaseUnit { get; set; } = "Y";
+        public decimal MRP { get; set; }
+    }
+
+    public class MasterDataSyncResponse
+    {
+        public int BranchId { get; set; }
+        public bool Success { get; set; }
+        public int SyncedItemCount { get; set; }
+        public string Message { get; set; }
+        public DateTime SyncedUtc { get; set; } = DateTime.UtcNow;
+    }
 }

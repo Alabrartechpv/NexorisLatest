@@ -1,4 +1,5 @@
 using Nexoris.SyncService.Configuration;
+using Nexoris.SyncService.Models;
 using Nexoris.SyncService.Services;
 using System;
 using System.Linq;
@@ -13,6 +14,7 @@ namespace Nexoris.SyncService.Workers
         private readonly ICentralApiClient _apiClient;
         private readonly SyncSettings _settings;
         private bool _isRunning;
+        private bool _hasCheckedOnboarding;
 
         public SyncWorker(
             ILocalDataProvider dataProvider,
@@ -35,10 +37,18 @@ namespace Nexoris.SyncService.Workers
             Console.WriteLine("===============================================================");
             Console.ResetColor();
 
+            // Initial automated onboarding check on startup
+            await CheckAndPerformInitialOnboardingAsync();
+
             while (_isRunning && !cancellationToken.IsCancellationRequested)
             {
                 try
                 {
+                    if (!_hasCheckedOnboarding)
+                    {
+                        await CheckAndPerformInitialOnboardingAsync();
+                    }
+
                     await PerformSyncCycleAsync();
                 }
                 catch (Exception ex)
@@ -59,6 +69,56 @@ namespace Nexoris.SyncService.Workers
             }
 
             Console.WriteLine("\nNexoris Branch Sync Worker STOPPED.");
+        }
+
+        private async Task CheckAndPerformInitialOnboardingAsync()
+        {
+            try
+            {
+                var status = await _apiClient.GetBranchStatusAsync(_settings.BranchId);
+                if (status != null)
+                {
+                    if (status.InitialSyncRequired)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Magenta;
+                        Console.WriteLine(string.Format("[ONBOARDING] [{0}] Central DB has 0 PriceSettings for Branch {1}. Starting Automated Baseline Sync...",
+                            DateTime.Now.ToString("HH:mm:ss"), _settings.BranchId));
+                        Console.ResetColor();
+
+                        var localPrices = await _dataProvider.GetLocalPriceSettingsAsync(_settings.BranchId);
+                        if (localPrices != null && localPrices.Any())
+                        {
+                            Console.WriteLine(string.Format("[ONBOARDING] Uploading {0} local PriceSettings master records to Head Office...", localPrices.Count));
+                            var response = await _apiClient.PushMasterDataAsync(new MasterDataSyncRequest
+                            {
+                                BranchId = _settings.BranchId,
+                                PriceSettings = localPrices
+                            });
+
+                            if (response != null && response.Success)
+                            {
+                                Console.ForegroundColor = ConsoleColor.Green;
+                                Console.WriteLine(string.Format("[OK]          [{0}] Automated Onboarding Complete! {1} items registered in Central DB.",
+                                    DateTime.Now.ToString("HH:mm:ss"), response.SyncedItemCount));
+                                Console.ResetColor();
+                                _hasCheckedOnboarding = true;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.WriteLine(string.Format("[OK]   [{0}] Branch {1} baseline verified ({2} items registered at Head Office).",
+                            DateTime.Now.ToString("HH:mm:ss"), _settings.BranchId, status.ExistingItemCount));
+                        Console.ResetColor();
+                        _hasCheckedOnboarding = true;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("[WARN] Onboarding handshake check deferred: " + ex.Message);
+            }
         }
 
         public void Stop()
