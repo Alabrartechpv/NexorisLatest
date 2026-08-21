@@ -92,11 +92,18 @@ namespace Nexoris.CentralApi.Services
                     Console.ForegroundColor = ConsoleColor.Red;
                     Console.WriteLine(string.Format("[ERROR] Failed to ingest transaction {0}: {1}", tx.TransactionGuid, ex.Message));
                     Console.ResetColor();
+
+                    string entityId = "Unknown";
+                    if (tx.EntityType.Equals("PURCHASE", StringComparison.OrdinalIgnoreCase) && tx.PMaster != null)
+                        entityId = tx.PMaster.PurchaseNo.ToString();
+                    else if (tx.SMaster != null)
+                        entityId = tx.SMaster.BillNo.ToString();
+
                     response.Results.Add(new SyncItemResult
                     {
                         TransactionGuid = tx.TransactionGuid,
                         EntityType = tx.EntityType,
-                        EntityId = tx.SMaster != null ? tx.SMaster.BillNo.ToString() : "Unknown",
+                        EntityId = entityId,
                         Status = "Failed",
                         ErrorMessage = ex.Message
                     });
@@ -112,262 +119,126 @@ namespace Nexoris.CentralApi.Services
             {
                 await conn.OpenAsync();
 
-                string entityId = tx.SMaster != null ? tx.SMaster.BillNo.ToString() : "Unknown";
-
-                if (tx.SMaster == null && !tx.Operation.Equals("CANCEL", StringComparison.OrdinalIgnoreCase))
+                if (tx.EntityType.Equals("PURCHASE", StringComparison.OrdinalIgnoreCase))
                 {
-                    return new SyncItemResult
-                    {
-                        TransactionGuid = tx.TransactionGuid,
-                        EntityType = tx.EntityType,
-                        EntityId = entityId,
-                        Status = "Failed",
-                        ErrorMessage = "Payload missing SMaster header record."
-                    };
+                    return await IngestPurchaseTransactionAsync(conn, branchId, tx);
                 }
-
-                // 1. DEDUPLICATION / IDEMPOTENCY CHECK
-                const string findGuidSql = @"
-                    SELECT TOP 1 CentralTransactionID, CancelFlag 
-                    FROM dbo.SMaster 
-                    WHERE TransactionGuid = @TransactionGuid";
-
-                var existing = await conn.QueryFirstOrDefaultAsync<dynamic>(findGuidSql, new { tx.TransactionGuid });
-
-                // HANDLE ALREADY SYNCED 'CREATE'
-                if (existing != null && tx.Operation.Equals("CREATE", StringComparison.OrdinalIgnoreCase))
+                else
                 {
-                    Console.WriteLine(string.Format("[INFO] Transaction {0} already exists in Central DB. Returning AlreadySynced.", tx.TransactionGuid));
-                    return new SyncItemResult
-                    {
-                        TransactionGuid = tx.TransactionGuid,
-                        EntityType = tx.EntityType,
-                        EntityId = entityId,
-                        Status = "AlreadySynced",
-                        CentralTransactionId = (long)existing.CentralTransactionID
-                    };
+                    return await IngestSalesTransactionAsync(conn, branchId, tx);
                 }
+            }
+        }
 
-                // HANDLE 'CANCEL' / VOID
-                if (tx.Operation.Equals("CANCEL", StringComparison.OrdinalIgnoreCase))
+        #region Sales Transaction Ingest
+        private async Task<SyncItemResult> IngestSalesTransactionAsync(SqlConnection conn, int branchId, TransactionSyncDto tx)
+        {
+            string entityId = tx.SMaster != null ? tx.SMaster.BillNo.ToString() : "Unknown";
+
+            if (tx.SMaster == null && !tx.Operation.Equals("CANCEL", StringComparison.OrdinalIgnoreCase))
+            {
+                return new SyncItemResult
                 {
-                    using (var cancelTrans = conn.BeginTransaction())
-                    {
-                        try
-                        {
-                            const string cancelSql = @"
-                                UPDATE dbo.SMaster 
-                                SET CancelFlag = 1 
-                                WHERE TransactionGuid = @TransactionGuid;
+                    TransactionGuid = tx.TransactionGuid,
+                    EntityType = tx.EntityType,
+                    EntityId = entityId,
+                    Status = "Failed",
+                    ErrorMessage = "Payload missing SMaster header record."
+                };
+            }
 
-                                UPDATE dbo.Vouchers 
-                                SET CancelFlag = 1 
-                                WHERE TransactionGuid = @TransactionGuid;
+            // 1. DEDUPLICATION / IDEMPOTENCY CHECK
+            const string findGuidSql = @"
+                SELECT TOP 1 CentralTransactionID, CancelFlag 
+                FROM dbo.SMaster 
+                WHERE TransactionGuid = @TransactionGuid";
 
-                                UPDATE PS 
-                                SET PS.Stock = PS.Stock + (SD.Qty * ISNULL(SD.Packing, 1)), PS.LastSyncUtc = GETUTCDATE()
-                                FROM dbo.PriceSettings PS
-                                INNER JOIN dbo.SDetails SD ON PS.BranchId = SD.BranchId AND PS.ItemId = SD.ItemId
-                                WHERE SD.TransactionGuid = @TransactionGuid;";
+            var existing = await conn.QueryFirstOrDefaultAsync<dynamic>(findGuidSql, new { tx.TransactionGuid });
 
-                            await conn.ExecuteAsync(cancelSql, new { tx.TransactionGuid }, transaction: cancelTrans);
-                            cancelTrans.Commit();
-
-                            return new SyncItemResult
-                            {
-                                TransactionGuid = tx.TransactionGuid,
-                                EntityType = tx.EntityType,
-                                EntityId = entityId,
-                                Status = "Synced",
-                                CentralTransactionId = existing != null ? (long)existing.CentralTransactionID : (long?)null
-                            };
-                        }
-                        catch
-                        {
-                            cancelTrans.Rollback();
-                            throw;
-                        }
-                    }
-                }
-
-                // HANDLE 'UPDATE' (Overwrite details and update header)
-                if (existing != null && tx.Operation.Equals("UPDATE", StringComparison.OrdinalIgnoreCase))
+            // HANDLE ALREADY SYNCED 'CREATE'
+            if (existing != null && tx.Operation.Equals("CREATE", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine(string.Format("[INFO] Sales Transaction {0} already exists in Central DB. Returning AlreadySynced.", tx.TransactionGuid));
+                return new SyncItemResult
                 {
-                    long centralId = (long)existing.CentralTransactionID;
-                    using (var updateTrans = conn.BeginTransaction())
-                    {
-                        try
-                        {
-                            const string updateMasterSql = @"
-                                UPDATE dbo.SMaster SET
-                                    BillDate = @BillDate,
-                                    CustomerName = @CustomerName,
-                                    LedgerID = @LedgerID,
-                                    PaymodeId = @PaymodeId,
-                                    PaymodeName = @PaymodeName,
-                                    SubTotal = @SubTotal,
-                                    DiscountAmt = @DiscountAmt,
-                                    TaxAmt = @TaxAmt,
-                                    NetAmount = @NetAmount,
-                                    UserId = @UserId,
-                                    Status = @Status,
-                                    SyncReceivedUtc = GETUTCDATE()
-                                WHERE CentralTransactionID = @CentralTransactionID;";
+                    TransactionGuid = tx.TransactionGuid,
+                    EntityType = tx.EntityType,
+                    EntityId = entityId,
+                    Status = "AlreadySynced",
+                    CentralTransactionId = (long)existing.CentralTransactionID
+                };
+            }
 
-                            await conn.ExecuteAsync(updateMasterSql, new
-                            {
-                                CentralTransactionID = centralId,
-                                tx.SMaster.BillDate,
-                                tx.SMaster.CustomerName,
-                                tx.SMaster.LedgerID,
-                                tx.SMaster.PaymodeId,
-                                tx.SMaster.PaymodeName,
-                                tx.SMaster.SubTotal,
-                                tx.SMaster.DiscountAmt,
-                                tx.SMaster.TaxAmt,
-                                tx.SMaster.NetAmount,
-                                tx.SMaster.UserId,
-                                tx.SMaster.Status
-                            }, transaction: updateTrans);
-
-                            // Restore previous details stock before replacing (taking Packing into account)
-                            const string restoreOldStockSql = @"
-                                UPDATE PS 
-                                SET PS.Stock = PS.Stock + (SD.Qty * ISNULL(SD.Packing, 1)), PS.LastSyncUtc = GETUTCDATE()
-                                FROM dbo.PriceSettings PS
-                                INNER JOIN dbo.SDetails SD ON PS.BranchId = SD.BranchId AND PS.ItemId = SD.ItemId
-                                WHERE SD.CentralTransactionID = @CentralTransactionID;";
-
-                            await conn.ExecuteAsync(restoreOldStockSql, new { CentralTransactionID = centralId }, transaction: updateTrans);
-
-                            // Replace SDetails
-                            await conn.ExecuteAsync(
-                                "DELETE FROM dbo.SDetails WHERE CentralTransactionID = @CentralTransactionID",
-                                new { CentralTransactionID = centralId }, transaction: updateTrans);
-
-                            const string insertDetailsSql = @"
-                                INSERT INTO dbo.SDetails (
-                                    CentralTransactionID, BranchId, TransactionGuid, BillNo, SlNO, 
-                                    ItemId, Barcode, ItemName, Qty, Packing, UnitPrice, Amount, 
-                                    DiscountAmount, TaxAmt, TotalAmount, UnitId, SyncReceivedUtc
-                                )
-                                VALUES (
-                                    @CentralTransactionID, @BranchId, @TransactionGuid, @BillNo, @SlNO, 
-                                    @ItemId, @Barcode, @ItemName, @Qty, @Packing, @UnitPrice, @Amount, 
-                                    @DiscountAmount, @TaxAmt, @TotalAmount, @UnitId, GETUTCDATE()
-                                );";
-
-                            const string deductStockSql = @"
-                                UPDATE dbo.PriceSettings 
-                                SET Stock = Stock - (@Qty * ISNULL(@Packing, 1)), LastSyncUtc = GETUTCDATE() 
-                                WHERE BranchId = @BranchId AND ItemId = @ItemId;";
-
-                            foreach (var d in tx.SDetails)
-                            {
-                                decimal packingVal = d.Packing > 0 ? d.Packing : 1.0m;
-                                await conn.ExecuteAsync(insertDetailsSql, new
-                                {
-                                    CentralTransactionID = centralId,
-                                    BranchId = branchId,
-                                    tx.TransactionGuid,
-                                    tx.SMaster.BillNo,
-                                    d.SlNO,
-                                    d.ItemId,
-                                    d.Barcode,
-                                    d.ItemName,
-                                    d.Qty,
-                                    Packing = packingVal,
-                                    d.UnitPrice,
-                                    d.Amount,
-                                    d.DiscountAmount,
-                                    d.TaxAmt,
-                                    d.TotalAmount,
-                                    d.UnitId
-                                }, transaction: updateTrans);
-
-                                await conn.ExecuteAsync(deductStockSql, new { BranchId = branchId, d.ItemId, d.Qty, Packing = packingVal }, transaction: updateTrans);
-                            }
-
-                            // Replace Vouchers if provided
-                            if (tx.Vouchers != null && tx.Vouchers.Count > 0)
-                            {
-                                await conn.ExecuteAsync(
-                                    "DELETE FROM dbo.Vouchers WHERE CentralTransactionID = @CentralTransactionID",
-                                    new { CentralTransactionID = centralId }, transaction: updateTrans);
-
-                                const string insertVoucherSql = @"
-                                    INSERT INTO dbo.Vouchers (
-                                        CentralTransactionID, BranchId, TransactionGuid, BranchVoucherID, 
-                                        LedgerID, LedgerName, Debit, Credit, Narration, CancelFlag, SyncReceivedUtc
-                                    )
-                                    VALUES (
-                                        @CentralTransactionID, @BranchId, @TransactionGuid, @BranchVoucherID, 
-                                        @LedgerID, @LedgerName, @Debit, @Credit, @Narration, 0, GETUTCDATE()
-                                    );";
-
-                                foreach (var v in tx.Vouchers)
-                                {
-                                    await conn.ExecuteAsync(insertVoucherSql, new
-                                    {
-                                        CentralTransactionID = centralId,
-                                        BranchId = branchId,
-                                        tx.TransactionGuid,
-                                        v.BranchVoucherId,
-                                        v.LedgerID,
-                                        v.LedgerName,
-                                        v.Debit,
-                                        v.Credit,
-                                        v.Narration
-                                    }, transaction: updateTrans);
-                                }
-                            }
-
-                            updateTrans.Commit();
-
-                            return new SyncItemResult
-                            {
-                                TransactionGuid = tx.TransactionGuid,
-                                EntityType = tx.EntityType,
-                                EntityId = entityId,
-                                Status = "Synced",
-                                CentralTransactionId = centralId
-                            };
-                        }
-                        catch
-                        {
-                            updateTrans.Rollback();
-                            throw;
-                        }
-                    }
-                }
-
-                // HANDLE NEW 'CREATE'
-                using (var insertTrans = conn.BeginTransaction())
+            // HANDLE 'CANCEL' / VOID
+            if (tx.Operation.Equals("CANCEL", StringComparison.OrdinalIgnoreCase))
+            {
+                using (var cancelTrans = conn.BeginTransaction())
                 {
                     try
                     {
-                        const string insertMasterSql = @"
-                            INSERT INTO dbo.SMaster (
-                                BranchId, TransactionGuid, BillNo, BillDate, CompanyId, FinYearId, 
-                                CounterId, CustomerName, LedgerID, PaymodeId, PaymodeName, 
-                                SubTotal, DiscountAmt, TaxAmt, NetAmount, UserId, CancelFlag, Status, SyncReceivedUtc
-                            )
-                            OUTPUT INSERTED.CentralTransactionID
-                            VALUES (
-                                @BranchId, @TransactionGuid, @BillNo, @BillDate, @CompanyId, @FinYearId, 
-                                @CounterId, @CustomerName, @LedgerID, @PaymodeId, @PaymodeName, 
-                                @SubTotal, @DiscountAmt, @TaxAmt, @NetAmount, @UserId, 0, @Status, GETUTCDATE()
-                            );";
+                        const string cancelSql = @"
+                            UPDATE dbo.SMaster 
+                            SET CancelFlag = 1 
+                            WHERE TransactionGuid = @TransactionGuid;
 
-                        long centralId = await conn.ExecuteScalarAsync<long>(insertMasterSql, new
+                            UPDATE dbo.Vouchers 
+                            SET CancelFlag = 1 
+                            WHERE TransactionGuid = @TransactionGuid;
+
+                            UPDATE PS 
+                            SET PS.Stock = PS.Stock + (SD.Qty * ISNULL(SD.Packing, 1)), PS.LastSyncUtc = GETUTCDATE()
+                            FROM dbo.PriceSettings PS
+                            INNER JOIN dbo.SDetails SD ON PS.BranchId = SD.BranchId AND PS.ItemId = SD.ItemId
+                            WHERE SD.TransactionGuid = @TransactionGuid;";
+
+                        await conn.ExecuteAsync(cancelSql, new { tx.TransactionGuid }, transaction: cancelTrans);
+                        cancelTrans.Commit();
+
+                        return new SyncItemResult
                         {
-                            BranchId = branchId,
-                            tx.TransactionGuid,
-                            tx.SMaster.BillNo,
+                            TransactionGuid = tx.TransactionGuid,
+                            EntityType = tx.EntityType,
+                            EntityId = entityId,
+                            Status = "Synced",
+                            CentralTransactionId = existing != null ? (long)existing.CentralTransactionID : (long?)null
+                        };
+                    }
+                    catch
+                    {
+                        cancelTrans.Rollback();
+                        throw;
+                    }
+                }
+            }
+
+            // HANDLE 'UPDATE' (Overwrite details and update header)
+            if (existing != null && tx.Operation.Equals("UPDATE", StringComparison.OrdinalIgnoreCase))
+            {
+                long centralId = (long)existing.CentralTransactionID;
+                using (var updateTrans = conn.BeginTransaction())
+                {
+                    try
+                    {
+                        const string updateMasterSql = @"
+                            UPDATE dbo.SMaster SET
+                                BillDate = @BillDate,
+                                CustomerName = @CustomerName,
+                                LedgerID = @LedgerID,
+                                PaymodeId = @PaymodeId,
+                                PaymodeName = @PaymodeName,
+                                SubTotal = @SubTotal,
+                                DiscountAmt = @DiscountAmt,
+                                TaxAmt = @TaxAmt,
+                                NetAmount = @NetAmount,
+                                UserId = @UserId,
+                                Status = @Status,
+                                SyncReceivedUtc = GETUTCDATE()
+                            WHERE CentralTransactionID = @CentralTransactionID;";
+
+                        await conn.ExecuteAsync(updateMasterSql, new
+                        {
+                            CentralTransactionID = centralId,
                             tx.SMaster.BillDate,
-                            tx.SMaster.CompanyId,
-                            tx.SMaster.FinYearId,
-                            tx.SMaster.CounterId,
                             tx.SMaster.CustomerName,
                             tx.SMaster.LedgerID,
                             tx.SMaster.PaymodeId,
@@ -378,9 +249,23 @@ namespace Nexoris.CentralApi.Services
                             tx.SMaster.NetAmount,
                             tx.SMaster.UserId,
                             tx.SMaster.Status
-                        }, transaction: insertTrans);
+                        }, transaction: updateTrans);
 
-                        // Insert SDetails line items
+                        // Restore previous details stock before replacing (taking Packing into account)
+                        const string restoreOldStockSql = @"
+                            UPDATE PS 
+                            SET PS.Stock = PS.Stock + (SD.Qty * ISNULL(SD.Packing, 1)), PS.LastSyncUtc = GETUTCDATE()
+                            FROM dbo.PriceSettings PS
+                            INNER JOIN dbo.SDetails SD ON PS.BranchId = SD.BranchId AND PS.ItemId = SD.ItemId
+                            WHERE SD.CentralTransactionID = @CentralTransactionID;";
+
+                        await conn.ExecuteAsync(restoreOldStockSql, new { CentralTransactionID = centralId }, transaction: updateTrans);
+
+                        // Replace SDetails
+                        await conn.ExecuteAsync(
+                            "DELETE FROM dbo.SDetails WHERE CentralTransactionID = @CentralTransactionID",
+                            new { CentralTransactionID = centralId }, transaction: updateTrans);
+
                         const string insertDetailsSql = @"
                             INSERT INTO dbo.SDetails (
                                 CentralTransactionID, BranchId, TransactionGuid, BillNo, SlNO, 
@@ -393,7 +278,7 @@ namespace Nexoris.CentralApi.Services
                                 @DiscountAmount, @TaxAmt, @TotalAmount, @UnitId, GETUTCDATE()
                             );";
 
-                        const string deductStockCreateSql = @"
+                        const string deductStockSql = @"
                             UPDATE dbo.PriceSettings 
                             SET Stock = Stock - (@Qty * ISNULL(@Packing, 1)), LastSyncUtc = GETUTCDATE() 
                             WHERE BranchId = @BranchId AND ItemId = @ItemId;";
@@ -419,39 +304,46 @@ namespace Nexoris.CentralApi.Services
                                 d.TaxAmt,
                                 d.TotalAmount,
                                 d.UnitId
-                            }, transaction: insertTrans);
+                            }, transaction: updateTrans);
 
-                            await conn.ExecuteAsync(deductStockCreateSql, new { BranchId = branchId, d.ItemId, d.Qty, Packing = packingVal }, transaction: insertTrans);
+                            await conn.ExecuteAsync(deductStockSql, new { BranchId = branchId, d.ItemId, d.Qty, Packing = packingVal }, transaction: updateTrans);
                         }
 
-                        // Insert Vouchers accounting entries
-                        const string insertVoucherSql = @"
-                            INSERT INTO dbo.Vouchers (
-                                CentralTransactionID, BranchId, TransactionGuid, BranchVoucherID, 
-                                LedgerID, LedgerName, Debit, Credit, Narration, CancelFlag, SyncReceivedUtc
-                            )
-                            VALUES (
-                                @CentralTransactionID, @BranchId, @TransactionGuid, @BranchVoucherID, 
-                                @LedgerID, @LedgerName, @Debit, @Credit, @Narration, 0, GETUTCDATE()
-                            );";
-
-                        foreach (var v in tx.Vouchers)
+                        // Replace Vouchers if provided
+                        if (tx.Vouchers != null && tx.Vouchers.Count > 0)
                         {
-                            await conn.ExecuteAsync(insertVoucherSql, new
+                            await conn.ExecuteAsync(
+                                "DELETE FROM dbo.Vouchers WHERE CentralTransactionID = @CentralTransactionID",
+                                new { CentralTransactionID = centralId }, transaction: updateTrans);
+
+                            const string insertVoucherSql = @"
+                                INSERT INTO dbo.Vouchers (
+                                    CentralTransactionID, BranchId, TransactionGuid, BranchVoucherID, 
+                                    LedgerID, LedgerName, Debit, Credit, Narration, CancelFlag, SyncReceivedUtc
+                                )
+                                VALUES (
+                                    @CentralTransactionID, @BranchId, @TransactionGuid, @BranchVoucherID, 
+                                    @LedgerID, @LedgerName, @Debit, @Credit, @Narration, 0, GETUTCDATE()
+                                );";
+
+                            foreach (var v in tx.Vouchers)
                             {
-                                CentralTransactionID = centralId,
-                                BranchId = branchId,
-                                tx.TransactionGuid,
-                                v.BranchVoucherId,
-                                v.LedgerID,
-                                v.LedgerName,
-                                v.Debit,
-                                v.Credit,
-                                v.Narration
-                            }, transaction: insertTrans);
+                                await conn.ExecuteAsync(insertVoucherSql, new
+                                {
+                                    CentralTransactionID = centralId,
+                                    BranchId = branchId,
+                                    tx.TransactionGuid,
+                                    v.BranchVoucherId,
+                                    v.LedgerID,
+                                    v.LedgerName,
+                                    v.Debit,
+                                    v.Credit,
+                                    v.Narration
+                                }, transaction: updateTrans);
+                            }
                         }
 
-                        insertTrans.Commit();
+                        updateTrans.Commit();
 
                         return new SyncItemResult
                         {
@@ -464,11 +356,592 @@ namespace Nexoris.CentralApi.Services
                     }
                     catch
                     {
-                        insertTrans.Rollback();
+                        updateTrans.Rollback();
                         throw;
                     }
                 }
             }
+
+            // HANDLE NEW 'CREATE'
+            using (var insertTrans = conn.BeginTransaction())
+            {
+                try
+                {
+                    const string insertMasterSql = @"
+                        INSERT INTO dbo.SMaster (
+                            BranchId, TransactionGuid, BillNo, BillDate, CompanyId, FinYearId, 
+                            CounterId, CustomerName, LedgerID, PaymodeId, PaymodeName, 
+                            SubTotal, DiscountAmt, TaxAmt, NetAmount, UserId, CancelFlag, Status, SyncReceivedUtc
+                        )
+                        OUTPUT INSERTED.CentralTransactionID
+                        VALUES (
+                            @BranchId, @TransactionGuid, @BillNo, @BillDate, @CompanyId, @FinYearId, 
+                            @CounterId, @CustomerName, @LedgerID, @PaymodeId, @PaymodeName, 
+                            @SubTotal, @DiscountAmt, @TaxAmt, @NetAmount, @UserId, 0, @Status, GETUTCDATE()
+                        );";
+
+                    long centralId = await conn.ExecuteScalarAsync<long>(insertMasterSql, new
+                    {
+                        BranchId = branchId,
+                        tx.TransactionGuid,
+                        tx.SMaster.BillNo,
+                        tx.SMaster.BillDate,
+                        tx.SMaster.CompanyId,
+                        tx.SMaster.FinYearId,
+                        tx.SMaster.CounterId,
+                        tx.SMaster.CustomerName,
+                        tx.SMaster.LedgerID,
+                        tx.SMaster.PaymodeId,
+                        tx.SMaster.PaymodeName,
+                        tx.SMaster.SubTotal,
+                        tx.SMaster.DiscountAmt,
+                        tx.SMaster.TaxAmt,
+                        tx.SMaster.NetAmount,
+                        tx.SMaster.UserId,
+                        tx.SMaster.Status
+                    }, transaction: insertTrans);
+
+                    // Insert SDetails line items
+                    const string insertDetailsSql = @"
+                        INSERT INTO dbo.SDetails (
+                            CentralTransactionID, BranchId, TransactionGuid, BillNo, SlNO, 
+                            ItemId, Barcode, ItemName, Qty, Packing, UnitPrice, Amount, 
+                            DiscountAmount, TaxAmt, TotalAmount, UnitId, SyncReceivedUtc
+                        )
+                        VALUES (
+                            @CentralTransactionID, @BranchId, @TransactionGuid, @BillNo, @SlNO, 
+                            @ItemId, @Barcode, @ItemName, @Qty, @Packing, @UnitPrice, @Amount, 
+                            @DiscountAmount, @TaxAmt, @TotalAmount, @UnitId, GETUTCDATE()
+                        );";
+
+                    const string deductStockCreateSql = @"
+                        UPDATE dbo.PriceSettings 
+                        SET Stock = Stock - (@Qty * ISNULL(@Packing, 1)), LastSyncUtc = GETUTCDATE() 
+                        WHERE BranchId = @BranchId AND ItemId = @ItemId;";
+
+                    foreach (var d in tx.SDetails)
+                    {
+                        decimal packingVal = d.Packing > 0 ? d.Packing : 1.0m;
+                        await conn.ExecuteAsync(insertDetailsSql, new
+                        {
+                            CentralTransactionID = centralId,
+                            BranchId = branchId,
+                            tx.TransactionGuid,
+                            tx.SMaster.BillNo,
+                            d.SlNO,
+                            d.ItemId,
+                            d.Barcode,
+                            d.ItemName,
+                            d.Qty,
+                            Packing = packingVal,
+                            d.UnitPrice,
+                            d.Amount,
+                            d.DiscountAmount,
+                            d.TaxAmt,
+                            d.TotalAmount,
+                            d.UnitId
+                        }, transaction: insertTrans);
+
+                        await conn.ExecuteAsync(deductStockCreateSql, new { BranchId = branchId, d.ItemId, d.Qty, Packing = packingVal }, transaction: insertTrans);
+                    }
+
+                    // Insert Vouchers accounting entries
+                    const string insertVoucherSql = @"
+                        INSERT INTO dbo.Vouchers (
+                            CentralTransactionID, BranchId, TransactionGuid, BranchVoucherID, 
+                            LedgerID, LedgerName, Debit, Credit, Narration, CancelFlag, SyncReceivedUtc
+                        )
+                        VALUES (
+                            @CentralTransactionID, @BranchId, @TransactionGuid, @BranchVoucherID, 
+                            @LedgerID, @LedgerName, @Debit, @Credit, @Narration, 0, GETUTCDATE()
+                        );";
+
+                    foreach (var v in tx.Vouchers)
+                    {
+                        await conn.ExecuteAsync(insertVoucherSql, new
+                        {
+                            CentralTransactionID = centralId,
+                            BranchId = branchId,
+                            tx.TransactionGuid,
+                            v.BranchVoucherId,
+                            v.LedgerID,
+                            v.LedgerName,
+                            v.Debit,
+                            v.Credit,
+                            v.Narration
+                        }, transaction: insertTrans);
+                    }
+
+                    insertTrans.Commit();
+
+                    return new SyncItemResult
+                    {
+                        TransactionGuid = tx.TransactionGuid,
+                        EntityType = tx.EntityType,
+                        EntityId = entityId,
+                        Status = "Synced",
+                        CentralTransactionId = centralId
+                    };
+                }
+                catch
+                {
+                    insertTrans.Rollback();
+                    throw;
+                }
+            }
         }
+        #endregion
+
+        #region Purchase Transaction Ingest
+        private async Task<SyncItemResult> IngestPurchaseTransactionAsync(SqlConnection conn, int branchId, TransactionSyncDto tx)
+        {
+            string entityId = tx.PMaster != null ? tx.PMaster.PurchaseNo.ToString() : "Unknown";
+
+            if (tx.PMaster == null && !tx.Operation.Equals("CANCEL", StringComparison.OrdinalIgnoreCase))
+            {
+                return new SyncItemResult
+                {
+                    TransactionGuid = tx.TransactionGuid,
+                    EntityType = tx.EntityType,
+                    EntityId = entityId,
+                    Status = "Failed",
+                    ErrorMessage = "Payload missing PMaster header record."
+                };
+            }
+
+            // 1. DEDUPLICATION / IDEMPOTENCY CHECK
+            const string findGuidSql = @"
+                SELECT TOP 1 CentralPurchaseID, CancelFlag 
+                FROM dbo.PMaster 
+                WHERE TransactionGuid = @TransactionGuid";
+
+            var existing = await conn.QueryFirstOrDefaultAsync<dynamic>(findGuidSql, new { tx.TransactionGuid });
+
+            // HANDLE ALREADY SYNCED 'CREATE'
+            if (existing != null && tx.Operation.Equals("CREATE", StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine(string.Format("[INFO] Purchase Transaction {0} already exists in Central DB. Returning AlreadySynced.", tx.TransactionGuid));
+                return new SyncItemResult
+                {
+                    TransactionGuid = tx.TransactionGuid,
+                    EntityType = tx.EntityType,
+                    EntityId = entityId,
+                    Status = "AlreadySynced",
+                    CentralTransactionId = (long)existing.CentralPurchaseID
+                };
+            }
+
+            // HANDLE 'CANCEL' / VOID
+            if (tx.Operation.Equals("CANCEL", StringComparison.OrdinalIgnoreCase))
+            {
+                using (var cancelTrans = conn.BeginTransaction())
+                {
+                    try
+                    {
+                        const string cancelSql = @"
+                            UPDATE dbo.PMaster 
+                            SET CancelFlag = 1 
+                            WHERE TransactionGuid = @TransactionGuid;
+
+                            UPDATE dbo.Vouchers 
+                            SET CancelFlag = 1 
+                            WHERE TransactionGuid = @TransactionGuid;
+
+                            -- Reverse stock added by purchase
+                            UPDATE PS 
+                            SET PS.Stock = PS.Stock - ((PD.Qty + ISNULL(PD.Free, 0)) * ISNULL(PD.Packing, 1)), PS.LastSyncUtc = GETUTCDATE()
+                            FROM dbo.PriceSettings PS
+                            INNER JOIN dbo.PDetails PD ON PS.BranchId = PD.BranchId AND PS.ItemId = PD.ItemID
+                            WHERE PD.TransactionGuid = @TransactionGuid;";
+
+                        await conn.ExecuteAsync(cancelSql, new { tx.TransactionGuid }, transaction: cancelTrans);
+                        cancelTrans.Commit();
+
+                        return new SyncItemResult
+                        {
+                            TransactionGuid = tx.TransactionGuid,
+                            EntityType = tx.EntityType,
+                            EntityId = entityId,
+                            Status = "Synced",
+                            CentralTransactionId = existing != null ? (long)existing.CentralPurchaseID : (long?)null
+                        };
+                    }
+                    catch
+                    {
+                        cancelTrans.Rollback();
+                        throw;
+                    }
+                }
+            }
+
+            // HANDLE 'UPDATE' (Overwrite details, adjust stock, and update header)
+            if (existing != null && tx.Operation.Equals("UPDATE", StringComparison.OrdinalIgnoreCase))
+            {
+                long centralId = (long)existing.CentralPurchaseID;
+                using (var updateTrans = conn.BeginTransaction())
+                {
+                    try
+                    {
+                        const string updateMasterSql = @"
+                            UPDATE dbo.PMaster SET
+                                PurchaseDate = @PurchaseDate,
+                                InvoiceNo = @InvoiceNo,
+                                InvoiceDate = @InvoiceDate,
+                                LedgerID = @LedgerID,
+                                VendorName = @VendorName,
+                                PaymodeID = @PaymodeID,
+                                Paymode = @Paymode,
+                                CreditPeriod = @CreditPeriod,
+                                SubTotal = @SubTotal,
+                                SpDisPer = @SpDisPer,
+                                SpDsiAmt = @SpDsiAmt,
+                                BillDiscountPer = @BillDiscountPer,
+                                BillDiscountAmt = @BillDiscountAmt,
+                                TaxPer = @TaxPer,
+                                TaxAmt = @TaxAmt,
+                                Frieght = @Frieght,
+                                ExpenseAmt = @ExpenseAmt,
+                                OtherExpAmt = @OtherExpAmt,
+                                GrandTotal = @GrandTotal,
+                                UserID = @UserID,
+                                UserName = @UserName,
+                                TaxType = @TaxType,
+                                Remarks = @Remarks,
+                                RoundOff = @RoundOff,
+                                CessPer = @CessPer,
+                                CessAmt = @CessAmt,
+                                CalAfterTax = @CalAfterTax,
+                                CurrencyID = @CurrencyID,
+                                CurSymbol = @CurSymbol,
+                                SeriesID = @SeriesID,
+                                NetTotal = @NetTotal,
+                                SyncReceivedUtc = GETUTCDATE()
+                            WHERE CentralPurchaseID = @CentralPurchaseID;";
+
+                        await conn.ExecuteAsync(updateMasterSql, new
+                        {
+                            CentralPurchaseID = centralId,
+                            tx.PMaster.PurchaseDate,
+                            tx.PMaster.InvoiceNo,
+                            tx.PMaster.InvoiceDate,
+                            tx.PMaster.LedgerID,
+                            tx.PMaster.VendorName,
+                            tx.PMaster.PaymodeID,
+                            tx.PMaster.Paymode,
+                            tx.PMaster.CreditPeriod,
+                            tx.PMaster.SubTotal,
+                            tx.PMaster.SpDisPer,
+                            tx.PMaster.SpDsiAmt,
+                            tx.PMaster.BillDiscountPer,
+                            tx.PMaster.BillDiscountAmt,
+                            tx.PMaster.TaxPer,
+                            tx.PMaster.TaxAmt,
+                            tx.PMaster.Frieght,
+                            tx.PMaster.ExpenseAmt,
+                            tx.PMaster.OtherExpAmt,
+                            tx.PMaster.GrandTotal,
+                            tx.PMaster.UserID,
+                            tx.PMaster.UserName,
+                            tx.PMaster.TaxType,
+                            tx.PMaster.Remarks,
+                            tx.PMaster.RoundOff,
+                            tx.PMaster.CessPer,
+                            tx.PMaster.CessAmt,
+                            tx.PMaster.CalAfterTax,
+                            tx.PMaster.CurrencyID,
+                            tx.PMaster.CurSymbol,
+                            tx.PMaster.SeriesID,
+                            tx.PMaster.NetTotal
+                        }, transaction: updateTrans);
+
+                        // Reverse previous purchase stock before replacing
+                        const string reverseOldStockSql = @"
+                            UPDATE PS 
+                            SET PS.Stock = PS.Stock - ((PD.Qty + ISNULL(PD.Free, 0)) * ISNULL(PD.Packing, 1)), PS.LastSyncUtc = GETUTCDATE()
+                            FROM dbo.PriceSettings PS
+                            INNER JOIN dbo.PDetails PD ON PS.BranchId = PD.BranchId AND PS.ItemId = PD.ItemID
+                            WHERE PD.CentralPurchaseID = @CentralPurchaseID;";
+
+                        await conn.ExecuteAsync(reverseOldStockSql, new { CentralPurchaseID = centralId }, transaction: updateTrans);
+
+                        // Delete old PDetails
+                        await conn.ExecuteAsync(
+                            "DELETE FROM dbo.PDetails WHERE CentralPurchaseID = @CentralPurchaseID",
+                            new { CentralPurchaseID = centralId }, transaction: updateTrans);
+
+                        const string insertDetailsSql = @"
+                            INSERT INTO dbo.PDetails (
+                                CentralPurchaseID, BranchId, TransactionGuid, PurchaseNo, SlNo, 
+                                ItemID, Barcode, ItemName, UnitId, Unit, BaseUnit, Packing, 
+                                Qty, Free, Cost, DisPer, DisAmt, SalesPrice, TaxPer, TaxAmt, 
+                                TotalSP, OriginalCost, OriginalSP, TaxType, SeriesID, CessAmt, CessPer, SyncReceivedUtc
+                            )
+                            VALUES (
+                                @CentralPurchaseID, @BranchId, @TransactionGuid, @PurchaseNo, @SlNo, 
+                                @ItemID, @Barcode, @ItemName, @UnitId, @Unit, @BaseUnit, @Packing, 
+                                @Qty, @Free, @Cost, @DisPer, @DisAmt, @SalesPrice, @TaxPer, @TaxAmt, 
+                                @TotalSP, @OriginalCost, @OriginalSP, @TaxType, @SeriesID, @CessAmt, @CessPer, GETUTCDATE()
+                            );";
+
+                        const string addStockSql = @"
+                            UPDATE dbo.PriceSettings 
+                            SET Stock = Stock + ((@Qty + @Free) * ISNULL(@Packing, 1)), LastSyncUtc = GETUTCDATE() 
+                            WHERE BranchId = @BranchId AND ItemId = @ItemId;";
+
+                        foreach (var d in tx.PDetails)
+                        {
+                            decimal packingVal = d.Packing > 0 ? d.Packing : 1.0m;
+                            await conn.ExecuteAsync(insertDetailsSql, new
+                            {
+                                CentralPurchaseID = centralId,
+                                BranchId = branchId,
+                                tx.TransactionGuid,
+                                tx.PMaster.PurchaseNo,
+                                d.SlNo,
+                                d.ItemID,
+                                d.Barcode,
+                                d.ItemName,
+                                d.UnitId,
+                                d.Unit,
+                                d.BaseUnit,
+                                Packing = packingVal,
+                                d.Qty,
+                                d.Free,
+                                d.Cost,
+                                d.DisPer,
+                                d.DisAmt,
+                                d.SalesPrice,
+                                d.TaxPer,
+                                d.TaxAmt,
+                                d.TotalSP,
+                                d.OriginalCost,
+                                d.OriginalSP,
+                                d.TaxType,
+                                d.SeriesID,
+                                d.CessAmt,
+                                d.CessPer
+                            }, transaction: updateTrans);
+
+                            await conn.ExecuteAsync(addStockSql, new { BranchId = branchId, d.ItemID, d.Qty, d.Free, Packing = packingVal }, transaction: updateTrans);
+                        }
+
+                        // Replace Vouchers if provided
+                        if (tx.Vouchers != null && tx.Vouchers.Count > 0)
+                        {
+                            await conn.ExecuteAsync(
+                                "DELETE FROM dbo.Vouchers WHERE TransactionGuid = @TransactionGuid",
+                                new { tx.TransactionGuid }, transaction: updateTrans);
+
+                            const string insertVoucherSql = @"
+                                INSERT INTO dbo.Vouchers (
+                                    CentralTransactionID, BranchId, TransactionGuid, BranchVoucherID, 
+                                    LedgerID, LedgerName, Debit, Credit, Narration, CancelFlag, SyncReceivedUtc
+                                )
+                                VALUES (
+                                    @CentralPurchaseID, @BranchId, @TransactionGuid, @BranchVoucherID, 
+                                    @LedgerID, @LedgerName, @Debit, @Credit, @Narration, 0, GETUTCDATE()
+                                );";
+
+                            foreach (var v in tx.Vouchers)
+                            {
+                                await conn.ExecuteAsync(insertVoucherSql, new
+                                {
+                                    CentralPurchaseID = centralId,
+                                    BranchId = branchId,
+                                    tx.TransactionGuid,
+                                    v.BranchVoucherId,
+                                    v.LedgerID,
+                                    v.LedgerName,
+                                    v.Debit,
+                                    v.Credit,
+                                    v.Narration
+                                }, transaction: updateTrans);
+                            }
+                        }
+
+                        updateTrans.Commit();
+
+                        return new SyncItemResult
+                        {
+                            TransactionGuid = tx.TransactionGuid,
+                            EntityType = tx.EntityType,
+                            EntityId = entityId,
+                            Status = "Synced",
+                            CentralTransactionId = centralId
+                        };
+                    }
+                    catch
+                    {
+                        updateTrans.Rollback();
+                        throw;
+                    }
+                }
+            }
+
+            // HANDLE NEW 'CREATE'
+            using (var insertTrans = conn.BeginTransaction())
+            {
+                try
+                {
+                    const string insertMasterSql = @"
+                        INSERT INTO dbo.PMaster (
+                            BranchId, TransactionGuid, PurchaseNo, PurchaseDate, InvoiceNo, InvoiceDate, 
+                            LedgerID, VendorName, PaymodeID, Paymode, CreditPeriod, SubTotal, 
+                            SpDisPer, SpDsiAmt, BillDiscountPer, BillDiscountAmt, TaxPer, TaxAmt, 
+                            Frieght, ExpenseAmt, OtherExpAmt, GrandTotal, CancelFlag, UserID, 
+                            UserName, TaxType, Remarks, RoundOff, CessPer, CessAmt, CalAfterTax, 
+                            CurrencyID, CurSymbol, SeriesID, NetTotal, SyncReceivedUtc
+                        )
+                        OUTPUT INSERTED.CentralPurchaseID
+                        VALUES (
+                            @BranchId, @TransactionGuid, @PurchaseNo, @PurchaseDate, @InvoiceNo, @InvoiceDate, 
+                            @LedgerID, @VendorName, @PaymodeID, @Paymode, @CreditPeriod, @SubTotal, 
+                            @SpDisPer, @SpDsiAmt, @BillDiscountPer, @BillDiscountAmt, @TaxPer, @TaxAmt, 
+                            @Frieght, @ExpenseAmt, @OtherExpAmt, @GrandTotal, 0, @UserID, 
+                            @UserName, @TaxType, @Remarks, @RoundOff, @CessPer, @CessAmt, @CalAfterTax, 
+                            @CurrencyID, @CurSymbol, @SeriesID, @NetTotal, GETUTCDATE()
+                        );";
+
+                    long centralId = await conn.ExecuteScalarAsync<long>(insertMasterSql, new
+                    {
+                        BranchId = branchId,
+                        tx.TransactionGuid,
+                        tx.PMaster.PurchaseNo,
+                        tx.PMaster.PurchaseDate,
+                        tx.PMaster.InvoiceNo,
+                        tx.PMaster.InvoiceDate,
+                        tx.PMaster.LedgerID,
+                        tx.PMaster.VendorName,
+                        tx.PMaster.PaymodeID,
+                        tx.PMaster.Paymode,
+                        tx.PMaster.CreditPeriod,
+                        tx.PMaster.SubTotal,
+                        tx.PMaster.SpDisPer,
+                        tx.PMaster.SpDsiAmt,
+                        tx.PMaster.BillDiscountPer,
+                        tx.PMaster.BillDiscountAmt,
+                        tx.PMaster.TaxPer,
+                        tx.PMaster.TaxAmt,
+                        tx.PMaster.Frieght,
+                        tx.PMaster.ExpenseAmt,
+                        tx.PMaster.OtherExpAmt,
+                        tx.PMaster.GrandTotal,
+                        tx.PMaster.UserID,
+                        tx.PMaster.UserName,
+                        tx.PMaster.TaxType,
+                        tx.PMaster.Remarks,
+                        tx.PMaster.RoundOff,
+                        tx.PMaster.CessPer,
+                        tx.PMaster.CessAmt,
+                        tx.PMaster.CalAfterTax,
+                        tx.PMaster.CurrencyID,
+                        tx.PMaster.CurSymbol,
+                        tx.PMaster.SeriesID,
+                        tx.PMaster.NetTotal
+                    }, transaction: insertTrans);
+
+                    // Insert PDetails line items
+                    const string insertDetailsSql = @"
+                        INSERT INTO dbo.PDetails (
+                            CentralPurchaseID, BranchId, TransactionGuid, PurchaseNo, SlNo, 
+                            ItemID, Barcode, ItemName, UnitId, Unit, BaseUnit, Packing, 
+                            Qty, Free, Cost, DisPer, DisAmt, SalesPrice, TaxPer, TaxAmt, 
+                            TotalSP, OriginalCost, OriginalSP, TaxType, SeriesID, CessAmt, CessPer, SyncReceivedUtc
+                        )
+                        VALUES (
+                            @CentralPurchaseID, @BranchId, @TransactionGuid, @PurchaseNo, @SlNo, 
+                            @ItemID, @Barcode, @ItemName, @UnitId, @Unit, @BaseUnit, @Packing, 
+                            @Qty, @Free, @Cost, @DisPer, @DisAmt, @SalesPrice, @TaxPer, @TaxAmt, 
+                            @TotalSP, @OriginalCost, @OriginalSP, @TaxType, @SeriesID, @CessAmt, @CessPer, GETUTCDATE()
+                        );";
+
+                    const string addStockCreateSql = @"
+                        UPDATE dbo.PriceSettings 
+                        SET Stock = Stock + ((@Qty + @Free) * ISNULL(@Packing, 1)), LastSyncUtc = GETUTCDATE() 
+                        WHERE BranchId = @BranchId AND ItemId = @ItemId;";
+
+                    foreach (var d in tx.PDetails)
+                    {
+                        decimal packingVal = d.Packing > 0 ? d.Packing : 1.0m;
+                        await conn.ExecuteAsync(insertDetailsSql, new
+                        {
+                            CentralPurchaseID = centralId,
+                            BranchId = branchId,
+                            tx.TransactionGuid,
+                            tx.PMaster.PurchaseNo,
+                            d.SlNo,
+                            d.ItemID,
+                            d.Barcode,
+                            d.ItemName,
+                            d.UnitId,
+                            d.Unit,
+                            d.BaseUnit,
+                            Packing = packingVal,
+                            d.Qty,
+                            d.Free,
+                            d.Cost,
+                            d.DisPer,
+                            d.DisAmt,
+                            d.SalesPrice,
+                            d.TaxPer,
+                            d.TaxAmt,
+                            d.TotalSP,
+                            d.OriginalCost,
+                            d.OriginalSP,
+                            d.TaxType,
+                            d.SeriesID,
+                            d.CessAmt,
+                            d.CessPer
+                        }, transaction: insertTrans);
+
+                        await conn.ExecuteAsync(addStockCreateSql, new { BranchId = branchId, d.ItemID, d.Qty, d.Free, Packing = packingVal }, transaction: insertTrans);
+                    }
+
+                    // Insert Vouchers accounting entries
+                    const string insertVoucherSql = @"
+                        INSERT INTO dbo.Vouchers (
+                            CentralTransactionID, BranchId, TransactionGuid, BranchVoucherID, 
+                            LedgerID, LedgerName, Debit, Credit, Narration, CancelFlag, SyncReceivedUtc
+                        )
+                        VALUES (
+                            @CentralPurchaseID, @BranchId, @TransactionGuid, @BranchVoucherID, 
+                            @LedgerID, @LedgerName, @Debit, @Credit, @Narration, 0, GETUTCDATE()
+                        );";
+
+                    foreach (var v in tx.Vouchers)
+                    {
+                        await conn.ExecuteAsync(insertVoucherSql, new
+                        {
+                            CentralPurchaseID = centralId,
+                            BranchId = branchId,
+                            tx.TransactionGuid,
+                            v.BranchVoucherId,
+                            v.LedgerID,
+                            v.LedgerName,
+                            v.Debit,
+                            v.Credit,
+                            v.Narration
+                        }, transaction: insertTrans);
+                    }
+
+                    insertTrans.Commit();
+
+                    return new SyncItemResult
+                    {
+                        TransactionGuid = tx.TransactionGuid,
+                        EntityType = tx.EntityType,
+                        EntityId = entityId,
+                        Status = "Synced",
+                        CentralTransactionId = centralId
+                    };
+                }
+                catch
+                {
+                    insertTrans.Rollback();
+                    throw;
+                }
+            }
+        }
+        #endregion
     }
 }
