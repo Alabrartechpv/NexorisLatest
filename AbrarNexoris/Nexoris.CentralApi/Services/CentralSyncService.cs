@@ -33,18 +33,32 @@ namespace Nexoris.CentralApi.Services
             {
                 await conn.OpenAsync();
 
-                const string countSql = "SELECT COUNT(1) FROM dbo.PriceSettings WHERE BranchId = @BranchId;";
-                int existingItemCount = await conn.ExecuteScalarAsync<int>(countSql, new { BranchId = branchId });
+                var status = await conn.QueryFirstOrDefaultAsync<dynamic>(
+                    "dbo.sp_Central_GetBranchStatus",
+                    new { BranchId = branchId },
+                    commandType: CommandType.StoredProcedure
+                );
 
-                const string checkActiveSql = "SELECT COUNT(1) FROM dbo.BranchApiKeys WHERE BranchId = @BranchId AND IsActive = 1;";
-                int activeCount = await conn.ExecuteScalarAsync<int>(checkActiveSql, new { BranchId = branchId });
+                if (status != null)
+                {
+                    int itemCount = Convert.ToInt32(status.ExistingItemCount);
+                    bool isActive = Convert.ToBoolean(status.IsActive);
+                    return new BranchStatusResponse
+                    {
+                        BranchId = branchId,
+                        IsActive = isActive,
+                        InitialSyncRequired = itemCount == 0,
+                        ExistingItemCount = itemCount,
+                        ServerUtc = DateTime.UtcNow
+                    };
+                }
 
                 return new BranchStatusResponse
                 {
                     BranchId = branchId,
-                    IsActive = activeCount > 0,
-                    InitialSyncRequired = existingItemCount == 0,
-                    ExistingItemCount = existingItemCount,
+                    IsActive = false,
+                    InitialSyncRequired = true,
+                    ExistingItemCount = 0,
                     ServerUtc = DateTime.UtcNow
                 };
             }
@@ -70,100 +84,92 @@ namespace Nexoris.CentralApi.Services
                 {
                     try
                     {
-                        const string upsertSql = @"
-                            IF EXISTS (SELECT 1 FROM dbo.PriceSettings WHERE BranchId = @BranchId AND ItemId = @ItemId AND UnitId = @UnitId)
-                            BEGIN
-                                UPDATE dbo.PriceSettings SET
-                                    CompanyId = @CompanyId,
-                                    FinYearId = @FinYearId,
-                                    BranchName = @BranchName,
-                                    Unit = @Unit,
-                                    Packing = @Packing,
-                                    Cost = @Cost,
-                                    MarginPer = @MarginPer,
-                                    MarginAmt = @MarginAmt,
-                                    TaxPer = @TaxPer,
-                                    TaxAmt = @TaxAmt,
-                                    RetailPrice = @RetailPrice,
-                                    WholeSalePrice = @WholeSalePrice,
-                                    CreditPrice = @CreditPrice,
-                                    CardPrice = @CardPrice,
-                                    Stock = @Stock,
-                                    StockValue = @StockValue,
-                                    ReOrder = @ReOrder,
-                                    BarCode = @BarCode,
-                                    TaxType = @TaxType,
-                                    OpnStk = @OpnStk,
-                                    OpnValue = @OpnValue,
-                                    IsBaseUnit = @IsBaseUnit,
-                                    MRP = @MRP,
-                                    LastSyncUtc = GETUTCDATE()
-                                WHERE BranchId = @BranchId AND ItemId = @ItemId AND UnitId = @UnitId;
-                            END
-                            ELSE
-                            BEGIN
-                                INSERT INTO dbo.PriceSettings (
-                                    CompanyId, FinYearId, BranchId, BranchName, ItemId, UnitId, Unit, 
-                                    Packing, Cost, MarginPer, MarginAmt, TaxPer, TaxAmt, RetailPrice, 
-                                    WholeSalePrice, CreditPrice, CardPrice, Stock, StockValue, ReOrder, 
-                                    BarCode, TaxType, OpnStk, OpnValue, IsBaseUnit, MRP, LastSyncUtc
-                                )
-                                VALUES (
-                                    @CompanyId, @FinYearId, @BranchId, @BranchName, @ItemId, @UnitId, @Unit, 
-                                    @Packing, @Cost, @MarginPer, @MarginAmt, @TaxPer, @TaxAmt, @RetailPrice, 
-                                    @WholeSalePrice, @CreditPrice, @CardPrice, @Stock, @StockValue, @ReOrder, 
-                                    @BarCode, @TaxType, @OpnStk, @OpnValue, @IsBaseUnit, @MRP, GETUTCDATE()
-                                );
-                            END";
+                        if (request.Item != null)
+                        {
+                            await conn.ExecuteAsync(
+                                "dbo.sp_Central_UpsertItemMaster",
+                                new
+                                {
+                                    CompanyId = request.Item.CompanyId ?? 1,
+                                    BranchId = request.BranchId,
+                                    FinYearId = request.Item.FinYearId ?? 1,
+                                    request.Item.ItemId,
+                                    request.Item.ItemNo,
+                                    request.Item.Description,
+                                    request.Item.BarCode,
+                                    request.Item.ItemTypeId,
+                                    request.Item.VendorId,
+                                    request.Item.BrandId,
+                                    request.Item.GroupId,
+                                    request.Item.CategoryId,
+                                    request.Item.SubCategoryId,
+                                    Active = request.Item.Active,
+                                    Hide = request.Item.Hide,
+                                    request.Item.BaseUnitId,
+                                    request.Item.HSNCode
+                                },
+                                transaction: trans,
+                                commandType: CommandType.StoredProcedure
+                            );
+                        }
 
                         foreach (var item in request.PriceSettings)
                         {
-                            await conn.ExecuteAsync(upsertSql, new
-                            {
-                                item.CompanyId,
-                                item.FinYearId,
-                                BranchId = request.BranchId,
-                                item.BranchName,
-                                item.ItemId,
-                                item.UnitId,
-                                item.Unit,
-                                Packing = item.Packing > 0 ? item.Packing : 1.0m,
-                                item.Cost,
-                                item.MarginPer,
-                                item.MarginAmt,
-                                item.TaxPer,
-                                item.TaxAmt,
-                                item.RetailPrice,
-                                item.WholeSalePrice,
-                                item.CreditPrice,
-                                item.CardPrice,
-                                item.Stock,
-                                item.StockValue,
-                                item.ReOrder,
-                                item.BarCode,
-                                item.TaxType,
-                                item.OpnStk,
-                                item.OpnValue,
-                                IsBaseUnit = string.IsNullOrEmpty(item.IsBaseUnit) ? "Y" : item.IsBaseUnit,
-                                item.MRP
-                            }, transaction: trans);
+                            await conn.ExecuteAsync(
+                                "dbo.sp_Central_UpsertPriceSetting",
+                                new
+                                {
+                                    CompanyId = item.CompanyId ?? 1,
+                                    FinYearId = item.FinYearId ?? 1,
+                                    BranchId = request.BranchId,
+                                    item.BranchName,
+                                    item.ItemId,
+                                    UnitId = item.UnitId,
+                                    Unit = item.Unit ?? "UNIT",
+                                    Packing = item.Packing > 0 ? item.Packing : 1.0m,
+                                    Cost = item.Cost,
+                                    MarginPer = item.MarginPer,
+                                    MarginAmt = item.MarginAmt,
+                                    TaxPer = item.TaxPer,
+                                    TaxAmt = item.TaxAmt,
+                                    RetailPrice = item.RetailPrice,
+                                    WholeSalePrice = item.WholeSalePrice,
+                                    CreditPrice = item.CreditPrice,
+                                    CardPrice = item.CardPrice,
+                                    Stock = item.Stock,
+                                    StockValue = item.StockValue,
+                                    ReOrder = item.ReOrder,
+                                    BarCode = item.BarCode,
+                                    TaxType = item.TaxType,
+                                    OpnStk = item.OpnStk,
+                                    OpnValue = item.OpnValue,
+                                    IsBaseUnit = string.IsNullOrEmpty(item.IsBaseUnit) ? "Y" : item.IsBaseUnit,
+                                    MRP = item.MRP
+                                },
+                                transaction: trans,
+                                commandType: CommandType.StoredProcedure
+                            );
                         }
 
                         trans.Commit();
-
                         return new MasterDataSyncResponse
                         {
                             BranchId = request.BranchId,
                             Success = true,
                             SyncedItemCount = request.PriceSettings.Count,
-                            Message = string.Format("Successfully synchronized {0} PriceSettings master records.", request.PriceSettings.Count),
-                            SyncedUtc = DateTime.UtcNow
+                            Message = $"Successfully synced {request.PriceSettings.Count} PriceSettings item(s)."
                         };
                     }
                     catch (Exception ex)
                     {
                         trans.Rollback();
-                        throw;
+                        return new MasterDataSyncResponse
+                        {
+                            BranchId = request.BranchId,
+                            Success = false,
+                            SyncedItemCount = 0,
+                            Message = "Error ingesting Master Data: " + ex.Message
+                        };
                     }
                 }
             }
@@ -196,14 +202,11 @@ namespace Nexoris.CentralApi.Services
                 using (var conn = new SqlConnection(_connectionString))
                 {
                     await conn.OpenAsync();
-                    const string sql = @"
-                        SELECT COUNT(1) 
-                        FROM dbo.BranchApiKeys 
-                        WHERE BranchId = @BranchId 
-                          AND ApiKey = @ApiKey 
-                          AND IsActive = 1";
-
-                    int count = await conn.ExecuteScalarAsync<int>(sql, new { BranchId = branchId, ApiKey = apiKey });
+                    int count = await conn.ExecuteScalarAsync<int>(
+                        "dbo.sp_Central_ValidateApiKey",
+                        new { BranchId = branchId, ApiKey = apiKey },
+                        commandType: CommandType.StoredProcedure
+                    );
                     return count > 0;
                 }
             }

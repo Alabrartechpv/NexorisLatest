@@ -158,9 +158,31 @@ namespace Nexoris.CentralApi.Models.DTOs
         public DateTime ServerUtc { get; set; } = DateTime.UtcNow;
     }
 
+    public class ItemMasterSyncDto
+    {
+        public int? CompanyId { get; set; }
+        public int? BranchId { get; set; }
+        public int? FinYearId { get; set; }
+        public int ItemId { get; set; }
+        public string ItemNo { get; set; }
+        public string Description { get; set; }
+        public string BarCode { get; set; }
+        public int? ItemTypeId { get; set; }
+        public int? VendorId { get; set; }
+        public int? BrandId { get; set; }
+        public int? GroupId { get; set; }
+        public int? CategoryId { get; set; }
+        public int? SubCategoryId { get; set; }
+        public bool Active { get; set; } = true;
+        public bool Hide { get; set; }
+        public int? BaseUnitId { get; set; }
+        public string HSNCode { get; set; }
+    }
+
     public class MasterDataSyncRequest
     {
         public int BranchId { get; set; }
+        public ItemMasterSyncDto Item { get; set; }
         public List<PriceSettingsSyncDto> PriceSettings { get; set; } = new List<PriceSettingsSyncDto>();
     }
 

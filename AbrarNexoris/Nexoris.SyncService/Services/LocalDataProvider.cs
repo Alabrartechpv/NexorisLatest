@@ -12,6 +12,7 @@ namespace Nexoris.SyncService.Services
 {
     public class LocalDataProvider : ILocalDataProvider
     {
+        private const string SyncStoredProcedure = "dbo.POS_SyncQueue";
         private readonly string _connectionString;
 
         public LocalDataProvider()
@@ -28,13 +29,9 @@ namespace Nexoris.SyncService.Services
                 {
                     await conn.OpenAsync();
 
-                    var parameters = new DynamicParameters();
-                    parameters.Add("@_Operation", "GETPENDING");
-                    parameters.Add("@TopN", batchSize);
-
                     var items = await conn.QueryAsync<SyncQueueItem>(
-                        "dbo.POS_SyncQueue",
-                        parameters,
+                        SyncStoredProcedure,
+                        new { _Operation = "GETPENDING", TopN = batchSize },
                         commandType: CommandType.StoredProcedure
                     );
 
@@ -75,119 +72,57 @@ namespace Nexoris.SyncService.Services
 
                         if (item.EntityType.Equals("PURCHASE", StringComparison.OrdinalIgnoreCase))
                         {
-                            // Fetch PMaster
-                            const string pMasterSql = @"
-                                SELECT TOP 1 
-                                    PurchaseNo, PurchaseDate, InvoiceNo, InvoiceDate, 
-                                    LedgerID, VendorName, PaymodeID, Paymode, CreditPeriod, 
-                                    SubTotal, SpDisPer, SpDsiAmt, BillDiscountPer, BillDiscountAmt, 
-                                    TaxPer, TaxAmt, Frieght, ExpenseAmt, OtherExpAmt, GrandTotal, 
-                                    CancelFlag, UserID, UserName, TaxType, Remarks, RoundOff, 
-                                    CessPer, CessAmt, CalAfterTax, CurrencyID, CurSymbol, SeriesID, 
-                                    NetTotal, VoucherID
-                                FROM dbo.PMaster 
-                                WHERE TransactionGuid = @TransactionGuid";
-
-                            var pMaster = await conn.QueryFirstOrDefaultAsync<dynamic>(
-                                pMasterSql, new { item.TransactionGuid });
-
-                            if (pMaster != null)
+                            using (var multi = await conn.QueryMultipleAsync(
+                                SyncStoredProcedure,
+                                new { _Operation = "GETPURCHASE", item.TransactionGuid, EntityId = item.EntityID },
+                                commandType: CommandType.StoredProcedure))
                             {
-                                tx.PMaster = new PMasterSyncDto
+                                var pMaster = await multi.ReadFirstOrDefaultAsync<dynamic>();
+                                if (pMaster != null)
                                 {
-                                    PurchaseNo = (int)pMaster.PurchaseNo,
-                                    PurchaseDate = (DateTime)pMaster.PurchaseDate,
-                                    InvoiceNo = pMaster.InvoiceNo != null ? (string)pMaster.InvoiceNo : string.Empty,
-                                    InvoiceDate = pMaster.InvoiceDate != null ? (DateTime?)pMaster.InvoiceDate : null,
-                                    LedgerID = pMaster.LedgerID != null ? (int?)pMaster.LedgerID : null,
-                                    VendorName = pMaster.VendorName != null ? (string)pMaster.VendorName : string.Empty,
-                                    PaymodeID = pMaster.PaymodeID != null ? (int?)pMaster.PaymodeID : null,
-                                    Paymode = pMaster.Paymode != null ? (string)pMaster.Paymode : "Cash",
-                                    CreditPeriod = pMaster.CreditPeriod != null ? (int)pMaster.CreditPeriod : 0,
-                                    SubTotal = pMaster.SubTotal != null ? Convert.ToDecimal(pMaster.SubTotal) : 0m,
-                                    SpDisPer = pMaster.SpDisPer != null ? Convert.ToDecimal(pMaster.SpDisPer) : 0m,
-                                    SpDsiAmt = pMaster.SpDsiAmt != null ? Convert.ToDecimal(pMaster.SpDsiAmt) : 0m,
-                                    BillDiscountPer = pMaster.BillDiscountPer != null ? Convert.ToDecimal(pMaster.BillDiscountPer) : 0m,
-                                    BillDiscountAmt = pMaster.BillDiscountAmt != null ? Convert.ToDecimal(pMaster.BillDiscountAmt) : 0m,
-                                    TaxPer = pMaster.TaxPer != null ? Convert.ToDecimal(pMaster.TaxPer) : 0m,
-                                    TaxAmt = pMaster.TaxAmt != null ? Convert.ToDecimal(pMaster.TaxAmt) : 0m,
-                                    Frieght = pMaster.Frieght != null ? Convert.ToDecimal(pMaster.Frieght) : 0m,
-                                    ExpenseAmt = pMaster.ExpenseAmt != null ? Convert.ToDecimal(pMaster.ExpenseAmt) : 0m,
-                                    OtherExpAmt = pMaster.OtherExpAmt != null ? Convert.ToDecimal(pMaster.OtherExpAmt) : 0m,
-                                    GrandTotal = pMaster.GrandTotal != null ? Convert.ToDecimal(pMaster.GrandTotal) : 0m,
-                                    CancelFlag = pMaster.CancelFlag != null ? (bool)pMaster.CancelFlag : false,
-                                    UserID = pMaster.UserID != null ? (int?)pMaster.UserID : null,
-                                    UserName = pMaster.UserName != null ? (string)pMaster.UserName : string.Empty,
-                                    TaxType = pMaster.TaxType != null ? (string)pMaster.TaxType : "I",
-                                    Remarks = pMaster.Remarks != null ? (string)pMaster.Remarks : string.Empty,
-                                    RoundOff = pMaster.RoundOff != null ? Convert.ToDecimal(pMaster.RoundOff) : 0m,
-                                    CessPer = pMaster.CessPer != null ? Convert.ToDecimal(pMaster.CessPer) : 0m,
-                                    CessAmt = pMaster.CessAmt != null ? Convert.ToDecimal(pMaster.CessAmt) : 0m,
-                                    CalAfterTax = pMaster.CalAfterTax != null ? Convert.ToDecimal(pMaster.CalAfterTax) : 0m,
-                                    CurrencyID = pMaster.CurrencyID != null ? (int?)pMaster.CurrencyID : 1,
-                                    CurSymbol = pMaster.CurSymbol != null ? (string)pMaster.CurSymbol : "RM",
-                                    SeriesID = pMaster.SeriesID != null ? (int)pMaster.SeriesID : 0,
-                                    NetTotal = pMaster.NetTotal != null ? Convert.ToDecimal(pMaster.NetTotal) : 0m
-                                };
-
-                                // Fetch PDetails
-                                const string pDetailsSql = @"
-                                    SELECT 
-                                        SlNo, ItemID, ItemName, UnitId, Unit, BaseUnit, 
-                                        Packing, Qty, Free, Cost, DisPer, DisAmt, SalesPrice, 
-                                        TaxPer, TaxAmt, TotalSP, OriginalCost, OriginalSP, TaxType, 
-                                        SeriesID, CessAmt, CessPer
-                                    FROM dbo.PDetails 
-                                    WHERE PurchaseNo = @PurchaseNo 
-                                    ORDER BY SlNo";
-
-                                var details = await conn.QueryAsync<dynamic>(pDetailsSql, new { PurchaseNo = (int)pMaster.PurchaseNo });
-                                foreach (var d in details)
-                                {
-                                    tx.PDetails.Add(new PDetailsSyncDto
+                                    tx.PMaster = new PMasterSyncDto
                                     {
-                                        SlNo = d.SlNo != null ? (int)d.SlNo : 1,
-                                        ItemID = d.ItemID != null ? (int)d.ItemID : 0,
-                                        Barcode = string.Empty,
-                                        ItemName = d.ItemName != null ? (string)d.ItemName : string.Empty,
-                                        UnitId = d.UnitId != null ? (int?)d.UnitId : null,
-                                        Unit = d.Unit != null ? (string)d.Unit : string.Empty,
-                                        BaseUnit = d.BaseUnit != null ? (string)d.BaseUnit : string.Empty,
-                                        Packing = d.Packing != null ? Convert.ToDecimal(d.Packing) : 1.0m,
-                                        Qty = d.Qty != null ? Convert.ToDecimal(d.Qty) : 0m,
-                                        Free = d.Free != null ? Convert.ToDecimal(d.Free) : 0m,
-                                        Cost = d.Cost != null ? Convert.ToDecimal(d.Cost) : 0m,
-                                        DisPer = d.DisPer != null ? Convert.ToDecimal(d.DisPer) : 0m,
-                                        DisAmt = d.DisAmt != null ? Convert.ToDecimal(d.DisAmt) : 0m,
-                                        SalesPrice = d.SalesPrice != null ? Convert.ToDecimal(d.SalesPrice) : 0m,
-                                        TaxPer = d.TaxPer != null ? Convert.ToDecimal(d.TaxPer) : 0m,
-                                        TaxAmt = d.TaxAmt != null ? Convert.ToDecimal(d.TaxAmt) : 0m,
-                                        TotalSP = d.TotalSP != null ? Convert.ToDecimal(d.TotalSP) : 0m,
-                                        OriginalCost = d.OriginalCost != null ? (decimal?)Convert.ToDecimal(d.OriginalCost) : null,
-                                        OriginalSP = d.OriginalSP != null ? (decimal?)Convert.ToDecimal(d.OriginalSP) : null,
-                                        TaxType = d.TaxType != null ? (string)d.TaxType : "I",
-                                        SeriesID = d.SeriesID != null ? (int)d.SeriesID : 0,
-                                        CessAmt = d.CessAmt != null ? Convert.ToDecimal(d.CessAmt) : 0m,
-                                        CessPer = d.CessPer != null ? Convert.ToDecimal(d.CessPer) : 0m
-                                    });
-                                }
+                                        PurchaseNo = Convert.ToInt32(pMaster.PurchaseNo),
+                                        InvoiceNo = pMaster.InvoiceNo != null ? (string)pMaster.InvoiceNo : string.Empty,
+                                        InvoiceDate = pMaster.InvoiceDate != null ? (DateTime?)pMaster.InvoiceDate : null,
+                                        LedgerID = pMaster.LedgerID != null ? (int?)pMaster.LedgerID : null,
+                                        VendorName = pMaster.VendorName != null ? (string)pMaster.VendorName : string.Empty,
+                                        Paymode = pMaster.Paymode != null ? (string)pMaster.Paymode : "Cash",
+                                        SubTotal = pMaster.SubTotal != null ? Convert.ToDecimal(pMaster.SubTotal) : 0m,
+                                        BillDiscountAmt = pMaster.BillDiscountAmt != null ? Convert.ToDecimal(pMaster.BillDiscountAmt) : 0m,
+                                        TaxAmt = pMaster.TaxAmt != null ? Convert.ToDecimal(pMaster.TaxAmt) : 0m,
+                                        GrandTotal = pMaster.GrandTotal != null ? Convert.ToDecimal(pMaster.GrandTotal) : 0m,
+                                        UserID = pMaster.UserID != null ? (int?)pMaster.UserID : null,
+                                        Remarks = pMaster.Remarks != null ? (string)pMaster.Remarks : string.Empty
+                                    };
 
-                                // Fetch Vouchers for Purchase
-                                if (pMaster.VoucherID != null)
-                                {
-                                    const string voucherSql = @"
-                                        SELECT 
-                                            VoucherID AS BranchVoucherId, LedgerID, LedgerName, 
-                                            Debit, Credit, Narration 
-                                        FROM dbo.Vouchers 
-                                        WHERE VoucherID = @VoucherID AND VoucherType = 'Purchase'";
+                                    var pDetails = await multi.ReadAsync<dynamic>();
+                                    foreach (var d in pDetails)
+                                    {
+                                        tx.PDetails.Add(new PDetailsSyncDto
+                                        {
+                                            SlNo = Convert.ToInt32(d.SlNo),
+                                            ItemID = Convert.ToInt32(d.ItemID),
+                                            ItemName = d.ItemName != null ? (string)d.ItemName : string.Empty,
+                                            UnitId = d.UnitId != null ? (int?)d.UnitId : null,
+                                            Unit = d.Unit != null ? (string)d.Unit : string.Empty,
+                                            Packing = d.Packing != null ? Convert.ToDecimal(d.Packing) : 1.0m,
+                                            Qty = Convert.ToDecimal(d.Qty),
+                                            Free = d.Free != null ? Convert.ToDecimal(d.Free) : 0m,
+                                            Cost = Convert.ToDecimal(d.Cost),
+                                            DisAmt = d.DisAmt != null ? Convert.ToDecimal(d.DisAmt) : 0m,
+                                            TaxAmt = d.TaxAmt != null ? Convert.ToDecimal(d.TaxAmt) : 0m,
+                                            TotalSP = d.TotalSP != null ? Convert.ToDecimal(d.TotalSP) : 0m,
+                                            SalesPrice = d.SalesPrice != null ? Convert.ToDecimal(d.SalesPrice) : 0m
+                                        });
+                                    }
 
-                                    var vouchers = await conn.QueryAsync<dynamic>(voucherSql, new { VoucherID = (int)pMaster.VoucherID });
+                                    var vouchers = await multi.ReadAsync<dynamic>();
                                     foreach (var v in vouchers)
                                     {
                                         tx.Vouchers.Add(new VoucherSyncDto
                                         {
-                                            BranchVoucherId = (long)v.BranchVoucherId,
+                                            BranchVoucherId = Convert.ToInt64(v.BranchVoucherId),
                                             LedgerID = v.LedgerID != null ? (int?)v.LedgerID : null,
                                             LedgerName = v.LedgerName != null ? (string)v.LedgerName : string.Empty,
                                             Debit = v.Debit != null ? Convert.ToDecimal(v.Debit) : 0m,
@@ -201,89 +136,63 @@ namespace Nexoris.SyncService.Services
                         else
                         {
                             // Default: SALES
-                            // Fetch SMaster
-                            const string masterSql = @"
-                                SELECT TOP 1 
-                                    BillNo, BillDate, CompanyId, FinYearId, CounterId, 
-                                    CustomerName, LedgerID, PaymodeId, PaymodeName, 
-                                    SubTotal, DiscountAmt, TaxAmt, NetAmount, UserId, Status,
-                                    VoucherID
-                                FROM dbo.SMaster 
-                                WHERE TransactionGuid = @TransactionGuid";
-
-                            var master = await conn.QueryFirstOrDefaultAsync<dynamic>(
-                                masterSql, new { item.TransactionGuid });
-
-                            if (master != null)
+                            using (var multi = await conn.QueryMultipleAsync(
+                                SyncStoredProcedure,
+                                new { _Operation = "GETSALES", item.TransactionGuid },
+                                commandType: CommandType.StoredProcedure))
                             {
-                                tx.SMaster = new SMasterSyncDto
+                                var master = await multi.ReadFirstOrDefaultAsync<dynamic>();
+                                if (master != null)
                                 {
-                                    BillNo = (long)master.BillNo,
-                                    BillDate = (DateTime)master.BillDate,
-                                    CompanyId = master.CompanyId != null ? (int)master.CompanyId : 1,
-                                    FinYearId = master.FinYearId != null ? (int)master.FinYearId : 1,
-                                    CounterId = master.CounterId != null ? (int)master.CounterId : 1,
-                                    CustomerName = master.CustomerName != null ? (string)master.CustomerName : string.Empty,
-                                    LedgerID = master.LedgerID != null ? (int?)master.LedgerID : null,
-                                    PaymodeId = master.PaymodeId != null ? (int?)master.PaymodeId : null,
-                                    PaymodeName = master.PaymodeName != null ? (string)master.PaymodeName : string.Empty,
-                                    SubTotal = master.SubTotal != null ? (decimal)master.SubTotal : 0m,
-                                    DiscountAmt = master.DiscountAmt != null ? (decimal)master.DiscountAmt : 0m,
-                                    TaxAmt = master.TaxAmt != null ? (decimal)master.TaxAmt : 0m,
-                                    NetAmount = master.NetAmount != null ? (decimal)master.NetAmount : 0m,
-                                    UserId = master.UserId != null ? (int?)master.UserId : null,
-                                    Status = master.Status != null ? (string)master.Status : "PAID"
-                                };
-
-                                // Fetch SDetails
-                                const string detailsSql = @"
-                                    SELECT 
-                                        SlNO, ItemId, Barcode, ItemName, Qty, Packing, UnitPrice, 
-                                        Amount, DiscountAmount, TaxAmt, TotalAmount, UnitId
-                                    FROM dbo.SDetails 
-                                    WHERE BillNo = @BillNo 
-                                    ORDER BY SlNO";
-
-                                var details = await conn.QueryAsync<dynamic>(detailsSql, new { BillNo = (long)master.BillNo });
-                                foreach (var d in details)
-                                {
-                                    tx.SDetails.Add(new SDetailsSyncDto
+                                    tx.SMaster = new SMasterSyncDto
                                     {
-                                        SlNO = (int)d.SlNO,
-                                        ItemId = (long)d.ItemId,
-                                        Barcode = d.Barcode != null ? (string)d.Barcode : string.Empty,
-                                        ItemName = d.ItemName != null ? (string)d.ItemName : string.Empty,
-                                        Qty = (decimal)d.Qty,
-                                        Packing = d.Packing != null ? (decimal)d.Packing : 1.0m,
-                                        UnitPrice = (decimal)d.UnitPrice,
-                                        Amount = (decimal)d.Amount,
-                                        DiscountAmount = d.DiscountAmount != null ? (decimal?)d.DiscountAmount : null,
-                                        TaxAmt = d.TaxAmt != null ? (decimal?)d.TaxAmt : null,
-                                        TotalAmount = (decimal)d.TotalAmount,
-                                        UnitId = d.UnitId != null ? (int?)d.UnitId : null
-                                    });
-                                }
+                                        BillNo = Convert.ToInt64(master.BillNo),
+                                        BillDate = (DateTime)master.BillDate,
+                                        CompanyId = master.CompanyId != null ? Convert.ToInt32(master.CompanyId) : 1,
+                                        FinYearId = master.FinYearId != null ? Convert.ToInt32(master.FinYearId) : 1,
+                                        CounterId = master.CounterId != null ? Convert.ToInt32(master.CounterId) : 1,
+                                        CustomerName = master.CustomerName != null ? (string)master.CustomerName : string.Empty,
+                                        LedgerID = master.LedgerID != null ? (int?)master.LedgerID : null,
+                                        PaymodeId = master.PaymodeId != null ? (int?)master.PaymodeId : null,
+                                        PaymodeName = master.PaymodeName != null ? (string)master.PaymodeName : string.Empty,
+                                        SubTotal = master.SubTotal != null ? Convert.ToDecimal(master.SubTotal) : 0m,
+                                        DiscountAmt = master.DiscountAmt != null ? Convert.ToDecimal(master.DiscountAmt) : 0m,
+                                        TaxAmt = master.TaxAmt != null ? Convert.ToDecimal(master.TaxAmt) : 0m,
+                                        NetAmount = master.NetAmount != null ? Convert.ToDecimal(master.NetAmount) : 0m,
+                                        UserId = master.UserId != null ? (int?)master.UserId : null,
+                                        Status = master.Status != null ? (string)master.Status : "PAID"
+                                    };
 
-                                // Fetch Vouchers for Sales
-                                if (master.VoucherID != null)
-                                {
-                                    const string voucherSql = @"
-                                        SELECT 
-                                            VoucherID AS BranchVoucherId, LedgerID, LedgerName, 
-                                            Debit, Credit, Narration 
-                                        FROM dbo.Vouchers 
-                                        WHERE VoucherID = @VoucherID AND VoucherType = 'Sales'";
+                                    var details = await multi.ReadAsync<dynamic>();
+                                    foreach (var d in details)
+                                    {
+                                        tx.SDetails.Add(new SDetailsSyncDto
+                                        {
+                                            SlNO = Convert.ToInt32(d.SlNO),
+                                            ItemId = Convert.ToInt64(d.ItemId),
+                                            Barcode = d.Barcode != null ? (string)d.Barcode : string.Empty,
+                                            ItemName = d.ItemName != null ? (string)d.ItemName : string.Empty,
+                                            Qty = Convert.ToDecimal(d.Qty),
+                                            Packing = d.Packing != null ? Convert.ToDecimal(d.Packing) : 1.0m,
+                                            UnitPrice = Convert.ToDecimal(d.UnitPrice),
+                                            Amount = Convert.ToDecimal(d.Amount),
+                                            DiscountAmount = d.DiscountAmount != null ? Convert.ToDecimal(d.DiscountAmount) : (decimal?)null,
+                                            TaxAmt = d.TaxAmt != null ? Convert.ToDecimal(d.TaxAmt) : (decimal?)null,
+                                            TotalAmount = Convert.ToDecimal(d.TotalAmount),
+                                            UnitId = d.UnitId != null ? (int?)d.UnitId : null
+                                        });
+                                    }
 
-                                    var vouchers = await conn.QueryAsync<dynamic>(voucherSql, new { VoucherID = (long)master.VoucherID });
+                                    var vouchers = await multi.ReadAsync<dynamic>();
                                     foreach (var v in vouchers)
                                     {
                                         tx.Vouchers.Add(new VoucherSyncDto
                                         {
-                                            BranchVoucherId = (long)v.BranchVoucherId,
+                                            BranchVoucherId = Convert.ToInt64(v.BranchVoucherId),
                                             LedgerID = v.LedgerID != null ? (int?)v.LedgerID : null,
                                             LedgerName = v.LedgerName != null ? (string)v.LedgerName : string.Empty,
-                                            Debit = (decimal)v.Debit,
-                                            Credit = (decimal)v.Credit,
+                                            Debit = Convert.ToDecimal(v.Debit),
+                                            Credit = Convert.ToDecimal(v.Credit),
                                             Narration = v.Narration != null ? (string)v.Narration : string.Empty
                                         });
                                     }
@@ -311,33 +220,32 @@ namespace Nexoris.SyncService.Services
                 {
                     await conn.OpenAsync();
 
-                    var parameters = new DynamicParameters();
-                    parameters.Add("@_Operation", "UPDATESTATUS");
-                    parameters.Add("@TransactionGuid", transactionGuid);
-                    parameters.Add("@Status", status);
-                    parameters.Add("@ErrorMessage", string.IsNullOrEmpty(errorMessage) ? null : errorMessage);
-
                     await conn.ExecuteAsync(
-                        "dbo.POS_SyncQueue",
-                        parameters,
+                        SyncStoredProcedure,
+                        new
+                        {
+                            _Operation = "UPDATESTATUS",
+                            TransactionGuid = transactionGuid,
+                            Status = status,
+                            ErrorMessage = string.IsNullOrEmpty(errorMessage) ? null : errorMessage
+                        },
                         commandType: CommandType.StoredProcedure
                     );
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine(string.Format("[ERROR] Failed to update SyncQueue for {0}: {1}", transactionGuid, ex.Message));
+                Console.WriteLine(string.Format("[ERROR] Failed to update queue status for {0}: {1}", transactionGuid, ex.Message));
             }
         }
 
         public async Task ProcessResultsAsync(List<SyncItemResult> results)
         {
-            if (results == null || results.Count == 0) return;
+            if (results == null || !results.Any()) return;
 
             foreach (var r in results)
             {
-                string syncStatus = (r.Status == "Synced" || r.Status == "AlreadySynced") ? "SYNCED" : "FAILED";
-                await UpdateQueueStatusAsync(r.TransactionGuid, syncStatus, r.ErrorMessage);
+                await UpdateQueueStatusAsync(r.TransactionGuid, r.Status, r.ErrorMessage);
             }
         }
 
@@ -350,48 +258,13 @@ namespace Nexoris.SyncService.Services
                 {
                     await conn.OpenAsync();
 
-                    const string sql = @"
-                        SELECT 
-                            CompanyId, FinYearId, BranchId, BranchName, ItemId, UnitId, Unit, 
-                            Packing, Cost, MarginPer, MarginAmt, TaxPer, TaxAmt, RetailPrice, 
-                            WholeSalePrice, CreditPrice, CardPrice, Stock, StockValue, ReOrder, 
-                            BarCode, TaxType, OpnStk, OpnValue, IsBaseUnit, MRP
-                        FROM dbo.PriceSettings
-                        WHERE (@BranchId <= 0 OR BranchId = @BranchId)";
+                    var rows = await conn.QueryAsync<PriceSettingsSyncDto>(
+                        SyncStoredProcedure,
+                        new { _Operation = "GETPRICESETTINGS", BranchId = branchId },
+                        commandType: CommandType.StoredProcedure
+                    );
 
-                    var rows = await conn.QueryAsync<dynamic>(sql, new { BranchId = branchId });
-                    foreach (var r in rows)
-                    {
-                        list.Add(new PriceSettingsSyncDto
-                        {
-                            CompanyId = r.CompanyId != null ? (int?)r.CompanyId : null,
-                            FinYearId = r.FinYearId != null ? (int?)r.FinYearId : null,
-                            BranchId = r.BranchId != null ? (int)r.BranchId : branchId,
-                            BranchName = r.BranchName != null ? (string)r.BranchName : string.Empty,
-                            ItemId = (int)r.ItemId,
-                            UnitId = r.UnitId != null ? (int)r.UnitId : 1,
-                            Unit = r.Unit != null ? (string)r.Unit : string.Empty,
-                            Packing = r.Packing != null ? Convert.ToDecimal(r.Packing) : 1.0m,
-                            Cost = r.Cost != null ? Convert.ToDecimal(r.Cost) : 0m,
-                            MarginPer = r.MarginPer != null ? Convert.ToDecimal(r.MarginPer) : 0m,
-                            MarginAmt = r.MarginAmt != null ? Convert.ToDecimal(r.MarginAmt) : 0m,
-                            TaxPer = r.TaxPer != null ? Convert.ToDecimal(r.TaxPer) : 0m,
-                            TaxAmt = r.TaxAmt != null ? Convert.ToDecimal(r.TaxAmt) : 0m,
-                            RetailPrice = r.RetailPrice != null ? Convert.ToDecimal(r.RetailPrice) : 0m,
-                            WholeSalePrice = r.WholeSalePrice != null ? Convert.ToDecimal(r.WholeSalePrice) : 0m,
-                            CreditPrice = r.CreditPrice != null ? Convert.ToDecimal(r.CreditPrice) : 0m,
-                            CardPrice = r.CardPrice != null ? Convert.ToDecimal(r.CardPrice) : 0m,
-                            Stock = r.Stock != null ? Convert.ToDecimal(r.Stock) : 0m,
-                            StockValue = r.StockValue != null ? Convert.ToDecimal(r.StockValue) : 0m,
-                            ReOrder = r.ReOrder != null ? Convert.ToDecimal(r.ReOrder) : 0m,
-                            BarCode = r.BarCode != null ? (string)r.BarCode : string.Empty,
-                            TaxType = r.TaxType != null ? (string)r.TaxType : string.Empty,
-                            OpnStk = r.OpnStk != null ? Convert.ToDecimal(r.OpnStk) : 0m,
-                            OpnValue = r.OpnValue != null ? Convert.ToDecimal(r.OpnValue) : 0m,
-                            IsBaseUnit = r.IsBaseUnit != null ? (string)r.IsBaseUnit : "Y",
-                            MRP = r.MRP != null ? Convert.ToDecimal(r.MRP) : 0m
-                        });
-                    }
+                    list = rows.ToList();
                 }
             }
             catch (Exception ex)
@@ -399,6 +272,57 @@ namespace Nexoris.SyncService.Services
                 Console.WriteLine(string.Format("[ERROR] Failed to read local PriceSettings for Branch {0}: {1}", branchId, ex.Message));
             }
             return list;
+        }
+
+        public async Task<MasterDataSyncRequest> AssembleMasterDataAsync(int itemId, int branchId)
+        {
+            var req = new MasterDataSyncRequest { BranchId = branchId };
+            try
+            {
+                using (var conn = new SqlConnection(_connectionString))
+                {
+                    await conn.OpenAsync();
+
+                    using (var multi = await conn.QueryMultipleAsync(
+                        SyncStoredProcedure,
+                        new { _Operation = "GETITEM", ItemId = itemId, BranchId = branchId },
+                        commandType: CommandType.StoredProcedure))
+                    {
+                        var it = await multi.ReadFirstOrDefaultAsync<dynamic>();
+                        if (it != null)
+                        {
+                            req.Item = new ItemMasterSyncDto
+                            {
+                                CompanyId = it.CompanyId != null ? (int?)it.CompanyId : null,
+                                BranchId = it.BranchId != null ? (int?)it.BranchId : branchId,
+                                FinYearId = it.FinYearId != null ? (int?)it.FinYearId : null,
+                                ItemId = (int)it.ItemId,
+                                ItemNo = it.ItemNo != null ? (string)it.ItemNo : string.Empty,
+                                Description = it.Description != null ? (string)it.Description : string.Empty,
+                                BarCode = it.BarCode != null ? (string)it.BarCode : string.Empty,
+                                ItemTypeId = it.ItemTypeId != null ? (int?)it.ItemTypeId : null,
+                                VendorId = it.VendorId != null ? (int?)it.VendorId : null,
+                                BrandId = it.BrandId != null ? (int?)it.BrandId : null,
+                                GroupId = it.GroupId != null ? (int?)it.GroupId : null,
+                                CategoryId = it.CategoryId != null ? (int?)it.CategoryId : null,
+                                SubCategoryId = it.SubCategoryId != null ? (int?)it.SubCategoryId : null,
+                                Active = it.Active != null ? (bool)it.Active : true,
+                                Hide = it.Hide != null ? (bool)it.Hide : false,
+                                BaseUnitId = it.BaseUnitId != null ? (int?)it.BaseUnitId : null,
+                                HSNCode = it.HSNCode != null ? (string)it.HSNCode : string.Empty
+                            };
+                        }
+
+                        var psRows = await multi.ReadAsync<PriceSettingsSyncDto>();
+                        req.PriceSettings = psRows.ToList();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(string.Format("[ERROR] Failed assembling master data for ItemId {0}: {1}", itemId, ex.Message));
+            }
+            return req;
         }
     }
 }

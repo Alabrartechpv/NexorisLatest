@@ -152,8 +152,45 @@ namespace Nexoris.SyncService.Workers
                 return;
             }
 
-            // 3. Assemble complete transaction payloads (Master + Line Items + Vouchers)
-            var batch = await _dataProvider.AssembleBatchAsync(pendingItems, _settings.BranchId);
+            // 3. Process ITEM_MASTER items individually if present
+            var masterItems = pendingItems.Where(p => p.EntityType.Equals("ITEM_MASTER", StringComparison.OrdinalIgnoreCase)).ToList();
+            var transactionItems = pendingItems.Where(p => !p.EntityType.Equals("ITEM_MASTER", StringComparison.OrdinalIgnoreCase)).ToList();
+
+            foreach (var m in masterItems)
+            {
+                if (int.TryParse(m.EntityID, out int itemId))
+                {
+                    Console.ForegroundColor = ConsoleColor.Magenta;
+                    Console.WriteLine(string.Format("[ITEM SYNC] [{0}] Syncing ItemId {1} master catalog & units to Head Office...",
+                        DateTime.Now.ToString("HH:mm:ss"), itemId));
+                    Console.ResetColor();
+
+                    var masterReq = await _dataProvider.AssembleMasterDataAsync(itemId, _settings.BranchId);
+                    var masterResp = await _apiClient.PushMasterDataAsync(masterReq);
+
+                    if (masterResp != null && masterResp.Success)
+                    {
+                        Console.ForegroundColor = ConsoleColor.Green;
+                        Console.WriteLine(string.Format("[OK]        [{0}] ItemId {1} synced ({2} unit price settings updated).",
+                            DateTime.Now.ToString("HH:mm:ss"), itemId, masterResp.SyncedItemCount));
+                        Console.ResetColor();
+                        await _dataProvider.UpdateQueueStatusAsync(m.TransactionGuid, "SYNCED");
+                    }
+                    else
+                    {
+                        string err = masterResp != null ? masterResp.Message : "Unknown API error";
+                        await _dataProvider.UpdateQueueStatusAsync(m.TransactionGuid, "FAILED", err);
+                    }
+                }
+            }
+
+            if (!transactionItems.Any())
+            {
+                return;
+            }
+
+            // 4. Assemble complete transaction payloads (Master + Line Items + Vouchers)
+            var batch = await _dataProvider.AssembleBatchAsync(transactionItems, _settings.BranchId);
 
             if (!batch.Transactions.Any())
             {
@@ -161,7 +198,7 @@ namespace Nexoris.SyncService.Workers
                 return;
             }
 
-            // 4. Send batch to Central API
+            // 5. Send batch to Central API
             Console.ForegroundColor = ConsoleColor.Cyan;
             Console.WriteLine(string.Format("[INFO] [{0}] Sending batch {1} ({2} items) to Head Office...",
                 DateTime.Now.ToString("HH:mm:ss"), batch.BatchId, batch.Transactions.Count));

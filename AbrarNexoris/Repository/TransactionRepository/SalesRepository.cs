@@ -145,6 +145,11 @@ namespace Repository.TransactionRepository
                     }
                 }
                 sales.BillCost = billCost;
+                if (!sales.TransactionGuid.HasValue || sales.TransactionGuid == Guid.Empty)
+                {
+                    sales.TransactionGuid = Guid.NewGuid();
+                }
+
                 // Now directly insert the sales master record using SQL Command
                 try
                 {
@@ -725,6 +730,12 @@ namespace Repository.TransactionRepository
                     {
                     }
                     throw;
+                }
+
+                if (!sales.TransactionGuid.HasValue || sales.TransactionGuid == Guid.Empty)
+                {
+                    int bId = sales.BranchId > 0 ? sales.BranchId : SessionContext.BranchId;
+                    sales.TransactionGuid = SyncQueueRepository.GetExistingGuid(DataConnection, trans, bId, "SALES", sales.BillNo.ToString()) ?? Guid.NewGuid();
                 }
 
                 // Now update the sales master record using SQL Command
