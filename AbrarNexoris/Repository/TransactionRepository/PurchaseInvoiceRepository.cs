@@ -1025,7 +1025,12 @@ namespace Repository.TransactionRepository
                     int targetBranchId = SessionContext.BranchId > 0 ? SessionContext.BranchId : 1;
                     if (ObjPmaster.TransactionGuid == Guid.Empty)
                     {
-                        ObjPmaster.TransactionGuid = SyncQueueRepository.GetExistingGuid(DataConnection, trans, targetBranchId, "PURCHASE", ObjPmaster.PurchaseNo.ToString()) ?? Guid.NewGuid();
+                        ObjPmaster.TransactionGuid = DataConnection.QueryFirstOrDefault<Guid?>(
+                            "SELECT TransactionGuid FROM dbo.PMaster WHERE PurchaseNo = @PurchaseNo AND BranchId = @BranchId AND FinYearId = @FinYearId",
+                            new { ObjPmaster.PurchaseNo, BranchId = targetBranchId, FinYearId = originalFinYearId },
+                            transaction: trans) 
+                            ?? SyncQueueRepository.GetExistingGuid(DataConnection, trans, targetBranchId, "PURCHASE", ObjPmaster.PurchaseNo.ToString()) 
+                            ?? Guid.NewGuid();
                     }
 
                     DataConnection.Execute(
@@ -1205,7 +1210,12 @@ namespace Repository.TransactionRepository
                 // ATOMIC SYNC QUEUE ENQUEUE (CANCEL/DELETE via Stored Procedure POS_SyncQueue)
                 try
                 {
-                    Guid deleteGuid = SyncQueueRepository.GetExistingGuid(DataConnection, trans, branchId, "PURCHASE", purchaseNo.ToString()) ?? Guid.NewGuid();
+                    Guid deleteGuid = DataConnection.QueryFirstOrDefault<Guid?>(
+                        "SELECT TransactionGuid FROM dbo.PMaster WHERE PurchaseNo = @PurchaseNo AND BranchId = @BranchId AND FinYearId = @FinYearId",
+                        new { PurchaseNo = purchaseNo, BranchId = branchId, FinYearId = finYearId },
+                        transaction: trans)
+                        ?? SyncQueueRepository.GetExistingGuid(DataConnection, trans, branchId, "PURCHASE", purchaseNo.ToString()) 
+                        ?? Guid.NewGuid();
                     SyncQueueRepository.EnqueueTransaction(
                         DataConnection,
                         trans,
