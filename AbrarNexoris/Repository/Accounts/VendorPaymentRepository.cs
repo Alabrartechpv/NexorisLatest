@@ -486,65 +486,196 @@ namespace Repository.Accounts
 
         public DataTable GetOutstandingInvoices(int vendorLedgerId)
         {
-            DataConnection.Open();
+            DataTable dt = new DataTable();
             try
             {
+                if (DataConnection.State == ConnectionState.Open)
+                    DataConnection.Close();
+
+                DataConnection.Open();
                 using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._VendorPaymentMaster, (SqlConnection)DataConnection))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@VendorLedgerId", vendorLedgerId);
                     cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
                     cmd.Parameters.AddWithValue("@_Operation", "GETOUTSTANDING");
-                    DataTable dt = new DataTable();
 
                     using (SqlDataAdapter da = new SqlDataAdapter(cmd))
                     {
                         da.Fill(dt);
                     }
-                    EnhanceInvoiceTableWithCashPaymode(dt);
-                    return dt;
                 }
             }
             catch (Exception ex)
             {
-                throw ex;
+                System.Diagnostics.Debug.WriteLine($"Error calling SP _VendorPaymentMaster GETOUTSTANDING: {ex.Message}");
             }
             finally
             {
                 if (DataConnection.State == ConnectionState.Open)
                     DataConnection.Close();
             }
+
+            // Direct SQL fallback if SP returned 0 rows or failed
+            if (dt == null || dt.Rows.Count == 0)
+            {
+                try
+                {
+                    DataConnection.Open();
+                    string sql = @"
+SELECT 
+    P.PurchaseNo AS BillNo,
+    ISNULL(P.InvoiceNo, CAST(P.PurchaseNo AS VARCHAR(50))) AS InvoiceNo,
+    ISNULL(P.GrandTotal, ISNULL(P.TotalAmount, 0)) AS InvoiceAmount,
+    ISNULL(P.PayedAmount, 0) AS PayedAmount,
+    ISNULL(P.ReturnedAmount, 0) AS ReturnedAmount,
+    (ISNULL(P.GrandTotal, ISNULL(P.TotalAmount, 0)) - ISNULL(P.PayedAmount, 0) - ISNULL(P.ReturnedAmount, 0)) AS Balance,
+    ISNULL(P.PurchaseDate, GETDATE()) AS BillDate,
+    ISNULL(P.Paymode, '') AS Paymode,
+    ISNULL(P.PaymodeID, 0) AS PaymodeID
+FROM PMaster P
+WHERE P.LedgerID = @VendorLedgerId
+  AND ISNULL(P.CancelFlag, 0) = 0
+  AND (ISNULL(P.GrandTotal, ISNULL(P.TotalAmount, 0)) - ISNULL(P.PayedAmount, 0) - ISNULL(P.ReturnedAmount, 0)) > 0
+ORDER BY P.PurchaseDate ASC, P.PurchaseNo ASC";
+
+                    using (SqlCommand cmd = new SqlCommand(sql, (SqlConnection)DataConnection))
+                    {
+                        cmd.Parameters.AddWithValue("@VendorLedgerId", vendorLedgerId);
+                        using (SqlDataAdapter da = new SqlDataAdapter(cmd))
+                        {
+                            dt = new DataTable();
+                            da.Fill(dt);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error running SQL fallback for GETOUTSTANDING: {ex.Message}");
+                }
+                finally
+                {
+                    if (DataConnection.State == ConnectionState.Open)
+                        DataConnection.Close();
+                }
+            }
+
+            SanitizeInvoiceTable(dt);
+            EnhanceInvoiceTableWithCashPaymode(dt);
+            return dt;
         }
 
         public DataTable GetAllInvoices(int vendorLedgerId)
         {
-            DataConnection.Open();
+            DataTable dt = new DataTable();
             try
             {
+                if (DataConnection.State == ConnectionState.Open)
+                    DataConnection.Close();
+
+                DataConnection.Open();
                 using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._VendorPaymentMaster, (SqlConnection)DataConnection))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@VendorLedgerId", vendorLedgerId);
                     cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
                     cmd.Parameters.AddWithValue("@_Operation", "GETALLINVOICES");
-                    DataTable dt = new DataTable();
 
                     using (SqlDataAdapter da = new SqlDataAdapter(cmd))
                     {
                         da.Fill(dt);
                     }
-                    EnhanceInvoiceTableWithCashPaymode(dt);
-                    return dt;
                 }
             }
-            catch (Exception Ex)
+            catch (Exception ex)
             {
-                throw Ex;
+                System.Diagnostics.Debug.WriteLine($"Error calling SP _VendorPaymentMaster GETALLINVOICES: {ex.Message}");
             }
             finally
             {
                 if (DataConnection.State == ConnectionState.Open)
                     DataConnection.Close();
+            }
+
+            // Direct SQL fallback if SP returned 0 rows or failed
+            if (dt == null || dt.Rows.Count == 0)
+            {
+                try
+                {
+                    DataConnection.Open();
+                    string sql = @"
+SELECT 
+    P.PurchaseNo AS BillNo,
+    ISNULL(P.InvoiceNo, CAST(P.PurchaseNo AS VARCHAR(50))) AS InvoiceNo,
+    ISNULL(P.GrandTotal, ISNULL(P.TotalAmount, 0)) AS InvoiceAmount,
+    ISNULL(P.PayedAmount, 0) AS PayedAmount,
+    ISNULL(P.ReturnedAmount, 0) AS ReturnedAmount,
+    (ISNULL(P.GrandTotal, ISNULL(P.TotalAmount, 0)) - ISNULL(P.PayedAmount, 0) - ISNULL(P.ReturnedAmount, 0)) AS Balance,
+    ISNULL(P.PurchaseDate, GETDATE()) AS BillDate,
+    ISNULL(P.Paymode, '') AS Paymode,
+    ISNULL(P.PaymodeID, 0) AS PaymodeID
+FROM PMaster P
+WHERE P.LedgerID = @VendorLedgerId
+  AND ISNULL(P.CancelFlag, 0) = 0
+ORDER BY P.PurchaseDate DESC, P.PurchaseNo DESC";
+
+                    using (SqlCommand cmd = new SqlCommand(sql, (SqlConnection)DataConnection))
+                    {
+                        cmd.Parameters.AddWithValue("@VendorLedgerId", vendorLedgerId);
+                        using (SqlDataAdapter da = new SqlDataAdapter(cmd))
+                        {
+                            dt = new DataTable();
+                            da.Fill(dt);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error running SQL fallback for GETALLINVOICES: {ex.Message}");
+                }
+                finally
+                {
+                    if (DataConnection.State == ConnectionState.Open)
+                        DataConnection.Close();
+                }
+            }
+
+            SanitizeInvoiceTable(dt);
+            EnhanceInvoiceTableWithCashPaymode(dt);
+            return dt;
+        }
+
+        private static void SanitizeInvoiceTable(DataTable dt)
+        {
+            if (dt == null || dt.Rows.Count == 0) return;
+
+            foreach (DataRow row in dt.Rows)
+            {
+                if (dt.Columns.Contains("BillNo") && (row["BillNo"] == DBNull.Value || row["BillNo"] == null))
+                    row["BillNo"] = "0";
+
+                if (dt.Columns.Contains("InvoiceNo") && (row["InvoiceNo"] == DBNull.Value || row["InvoiceNo"] == null))
+                    row["InvoiceNo"] = row["BillNo"]?.ToString() ?? "";
+
+                if (dt.Columns.Contains("InvoiceAmount") && (row["InvoiceAmount"] == DBNull.Value || row["InvoiceAmount"] == null))
+                    row["InvoiceAmount"] = 0m;
+
+                if (dt.Columns.Contains("PayedAmount") && (row["PayedAmount"] == DBNull.Value || row["PayedAmount"] == null))
+                    row["PayedAmount"] = 0m;
+
+                if (dt.Columns.Contains("ReturnedAmount") && (row["ReturnedAmount"] == DBNull.Value || row["ReturnedAmount"] == null))
+                    row["ReturnedAmount"] = 0m;
+
+                if (dt.Columns.Contains("Balance") && (row["Balance"] == DBNull.Value || row["Balance"] == null))
+                {
+                    decimal inv = decimal.TryParse(row["InvoiceAmount"]?.ToString(), out decimal iVal) ? iVal : 0m;
+                    decimal paid = decimal.TryParse(row["PayedAmount"]?.ToString(), out decimal pVal) ? pVal : 0m;
+                    decimal ret = dt.Columns.Contains("ReturnedAmount") && decimal.TryParse(row["ReturnedAmount"]?.ToString(), out decimal rVal) ? rVal : 0m;
+                    row["Balance"] = inv - paid - ret;
+                }
+
+                if (dt.Columns.Contains("BillDate") && (row["BillDate"] == DBNull.Value || row["BillDate"] == null))
+                    row["BillDate"] = DateTime.Now;
             }
         }
 
@@ -656,6 +787,40 @@ namespace Repository.Accounts
                 if (DataConnection.State == ConnectionState.Open)
                     DataConnection.Close();
             }
+
+            if (outstandingTotal <= 0)
+            {
+                try
+                {
+                    DataConnection.Open();
+                    string sql = @"
+SELECT ISNULL(SUM(ISNULL(P.GrandTotal, ISNULL(P.TotalAmount, 0)) - ISNULL(P.PayedAmount, 0) - ISNULL(P.ReturnedAmount, 0)), 0)
+FROM PMaster P
+WHERE P.LedgerID = @VendorLedgerId
+  AND ISNULL(P.CancelFlag, 0) = 0
+  AND (ISNULL(P.GrandTotal, ISNULL(P.TotalAmount, 0)) - ISNULL(P.PayedAmount, 0) - ISNULL(P.ReturnedAmount, 0)) > 0";
+
+                    using (SqlCommand cmd = new SqlCommand(sql, (SqlConnection)DataConnection))
+                    {
+                        cmd.Parameters.AddWithValue("@VendorLedgerId", vendorLedgerId);
+                        object res = cmd.ExecuteScalar();
+                        if (res != null && res != DBNull.Value)
+                        {
+                            outstandingTotal = Convert.ToDecimal(res);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error getting vendor outstanding total via SQL: {ex.Message}");
+                }
+                finally
+                {
+                    if (DataConnection.State == ConnectionState.Open)
+                        DataConnection.Close();
+                }
+            }
+
             return outstandingTotal;
         }
 

@@ -36,6 +36,10 @@ namespace PosBranch_Win.Reports.InventoryReport
         private UltraPanel ultraPanel1;
         private Label lblPreset;
 
+        // Export Grid button ultraPanelExport matching IRS blue theme
+        private UltraPanel ultraPanelExport;
+        private Label lblExport;
+
         // Custom action panels matching frmReportFormatDialog's ultraPanel6 theme
         private UltraPanel ultraPanel2;
         private Label lblViewGrid;
@@ -95,6 +99,8 @@ namespace PosBranch_Win.Reports.InventoryReport
             this.lblRefreshStats = new System.Windows.Forms.Label();
             this.ultraPanel1 = new Infragistics.Win.Misc.UltraPanel();
             this.lblPreset = new System.Windows.Forms.Label();
+            this.ultraPanelExport = new Infragistics.Win.Misc.UltraPanel();
+            this.lblExport = new System.Windows.Forms.Label();
             this.lblCount = new Infragistics.Win.Misc.UltraLabel();
             this.lblExceptionCount = new Infragistics.Win.Misc.UltraLabel();
             this.ultraPanel6 = new Infragistics.Win.Misc.UltraPanel();
@@ -125,6 +131,8 @@ namespace PosBranch_Win.Reports.InventoryReport
             this.ultraPanel5.SuspendLayout();
             this.ultraPanel1.ClientArea.SuspendLayout();
             this.ultraPanel1.SuspendLayout();
+            this.ultraPanelExport.ClientArea.SuspendLayout();
+            this.ultraPanelExport.SuspendLayout();
             this.ultraPanel6.ClientArea.SuspendLayout();
             this.ultraPanel6.SuspendLayout();
             this.ultraPanelGrid.ClientArea.SuspendLayout();
@@ -313,6 +321,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             this.ultraPanelActionBar.ClientArea.Controls.Add(this.ultraPanel4);
             this.ultraPanelActionBar.ClientArea.Controls.Add(this.ultraPanel5);
             this.ultraPanelActionBar.ClientArea.Controls.Add(this.ultraPanel1);
+            this.ultraPanelActionBar.ClientArea.Controls.Add(this.ultraPanelExport);
             this.ultraPanelActionBar.ClientArea.Controls.Add(this.lblCount);
             this.ultraPanelActionBar.ClientArea.Controls.Add(this.lblExceptionCount);
             this.ultraPanelActionBar.ClientArea.Controls.Add(this.ultraPanel6);
@@ -433,12 +442,34 @@ namespace PosBranch_Win.Reports.InventoryReport
             this.lblPreset.Text = "Preset";
             this.lblPreset.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
             // 
+            // ultraPanelExport
+            // 
+            this.ultraPanelExport.BorderStyle = Infragistics.Win.UIElementBorderStyle.Rounded1;
+            // 
+            // ultraPanelExport.ClientArea
+            // 
+            this.ultraPanelExport.ClientArea.Controls.Add(this.lblExport);
+            this.ultraPanelExport.Location = new System.Drawing.Point(547, 4);
+            this.ultraPanelExport.Name = "ultraPanelExport";
+            this.ultraPanelExport.Size = new System.Drawing.Size(95, 27);
+            this.ultraPanelExport.TabIndex = 5;
+            // 
+            // lblExport
+            // 
+            this.lblExport.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.lblExport.Location = new System.Drawing.Point(0, 0);
+            this.lblExport.Name = "lblExport";
+            this.lblExport.Size = new System.Drawing.Size(91, 23);
+            this.lblExport.TabIndex = 0;
+            this.lblExport.Text = "Export Grid";
+            this.lblExport.TextAlign = System.Drawing.ContentAlignment.MiddleCenter;
+            // 
             // lblCount
             // 
-            this.lblCount.Location = new System.Drawing.Point(552, 9);
+            this.lblCount.Location = new System.Drawing.Point(650, 9);
             this.lblCount.Name = "lblCount";
             this.lblCount.Size = new System.Drawing.Size(95, 20);
-            this.lblCount.TabIndex = 5;
+            this.lblCount.TabIndex = 6;
             this.lblCount.Text = "Rows: 0";
             // 
             // lblExceptionCount

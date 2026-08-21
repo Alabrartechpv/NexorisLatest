@@ -323,6 +323,27 @@ namespace PosBranch_Win.Accounts
             }
         }
 
+        private static decimal SafeToDecimal(object value, decimal defaultValue = 0m)
+        {
+            if (value == null || value == DBNull.Value) return defaultValue;
+            if (decimal.TryParse(value.ToString(), out decimal result)) return result;
+            return defaultValue;
+        }
+
+        private static int SafeToInt(object value, int defaultValue = 0)
+        {
+            if (value == null || value == DBNull.Value) return defaultValue;
+            if (int.TryParse(value.ToString(), out int result)) return result;
+            return defaultValue;
+        }
+
+        private static DateTime SafeToDateTime(object value)
+        {
+            if (value == null || value == DBNull.Value) return DateTime.Now;
+            if (DateTime.TryParse(value.ToString(), out DateTime result)) return result;
+            return DateTime.Now;
+        }
+
         private void LoadVendorInvoices()
         {
             try
@@ -337,11 +358,7 @@ namespace PosBranch_Win.Accounts
                         var rows = invoices.AsEnumerable()
                             .Where(row => {
                                 var val = row["Balance"];
-                                decimal balance = 0;
-                                if (val != DBNull.Value && val != null)
-                                {
-                                    decimal.TryParse(val.ToString(), out balance);
-                                }
+                                decimal balance = SafeToDecimal(val);
                                 return balance > 0;
                             })
                             .ToList();
@@ -624,8 +641,8 @@ namespace PosBranch_Win.Accounts
                     return;
                 }
 
-                decimal invoiceAmount = Convert.ToDecimal(e.Cell.Row.Cells["InvoiceAmount"].Value);
-                decimal paidAmount = Convert.ToDecimal(e.Cell.Row.Cells["PayedAmount"].Value);
+                decimal invoiceAmount = SafeToDecimal(e.Cell.Row.Cells["InvoiceAmount"].Value);
+                decimal paidAmount = SafeToDecimal(e.Cell.Row.Cells["PayedAmount"].Value);
                 decimal originalBalance = invoiceAmount - paidAmount;
 
                 // For payments, handle negative balances (vendor overpaid) differently
@@ -707,10 +724,10 @@ namespace PosBranch_Win.Accounts
             foreach (var row in selectedRows)
             {
                 if (remainingAmount <= 0) break;
-                decimal invoiceAmount = Convert.ToDecimal(row.Cells["InvoiceAmount"].Value);
-                decimal paidAmount = Convert.ToDecimal(row.Cells["PayedAmount"].Value);
+                decimal invoiceAmount = SafeToDecimal(row.Cells["InvoiceAmount"].Value);
+                decimal paidAmount = SafeToDecimal(row.Cells["PayedAmount"].Value);
                 decimal returnedAmount = row.Cells.Exists("ReturnedAmount") && row.Cells["ReturnedAmount"].Value != null && row.Cells["ReturnedAmount"].Value != DBNull.Value 
-                    ? Convert.ToDecimal(row.Cells["ReturnedAmount"].Value) 
+                    ? SafeToDecimal(row.Cells["ReturnedAmount"].Value) 
                     : 0m;
                 decimal originalBalance = invoiceAmount - paidAmount - returnedAmount;
                 decimal adjustedAmount;
@@ -744,12 +761,12 @@ namespace PosBranch_Win.Accounts
 
         private void UpdateRowBalance(UltraGridRow row)
         {
-            decimal invoiceAmount = Convert.ToDecimal(row.Cells["InvoiceAmount"].Value);
-            decimal paidAmount = Convert.ToDecimal(row.Cells["PayedAmount"].Value);
+            decimal invoiceAmount = SafeToDecimal(row.Cells["InvoiceAmount"].Value);
+            decimal paidAmount = SafeToDecimal(row.Cells["PayedAmount"].Value);
             decimal returnedAmount = row.Cells.Exists("ReturnedAmount") && row.Cells["ReturnedAmount"].Value != null && row.Cells["ReturnedAmount"].Value != DBNull.Value 
-                ? Convert.ToDecimal(row.Cells["ReturnedAmount"].Value) 
+                ? SafeToDecimal(row.Cells["ReturnedAmount"].Value) 
                 : 0m;
-            decimal adjustedAmount = Convert.ToDecimal(row.Cells["AdjustedAmount"].Value);
+            decimal adjustedAmount = SafeToDecimal(row.Cells["AdjustedAmount"].Value);
 
             // Calculate the new balance: Original outstanding balance - adjusted amount
             // Original outstanding balance = InvoiceAmount - PayedAmount - ReturnedAmount
@@ -761,13 +778,12 @@ namespace PosBranch_Win.Accounts
 
         private decimal GetTotalAdjustedAmount()
         {
-            return ultraGrid1.Rows.Sum(row =>
-                Convert.ToDecimal(row.Cells["AdjustedAmount"].Value));
+            return ultraGrid1.Rows.Sum(row => SafeToDecimal(row.Cells["AdjustedAmount"].Value));
         }
 
         private decimal GetCurrentAdjustedAmount(UltraGridRow row)
         {
-            return Convert.ToDecimal(row.Cells["AdjustedAmount"].Value);
+            return SafeToDecimal(row.Cells["AdjustedAmount"].Value);
         }
 
         private void UpdateRemainingAmount()
@@ -844,24 +860,24 @@ namespace PosBranch_Win.Accounts
                 // Recalculate balance: InvoiceAmount - PayedAmount - ReturnedAmount
                 if (newDt.Columns.Contains("InvoiceAmount") && newDt.Columns.Contains("PayedAmount") && newDt.Columns.Contains("Balance"))
                 {
-                    decimal invoiceAmount = Convert.ToDecimal(newRow["InvoiceAmount"]);
-                    decimal paidAmount = Convert.ToDecimal(newRow["PayedAmount"]);
-                    decimal returnedAmount = newDt.Columns.Contains("ReturnedAmount") && newRow["ReturnedAmount"] != DBNull.Value ? Convert.ToDecimal(newRow["ReturnedAmount"]) : 0m;
+                    decimal invoiceAmount = SafeToDecimal(newRow["InvoiceAmount"]);
+                    decimal paidAmount = SafeToDecimal(newRow["PayedAmount"]);
+                    decimal returnedAmount = newDt.Columns.Contains("ReturnedAmount") && newRow["ReturnedAmount"] != DBNull.Value ? SafeToDecimal(newRow["ReturnedAmount"]) : 0m;
 
                     // Detect cash purchases where full payment was settled at purchase time
                     bool isCashPurchase = false;
-                    if (dt.Columns.Contains("Paymode") && row["Paymode"] != DBNull.Value)
+                    if (dt.Columns.Contains("Paymode") && row["Paymode"] != DBNull.Value && row["Paymode"] != null)
                     {
                         string pm = row["Paymode"].ToString().Trim().ToLower();
                         if (pm == "cash" || pm == "2") isCashPurchase = true;
                     }
-                    if (dt.Columns.Contains("PaymodeID") && row["PaymodeID"] != DBNull.Value)
+                    if (dt.Columns.Contains("PaymodeID") && row["PaymodeID"] != DBNull.Value && row["PaymodeID"] != null)
                     {
-                        if (Convert.ToInt32(row["PaymodeID"]) == 2) isCashPurchase = true;
+                        if (SafeToInt(row["PaymodeID"]) == 2) isCashPurchase = true;
                     }
-                    if (dt.Columns.Contains("PayModeID") && row["PayModeID"] != DBNull.Value)
+                    if (dt.Columns.Contains("PayModeID") && row["PayModeID"] != DBNull.Value && row["PayModeID"] != null)
                     {
-                        if (Convert.ToInt32(row["PayModeID"]) == 2) isCashPurchase = true;
+                        if (SafeToInt(row["PayModeID"]) == 2) isCashPurchase = true;
                     }
 
                     if (isCashPurchase)
@@ -998,18 +1014,20 @@ namespace PosBranch_Win.Accounts
                 var details = new List<VendorPaymentDetails>();
                 foreach (UltraGridRow row in ultraGrid1.Rows)
                 {
-                    if (Convert.ToBoolean(row.Cells["Select"].Value) &&
-                        Convert.ToDecimal(row.Cells["AdjustedAmount"].Value) > 0)
+                    bool isSelected = row.Cells.Exists("Select") && row.Cells["Select"].Value != null && Convert.ToBoolean(row.Cells["Select"].Value);
+                    decimal adjustedAmt = row.Cells.Exists("AdjustedAmount") ? SafeToDecimal(row.Cells["AdjustedAmount"].Value) : 0m;
+
+                    if (isSelected && adjustedAmt > 0)
                     {
                         var detail = new VendorPaymentDetails
                         {
-                            BillNo = row.Cells["BillNo"].Value.ToString(),
-                            InvoiceAmount = Convert.ToDecimal(row.Cells["InvoiceAmount"].Value),
-                            AdjustedAmount = Convert.ToDecimal(row.Cells["AdjustedAmount"].Value),
-                            Balance = Convert.ToDecimal(row.Cells["Balance"].Value),
-                            BillDate = row.Cells.Exists("BillDate") && row.Cells["BillDate"].Value != null
-    ? Convert.ToDateTime(row.Cells["BillDate"].Value)
-    : Convert.ToDateTime(dtpPurchaseDate.Value),
+                            BillNo = row.Cells.Exists("BillNo") ? (row.Cells["BillNo"].Value?.ToString() ?? "0") : "0",
+                            InvoiceAmount = row.Cells.Exists("InvoiceAmount") ? SafeToDecimal(row.Cells["InvoiceAmount"].Value) : 0m,
+                            AdjustedAmount = adjustedAmt,
+                            Balance = row.Cells.Exists("Balance") ? SafeToDecimal(row.Cells["Balance"].Value) : 0m,
+                            BillDate = row.Cells.Exists("BillDate") && row.Cells["BillDate"].Value != null && row.Cells["BillDate"].Value != DBNull.Value
+                                ? SafeToDateTime(row.Cells["BillDate"].Value)
+                                : Convert.ToDateTime(dtpPurchaseDate.Value),
                             CreatedBy = currentUserId
                         };
                         details.Add(detail);
@@ -1105,7 +1123,7 @@ namespace PosBranch_Win.Accounts
             }
 
             var selectedRows = ultraGrid1.Rows.Where(row =>
-                Convert.ToBoolean(row.Cells["Select"].Value)).ToList();
+                row.Cells.Exists("Select") && row.Cells["Select"].Value != null && Convert.ToBoolean(row.Cells["Select"].Value)).ToList();
             if (!selectedRows.Any())
             {
                 MessageBox.Show("Please select at least one invoice", "Validation Error",
@@ -1503,7 +1521,7 @@ namespace PosBranch_Win.Accounts
                 }
 
                 textBox1.Text = master["PaymentAmount"]?.ToString() ?? "0.00";
-                totalPaymentAmount = Convert.ToDecimal(master["PaymentAmount"] ?? 0);
+                totalPaymentAmount = SafeToDecimal(master["PaymentAmount"]);
                 
                 if (master["PaymentMethodLedgerId"] != DBNull.Value)
                     CmboPayment.Value = master["PaymentMethodLedgerId"];
@@ -1523,13 +1541,13 @@ namespace PosBranch_Win.Accounts
                         DataRow newRow = dtGrid.NewRow();
                         newRow["BillNo"] = dr["BillNo"]?.ToString();
                         newRow["InvoiceNo"] = dr.Table.Columns.Contains("InvoiceNo") ? dr["InvoiceNo"]?.ToString() : dr["BillNo"]?.ToString();
-                        newRow["InvoiceAmount"] = dr["BillAmount"];
-                        newRow["PayedAmount"] = dr["PayedAmount"];
-                        newRow["ReturnedAmount"] = dr.Table.Columns.Contains("ReturnedAmount") && dr["ReturnedAmount"] != DBNull.Value ? dr["ReturnedAmount"] : 0m;
-                        newRow["Balance"] = dr["BalanceAmount"];
+                        newRow["InvoiceAmount"] = SafeToDecimal(dr["BillAmount"]);
+                        newRow["PayedAmount"] = SafeToDecimal(dr["PayedAmount"]);
+                        newRow["ReturnedAmount"] = dr.Table.Columns.Contains("ReturnedAmount") && dr["ReturnedAmount"] != DBNull.Value ? SafeToDecimal(dr["ReturnedAmount"]) : 0m;
+                        newRow["Balance"] = SafeToDecimal(dr["BalanceAmount"]);
                         newRow["Select"] = true;
-                        newRow["AdjustedAmount"] = dr["PaymentAmount"];
-                        newRow["BillDate"] = dr["BillDate"];
+                        newRow["AdjustedAmount"] = SafeToDecimal(dr["PaymentAmount"]);
+                        newRow["BillDate"] = dr.Table.Columns.Contains("BillDate") && dr["BillDate"] != DBNull.Value ? SafeToDateTime(dr["BillDate"]) : DateTime.Now;
                         dtGrid.Rows.Add(newRow);
                     }
                 }

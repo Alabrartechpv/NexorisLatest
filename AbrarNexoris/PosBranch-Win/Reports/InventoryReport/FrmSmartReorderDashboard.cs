@@ -16,6 +16,7 @@ using System.ComponentModel;
 using System.Drawing;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Windows.Forms;
 using WinFormsToolTip = System.Windows.Forms.ToolTip;
 
@@ -220,6 +221,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             RegisterPanelButton(ultraPanel4, () => BtnGenBranchPO_Click(null, EventArgs.Empty));
             RegisterPanelButton(ultraPanel5, () => BtnRefreshStats_Click(null, EventArgs.Empty));
             RegisterPanelButton(ultraPanel1, OpenPresetDialog);
+            RegisterPanelButton(ultraPanelExport, ExportGridData);
             RegisterPanelButton(ultraPanel6, () => BtnHideSelection_Click(null, EventArgs.Empty));
 
             ConfigureGridAppearance();
@@ -1153,7 +1155,15 @@ namespace PosBranch_Win.Reports.InventoryReport
             e.Layout.Override.WrapHeaderText = DefaultableBoolean.False;
             e.Layout.Override.HeaderStyle = HeaderStyle.Standard;
 
-            ConfigureColumn(band, "IsSelected", "Select", 45, true, null);
+            ConfigureColumn(band, "IsSelected", "Select", 50, true, null);
+            if (band.Columns.Exists("IsSelected"))
+            {
+                UltraGridColumn selectCol = band.Columns["IsSelected"];
+                selectCol.Header.CheckBoxVisibility = HeaderCheckBoxVisibility.Always;
+                selectCol.Header.CheckBoxAlignment = HeaderCheckBoxAlignment.Center;
+                selectCol.Header.CheckBoxSynchronization = HeaderCheckBoxSynchronization.RowsCollection;
+            }
+
             ConfigureColumn(band, "ItemName", "Item Name", 220, false, null);
             ConfigureColumn(band, "Barcode", "Barcode", 110, false, null);
             ConfigureColumn(band, "Unit", "Unit", 70, false, null);
@@ -1183,6 +1193,9 @@ namespace PosBranch_Win.Reports.InventoryReport
             HideColumn(band, "NearestExpiryDate");
             HideColumn(band, "LastSaleDate");
             HideColumn(band, "RequiredQuantity");
+
+            ultraGridMaster.AfterHeaderCheckStateChanged -= UltraGridMaster_AfterHeaderCheckStateChanged;
+            ultraGridMaster.AfterHeaderCheckStateChanged += UltraGridMaster_AfterHeaderCheckStateChanged;
 
             CreateFooterCells();
             UpdateFooterCellPositions();
@@ -1302,11 +1315,437 @@ namespace PosBranch_Win.Reports.InventoryReport
             }
         }
 
+        private void UltraGridMaster_AfterHeaderCheckStateChanged(object sender, AfterHeaderCheckStateChangedEventArgs e)
+        {
+            if (e.Column != null && string.Equals(e.Column.Key, "IsSelected", StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (UltraGridRow row in e.Rows)
+                {
+                    if (row.ListObject is SmartReorderItemModel item)
+                    {
+                        item.IsSelected = Convert.ToBoolean(row.Cells["IsSelected"].Value ?? false);
+                    }
+                }
+                UpdateSummary();
+            }
+        }
+
+        public void SelectAllRows(bool select)
+        {
+            try
+            {
+                ultraGridMaster.UpdateData();
+                _suppressGridCellUpdate = true;
+
+                foreach (UltraGridRow row in ultraGridMaster.Rows.GetFilteredInNonGroupByRows())
+                {
+                    if (row.ListObject is SmartReorderItemModel item)
+                    {
+                        item.IsSelected = select;
+                    }
+                    if (row.Cells.Exists("IsSelected"))
+                    {
+                        row.Cells["IsSelected"].Value = select;
+                    }
+                }
+            }
+            finally
+            {
+                _suppressGridCellUpdate = false;
+                ultraGridMaster.Refresh();
+                UpdateSummary();
+            }
+        }
+
+        public void InvertRowSelection()
+        {
+            try
+            {
+                ultraGridMaster.UpdateData();
+                _suppressGridCellUpdate = true;
+
+                foreach (UltraGridRow row in ultraGridMaster.Rows.GetFilteredInNonGroupByRows())
+                {
+                    if (row.ListObject is SmartReorderItemModel item)
+                    {
+                        item.IsSelected = !item.IsSelected;
+                        if (row.Cells.Exists("IsSelected"))
+                        {
+                            row.Cells["IsSelected"].Value = item.IsSelected;
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                _suppressGridCellUpdate = false;
+                ultraGridMaster.Refresh();
+                UpdateSummary();
+            }
+        }
+
         private void SetupGridMenu()
         {
             _gridMenu = new ContextMenuStrip();
-            _gridMenu.Items.Add("Field/Column Chooser", null, (s, e) => ShowColumnChooser());
+
+            ToolStripMenuItem itemSelectAll = new ToolStripMenuItem("☑ Select All Rows", null, (s, e) => SelectAllRows(true));
+            ToolStripMenuItem itemUnselectAll = new ToolStripMenuItem("⬜ Unselect All Rows", null, (s, e) => SelectAllRows(false));
+            ToolStripMenuItem itemInvertSelect = new ToolStripMenuItem("🔄 Invert Selection", null, (s, e) => InvertRowSelection());
+            ToolStripMenuItem itemExportGrid = new ToolStripMenuItem("📥 Export Grid Data...", null, (s, e) => ExportGridData());
+            ToolStripMenuItem itemColumnChooser = new ToolStripMenuItem("📋 Field/Column Chooser", null, (s, e) => ShowColumnChooser());
+
+            _gridMenu.Items.Add(itemSelectAll);
+            _gridMenu.Items.Add(itemUnselectAll);
+            _gridMenu.Items.Add(itemInvertSelect);
+            _gridMenu.Items.Add(new ToolStripSeparator());
+            _gridMenu.Items.Add(itemExportGrid);
+            _gridMenu.Items.Add(new ToolStripSeparator());
+            _gridMenu.Items.Add(itemColumnChooser);
+
             ultraGridMaster.ContextMenuStrip = _gridMenu;
+        }
+
+        private void ExportGridData()
+        {
+            try
+            {
+                List<UltraGridRow> rows = GetVisibleDataRows().ToList();
+                if (rows.Count == 0)
+                {
+                    MessageBox.Show("No data rows available to export.", "Export Grid Data", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                using (SaveFileDialog dialog = new SaveFileDialog())
+                {
+                    dialog.Title = "Export Grid Data";
+                    dialog.Filter = "Excel Workbook (*.csv)|*.csv|Excel XML Spreadsheet (*.xml)|*.xml|PDF Document (*.pdf)|*.pdf|HTML Document (*.html)|*.html|Text File (*.txt)|*.txt";
+                    dialog.FilterIndex = 1;
+                    dialog.FileName = "SmartReorderReport_" + DateTime.Now.ToString("yyyyMMdd_HHmmss");
+
+                    if (dialog.ShowDialog(this) != DialogResult.OK)
+                    {
+                        return;
+                    }
+
+                    string ext = Path.GetExtension(dialog.FileName).ToLowerInvariant();
+                    switch (ext)
+                    {
+                        case ".pdf":
+                            ExportToPdf(dialog.FileName, rows);
+                            break;
+                        case ".html":
+                        case ".htm":
+                            ExportToHtml(dialog.FileName, rows);
+                            break;
+                        case ".txt":
+                            ExportToText(dialog.FileName, rows);
+                            break;
+                        case ".xml":
+                            ExportToExcelXml(dialog.FileName, rows);
+                            break;
+                        case ".csv":
+                        default:
+                            ExportToCsv(dialog.FileName, rows);
+                            break;
+                    }
+
+                    MessageBox.Show($"Grid data exported successfully to:\n{dialog.FileName}", "Export Successful", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Unable to export grid data.\n\n" + ex.Message, "Export Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private List<UltraGridColumn> GetExportableColumns()
+        {
+            if (ultraGridMaster.DisplayLayout == null || ultraGridMaster.DisplayLayout.Bands.Count == 0)
+                return new List<UltraGridColumn>();
+
+            return ultraGridMaster.DisplayLayout.Bands[0].Columns
+                .Cast<UltraGridColumn>()
+                .Where(c => !c.Hidden && !string.Equals(c.Key, "IsSelected", StringComparison.OrdinalIgnoreCase))
+                .OrderBy(c => c.Header.VisiblePosition)
+                .ToList();
+        }
+
+        private void ExportToCsv(string filePath, List<UltraGridRow> rows)
+        {
+            var columns = GetExportableColumns();
+            StringBuilder csv = new StringBuilder();
+
+            for (int i = 0; i < columns.Count; i++)
+            {
+                if (i > 0) csv.Append(",");
+                string caption = !string.IsNullOrWhiteSpace(columns[i].Header?.Caption) ? columns[i].Header.Caption : columns[i].Key;
+                csv.Append(EscapeCsv(caption));
+            }
+            csv.AppendLine();
+
+            foreach (UltraGridRow row in rows)
+            {
+                for (int i = 0; i < columns.Count; i++)
+                {
+                    if (i > 0) csv.Append(",");
+                    object val = row.Cells.Exists(columns[i].Key) ? row.Cells[columns[i].Key].Value : null;
+                    csv.Append(EscapeCsv(Convert.ToString(val)));
+                }
+                csv.AppendLine();
+            }
+
+            File.WriteAllText(filePath, csv.ToString(), Encoding.UTF8);
+        }
+
+        private static string EscapeCsv(string val)
+        {
+            if (string.IsNullOrEmpty(val)) return "\"\"";
+            if (val.Contains(",") || val.Contains("\"") || val.Contains("\n") || val.Contains("\r"))
+            {
+                return "\"" + val.Replace("\"", "\"\"") + "\"";
+            }
+            return "\"" + val + "\"";
+        }
+
+        private void ExportToHtml(string filePath, List<UltraGridRow> rows)
+        {
+            var columns = GetExportableColumns();
+            StringBuilder html = new StringBuilder();
+
+            html.AppendLine("<!DOCTYPE html><html><head><meta charset='utf-8'><title>Smart Reorder Dashboard Report</title>");
+            html.AppendLine("<style>");
+            html.AppendLine("body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f9ff; color: #123166; margin: 20px; }");
+            html.AppendLine("h2 { color: #0074d9; margin-bottom: 5px; }");
+            html.AppendLine(".meta { font-size: 12px; color: #555; margin-bottom: 15px; }");
+            html.AppendLine("table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #769ac6; }");
+            html.AppendLine("th { background: linear-gradient(to bottom, #5d97d6, #4376b8); color: #fff; padding: 8px 10px; font-size: 13px; text-align: center; border: 1px solid #769ac6; }");
+            html.AppendLine("td { padding: 6px 10px; font-size: 12px; border: 1px solid #c5d9f1; }");
+            html.AppendLine("tr:nth-child(even) { background-color: #f6faff; }");
+            html.AppendLine("tr:hover { background-color: #add8ff; }");
+            html.AppendLine(".number { text-align: right; }");
+            html.AppendLine(".alert-urgent { background-color: #8b0000; color: #fff; font-weight: bold; }");
+            html.AppendLine(".alert-reorder { background-color: #d23300; color: #fff; font-weight: bold; }");
+            html.AppendLine(".alert-target { background-color: #e67e22; color: #fff; font-weight: bold; }");
+            html.AppendLine("</style></head><body>");
+
+            html.AppendLine("<h2>Smart Reorder Dashboard Report</h2>");
+            html.AppendLine($"<div class='meta'>Generated: {DateTime.Now:dd-MMM-yyyy HH:mm:ss} | Total Rows: {rows.Count}</div>");
+            html.AppendLine("<table><thead><tr>");
+
+            foreach (var col in columns)
+            {
+                string caption = !string.IsNullOrWhiteSpace(col.Header?.Caption) ? col.Header.Caption : col.Key;
+                html.AppendLine($"<th>{System.Net.WebUtility.HtmlEncode(caption)}</th>");
+            }
+            html.AppendLine("</tr></thead><tbody>");
+
+            foreach (UltraGridRow row in rows)
+            {
+                string alertText = row.Cells.Exists("Alert") ? Convert.ToString(row.Cells["Alert"].Value ?? "") : "";
+                html.AppendLine("<tr>");
+
+                foreach (var col in columns)
+                {
+                    object rawVal = row.Cells.Exists(col.Key) ? row.Cells[col.Key].Value : null;
+                    string valStr = Convert.ToString(rawVal);
+                    bool isNum = IsSummableColumn(col);
+                    string alignClass = isNum ? " class='number'" : "";
+
+                    if (string.Equals(col.Key, "Alert", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string alertClass = "";
+                        if (alertText.StartsWith("URGENT", StringComparison.OrdinalIgnoreCase)) alertClass = " class='alert-urgent'";
+                        else if (string.Equals(alertText, "Reorder Level Reached", StringComparison.OrdinalIgnoreCase)) alertClass = " class='alert-reorder'";
+                        else if (string.Equals(alertText, "Below Target Stock", StringComparison.OrdinalIgnoreCase)) alertClass = " class='alert-target'";
+
+                        html.AppendLine($"<td{alertClass}>{System.Net.WebUtility.HtmlEncode(valStr)}</td>");
+                    }
+                    else
+                    {
+                        html.AppendLine($"<td{alignClass}>{System.Net.WebUtility.HtmlEncode(valStr)}</td>");
+                    }
+                }
+                html.AppendLine("</tr>");
+            }
+
+            html.AppendLine("</tbody></table></body></html>");
+            File.WriteAllText(filePath, html.ToString(), Encoding.UTF8);
+        }
+
+        private void ExportToText(string filePath, List<UltraGridRow> rows)
+        {
+            var columns = GetExportableColumns();
+            StringBuilder txt = new StringBuilder();
+
+            for (int i = 0; i < columns.Count; i++)
+            {
+                if (i > 0) txt.Append("\t");
+                string caption = !string.IsNullOrWhiteSpace(columns[i].Header?.Caption) ? columns[i].Header.Caption : columns[i].Key;
+                txt.Append(caption);
+            }
+            txt.AppendLine();
+
+            foreach (UltraGridRow row in rows)
+            {
+                for (int i = 0; i < columns.Count; i++)
+                {
+                    if (i > 0) txt.Append("\t");
+                    object val = row.Cells.Exists(columns[i].Key) ? row.Cells[columns[i].Key].Value : null;
+                    txt.Append(Convert.ToString(val).Replace("\t", " ").Replace("\r", "").Replace("\n", " "));
+                }
+                txt.AppendLine();
+            }
+
+            File.WriteAllText(filePath, txt.ToString(), Encoding.UTF8);
+        }
+
+        private void ExportToExcelXml(string filePath, List<UltraGridRow> rows)
+        {
+            var columns = GetExportableColumns();
+            StringBuilder xml = new StringBuilder();
+
+            xml.AppendLine("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+            xml.AppendLine("<?mso-application progid=\"Excel.Sheet\"?>");
+            xml.AppendLine("<Workbook xmlns=\"urn:schemas-microsoft-com:office:spreadsheet\"");
+            xml.AppendLine(" xmlns:o=\"urn:schemas-microsoft-com:office:office\"");
+            xml.AppendLine(" xmlns:x=\"urn:schemas-microsoft-com:office:excel\"");
+            xml.AppendLine(" xmlns:ss=\"urn:schemas-microsoft-com:office:spreadsheet\">");
+            xml.AppendLine(" <Styles>");
+            xml.AppendLine("  <Style ss:ID=\"Default\" ss:Name=\"Normal\"><Font ss:FontName=\"Segoe UI\" ss:Size=\"10\"/></Style>");
+            xml.AppendLine("  <Style ss:ID=\"Header\"><Font ss:FontName=\"Segoe UI\" ss:Size=\"10\" ss:Bold=\"1\" ss:Color=\"#FFFFFF\"/><Interior ss:Color=\"#5D97D6\" ss:Pattern=\"Solid\"/><Alignment ss:Horizontal=\"Center\" ss:Vertical=\"Center\"/></Style>");
+            xml.AppendLine("  <Style ss:ID=\"Number\"><Alignment ss:Horizontal=\"Right\"/></Style>");
+            xml.AppendLine(" </Styles>");
+            xml.AppendLine(" <Worksheet ss:Name=\"Smart Reorder\">");
+            xml.AppendLine("  <Table>");
+
+            foreach (var col in columns)
+            {
+                int w = Math.Max(60, col.Width);
+                xml.AppendLine($"   <Column ss:Width=\"{w}\"/>");
+            }
+
+            xml.AppendLine("   <Row ss:Height=\"22\">");
+            foreach (var col in columns)
+            {
+                string caption = !string.IsNullOrWhiteSpace(col.Header?.Caption) ? col.Header.Caption : col.Key;
+                xml.AppendLine($"    <Cell ss:StyleID=\"Header\"><Data ss:Type=\"String\">{System.Net.WebUtility.HtmlEncode(caption)}</Data></Cell>");
+            }
+            xml.AppendLine("   </Row>");
+
+            foreach (UltraGridRow row in rows)
+            {
+                xml.AppendLine("   <Row>");
+                foreach (var col in columns)
+                {
+                    object rawVal = row.Cells.Exists(col.Key) ? row.Cells[col.Key].Value : null;
+                    string valStr = Convert.ToString(rawVal);
+                    bool isNum = IsSummableColumn(col);
+
+                    if (isNum && decimal.TryParse(valStr, out decimal numVal))
+                    {
+                        xml.AppendLine($"    <Cell ss:StyleID=\"Number\"><Data ss:Type=\"Number\">{numVal}</Data></Cell>");
+                    }
+                    else
+                    {
+                        xml.AppendLine($"    <Cell><Data ss:Type=\"String\">{System.Net.WebUtility.HtmlEncode(valStr)}</Data></Cell>");
+                    }
+                }
+                xml.AppendLine("   </Row>");
+            }
+
+            xml.AppendLine("  </Table>");
+            xml.AppendLine(" </Worksheet>");
+            xml.AppendLine("</Workbook>");
+
+            File.WriteAllText(filePath, xml.ToString(), Encoding.UTF8);
+        }
+
+        private void ExportToPdf(string filePath, List<UltraGridRow> rows)
+        {
+            byte[] pdfData = BuildPdfDocument("Smart Reorder Dashboard Report", GetExportableColumns(), rows);
+            File.WriteAllBytes(filePath, pdfData);
+        }
+
+        private byte[] BuildPdfDocument(string title, List<UltraGridColumn> columns, List<UltraGridRow> rows)
+        {
+            StringBuilder content = new StringBuilder();
+            content.AppendLine("BT /F1 14 Tf 40 750 Td (" + EscapePdfString(title) + ") Tj ET");
+            content.AppendLine("BT /F1 9 Tf 40 735 Td (Generated: " + DateTime.Now.ToString("dd-MMM-yyyy HH:mm:ss") + " | Total Rows: " + rows.Count + ") Tj ET");
+
+            int yPos = 700;
+            int xStart = 40;
+            int cellWidth = Math.Max(30, 515 / Math.Max(1, columns.Count));
+
+            content.AppendLine($"q 0.36 0.59 0.84 rg 40 {yPos - 5} 515 18 re f Q");
+
+            int xPos = xStart;
+            foreach (var col in columns)
+            {
+                string caption = !string.IsNullOrWhiteSpace(col.Header?.Caption) ? col.Header.Caption : col.Key;
+                if (caption.Length > 12) caption = caption.Substring(0, 10) + "..";
+                content.AppendLine($"BT /F1 8 Tf 1 g {xPos + 2} {yPos} Td (" + EscapePdfString(caption) + ") Tj ET");
+                xPos += cellWidth;
+            }
+
+            yPos -= 20;
+
+            foreach (UltraGridRow row in rows)
+            {
+                if (yPos < 50) break;
+
+                xPos = xStart;
+                content.AppendLine($"q 0.96 0.98 1.0 rg 40 {yPos - 3} 515 15 re f Q");
+
+                foreach (var col in columns)
+                {
+                    object rawVal = row.Cells.Exists(col.Key) ? row.Cells[col.Key].Value : null;
+                    string valStr = Convert.ToString(rawVal);
+                    if (valStr.Length > 14) valStr = valStr.Substring(0, 12) + "..";
+
+                    content.AppendLine($"BT /F1 7.5 Tf 0 0 0 rg {xPos + 2} {yPos} Td (" + EscapePdfString(valStr) + ") Tj ET");
+                    xPos += cellWidth;
+                }
+
+                yPos -= 16;
+            }
+
+            string streamText = content.ToString();
+            byte[] streamBytes = Encoding.ASCII.GetBytes(streamText);
+
+            StringBuilder pdf = new StringBuilder();
+            pdf.AppendLine("%PDF-1.4");
+            pdf.AppendLine("1 0 obj <</Type /Catalog /Pages 2 0 R>> endobj");
+            pdf.AppendLine("2 0 obj <</Type /Pages /Kids [3 0 R] /Count 1>> endobj");
+            pdf.AppendLine("3 0 obj <</Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources <</Font <</F1 4 0 R>>>> /Contents 5 0 R>> endobj");
+            pdf.AppendLine("4 0 obj <</Type /Font /Subtype /Type1 /BaseFont /Helvetica>> endobj");
+            pdf.AppendLine($"5 0 obj <</Length {streamBytes.Length}>>");
+            pdf.AppendLine("stream");
+            pdf.Append(streamText);
+            pdf.AppendLine("endstream");
+            pdf.AppendLine("endobj");
+
+            int xrefOffset = pdf.Length;
+            pdf.AppendLine("xref");
+            pdf.AppendLine("0 6");
+            pdf.AppendLine("0000000000 65535 f ");
+            pdf.AppendLine("0000000009 00000 n ");
+            pdf.AppendLine("0000000058 00000 n ");
+            pdf.AppendLine("0000000115 00000 n ");
+            pdf.AppendLine("0000000230 00000 n ");
+            pdf.AppendLine("0000000302 00000 n ");
+            pdf.AppendLine("trailer <</Size 6 /Root 1 0 R>>");
+            pdf.AppendLine("startxref");
+            pdf.AppendLine(xrefOffset.ToString());
+            pdf.AppendLine("%%EOF");
+
+            return Encoding.ASCII.GetBytes(pdf.ToString());
+        }
+
+        private static string EscapePdfString(string input)
+        {
+            if (string.IsNullOrEmpty(input)) return "";
+            return input.Replace("\\", "\\\\").Replace("(", "\\(").Replace(")", "\\)");
         }
 
         private void SetupHeaderDragToHideAndColumnChooser()
