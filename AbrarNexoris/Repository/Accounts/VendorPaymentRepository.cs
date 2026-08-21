@@ -651,13 +651,23 @@ namespace Repository.Accounts
 
                         if (purDt != null && purDt.Rows.Count > 0)
                         {
-                            var vendorRows = purDt.AsEnumerable()
-                                .Where(r => r.Table.Columns.Contains("LedgerID") && r["LedgerID"] != DBNull.Value && Convert.ToInt32(r["LedgerID"]) == vendorLedgerId);
+                            string ledgerCol = purDt.Columns.Contains("LedgerID") ? "LedgerID" :
+                                               purDt.Columns.Contains("LedgerId") ? "LedgerId" :
+                                               purDt.Columns.Contains("VendorLedgerId") ? "VendorLedgerId" :
+                                               purDt.Columns.Contains("VendorLedgerID") ? "VendorLedgerID" :
+                                               purDt.Columns.Contains("VendorID") ? "VendorID" :
+                                               purDt.Columns.Contains("VendorId") ? "VendorId" : null;
 
-                            if (vendorRows.Any())
+                            if (ledgerCol != null)
                             {
-                                DataTable filteredPur = vendorRows.CopyToDataTable();
-                                dt = MapPurchaseTableToInvoiceTable(filteredPur);
+                                var vendorRows = purDt.AsEnumerable()
+                                    .Where(r => r[ledgerCol] != DBNull.Value && Convert.ToInt32(r[ledgerCol]) == vendorLedgerId);
+
+                                if (vendorRows.Any())
+                                {
+                                    DataTable filteredPur = vendorRows.CopyToDataTable();
+                                    dt = MapPurchaseTableToInvoiceTable(filteredPur);
+                                }
                             }
                         }
                     }
@@ -671,6 +681,12 @@ namespace Repository.Accounts
                     if (DataConnection.State == ConnectionState.Open)
                         DataConnection.Close();
                 }
+            }
+
+            // Ultimate Stored Procedure fallback: If all invoices SP returned no records, fallback to outstanding invoices SP
+            if (dt == null || dt.Rows.Count == 0)
+            {
+                dt = GetOutstandingInvoices(vendorLedgerId);
             }
 
             SanitizeInvoiceTable(dt);
