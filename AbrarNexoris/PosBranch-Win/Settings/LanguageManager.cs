@@ -38,6 +38,9 @@ namespace PosBranch_Win
         private static readonly Dictionary<string, LanguageItem> _availableLanguages = new Dictionary<string, LanguageItem>(StringComparer.OrdinalIgnoreCase);
         private static readonly Dictionary<string, Dictionary<string, string>> _translations = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
 
+        // Reverse map from translated string -> English master key (e.g. "Kod Bar" -> "Barcode")
+        private static readonly Dictionary<string, string> _reverseTranslationMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
         // Store original text for every UI element so switching languages multiple times never degrades or locks text in foreign strings
         private static readonly Dictionary<object, string> _originalTextMap = new Dictionary<object, string>();
 
@@ -51,6 +54,7 @@ namespace PosBranch_Win
             EnsureDirectoriesExist();
             LoadCustomLanguages();
             LoadSavedConfiguration();
+            RebuildReverseTranslationMap();
         }
 
         public static string CurrentLanguageCode => _currentLanguageCode;
@@ -85,6 +89,37 @@ namespace PosBranch_Win
             }
         }
 
+        private static void RebuildReverseTranslationMap()
+        {
+            lock (_reverseTranslationMap)
+            {
+                _reverseTranslationMap.Clear();
+
+                foreach (var kvpLang in _translations)
+                {
+                    string langCode = kvpLang.Key;
+                    if (string.Equals(langCode, "en", StringComparison.OrdinalIgnoreCase)) continue;
+
+                    var dict = kvpLang.Value;
+                    foreach (var kvp in dict)
+                    {
+                        string englishKey = kvp.Key;
+                        string translatedValue = kvp.Value;
+
+                        if (!string.IsNullOrWhiteSpace(translatedValue) && !string.IsNullOrWhiteSpace(englishKey))
+                        {
+                            string trimmedVal = translatedValue.Trim();
+                            string trimmedEng = englishKey.Trim();
+                            if (!string.Equals(trimmedVal, trimmedEng, StringComparison.OrdinalIgnoreCase))
+                            {
+                                _reverseTranslationMap[trimmedVal] = trimmedEng;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         private static string GetOriginalText(object element, string currentText)
         {
             if (element == null) return currentText;
@@ -92,11 +127,29 @@ namespace PosBranch_Win
             {
                 if (_originalTextMap.TryGetValue(element, out string orig) && !string.IsNullOrEmpty(orig))
                 {
+                    string trimmedOrig = orig.Trim();
+                    lock (_reverseTranslationMap)
+                    {
+                        if (_reverseTranslationMap.TryGetValue(trimmedOrig, out string masterKey))
+                        {
+                            _originalTextMap[element] = masterKey;
+                            return masterKey;
+                        }
+                    }
                     return orig;
                 }
                 if (!string.IsNullOrEmpty(currentText))
                 {
-                    _originalTextMap[element] = currentText;
+                    string trimmedCurrent = currentText.Trim();
+                    lock (_reverseTranslationMap)
+                    {
+                        if (_reverseTranslationMap.TryGetValue(trimmedCurrent, out string masterKey))
+                        {
+                            trimmedCurrent = masterKey;
+                        }
+                    }
+                    _originalTextMap[element] = trimmedCurrent;
+                    return trimmedCurrent;
                 }
             }
             return currentText;
@@ -122,7 +175,7 @@ namespace PosBranch_Win
                 { "Search", "Search" }, { "Filter", "Filter" }, { "Refresh", "Refresh" }, { "Hold", "Hold" }, { "Last Bill", "Last Bill" },
                 { "Export", "Export" }, { "Import", "Import" }, { "Bill No", "Bill No" }, { "Invoice No", "Invoice No" },
                 { "Customer Name", "Customer Name" }, { "Customer", "Customer" }, { "Item Name", "Item Name" }, { "Item Description", "Item Description" },
-                { "Barcode", "Barcode" }, { "Unit", "Unit" }, { "Qty", "Qty" }, { "Stock Qty", "Stock Qty" }, { "Unit Price", "Unit Price" },
+                { "Barcode", "Barcode" }, { "Unit", "Unit" }, { "Qty", "Qty" }, { "Quantity", "Quantity" }, { "Stock Qty", "Stock Qty" }, { "Unit Price", "Unit Price" },
                 { "Total Amount", "Total Amount" }, { "Amount", "Amount" }, { "Net Amount", "Net Amount" }, { "Cost", "Cost" },
                 { "Selling Price", "Selling Price" }, { "Price", "Price" }, { "Billed By", "Billed By" }, { "Date & Time", "Date & Time" },
                 { "Date", "Date" }, { "Time", "Time" }, { "Payment Mode", "Payment Mode" }, { "Cash", "Cash" }, { "Card", "Card" },
@@ -136,7 +189,11 @@ namespace PosBranch_Win
                 { "Sales Return", "Sales Return" }, { "Purchase Return", "Purchase Return" }, { "Stock Adjustment", "Stock Adjustment" },
                 { "Stock Transfer", "Stock Transfer" }, { "Stock Report", "Stock Report" }, { "Category", "Category" },
                 { "Group", "Group" }, { "Brand", "Brand" }, { "Users", "Users" }, { "Company", "Company" }, { "Branch", "Branch" },
-                { "User", "User" }, { "Business Date", "Business Date" }, { "SQL File Size", "SQL File Size" }, { "Nexoris Version", "Nexoris Version" }
+                { "User", "User" }, { "Business Date", "Business Date" }, { "SQL File Size", "SQL File Size" }, { "Nexoris Version", "Nexoris Version" },
+                { "SLNO", "SLNO" }, { "SL.No", "SL.No" }, { "Sl No", "Sl No" }, { "Sub Total", "Sub Total" }, { "Rounding", "Rounding" },
+                { "Purchase Tax", "Purchase Tax" }, { "Purcahse Tax", "Purchase Tax" }, { "Remark", "Remark" }, { "Remarks", "Remarks" },
+                { "Recieve Information", "Receive Information" }, { "Receive Information", "Receive Information" },
+                { "Item Information", "Item Information" }, { "Activate Total Rounding", "Activate Total Rounding" }
             };
             _translations["en"] = enDict;
 
@@ -158,7 +215,7 @@ namespace PosBranch_Win
                 { "Search", "खोजें" }, { "Filter", "फ़िल्टर" }, { "Refresh", "ताज़ा करें" }, { "Hold", "होल्ड करें" }, { "Last Bill", "अंतिम बिल" },
                 { "Export", "निर्यात" }, { "Import", "आयात" }, { "Bill No", "बिल संख्या" }, { "Invoice No", "इनवॉइस संख्या" },
                 { "Customer Name", "ग्राहक का नाम" }, { "Customer", "ग्राहक" }, { "Item Name", "वस्तु का नाम" }, { "Item Description", "वस्तु विवरण" },
-                { "Barcode", "बारकोड" }, { "Unit", "इकाई" }, { "Qty", "मात्रा" }, { "Stock Qty", "स्टॉक मात्रा" }, { "Unit Price", "इकाई मूल्य" },
+                { "Barcode", "बारकोड" }, { "Unit", "इकाई" }, { "Qty", "मात्रा" }, { "Quantity", "मात्रा" }, { "Stock Qty", "स्टॉक मात्रा" }, { "Unit Price", "इकाई मूल्य" },
                 { "Total Amount", "कुल राशि" }, { "Amount", "राशि" }, { "Net Amount", "शुद्ध राशि" }, { "Cost", "लागत" },
                 { "Selling Price", "बिक्री मूल्य" }, { "Price", "मूल्य" }, { "Billed By", "बिलकर्ता" }, { "Date & Time", "दिनांक एवं समय" },
                 { "Date", "दिनांक" }, { "Time", "समय" }, { "Payment Mode", "भुगतान का प्रकार" }, { "Cash", "नकद" }, { "Card", "कार्ड" },
@@ -172,7 +229,11 @@ namespace PosBranch_Win
                 { "Sales Return", "बिक्री वापसी" }, { "Purchase Return", "खरीद वापसी" }, { "Stock Adjustment", "स्टॉक समायोजन" },
                 { "Stock Transfer", "स्टॉक स्थानांतरण" }, { "Stock Report", "स्टॉक रिपोर्ट" }, { "Category", "श्रेणी" },
                 { "Group", "समूह" }, { "Brand", "ब्रांड" }, { "Users", "उपयोगकर्ता" }, { "Company", "कंपनी" }, { "Branch", "शाखा" },
-                { "User", "उपयोगकर्ता" }, { "Business Date", "व्यवसाय दिनांक" }, { "SQL File Size", "एसक्यूएल फ़ाइल आकार" }, { "Nexoris Version", "नेक्सोरिस संस्करण" }
+                { "User", "उपयोगकर्ता" }, { "Business Date", "व्यवसाय दिनांक" }, { "SQL File Size", "एसक्यूएल फ़ाइल आकार" }, { "Nexoris Version", "नेक्सोरिस संस्करण" },
+                { "SLNO", "क्रमांक" }, { "SL.No", "क्रमांक" }, { "Sl No", "क्रमांक" }, { "Sub Total", "उप-कुल" }, { "Rounding", "राउंडिंग" },
+                { "Purchase Tax", "खरीद कर" }, { "Purcahse Tax", "खरीद कर" }, { "Remark", "टिप्पणी" }, { "Remarks", "टिप्पणी" },
+                { "Recieve Information", "प्राप्ति जानकारी" }, { "Receive Information", "प्राप्ति जानकारी" },
+                { "Item Information", "वस्तु जानकारी" }, { "Activate Total Rounding", "कुल राउंडिंग सक्रिय करें" }
             };
             _translations["hi"] = hiDict;
 
@@ -194,7 +255,7 @@ namespace PosBranch_Win
                 { "Search", "Cari" }, { "Filter", "Penapis" }, { "Refresh", "Muat Semula" }, { "Hold", "Pegang (Hold)" }, { "Last Bill", "Resit Terakhir" },
                 { "Export", "Eksport" }, { "Import", "Import" }, { "Bill No", "No. Resit" }, { "Invoice No", "No. Invois" },
                 { "Customer Name", "Nama Pelanggan" }, { "Customer", "Pelanggan" }, { "Item Name", "Nama Barangan" }, { "Item Description", "Penerangan Barangan" },
-                { "Barcode", "Kod Bar" }, { "Unit", "Unit" }, { "Qty", "Kuantiti" }, { "Stock Qty", "Kuantiti Stok" }, { "Unit Price", "Harga Seunit" },
+                { "Barcode", "Kod Bar" }, { "Unit", "Unit" }, { "Qty", "Kuantiti" }, { "Quantity", "Kuantiti" }, { "Stock Qty", "Kuantiti Stok" }, { "Unit Price", "Harga Seunit" },
                 { "Total Amount", "Jumlah Besar" }, { "Amount", "Jumlah" }, { "Net Amount", "Jumlah Bersih" }, { "Cost", "Kos" },
                 { "Selling Price", "Harga Jualan" }, { "Price", "Harga" }, { "Billed By", "Juruwang" }, { "Date & Time", "Tarikh & Masa" },
                 { "Date", "Tarikh" }, { "Time", "Masa" }, { "Payment Mode", "Mod Pembayaran" }, { "Cash", "Tunai" }, { "Card", "Kad" },
@@ -371,6 +432,33 @@ namespace PosBranch_Win
 
             string key = textKey.Trim();
 
+            // Reverse lookup: If key is a translated string (e.g. "Kod Bar", "Nama Barangan", "Utama"), resolve its English master key!
+            lock (_reverseTranslationMap)
+            {
+                if (_reverseTranslationMap.TryGetValue(key, out string masterKey) && !string.IsNullOrWhiteSpace(masterKey))
+                {
+                    key = masterKey;
+                }
+                else if (fallback != null && _reverseTranslationMap.TryGetValue(fallback.Trim(), out string fallbackMasterKey))
+                {
+                    key = fallbackMasterKey;
+                }
+            }
+
+            // 1. English Mode: Return English master key or English translation if available
+            if (string.Equals(_currentLanguageCode, "en", StringComparison.OrdinalIgnoreCase))
+            {
+                if (_translations.TryGetValue("en", out var enDict))
+                {
+                    if (enDict.TryGetValue(key, out var enTranslation) && !string.IsNullOrWhiteSpace(enTranslation))
+                    {
+                        return enTranslation;
+                    }
+                }
+                return key;
+            }
+
+            // 2. Active Language Lookup
             if (_translations.TryGetValue(_currentLanguageCode, out var langDict))
             {
                 if (langDict.TryGetValue(key, out var translation) && !string.IsNullOrWhiteSpace(translation))
@@ -379,16 +467,16 @@ namespace PosBranch_Win
                 }
             }
 
-            // Fallback to English dictionary if present
-            if (_translations.TryGetValue("en", out var enDict))
+            // 3. Fallback to English dictionary if present
+            if (_translations.TryGetValue("en", out var enFallbackDict))
             {
-                if (enDict.TryGetValue(key, out var enTranslation) && !string.IsNullOrWhiteSpace(enTranslation))
+                if (enFallbackDict.TryGetValue(key, out var enTranslation) && !string.IsNullOrWhiteSpace(enTranslation))
                 {
                     return enTranslation;
                 }
             }
 
-            return fallback ?? textKey;
+            return fallback ?? key;
         }
 
         public static void ApplyLanguageToForm(Form form)
@@ -545,26 +633,11 @@ namespace PosBranch_Win
                     }
                     else if (control is UltraGrid uGrid)
                     {
-                        if (uGrid.DisplayLayout != null)
-                        {
-                            if (uGrid.DisplayLayout.GroupByBox != null && !string.IsNullOrWhiteSpace(uGrid.DisplayLayout.GroupByBox.Prompt))
-                            {
-                                string origPrompt = GetOriginalText(uGrid.DisplayLayout.GroupByBox, uGrid.DisplayLayout.GroupByBox.Prompt);
-                                uGrid.DisplayLayout.GroupByBox.Prompt = GetString(origPrompt, uGrid.DisplayLayout.GroupByBox.Prompt);
-                            }
-
-                            foreach (UltraGridBand band in uGrid.DisplayLayout.Bands)
-                            {
-                                foreach (UltraGridColumn col in band.Columns)
-                                {
-                                    if (col != null && !string.IsNullOrWhiteSpace(col.Header.Caption))
-                                    {
-                                        string orig = GetOriginalText(col, col.Header.Caption);
-                                        col.Header.Caption = GetString(orig, col.Header.Caption);
-                                    }
-                                }
-                            }
-                        }
+                        ApplyLanguageToUltraGrid(uGrid);
+                    }
+                    else if (control is ToolStrip ts)
+                    {
+                        ApplyLanguageToToolStrip(ts);
                     }
                 }
                 catch (Exception ex)
@@ -577,6 +650,99 @@ namespace PosBranch_Win
                     ApplyLanguageToControls(control.Controls);
                 }
             }
+        }
+
+        public static void ApplyLanguageToUltraGrid(UltraGrid uGrid)
+        {
+            if (uGrid == null || uGrid.IsDisposed || uGrid.DisplayLayout == null) return;
+
+            try
+            {
+                if (uGrid.DisplayLayout.GroupByBox != null && !string.IsNullOrWhiteSpace(uGrid.DisplayLayout.GroupByBox.Prompt))
+                {
+                    string origPrompt = GetOriginalText(uGrid.DisplayLayout.GroupByBox, uGrid.DisplayLayout.GroupByBox.Prompt);
+                    uGrid.DisplayLayout.GroupByBox.Prompt = GetString(origPrompt, uGrid.DisplayLayout.GroupByBox.Prompt);
+                }
+
+                foreach (UltraGridBand band in uGrid.DisplayLayout.Bands)
+                {
+                    foreach (UltraGridColumn col in band.Columns)
+                    {
+                        if (col != null && !string.IsNullOrWhiteSpace(col.Header.Caption))
+                        {
+                            string orig = GetOriginalText(col, col.Header.Caption);
+                            col.Header.Caption = GetString(orig, col.Header.Caption);
+                        }
+                    }
+                }
+
+                uGrid.InitializeLayout -= UltraGrid_Language_InitializeLayout;
+                uGrid.InitializeLayout += UltraGrid_Language_InitializeLayout;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error applying language to UltraGrid '{uGrid.Name}': {ex.Message}");
+            }
+        }
+
+        private static void UltraGrid_Language_InitializeLayout(object sender, InitializeLayoutEventArgs e)
+        {
+            if (e.Layout == null) return;
+            try
+            {
+                foreach (UltraGridBand band in e.Layout.Bands)
+                {
+                    foreach (UltraGridColumn col in band.Columns)
+                    {
+                        if (col != null && !string.IsNullOrWhiteSpace(col.Header.Caption))
+                        {
+                            string orig = GetOriginalText(col, col.Header.Caption);
+                            col.Header.Caption = GetString(orig, col.Header.Caption);
+                        }
+                    }
+                }
+            }
+            catch { }
+        }
+
+        public static void ApplyLanguageToToolStrip(ToolStrip ts)
+        {
+            if (ts == null || ts.IsDisposed) return;
+
+            try
+            {
+                foreach (ToolStripItem item in ts.Items)
+                {
+                    ApplyLanguageToToolStripItem(item);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error applying language to ToolStrip '{ts.Name}': {ex.Message}");
+            }
+        }
+
+        private static void ApplyLanguageToToolStripItem(ToolStripItem item)
+        {
+            if (item == null) return;
+
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(item.Text))
+                {
+                    string orig = GetOriginalText(item, item.Text);
+                    item.Text = GetString(orig, item.Text);
+                }
+
+                if (item is ToolStripDropDownItem dropDownItem && dropDownItem.HasDropDownItems)
+                {
+                    foreach (ToolStripItem subItem in dropDownItem.DropDownItems)
+                    {
+                        ApplyLanguageToToolStripItem(subItem);
+                    }
+                }
+            }
+            catch { }
         }
 
         public static void ApplyLanguageToExplorerBar(UltraExplorerBar explorerBar)
@@ -799,6 +965,7 @@ namespace PosBranch_Win
                     FilePath = filePath
                 };
                 _translations[code] = dict;
+                RebuildReverseTranslationMap();
                 return code;
             }
 
