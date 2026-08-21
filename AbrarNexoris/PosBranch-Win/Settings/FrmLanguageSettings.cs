@@ -1,4 +1,4 @@
-using Repository;
+using PosBranch_Win;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
@@ -10,6 +10,16 @@ namespace PosBranch_Win.Settings
 {
     public partial class FrmLanguageSettings : Form
     {
+        private readonly Color pageBack = Color.FromArgb(232, 246, 255);
+        private readonly Color cardBack = Color.FromArgb(250, 253, 255);
+        private readonly Color border = Color.FromArgb(190, 226, 250);
+        private readonly Color navy = Color.FromArgb(20, 55, 120);
+        private readonly Color muted = Color.FromArgb(72, 98, 138);
+        private readonly Color accent = Color.FromArgb(42, 121, 232);
+        private readonly Color skyBlueOutline = Color.FromArgb(102, 190, 255);
+
+        private bool suppressSelectionChange = false;
+
         public FrmLanguageSettings()
         {
             InitializeComponent();
@@ -20,8 +30,80 @@ namespace PosBranch_Win.Settings
             this.btnImport.Click += BtnImport_Click;
             this.btnExport.Click += BtnExport_Click;
             this.btnClose.Click += (s, e) => this.Close();
+            this.lstLanguages.SelectedIndexChanged += LstLanguages_SelectedIndexChanged;
+            this.lstLanguages.DoubleClick += LstLanguages_DoubleClick;
 
             LanguageManager.LanguageChanged += LanguageManager_LanguageChanged;
+            ApplyRuntimeStyles();
+        }
+
+        private void ApplyRuntimeStyles()
+        {
+            this.Text = "App Language Settings";
+            this.BackColor = pageBack;
+            this.Font = new Font("Segoe UI", 9F);
+
+            AttachCardPaint(panelHeaderCard);
+            AttachCardPaint(panelCard);
+
+            StyleButton(btnApply, true);
+            StyleButton(btnResetDefault, false);
+            StyleButton(btnImport, false);
+            StyleButton(btnExport, false);
+            StyleButton(btnClose, false);
+        }
+
+        private void AttachCardPaint(Panel panel)
+        {
+            if (panel != null)
+                panel.Paint += Card_Paint;
+        }
+
+        private void Card_Paint(object sender, PaintEventArgs e)
+        {
+            if (sender is Panel panel)
+            {
+                using (Pen pen = new Pen(border, 1))
+                {
+                    Rectangle rect = panel.ClientRectangle;
+                    rect.Width -= 1;
+                    rect.Height -= 1;
+                    e.Graphics.DrawRectangle(pen, rect);
+                }
+            }
+        }
+
+        private void StyleButton(Button button, bool primary)
+        {
+            if (button == null) return;
+
+            button.FlatStyle = FlatStyle.Flat;
+            button.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
+            button.ForeColor = primary ? Color.White : navy;
+            button.BackColor = primary ? accent : Color.FromArgb(236, 246, 255);
+            button.UseVisualStyleBackColor = false;
+            button.FlatAppearance.BorderColor = primary ? accent : skyBlueOutline;
+            button.FlatAppearance.BorderSize = primary ? 0 : 1;
+            button.FlatAppearance.MouseOverBackColor = primary ? accent : Color.FromArgb(225, 244, 255);
+            button.FlatAppearance.MouseDownBackColor = primary ? Color.FromArgb(31, 96, 205) : Color.FromArgb(210, 235, 252);
+
+            if (primary)
+            {
+                button.Paint -= ApplyButton_Paint;
+                button.Paint += ApplyButton_Paint;
+            }
+        }
+
+        private void ApplyButton_Paint(object sender, PaintEventArgs e)
+        {
+            if (sender is Button btn)
+            {
+                using (SolidBrush brush = new SolidBrush(accent))
+                    e.Graphics.FillRectangle(brush, btn.ClientRectangle);
+
+                TextRenderer.DrawText(e.Graphics, btn.Text, btn.Font, btn.ClientRectangle,
+                    Color.White, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.SingleLine);
+            }
         }
 
         private void FrmLanguageSettings_Load(object sender, EventArgs e)
@@ -44,31 +126,75 @@ namespace PosBranch_Win.Settings
 
         private void PopulateLanguageList()
         {
-            lstLanguages.Items.Clear();
-            var languages = LanguageManager.GetAvailableLanguages();
-
-            int selectedIndex = 0;
-            for (int i = 0; i < languages.Count; i++)
+            suppressSelectionChange = true;
+            try
             {
-                var lang = languages[i];
-                string display = $"{lang.FlagSymbol}  {lang.Name} [Code: {lang.Code.ToUpper()}]" + (lang.IsCustom ? " (Custom)" : "");
-                lstLanguages.Items.Add(display);
+                lstLanguages.Items.Clear();
+                var languages = LanguageManager.GetAvailableLanguages();
 
-                if (string.Equals(lang.Code, LanguageManager.CurrentLanguageCode, StringComparison.OrdinalIgnoreCase))
+                int selectedIndex = 0;
+                for (int i = 0; i < languages.Count; i++)
                 {
-                    selectedIndex = i;
+                    var lang = languages[i];
+                    string display = $"{lang.FlagSymbol}  {lang.Name} [Code: {lang.Code.ToUpper()}]" + (lang.IsCustom ? " (Custom)" : "");
+                    lstLanguages.Items.Add(display);
+
+                    if (string.Equals(lang.Code, LanguageManager.CurrentLanguageCode, StringComparison.OrdinalIgnoreCase))
+                    {
+                        selectedIndex = i;
+                    }
+                }
+
+                if (lstLanguages.Items.Count > 0)
+                {
+                    lstLanguages.SelectedIndex = selectedIndex;
                 }
             }
-
-            if (lstLanguages.Items.Count > 0)
+            finally
             {
-                lstLanguages.SelectedIndex = selectedIndex;
+                suppressSelectionChange = false;
             }
         }
 
         private void UpdateStatusLabel()
         {
             lblStatus.Text = $"{LanguageManager.GetString("Ready")}: {LanguageManager.CurrentLanguageName} ({LanguageManager.CurrentLanguageCode.ToUpper()})";
+        }
+
+        private void LstLanguages_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            if (suppressSelectionChange) return;
+            ApplySelectedLanguage();
+        }
+
+        private void LstLanguages_DoubleClick(object sender, EventArgs e)
+        {
+            ApplySelectedLanguage();
+        }
+
+        private void ApplySelectedLanguage()
+        {
+            try
+            {
+                int index = lstLanguages.SelectedIndex;
+                var languages = LanguageManager.GetAvailableLanguages();
+                if (index >= 0 && index < languages.Count)
+                {
+                    var selectedLang = languages[index];
+                    if (!string.Equals(selectedLang.Code, LanguageManager.CurrentLanguageCode, StringComparison.OrdinalIgnoreCase))
+                    {
+                        bool success = LanguageManager.SetLanguage(selectedLang.Code);
+                        if (success)
+                        {
+                            LanguageManager.ApplyLanguageToApplication();
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error applying selected language: {ex.Message}");
+            }
         }
 
         private void BtnApply_Click(object sender, EventArgs e)
@@ -83,9 +209,10 @@ namespace PosBranch_Win.Settings
                     bool success = LanguageManager.SetLanguage(selectedLang.Code);
                     if (success)
                     {
+                        LanguageManager.ApplyLanguageToApplication();
                         MessageBox.Show(
-                            $"{LanguageManager.GetString("Language Changed") ?? "Language changed successfully to"}: {selectedLang.Name}",
-                            LanguageManager.GetString("App Language"),
+                            $"{LanguageManager.GetString("Language Changed", "Language changed successfully to")}: {selectedLang.Name}",
+                            LanguageManager.GetString("App Language", "App Language"),
                             MessageBoxButtons.OK,
                             MessageBoxIcon.Information);
                     }
@@ -112,9 +239,10 @@ namespace PosBranch_Win.Settings
                 bool success = LanguageManager.SetLanguage("en");
                 if (success)
                 {
+                    LanguageManager.ApplyLanguageToApplication();
                     MessageBox.Show(
-                        LanguageManager.GetString("Rolled back to Default Language (English)"),
-                        LanguageManager.GetString("App Language"),
+                        LanguageManager.GetString("Rolled back to Default Language (English)", "Rolled back to Default Language (English)"),
+                        LanguageManager.GetString("App Language", "App Language"),
                         MessageBoxButtons.OK,
                         MessageBoxIcon.Information);
                 }
@@ -141,6 +269,7 @@ namespace PosBranch_Win.Settings
                         if (success)
                         {
                             PopulateLanguageList();
+                            LanguageManager.ApplyLanguageToApplication();
                             MessageBox.Show(
                                 "Language file imported successfully!",
                                 LanguageManager.GetString("Success"),

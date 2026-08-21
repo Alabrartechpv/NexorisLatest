@@ -145,7 +145,14 @@ namespace PosBranch_Win
             tabControlMain.SelectedTabChanged += TabControlMain_SelectedTabChanged;
             UpdateHoldToolVisibility();
 
-
+            // Subscribe to persistent language change events
+            LanguageManager.LanguageChanged += (s, e) =>
+            {
+                if (!this.IsDisposed && this.IsHandleCreated)
+                {
+                    this.BeginInvoke(new Action(() => ApplyLanguageToAllForms()));
+                }
+            };
 
             // Configure specific properties for UltraTabControl v22.2
             // Note: Some properties may not exist in v22.2, so we use try-catch
@@ -1055,6 +1062,7 @@ namespace PosBranch_Win
                     if (this.IsDisposed || !this.IsHandleCreated) return;
                     this.BeginInvoke(new Action(() =>
                     {
+                        PopulateLanguageGroup();
                         LanguageManager.ApplyLanguageToRibbon(this.ultraToolbarsManager1);
                         LanguageManager.ApplyLanguageToForm(this);
                         foreach (Infragistics.Win.UltraWinTabControl.UltraTab tab in tabControlMain.Tabs)
@@ -1219,6 +1227,25 @@ namespace PosBranch_Win
                     }
                     catch { }
                 }
+
+                // Populate available languages inside "My Language" sidebar group
+                PopulateLanguageGroup();
+
+                // Wire up group selection/click to refresh language list
+                ultraExplorerBarSideMenu.GroupClick += (s, args) =>
+                {
+                    if (args.Group != null && args.Group.Key == "MyLanguage")
+                    {
+                        PopulateLanguageGroup();
+                    }
+                };
+                ultraExplorerBarSideMenu.SelectedGroupChanged += (s, args) =>
+                {
+                    if (args.Group != null && args.Group.Key == "MyLanguage")
+                    {
+                        PopulateLanguageGroup();
+                    }
+                };
             }
             catch { } // If property doesn't exist
 
@@ -1240,6 +1267,9 @@ namespace PosBranch_Win
 
             // Ensure "Item Type" button exists in the Utilities ribbon
             EnsureItemTypeRibbonButton();
+
+            // Apply active persistent language to Home and all controls
+            ApplyLanguageToAllForms();
         }
 
         /// <summary>
@@ -3801,6 +3831,26 @@ namespace PosBranch_Win
         {
             try
             {
+                if (e.Item != null && (e.Item.Group?.Key == "MyLanguage" || (e.Item.Key != null && e.Item.Key.StartsWith("LANG_"))))
+                {
+                    string langCode = e.Item.Tag as string;
+                    if (string.IsNullOrEmpty(langCode) && e.Item.Key != null && e.Item.Key.StartsWith("LANG_"))
+                    {
+                        langCode = e.Item.Key.Substring("LANG_".Length);
+                    }
+
+                    if (!string.IsNullOrEmpty(langCode))
+                    {
+                        bool success = LanguageManager.SetLanguage(langCode);
+                        if (success)
+                        {
+                            LanguageManager.ApplyLanguageToApplication();
+                            PopulateLanguageGroup();
+                        }
+                    }
+                    return;
+                }
+
                 if (e.Item.Key == "AddToFavourite")
                 {
                     if (tabControlMain.SelectedTab != null)
@@ -4131,6 +4181,101 @@ namespace PosBranch_Win
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error styling favourite item: {ex.Message}");
+            }
+        }
+
+        private void PopulateLanguageGroup()
+        {
+            try
+            {
+                var langGroup = ultraExplorerBarSideMenu.Groups["MyLanguage"];
+                if (langGroup == null) return;
+
+                langGroup.Items.Clear();
+                var availableLanguages = LanguageManager.GetAvailableLanguages();
+                string currentLangCode = LanguageManager.CurrentLanguageCode;
+
+                foreach (var lang in availableLanguages)
+                {
+                    string itemKey = "LANG_" + lang.Code;
+                    bool isActive = string.Equals(lang.Code, currentLangCode, StringComparison.OrdinalIgnoreCase);
+
+                    string display = $"{lang.FlagSymbol}  {lang.Name}";
+                    if (isActive)
+                    {
+                        display += "  ✓";
+                    }
+
+                    var item = new Infragistics.Win.UltraWinExplorerBar.UltraExplorerBarItem(itemKey);
+                    item.Text = display;
+                    item.Tag = lang.Code;
+
+                    StyleLanguageItem(item, isActive);
+
+                    langGroup.Items.Add(item);
+                }
+
+                langGroup.Settings.AppearancesSmall.ItemAreaAppearance.BackColor = Color.FromArgb(215, 236, 255);
+                langGroup.Settings.ItemAreaInnerMargins.Left = 8;
+                langGroup.Settings.ItemAreaInnerMargins.Right = 8;
+                langGroup.Settings.ItemAreaInnerMargins.Top = 3;
+                langGroup.Settings.ItemAreaInnerMargins.Bottom = 3;
+
+                ultraExplorerBarSideMenu.Refresh();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error populating language group in sidebar: {ex.Message}");
+            }
+        }
+
+        private void StyleLanguageItem(Infragistics.Win.UltraWinExplorerBar.UltraExplorerBarItem item, bool isActive)
+        {
+            if (item == null) return;
+
+            try
+            {
+                item.Settings.ReserveImageSpace = Infragistics.Win.DefaultableBoolean.False;
+                item.Settings.UseDefaultImage = Infragistics.Win.DefaultableBoolean.False;
+
+                item.Settings.Style = Infragistics.Win.UltraWinExplorerBar.ItemStyle.Button;
+                item.Settings.Height = 32;
+
+                item.Settings.AppearancesSmall.Appearance.ThemedElementAlpha = Infragistics.Win.Alpha.Transparent;
+                item.Settings.AppearancesSmall.HotTrackAppearance.ThemedElementAlpha = Infragistics.Win.Alpha.Transparent;
+                item.Settings.AppearancesSmall.ActiveAppearance.ThemedElementAlpha = Infragistics.Win.Alpha.Transparent;
+
+                if (isActive)
+                {
+                    item.Settings.AppearancesSmall.Appearance.BackColor = Color.FromArgb(42, 121, 232);
+                    item.Settings.AppearancesSmall.Appearance.BackColor2 = Color.FromArgb(20, 90, 190);
+                    item.Settings.AppearancesSmall.Appearance.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
+                    item.Settings.AppearancesSmall.Appearance.ForeColor = Color.White;
+                    item.Settings.AppearancesSmall.Appearance.FontData.Bold = Infragistics.Win.DefaultableBoolean.True;
+                }
+                else
+                {
+                    item.Settings.AppearancesSmall.Appearance.BackColor = Color.FromArgb(236, 246, 255);
+                    item.Settings.AppearancesSmall.Appearance.BackColor2 = Color.FromArgb(215, 236, 255);
+                    item.Settings.AppearancesSmall.Appearance.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
+                    item.Settings.AppearancesSmall.Appearance.ForeColor = Color.FromArgb(20, 55, 120);
+                    item.Settings.AppearancesSmall.Appearance.FontData.Bold = Infragistics.Win.DefaultableBoolean.False;
+                }
+
+                item.Settings.AppearancesSmall.Appearance.FontData.Name = "Segoe UI";
+                item.Settings.AppearancesSmall.Appearance.FontData.SizeInPoints = 9f;
+                item.Settings.AppearancesSmall.Appearance.TextHAlignAsString = "Left";
+                item.Settings.AppearancesSmall.Appearance.TextVAlignAsString = "Middle";
+
+                item.Settings.AppearancesSmall.HotTrackAppearance.BackColor = Color.FromArgb(0, 190, 235);
+                item.Settings.AppearancesSmall.HotTrackAppearance.BackColor2 = Color.FromArgb(0, 155, 200);
+                item.Settings.AppearancesSmall.HotTrackAppearance.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
+                item.Settings.AppearancesSmall.HotTrackAppearance.ForeColor = Color.White;
+                item.Settings.AppearancesSmall.HotTrackAppearance.FontData.Bold = Infragistics.Win.DefaultableBoolean.True;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error styling language item: {ex.Message}");
             }
         }
 
@@ -5101,6 +5246,100 @@ namespace PosBranch_Win
             {
                 System.Diagnostics.Debug.WriteLine($"Error opening form by type: {ex.Message}");
                 MessageBox.Show($"Error opening form: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// Universal method that translates Home, Ribbon, ExplorerBar, StatusStrip, all tabbed forms, MDI children, and standalone dialogs
+        /// </summary>
+        public void ApplyLanguageToAllForms()
+        {
+            try
+            {
+                // 1. Translate Home form controls
+                LanguageManager.ApplyLanguageToForm(this);
+
+                // 2. Translate Ribbon
+                if (this.ultraToolbarsManager1 != null)
+                {
+                    LanguageManager.ApplyLanguageToRibbon(this.ultraToolbarsManager1);
+                }
+
+                // 3. Translate Side Menu ExplorerBar
+                if (this.ultraExplorerBarSideMenu != null)
+                {
+                    LanguageManager.ApplyLanguageToExplorerBar(this.ultraExplorerBarSideMenu);
+                }
+
+                // 4. Translate Report Navigator ExplorerBar
+                if (this.ultraExplorerBarReportNavigator != null)
+                {
+                    LanguageManager.ApplyLanguageToExplorerBar(this.ultraExplorerBarReportNavigator);
+                }
+
+                // 5. Translate any status strip or status bar controls on Home if present
+                foreach (Control ctrl in this.Controls)
+                {
+                    if (ctrl is StatusStrip ss)
+                    {
+                        foreach (ToolStripItem item in ss.Items)
+                        {
+                            if (item != null && !string.IsNullOrWhiteSpace(item.Text))
+                            {
+                                item.Text = LanguageManager.GetString(item.Text, item.Text);
+                            }
+                        }
+                    }
+                }
+
+                // 6. Translate all active tab pages and embedded child forms
+                if (this.tabControlMain != null && this.tabControlMain.Tabs != null)
+                {
+                    foreach (Infragistics.Win.UltraWinTabControl.UltraTab tab in this.tabControlMain.Tabs)
+                    {
+                        if (tab != null && !string.IsNullOrWhiteSpace(tab.Text))
+                        {
+                            tab.Text = LanguageManager.GetString(tab.Text, tab.Text);
+                        }
+                        if (tab?.TabPage != null)
+                        {
+                            foreach (Control c in tab.TabPage.Controls)
+                            {
+                                if (c is Form childForm && !childForm.IsDisposed)
+                                {
+                                    LanguageManager.ApplyLanguageToForm(childForm);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 7. Translate MDI Children
+                if (this.MdiChildren != null)
+                {
+                    foreach (Form mdiChild in this.MdiChildren)
+                    {
+                        if (mdiChild != null && !mdiChild.IsDisposed)
+                        {
+                            LanguageManager.ApplyLanguageToForm(mdiChild);
+                        }
+                    }
+                }
+
+                // 8. Translate all Application.OpenForms
+                foreach (Form openForm in Application.OpenForms.Cast<Form>().ToList())
+                {
+                    if (openForm != null && !openForm.IsDisposed && openForm != this)
+                    {
+                        LanguageManager.ApplyLanguageToForm(openForm);
+                    }
+                }
+
+                this.Refresh();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error in Home.ApplyLanguageToAllForms: {ex.Message}");
             }
         }
 

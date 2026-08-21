@@ -1,11 +1,17 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
+using Infragistics.Win;
+using Infragistics.Win.Misc;
+using Infragistics.Win.UltraWinEditors;
+using Infragistics.Win.UltraWinExplorerBar;
 using Infragistics.Win.UltraWinGrid;
+using Infragistics.Win.UltraWinTabControl;
 using Infragistics.Win.UltraWinToolbars;
 
 namespace PosBranch_Win
@@ -31,7 +37,9 @@ namespace PosBranch_Win
         private static string _currentLanguageCode = "en";
         private static readonly Dictionary<string, LanguageItem> _availableLanguages = new Dictionary<string, LanguageItem>(StringComparer.OrdinalIgnoreCase);
         private static readonly Dictionary<string, Dictionary<string, string>> _translations = new Dictionary<string, Dictionary<string, string>>(StringComparer.OrdinalIgnoreCase);
-        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<object, string> _originalTextMap = new System.Runtime.CompilerServices.ConditionalWeakTable<object, string>();
+
+        // Store original text for every UI element so switching languages multiple times never degrades or locks text in foreign strings
+        private static readonly Dictionary<object, string> _originalTextMap = new Dictionary<object, string>();
 
         private static readonly string ConfigDirectory = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Settings");
         private static readonly string ConfigFilePath = Path.Combine(ConfigDirectory, "language_config.json");
@@ -62,7 +70,7 @@ namespace PosBranch_Win
             return _availableLanguages.Values.ToList();
         }
 
-        private static void EnsureDirectoriesExist()
+        public static void EnsureDirectoriesExist()
         {
             try
             {
@@ -77,6 +85,23 @@ namespace PosBranch_Win
             }
         }
 
+        private static string GetOriginalText(object element, string currentText)
+        {
+            if (element == null) return currentText;
+            lock (_originalTextMap)
+            {
+                if (_originalTextMap.TryGetValue(element, out string orig) && !string.IsNullOrEmpty(orig))
+                {
+                    return orig;
+                }
+                if (!string.IsNullOrEmpty(currentText))
+                {
+                    _originalTextMap[element] = currentText;
+                }
+            }
+            return currentText;
+        }
+
         private static void InitializeBuiltInLanguages()
         {
             // 1. ENGLISH (en)
@@ -85,37 +110,33 @@ namespace PosBranch_Win
             {
                 { "Home", "Home" }, { "Master", "Master" }, { "Transaction", "Transaction" }, { "Accounts", "Accounts" },
                 { "Vendor", "Vendor" }, { "Reports", "Reports" }, { "Utilities", "Utilities" }, { "Settings", "Settings" },
-                { "Manual Balance", "Manual Balance" }, { "Company", "Company" }, { "Branch", "Branch" }, { "State", "State" },
-                { "Country", "Country" }, { "Currency", "Currency" }, { "Group", "Group" }, { "Category", "Category" },
-                { "ItemMaster", "Item Master" }, { "Item Master", "Item Master" }, { "Brand", "Brand" }, { "Users", "Users" },
-                { "Reason", "Reason" }, { "Sales", "Sales" }, { "Sales Details", "Sales Details" }, { "Sales Return", "Sales Return" },
-                { "Purchase", "Purchase" }, { "Purchase Order", "Purchase Order" }, { "Purchase Return", "Purchase Return" },
-                { "Stock Adjustment", "Stock Adjustment" }, { "Stock Transfer", "Stock Transfer" }, { "Customer", "Customer" },
-                { "Ledger", "Ledger" }, { "Receipt", "Receipt" }, { "Payment", "Payment" }, { "General Payment", "General Payment" },
-                { "General Receipt", "General Receipt" }, { "Contra", "Contra" }, { "Journal", "Journal" }, { "DebitNote", "Debit Note" },
-                { "Debit Note", "Debit Note" }, { "CreditNote", "Credit Note" }, { "Credit Note", "Credit Note" }, { "ChartOfAccount", "Chart of Accounts" },
-                { "Print Barcode", "Print Barcode" }, { "PLU Weighing", "PLU Weighing" }, { "OpeningStock", "Opening Stock" },
-                { "Opening Stock", "Opening Stock" }, { "Closing", "Closing" }, { "Database Maintenance", "Database Maintenance" },
-                { "Sale Settings", "Sale Settings" }, { "Excel Import/Export", "Excel Import/Export" }, { "Import/Export", "Import/Export" },
-                { "Roles", "Roles" }, { "RolePermission", "Role Permission" }, { "Role Permissions", "Role Permission" },
+                { "Manual Balance", "Manual Balance" }, { "Sale Settings", "Sale Settings" }, { "Import/Export", "Import/Export" },
+                { "Roles", "Roles" }, { "RolePermission", "Role Permission" }, { "Role Permissions", "Role Permissions" },
                 { "Tax Management", "Tax Management" }, { "TaxManagement", "Tax Management" }, { "ActivityLog", "Activity Log" },
-                { "Activity Log", "Activity Log" }, { "Year Closing", "Year Closing" }, { "Financial Year Closing", "Year Closing" },
-                { "App Language", "App Language" }, { "Language Settings", "Language Settings" }, { "Save", "Save" }, { "Clear", "Clear" },
-                { "Delete", "Delete" }, { "Update", "Update" }, { "Cancel", "Cancel" }, { "Print", "Print" }, { "Close", "Close" },
+                { "Activity Log", "Activity Log" }, { "Year Closing", "Year Closing" }, { "Financial Year Closing", "Financial Year Closing" },
+                { "App Language", "App Language" }, { "App Language Settings", "App Language Settings" }, { "Language Settings", "Language Settings" },
+                { "Select your preferred application language or import custom translations", "Select your preferred application language or import custom translations" },
+                { "Available Languages:", "Available Languages:" }, { "Apply Language", "Apply Language" }, { "Reset to Default (English)", "Reset to Default (English)" },
+                { "Import Custom Language", "Import Custom Language" }, { "Export Template", "Export Template" }, { "Close", "Close" },
+                { "Save", "Save" }, { "Clear", "Clear" }, { "Delete", "Delete" }, { "Update", "Update" }, { "Cancel", "Cancel" }, { "Print", "Print" },
                 { "Search", "Search" }, { "Filter", "Filter" }, { "Refresh", "Refresh" }, { "Hold", "Hold" }, { "Last Bill", "Last Bill" },
-                { "Export", "Export" }, { "Import", "Import" }, { "Bill No", "Bill No" }, { "Customer Name", "Customer Name" },
-                { "Item Name", "Item Name" }, { "Barcode", "Barcode" }, { "Unit", "Unit" }, { "Qty", "Qty" }, { "Quantity", "Quantity" },
-                { "Unit Price", "Unit Price" }, { "Price", "Price" }, { "Total Amount", "Total Amount" }, { "Amount", "Amount" },
-                { "Net Amount", "Net Amount" }, { "Cost", "Cost" }, { "Selling Price", "Selling Price" }, { "Billed By", "Billed By" },
-                { "Date & Time", "Date & Time" }, { "Date", "Date" }, { "Payment Mode", "Payment Mode" }, { "Paymode", "Paymode" },
+                { "Export", "Export" }, { "Import", "Import" }, { "Bill No", "Bill No" }, { "Invoice No", "Invoice No" },
+                { "Customer Name", "Customer Name" }, { "Customer", "Customer" }, { "Item Name", "Item Name" }, { "Item Description", "Item Description" },
+                { "Barcode", "Barcode" }, { "Unit", "Unit" }, { "Qty", "Qty" }, { "Stock Qty", "Stock Qty" }, { "Unit Price", "Unit Price" },
+                { "Total Amount", "Total Amount" }, { "Amount", "Amount" }, { "Net Amount", "Net Amount" }, { "Cost", "Cost" },
+                { "Selling Price", "Selling Price" }, { "Price", "Price" }, { "Billed By", "Billed By" }, { "Date & Time", "Date & Time" },
+                { "Date", "Date" }, { "Time", "Time" }, { "Payment Mode", "Payment Mode" }, { "Cash", "Cash" }, { "Card", "Card" },
                 { "Total Sales", "Total Sales" }, { "Total Orders", "Total Orders" }, { "Average Order", "Average Order" },
                 { "Total Profit", "Total Profit" }, { "Items Sold", "Items Sold" }, { "Hold Item", "Hold Item" }, { "Ready", "Ready" },
                 { "Success", "Success" }, { "Error", "Error" }, { "Warning", "Warning" }, { "Information", "Information" },
-                { "Select Language", "Select Language" }, { "Import Custom Language", "Import Custom Language" },
-                { "Export Template", "Export Template" }, { "Apply Language", "Apply Language" },
-                { "Reset to Default (English)", "Reset to Default (English)" },
-                { "Language changed successfully to", "Language changed successfully to" },
-                { "Rolled back to Default Language (English)", "Rolled back to Default Language (English)" }
+                { "Item Master", "Item Master" }, { "ItemMaster", "Item Master" }, { "Sales", "Sales Invoice" }, { "Exit", "Exit" },
+                { "Report", "Report" }, { "LogOff", "Log Off" }, { "ReOrder", "ReOrder" }, { "Overview", "Overview" },
+                { "Business Summary", "Business Summary" }, { "Dashboard", "Dashboard" }, { "My Favourite Menu", "My Favourite Menu" },
+                { "Sales Invoice", "Sales Invoice" }, { "Purchase", "Purchase" }, { "Purchase Order", "Purchase Order" },
+                { "Sales Return", "Sales Return" }, { "Purchase Return", "Purchase Return" }, { "Stock Adjustment", "Stock Adjustment" },
+                { "Stock Transfer", "Stock Transfer" }, { "Stock Report", "Stock Report" }, { "Category", "Category" },
+                { "Group", "Group" }, { "Brand", "Brand" }, { "Users", "Users" }, { "Company", "Company" }, { "Branch", "Branch" },
+                { "User", "User" }, { "Business Date", "Business Date" }, { "SQL File Size", "SQL File Size" }, { "Nexoris Version", "Nexoris Version" }
             };
             _translations["en"] = enDict;
 
@@ -126,22 +147,32 @@ namespace PosBranch_Win
                 { "Home", "मुख्य पृष्ठ" }, { "Master", "मास्टर" }, { "Transaction", "लेन-देन" }, { "Accounts", "खाते" },
                 { "Vendor", "विक्रेता" }, { "Reports", "रिपोर्ट्स" }, { "Utilities", "उपयोगिताएँ" }, { "Settings", "सेटिंग्स" },
                 { "Manual Balance", "मैनुअल बैलेंस" }, { "Sale Settings", "बिक्री सेटिंग्स" }, { "Import/Export", "आयात/निर्यात" },
-                { "Roles", "भूमिकाएं" }, { "RolePermission", "अनुमति प्रबंधन" }, { "Tax Management", "कर प्रबंधन" },
-                { "TaxManagement", "कर प्रबंधन" }, { "ActivityLog", "गतिविधि लॉग" }, { "Activity Log", "गतिविधि लॉग" },
-                { "Year Closing", "वर्ष समाप्ति" }, { "Financial Year Closing", "वित्तीय वर्ष समाप्ति" }, { "App Language", "ऐप भाषा" },
-                { "Language Settings", "भाषा सेटिंग्स" }, { "Save", "सहेजें" }, { "Clear", "साफ करें" }, { "Delete", "हटाएं" },
-                { "Update", "अद्यतन करें" }, { "Cancel", "रद्द करें" }, { "Print", "प्रिंट" }, { "Close", "बंद करें" }, { "Search", "खोजें" },
-                { "Filter", "फ़िल्टर" }, { "Refresh", "ताज़ा करें" }, { "Hold", "होल्ड करें" }, { "Last Bill", "अंतिम बिल" },
-                { "Export", "निर्यात" }, { "Import", "आयात" }, { "Bill No", "बिल संख्या" }, { "Customer Name", "ग्राहक का नाम" },
-                { "Customer", "ग्राहक" }, { "Item Name", "वस्तु का नाम" }, { "Barcode", "बारकोड" }, { "Unit", "इकाई" },
-                { "Qty", "मात्रा" }, { "Unit Price", "इकाई मूल्य" }, { "Total Amount", "कुल राशि" }, { "Amount", "राशि" },
-                { "Net Amount", "शुद्ध राशि" }, { "Cost", "लागत" }, { "Selling Price", "बिक्री मूल्य" }, { "Billed By", "बिलकर्ता" },
-                { "Date & Time", "दिनांक एवं समय" }, { "Date", "दिनांक" }, { "Payment Mode", "भुगतान का प्रकार" }, { "Total Sales", "कुल बिक्री" },
-                { "Total Orders", "कुल ऑर्डर" }, { "Average Order", "औसत ऑर्डर" }, { "Total Profit", "कुल लाभ" },
-                { "Items Sold", "बेची गई वस्तुएं" }, { "Hold Item", "होल्ड वस्तुएं" }, { "Ready", "तैयार" }, { "Success", "सफलता" },
-                { "Error", "त्रुटि" }, { "Warning", "चेतावनी" }, { "Information", "सूचना" }, { "Select Language", "भाषा चुनें" },
-                { "Import Custom Language", "कस्टम भाषा आयात करें" }, { "Export Template", "टम्प्लेट निर्यात करें" },
-                { "Apply Language", "भाषा लागू करें" }
+                { "Roles", "भूमिकाएं" }, { "RolePermission", "अनुमति प्रबंधन" }, { "Role Permissions", "भूमिका अनुमतियां" },
+                { "Tax Management", "कर प्रबंधन" }, { "TaxManagement", "कर प्रबंधन" }, { "ActivityLog", "गतिविधि लॉग" },
+                { "Activity Log", "गतिविधि लॉग" }, { "Year Closing", "वर्ष समाप्ति" }, { "Financial Year Closing", "वित्तीय वर्ष समाप्ति" },
+                { "App Language", "ऐप भाषा" }, { "App Language Settings", "ऐप भाषा सेटिंग्स" }, { "Language Settings", "भाषा सेटिंग्स" },
+                { "Select your preferred application language or import custom translations", "अपनी पसंदीदा ऐप भाषा चुनें या कस्टम अनुवाद आयात करें" },
+                { "Available Languages:", "उपलब्ध भाषाएं:" }, { "Apply Language", "भाषा लागू करें" }, { "Reset to Default (English)", "डिफ़ॉल्ट पर रीसेट करें (अंग्रेज़ी)" },
+                { "Import Custom Language", "कस्टम भाषा आयात करें" }, { "Export Template", "टम्प्लेट निर्यात करें" }, { "Close", "बंद करें" },
+                { "Save", "सहेजें" }, { "Clear", "साफ करें" }, { "Delete", "हटाएं" }, { "Update", "अद्यतन करें" }, { "Cancel", "रद्द करें" }, { "Print", "प्रिंट" },
+                { "Search", "खोजें" }, { "Filter", "फ़िल्टर" }, { "Refresh", "ताज़ा करें" }, { "Hold", "होल्ड करें" }, { "Last Bill", "अंतिम बिल" },
+                { "Export", "निर्यात" }, { "Import", "आयात" }, { "Bill No", "बिल संख्या" }, { "Invoice No", "इनवॉइस संख्या" },
+                { "Customer Name", "ग्राहक का नाम" }, { "Customer", "ग्राहक" }, { "Item Name", "वस्तु का नाम" }, { "Item Description", "वस्तु विवरण" },
+                { "Barcode", "बारकोड" }, { "Unit", "इकाई" }, { "Qty", "मात्रा" }, { "Stock Qty", "स्टॉक मात्रा" }, { "Unit Price", "इकाई मूल्य" },
+                { "Total Amount", "कुल राशि" }, { "Amount", "राशि" }, { "Net Amount", "शुद्ध राशि" }, { "Cost", "लागत" },
+                { "Selling Price", "बिक्री मूल्य" }, { "Price", "मूल्य" }, { "Billed By", "बिलकर्ता" }, { "Date & Time", "दिनांक एवं समय" },
+                { "Date", "दिनांक" }, { "Time", "समय" }, { "Payment Mode", "भुगतान का प्रकार" }, { "Cash", "नकद" }, { "Card", "कार्ड" },
+                { "Total Sales", "कुल बिक्री" }, { "Total Orders", "कुल ऑर्डर" }, { "Average Order", "औसत ऑर्डर" },
+                { "Total Profit", "कुल लाभ" }, { "Items Sold", "बेची गई वस्तुएं" }, { "Hold Item", "होल्ड वस्तुएं" }, { "Ready", "तैयार" },
+                { "Success", "सफलता" }, { "Error", "त्रुटि" }, { "Warning", "चेतावनी" }, { "Information", "सूचना" },
+                { "Item Master", "वस्तु मास्टर" }, { "ItemMaster", "वस्तु मास्टर" }, { "Sales", "बिक्री चालान" }, { "Exit", "बाहर निकलें" },
+                { "Report", "रिपोर्ट" }, { "LogOff", "लॉग ऑफ" }, { "ReOrder", "पुनः ऑर्डर" }, { "Overview", "अवलोकन" },
+                { "Business Summary", "व्यवसाय सारांश" }, { "Dashboard", "डैशबोर्ड" }, { "My Favourite Menu", "मेरा पसंदीदा मेनू" },
+                { "Sales Invoice", "बिक्री चालान" }, { "Purchase", "खरीद" }, { "Purchase Order", "खरीद ऑर्डर" },
+                { "Sales Return", "बिक्री वापसी" }, { "Purchase Return", "खरीद वापसी" }, { "Stock Adjustment", "स्टॉक समायोजन" },
+                { "Stock Transfer", "स्टॉक स्थानांतरण" }, { "Stock Report", "स्टॉक रिपोर्ट" }, { "Category", "श्रेणी" },
+                { "Group", "समूह" }, { "Brand", "ब्रांड" }, { "Users", "उपयोगकर्ता" }, { "Company", "कंपनी" }, { "Branch", "शाखा" },
+                { "User", "उपयोगकर्ता" }, { "Business Date", "व्यवसाय दिनांक" }, { "SQL File Size", "एसक्यूएल फ़ाइल आकार" }, { "Nexoris Version", "नेक्सोरिस संस्करण" }
             };
             _translations["hi"] = hiDict;
 
@@ -152,22 +183,32 @@ namespace PosBranch_Win
                 { "Home", "Utama" }, { "Master", "Induk" }, { "Transaction", "Transaksi" }, { "Accounts", "Akaun" },
                 { "Vendor", "Pembekal" }, { "Reports", "Laporan" }, { "Utilities", "Utiliti" }, { "Settings", "Tetapan" },
                 { "Manual Balance", "Baki Manual" }, { "Sale Settings", "Tetapan Jualan" }, { "Import/Export", "Import/Eksport" },
-                { "Roles", "Peranan" }, { "RolePermission", "Kebenaran Peranan" }, { "Tax Management", "Pengurusan Cukai" },
-                { "TaxManagement", "Pengurusan Cukai" }, { "ActivityLog", "Log Aktiviti" }, { "Activity Log", "Log Aktiviti" },
-                { "Year Closing", "Penutupan Tahun" }, { "Financial Year Closing", "Penutupan Tahun Kewangan" }, { "App Language", "Bahasa Aplikasi" },
-                { "Language Settings", "Tetapan Bahasa" }, { "Save", "Simpan" }, { "Clear", "Padam" }, { "Delete", "Hapus" },
-                { "Update", "Kemaskini" }, { "Cancel", "Batal" }, { "Print", "Cetak" }, { "Close", "Tutup" }, { "Search", "Cari" },
-                { "Filter", "Penapis" }, { "Refresh", "Muat Semula" }, { "Hold", "Pegang (Hold)" }, { "Last Bill", "Resit Terakhir" },
-                { "Export", "Eksport" }, { "Import", "Import" }, { "Bill No", "No. Resit" }, { "Customer Name", "Nama Pelanggan" },
-                { "Customer", "Pelanggan" }, { "Item Name", "Nama Barangan" }, { "Barcode", "Kod Bar" }, { "Unit", "Unit" },
-                { "Qty", "Kuantiti" }, { "Unit Price", "Harga Seunit" }, { "Total Amount", "Jumlah Besar" }, { "Amount", "Jumlah" },
-                { "Net Amount", "Jumlah Bersih" }, { "Cost", "Kos" }, { "Selling Price", "Harga Jualan" }, { "Billed By", "Juruwang" },
-                { "Date & Time", "Tarikh & Masa" }, { "Date", "Tarikh" }, { "Payment Mode", "Mod Pembayaran" }, { "Total Sales", "Jumlah Jualan" },
-                { "Total Orders", "Jumlah Pesanan" }, { "Average Order", "Purata Pesanan" }, { "Total Profit", "Jumlah Keuntungan" },
-                { "Items Sold", "Barangan Dijual" }, { "Hold Item", "Item Dipegang" }, { "Ready", "Sedia" }, { "Success", "Berjaya" },
-                { "Error", "Ralat" }, { "Warning", "Amaran" }, { "Information", "Maklumat" }, { "Select Language", "Pilih Bahasa" },
-                { "Import Custom Language", "Import Bahasa Tersuai" }, { "Export Templat", "Eksport Templat" },
-                { "Apply Language", "Gunakan Bahasa" }
+                { "Roles", "Peranan" }, { "RolePermission", "Kebenaran Peranan" }, { "Role Permissions", "Kebenaran Peranan" },
+                { "Tax Management", "Pengurusan Cukai" }, { "TaxManagement", "Pengurusan Cukai" }, { "ActivityLog", "Log Aktiviti" },
+                { "Activity Log", "Log Aktiviti" }, { "Year Closing", "Penutupan Tahun" }, { "Financial Year Closing", "Penutupan Tahun Kewangan" },
+                { "App Language", "Bahasa Aplikasi" }, { "App Language Settings", "Tetapan Bahasa Aplikasi" }, { "Language Settings", "Tetapan Bahasa" },
+                { "Select your preferred application language or import custom translations", "Pilih bahasa aplikasi pilihan anda atau import terjemahan tersuai" },
+                { "Available Languages:", "Bahasa Yang Ada:" }, { "Apply Language", "Gunakan Bahasa" }, { "Reset to Default (English)", "Set Semula ke Laluan (Inggeris)" },
+                { "Import Custom Language", "Import Bahasa Tersuai" }, { "Export Template", "Eksport Templat" }, { "Close", "Tutup" },
+                { "Save", "Simpan" }, { "Clear", "Padam" }, { "Delete", "Hapus" }, { "Update", "Kemaskini" }, { "Cancel", "Batal" }, { "Print", "Cetak" },
+                { "Search", "Cari" }, { "Filter", "Penapis" }, { "Refresh", "Muat Semula" }, { "Hold", "Pegang (Hold)" }, { "Last Bill", "Resit Terakhir" },
+                { "Export", "Eksport" }, { "Import", "Import" }, { "Bill No", "No. Resit" }, { "Invoice No", "No. Invois" },
+                { "Customer Name", "Nama Pelanggan" }, { "Customer", "Pelanggan" }, { "Item Name", "Nama Barangan" }, { "Item Description", "Penerangan Barangan" },
+                { "Barcode", "Kod Bar" }, { "Unit", "Unit" }, { "Qty", "Kuantiti" }, { "Stock Qty", "Kuantiti Stok" }, { "Unit Price", "Harga Seunit" },
+                { "Total Amount", "Jumlah Besar" }, { "Amount", "Jumlah" }, { "Net Amount", "Jumlah Bersih" }, { "Cost", "Kos" },
+                { "Selling Price", "Harga Jualan" }, { "Price", "Harga" }, { "Billed By", "Juruwang" }, { "Date & Time", "Tarikh & Masa" },
+                { "Date", "Tarikh" }, { "Time", "Masa" }, { "Payment Mode", "Mod Pembayaran" }, { "Cash", "Tunai" }, { "Card", "Kad" },
+                { "Total Sales", "Jumlah Jualan" }, { "Total Orders", "Jumlah Pesanan" }, { "Average Order", "Purata Pesanan" },
+                { "Total Profit", "Jumlah Keuntungan" }, { "Items Sold", "Barangan Dijual" }, { "Hold Item", "Item Dipegang" }, { "Ready", "Sedia" },
+                { "Success", "Berjaya" }, { "Error", "Ralat" }, { "Warning", "Amaran" }, { "Information", "Maklumat" },
+                { "Item Master", "Induk Barangan" }, { "ItemMaster", "Induk Barangan" }, { "Sales", "Invois Jualan" }, { "Exit", "Keluar" },
+                { "Report", "Laporan" }, { "LogOff", "Log Keluar" }, { "ReOrder", "Pesanan Semula" }, { "Overview", "Gambaran Keseluruhan" },
+                { "Business Summary", "Ringkasan Perniagaan" }, { "Dashboard", "Papan Pemuka" }, { "My Favourite Menu", "Menu Kegemaran Saya" },
+                { "Sales Invoice", "Invois Jualan" }, { "Purchase", "Pembelian" }, { "Purchase Order", "Pesanan Pembelian" },
+                { "Sales Return", "Pulangan Jualan" }, { "Purchase Return", "Pulangan Pembelian" }, { "Stock Adjustment", "Pelarasan Stok" },
+                { "Stock Transfer", "Pemindahan Stok" }, { "Stock Report", "Laporan Stok" }, { "Category", "Kategori" },
+                { "Group", "Kumpulan" }, { "Brand", "Jenama" }, { "Users", "Pengguna" }, { "Company", "Syarikat" }, { "Branch", "Cawangan" },
+                { "User", "Pengguna" }, { "Business Date", "Tarikh Perniagaan" }, { "SQL File Size", "Saiz Fail SQL" }, { "Nexoris Version", "Versi Nexoris" }
             };
             _translations["ms"] = msDict;
 
@@ -178,22 +219,32 @@ namespace PosBranch_Win
                 { "Home", "Inicio" }, { "Master", "Principal" }, { "Transaction", "Transacción" }, { "Accounts", "Cuentas" },
                 { "Vendor", "Proveedor" }, { "Reports", "Informes" }, { "Utilities", "Utilidades" }, { "Settings", "Configuración" },
                 { "Manual Balance", "Saldo Manual" }, { "Sale Settings", "Ajustes de Venta" }, { "Import/Export", "Importar/Exportar" },
-                { "Roles", "Roles" }, { "RolePermission", "Permisos de Rol" }, { "Tax Management", "Gestión de Impuestos" },
-                { "TaxManagement", "Gestión de Impuestos" }, { "ActivityLog", "Registro de Actividad" }, { "Activity Log", "Registro de Actividad" },
-                { "Year Closing", "Cierre Anual" }, { "Financial Year Closing", "Cierre del Ejercicio" }, { "App Language", "Idioma de la Aplicación" },
-                { "Language Settings", "Ajustes de Idioma" }, { "Save", "Guardar" }, { "Clear", "Limpiar" }, { "Delete", "Eliminar" },
-                { "Update", "Actualizar" }, { "Cancel", "Cancelar" }, { "Print", "Imprimir" }, { "Close", "Cerrar" }, { "Search", "Buscar" },
-                { "Filter", "Filtrar" }, { "Refresh", "Actualizar" }, { "Hold", "Retener (Hold)" }, { "Last Bill", "Última Factura" },
-                { "Export", "Exportar" }, { "Import", "Importar" }, { "Bill No", "Nº Factura" }, { "Customer Name", "Nombre del Cliente" },
-                { "Customer", "Cliente" }, { "Item Name", "Nombre del Artículo" }, { "Barcode", "Código de Barras" }, { "Unit", "Unidad" },
-                { "Qty", "Cant" }, { "Unit Price", "Precio Unitario" }, { "Total Amount", "Importe Total" }, { "Amount", "Importe" },
-                { "Net Amount", "Importe Neto" }, { "Cost", "Coste" }, { "Selling Price", "Precio de Venta" }, { "Billed By", "Facturado Por" },
-                { "Date & Time", "Fecha y Hora" }, { "Date", "Fecha" }, { "Payment Mode", "Forma de Pago" }, { "Total Sales", "Ventas Totales" },
-                { "Total Orders", "Pedidos Totales" }, { "Average Order", "Pedido Medio" }, { "Total Profit", "Beneficio Total" },
-                { "Items Sold", "Artículos Vendidos" }, { "Hold Item", "Artículos Retenidos" }, { "Ready", "Listo" }, { "Success", "Éxito" },
-                { "Error", "Error" }, { "Warning", "Advertencia" }, { "Information", "Información" }, { "Select Language", "Seleccionar Idioma" },
-                { "Import Custom Language", "Importar Idioma Personalizado" }, { "Export Template", "Exportar Plantilla" },
-                { "Apply Language", "Aplicar Idioma" }
+                { "Roles", "Roles" }, { "RolePermission", "Permisos de Rol" }, { "Role Permissions", "Permisos de Rol" },
+                { "Tax Management", "Gestión de Impuestos" }, { "TaxManagement", "Gestión de Impuestos" }, { "ActivityLog", "Registro de Actividad" },
+                { "Activity Log", "Registro de Actividad" }, { "Year Closing", "Cierre Anual" }, { "Financial Year Closing", "Cierre del Ejercicio" },
+                { "App Language", "Idioma de la Aplicación" }, { "App Language Settings", "Ajustes de Idioma de la Aplicación" }, { "Language Settings", "Ajustes de Idioma" },
+                { "Select your preferred application language or import custom translations", "Seleccione su idioma preferido de la aplicación o importe traducciones personalizadas" },
+                { "Available Languages:", "Idiomas Disponibles:" }, { "Apply Language", "Aplicar Idioma" }, { "Reset to Default (English)", "Restablecer a Predeterminado (Inglés)" },
+                { "Import Custom Language", "Importar Idioma Personalizado" }, { "Export Template", "Exportar Plantilla" }, { "Close", "Cerrar" },
+                { "Save", "Guardar" }, { "Clear", "Limpiar" }, { "Delete", "Eliminar" }, { "Update", "Actualizar" }, { "Cancel", "Cancelar" }, { "Print", "Imprimir" },
+                { "Search", "Buscar" }, { "Filter", "Filtrar" }, { "Refresh", "Actualizar" }, { "Hold", "Retener (Hold)" }, { "Last Bill", "Última Factura" },
+                { "Export", "Exportar" }, { "Import", "Importar" }, { "Bill No", "Nº Factura" }, { "Invoice No", "Nº Factura" },
+                { "Customer Name", "Nombre del Cliente" }, { "Customer", "Cliente" }, { "Item Name", "Nombre del Artículo" }, { "Item Description", "Descripción del Artículo" },
+                { "Barcode", "Código de Barras" }, { "Unit", "Unidad" }, { "Qty", "Cant" }, { "Stock Qty", "Stock Cant" }, { "Unit Price", "Precio Unitario" },
+                { "Total Amount", "Importe Total" }, { "Amount", "Importe" }, { "Net Amount", "Importe Neto" }, { "Cost", "Coste" },
+                { "Selling Price", "Precio de Venta" }, { "Price", "Precio" }, { "Billed By", "Facturado Por" }, { "Date & Time", "Fecha y Hora" },
+                { "Date", "Fecha" }, { "Time", "Hora" }, { "Payment Mode", "Forma de Pago" }, { "Cash", "Efectivo" }, { "Card", "Tarjeta" },
+                { "Total Sales", "Ventas Totales" }, { "Total Orders", "Pedidos Totales" }, { "Average Order", "Pedido Medio" },
+                { "Total Profit", "Beneficio Total" }, { "Items Sold", "Artículos Vendidos" }, { "Hold Item", "Artículos Retenidos" }, { "Ready", "Listo" },
+                { "Success", "Éxito" }, { "Error", "Error" }, { "Warning", "Advertencia" }, { "Information", "Información" },
+                { "Item Master", "Maestro de Artículos" }, { "ItemMaster", "Maestro de Artículos" }, { "Sales", "Factura de Venta" }, { "Exit", "Salir" },
+                { "Report", "Informe" }, { "LogOff", "Cerrar Sesión" }, { "ReOrder", "Reordenar" }, { "Overview", "Resumen" },
+                { "Business Summary", "Resumen de Negocio" }, { "Dashboard", "Panel de Control" }, { "My Favourite Menu", "Mi Menú Favorito" },
+                { "Sales Invoice", "Factura de Venta" }, { "Purchase", "Compra" }, { "Purchase Order", "Orden de Compra" },
+                { "Sales Return", "Devolución de Venta" }, { "Purchase Return", "Devolución de Compra" }, { "Stock Adjustment", "Ajuste de Inventario" },
+                { "Stock Transfer", "Transferencia de Stock" }, { "Stock Report", "Informe de Stock" }, { "Category", "Categoría" },
+                { "Group", "Grupo" }, { "Brand", "Marca" }, { "Users", "Usuarios" }, { "Company", "Empresa" }, { "Branch", "Sucursal" },
+                { "User", "Usuario" }, { "Business Date", "Fecha Comercial" }, { "SQL File Size", "Tamaño de Archivo SQL" }, { "Nexoris Version", "Versión de Nexoris" }
             };
             _translations["es"] = esDict;
 
@@ -204,22 +255,32 @@ namespace PosBranch_Win
                 { "Home", "Home" }, { "Master", "Anagrafica" }, { "Transaction", "Transazioni" }, { "Accounts", "Contabilità" },
                 { "Vendor", "Fornitore" }, { "Reports", "Report" }, { "Utilities", "Utilità" }, { "Settings", "Impostazioni" },
                 { "Manual Balance", "Saldo Manuale" }, { "Sale Settings", "Impostazioni Vendita" }, { "Import/Export", "Importa/Esporta" },
-                { "Roles", "Ruoli" }, { "RolePermission", "Permessi Ruolo" }, { "Tax Management", "Gestione Tasse" },
-                { "TaxManagement", "Gestione Tasse" }, { "ActivityLog", "Registro Attività" }, { "Activity Log", "Registro Attività" },
-                { "Year Closing", "Chiusura Anno" }, { "Financial Year Closing", "Chiusura Anno Fiscale" }, { "App Language", "Lingua App" },
-                { "Language Settings", "Impostazioni Lingua" }, { "Save", "Salva" }, { "Clear", "Cancella" }, { "Delete", "Elimina" },
-                { "Update", "Aggiorna" }, { "Cancel", "Annulla" }, { "Print", "Stampa" }, { "Close", "Chiudi" }, { "Search", "Cerca" },
-                { "Filter", "Filtra" }, { "Refresh", "Aggiorna" }, { "Hold", "In Sospeso" }, { "Last Bill", "Ultimo Scontrino" },
-                { "Export", "Esporta" }, { "Import", "Importa" }, { "Bill No", "N. Scontrino" }, { "Customer Name", "Nome Cliente" },
-                { "Customer", "Cliente" }, { "Item Name", "Nome Articolo" }, { "Barcode", "Codice a Barre" }, { "Unit", "Unità" },
-                { "Qty", "Qtà" }, { "Unit Price", "Prezzo Unitario" }, { "Total Amount", "Importo Totale" }, { "Amount", "Importo" },
-                { "Net Amount", "Importo Netto" }, { "Cost", "Costo" }, { "Selling Price", "Prezzo Vendita" }, { "Billed By", "Emesso Da" },
-                { "Date & Time", "Data e Ora" }, { "Date", "Data" }, { "Payment Mode", "Modalità Pagamento" }, { "Total Sales", "Vendite Totali" },
-                { "Total Orders", "Ordini Totali" }, { "Average Order", "Ordine Medio" }, { "Total Profit", "Profitto Totale" },
-                { "Items Sold", "Articoli Venduti" }, { "Hold Item", "Articoli in Sospeso" }, { "Ready", "Pronto" }, { "Success", "Operazione Riuscita" },
-                { "Error", "Errore" }, { "Warning", "Avviso" }, { "Information", "Informazioni" }, { "Select Language", "Seleziona Lingua" },
-                { "Import Custom Language", "Importa Lingua Personalizzata" }, { "Export Template", "Esporta Modello" },
-                { "Apply Language", "Applica Lingua" }
+                { "Roles", "Ruoli" }, { "RolePermission", "Permessi Ruolo" }, { "Role Permissions", "Permessi Ruolo" },
+                { "Tax Management", "Gestione Tasse" }, { "TaxManagement", "Gestione Tasse" }, { "ActivityLog", "Registro Attività" },
+                { "Activity Log", "Registro Attività" }, { "Year Closing", "Chiusura Anno" }, { "Financial Year Closing", "Chiusura Anno Fiscale" },
+                { "App Language", "Lingua App" }, { "App Language Settings", "Impostazioni Lingua App" }, { "Language Settings", "Impostazioni Lingua" },
+                { "Select your preferred application language or import custom translations", "Seleziona la tua lingua preferita dell'applicazione o importa traduzioni personalizzate" },
+                { "Available Languages:", "Lingue Disponibili:" }, { "Apply Language", "Applica Lingua" }, { "Reset to Default (English)", "Ripristina Predefinito (Inglese)" },
+                { "Import Custom Language", "Importa Lingua Personalizzata" }, { "Export Template", "Esporta Modello" }, { "Close", "Chiudi" },
+                { "Save", "Salva" }, { "Clear", "Cancella" }, { "Delete", "Elimina" }, { "Update", "Aggiorna" }, { "Cancel", "Annulla" }, { "Print", "Stampa" },
+                { "Search", "Cerca" }, { "Filter", "Filtra" }, { "Refresh", "Aggiorna" }, { "Hold", "In Sospeso" }, { "Last Bill", "Ultimo Scontrino" },
+                { "Export", "Esporta" }, { "Import", "Importa" }, { "Bill No", "N. Scontrino" }, { "Invoice No", "N. Fattura" },
+                { "Customer Name", "Nome Cliente" }, { "Customer", "Cliente" }, { "Item Name", "Nome Articolo" }, { "Item Description", "Descrizione Articolo" },
+                { "Barcode", "Codice a Barre" }, { "Unit", "Unità" }, { "Qty", "Qtà" }, { "Stock Qty", "Qtà Giacenza" }, { "Unit Price", "Prezzo Unitario" },
+                { "Total Amount", "Importo Totale" }, { "Amount", "Importo" }, { "Net Amount", "Importo Netto" }, { "Cost", "Costo" },
+                { "Selling Price", "Prezzo Vendita" }, { "Price", "Prezzo" }, { "Billed By", "Emesso Da" }, { "Date & Time", "Data e Ora" },
+                { "Date", "Data" }, { "Time", "Ora" }, { "Payment Mode", "Modalità Pagamento" }, { "Cash", "Contanti" }, { "Card", "Carta" },
+                { "Total Sales", "Vendite Totali" }, { "Total Orders", "Ordini Totali" }, { "Average Order", "Ordine Medio" },
+                { "Total Profit", "Profitto Totale" }, { "Items Sold", "Articoli Venduti" }, { "Hold Item", "Articoli in Sospeso" }, { "Ready", "Pronto" },
+                { "Success", "Operazione Riuscita" }, { "Error", "Errore" }, { "Warning", "Avviso" }, { "Information", "Informazioni" },
+                { "Item Master", "Anagrafica Articoli" }, { "ItemMaster", "Anagrafica Articoli" }, { "Sales", "Fattura di Vendita" }, { "Exit", "Esci" },
+                { "Report", "Report" }, { "LogOff", "Disconnetti" }, { "ReOrder", "Riapprovvigionamento" }, { "Overview", "Panoramica" },
+                { "Business Summary", "Riepilogo Aziendale" }, { "Dashboard", "Cruscotto" }, { "My Favourite Menu", "Il Mio Menu Preferito" },
+                { "Sales Invoice", "Fattura di Vendita" }, { "Purchase", "Acquisto" }, { "Purchase Order", "Ordine di Acquisto" },
+                { "Sales Return", "Reso Vendita" }, { "Purchase Return", "Reso Acquisto" }, { "Stock Adjustment", "Rettifica Inventario" },
+                { "Stock Transfer", "Trasferimento Stock" }, { "Stock Report", "Report Giacenze" }, { "Category", "Categoria" },
+                { "Group", "Gruppo" }, { "Brand", "Marca" }, { "Users", "Utenti" }, { "Company", "Azienda" }, { "Branch", "Filiale" },
+                { "User", "Utente" }, { "Business Date", "Data Aziendale" }, { "SQL File Size", "Dimensione File SQL" }, { "Nexoris Version", "Versione Nexoris" }
             };
             _translations["it"] = itDict;
         }
@@ -308,35 +369,7 @@ namespace PosBranch_Win
         {
             if (string.IsNullOrWhiteSpace(textKey)) return fallback ?? string.Empty;
 
-            string trimmed = textKey.Trim();
-            bool hasColon = trimmed.EndsWith(":") || textKey.TrimEnd().EndsWith(":");
-            string coreKey = trimmed.TrimEnd(':').Trim();
-
-            string translation = LookupKey(coreKey);
-            if (translation == null)
-            {
-                translation = LookupKey(trimmed);
-            }
-            if (translation == null)
-            {
-                translation = LookupKey(textKey);
-            }
-
-            if (translation != null)
-            {
-                if (hasColon && !translation.EndsWith(":"))
-                {
-                    translation = translation + " :";
-                }
-                return translation;
-            }
-
-            return fallback ?? textKey;
-        }
-
-        private static string LookupKey(string key)
-        {
-            if (string.IsNullOrWhiteSpace(key)) return null;
+            string key = textKey.Trim();
 
             if (_translations.TryGetValue(_currentLanguageCode, out var langDict))
             {
@@ -355,22 +388,7 @@ namespace PosBranch_Win
                 }
             }
 
-            return null;
-        }
-
-        private static string GetOrStoreOriginalText(object obj, string currentText)
-        {
-            if (obj == null || string.IsNullOrWhiteSpace(currentText)) return currentText;
-
-            if (_originalTextMap.TryGetValue(obj, out string original))
-            {
-                return original;
-            }
-            else
-            {
-                _originalTextMap.Add(obj, currentText);
-                return currentText;
-            }
+            return fallback ?? textKey;
         }
 
         public static void ApplyLanguageToForm(Form form)
@@ -383,8 +401,8 @@ namespace PosBranch_Win
 
                 if (!string.IsNullOrWhiteSpace(form.Text))
                 {
-                    string origText = GetOrStoreOriginalText(form, form.Text);
-                    form.Text = GetString(origText, origText);
+                    string origTitle = GetOriginalText(form, form.Text);
+                    form.Text = GetString(origTitle, form.Text);
                 }
 
                 ApplyLanguageToControls(form.Controls);
@@ -395,7 +413,7 @@ namespace PosBranch_Win
             }
             finally
             {
-                form.ResumeLayout(false);
+                try { form.ResumeLayout(false); } catch { }
             }
         }
 
@@ -405,85 +423,153 @@ namespace PosBranch_Win
 
             foreach (Control control in controls)
             {
-                if (control == null) continue;
+                if (control == null || control.IsDisposed) continue;
 
-                // Skip user data input controls to preserve typed values
-                bool isInputControl = control is TextBox || 
-                                       control is Infragistics.Win.UltraWinEditors.UltraTextEditor || 
-                                       control is ComboBox || 
-                                       control is DateTimePicker || 
-                                       control is NumericUpDown || 
-                                       control is RichTextBox || 
-                                       control is MaskedTextBox;
-
-                if (!isInputControl && !string.IsNullOrWhiteSpace(control.Text))
+                try
                 {
-                    string orig = GetOrStoreOriginalText(control, control.Text);
-                    string translated = GetString(orig, orig);
-                    if (!string.Equals(control.Text, translated, StringComparison.Ordinal))
+                    // Standard Windows Forms & Infragistics Controls
+                    if (control is Label lbl && !string.IsNullOrWhiteSpace(lbl.Text))
                     {
-                        control.Text = translated;
+                        string orig = GetOriginalText(lbl, lbl.Text);
+                        lbl.Text = GetString(orig, lbl.Text);
                     }
-                }
-
-                // Special handling for UltraGrid (Infragistics Grid)
-                if (control is UltraGrid uGrid)
-                {
-                    foreach (UltraGridBand band in uGrid.DisplayLayout.Bands)
+                    else if (control is UltraLabel ulbl && !string.IsNullOrWhiteSpace(ulbl.Text))
                     {
-                        foreach (UltraGridColumn col in band.Columns)
+                        string orig = GetOriginalText(ulbl, ulbl.Text);
+                        ulbl.Text = GetString(orig, ulbl.Text);
+                    }
+                    else if (control.GetType().Name.Equals("UltraFormattedTextLabel", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var valProp = control.GetType().GetProperty("Value");
+                        if (valProp != null)
                         {
-                            if (col != null && !string.IsNullOrWhiteSpace(col.Header.Caption))
+                            string txt = valProp.GetValue(control)?.ToString();
+                            if (!string.IsNullOrWhiteSpace(txt))
                             {
-                                string orig = GetOrStoreOriginalText(col, col.Header.Caption);
-                                col.Header.Caption = GetString(orig, orig);
+                                string orig = GetOriginalText(control, txt);
+                                valProp.SetValue(control, GetString(orig, txt));
+                            }
+                        }
+                    }
+                    else if (control is Button btn && !string.IsNullOrWhiteSpace(btn.Text))
+                    {
+                        string orig = GetOriginalText(btn, btn.Text);
+                        btn.Text = GetString(orig, btn.Text);
+                    }
+                    else if (control is UltraButton ubtn && !string.IsNullOrWhiteSpace(ubtn.Text))
+                    {
+                        string orig = GetOriginalText(ubtn, ubtn.Text);
+                        ubtn.Text = GetString(orig, ubtn.Text);
+                    }
+                    else if (control is CheckBox cb && !string.IsNullOrWhiteSpace(cb.Text))
+                    {
+                        string orig = GetOriginalText(cb, cb.Text);
+                        cb.Text = GetString(orig, cb.Text);
+                    }
+                    else if (control is UltraCheckEditor ucb && !string.IsNullOrWhiteSpace(ucb.Text))
+                    {
+                        string orig = GetOriginalText(ucb, ucb.Text);
+                        ucb.Text = GetString(orig, ucb.Text);
+                    }
+                    else if (control is RadioButton rb && !string.IsNullOrWhiteSpace(rb.Text))
+                    {
+                        string orig = GetOriginalText(rb, rb.Text);
+                        rb.Text = GetString(orig, rb.Text);
+                    }
+                    else if (control is GroupBox gb && !string.IsNullOrWhiteSpace(gb.Text))
+                    {
+                        string orig = GetOriginalText(gb, gb.Text);
+                        gb.Text = GetString(orig, gb.Text);
+                    }
+                    else if (control is UltraGroupBox ugb && !string.IsNullOrWhiteSpace(ugb.Text))
+                    {
+                        string orig = GetOriginalText(ugb, ugb.Text);
+                        ugb.Text = GetString(orig, ugb.Text);
+                    }
+                    else if (control is UltraExpandableGroupBox uegb && !string.IsNullOrWhiteSpace(uegb.Text))
+                    {
+                        string orig = GetOriginalText(uegb, uegb.Text);
+                        uegb.Text = GetString(orig, uegb.Text);
+                    }
+                    else if (control is UltraOptionSet uopt)
+                    {
+                        foreach (ValueListItem item in uopt.Items)
+                        {
+                            if (item != null && !string.IsNullOrWhiteSpace(item.DisplayText))
+                            {
+                                string orig = GetOriginalText(item, item.DisplayText);
+                                item.DisplayText = GetString(orig, item.DisplayText);
+                            }
+                        }
+                    }
+                    else if (control is TabControl tc)
+                    {
+                        foreach (TabPage tp in tc.TabPages)
+                        {
+                            if (tp != null && !string.IsNullOrWhiteSpace(tp.Text))
+                            {
+                                string orig = GetOriginalText(tp, tp.Text);
+                                tp.Text = GetString(orig, tp.Text);
+                            }
+                        }
+                    }
+                    else if (control is UltraTabControl utc)
+                    {
+                        foreach (UltraTab tab in utc.Tabs)
+                        {
+                            if (tab != null && !string.IsNullOrWhiteSpace(tab.Text))
+                            {
+                                string orig = GetOriginalText(tab, tab.Text);
+                                tab.Text = GetString(orig, tab.Text);
+                            }
+                        }
+                    }
+                    else if (control is UltraExplorerBar ueb)
+                    {
+                        ApplyLanguageToExplorerBar(ueb);
+                    }
+                    else if (control.GetType().Name.Equals("UltraStatusBar", StringComparison.OrdinalIgnoreCase))
+                    {
+                        ApplyLanguageToStatusBar(control);
+                    }
+                    else if (control is DataGridView dgv)
+                    {
+                        foreach (DataGridViewColumn col in dgv.Columns)
+                        {
+                            if (col != null && !string.IsNullOrWhiteSpace(col.HeaderText))
+                            {
+                                string orig = GetOriginalText(col, col.HeaderText);
+                                col.HeaderText = GetString(orig, col.HeaderText);
+                            }
+                        }
+                    }
+                    else if (control is UltraGrid uGrid)
+                    {
+                        if (uGrid.DisplayLayout != null)
+                        {
+                            if (uGrid.DisplayLayout.GroupByBox != null && !string.IsNullOrWhiteSpace(uGrid.DisplayLayout.GroupByBox.Prompt))
+                            {
+                                string origPrompt = GetOriginalText(uGrid.DisplayLayout.GroupByBox, uGrid.DisplayLayout.GroupByBox.Prompt);
+                                uGrid.DisplayLayout.GroupByBox.Prompt = GetString(origPrompt, uGrid.DisplayLayout.GroupByBox.Prompt);
+                            }
+
+                            foreach (UltraGridBand band in uGrid.DisplayLayout.Bands)
+                            {
+                                foreach (UltraGridColumn col in band.Columns)
+                                {
+                                    if (col != null && !string.IsNullOrWhiteSpace(col.Header.Caption))
+                                    {
+                                        string orig = GetOriginalText(col, col.Header.Caption);
+                                        col.Header.Caption = GetString(orig, col.Header.Caption);
+                                    }
+                                }
                             }
                         }
                     }
                 }
-                // Special handling for DataGridView
-                else if (control is DataGridView dgv)
+                catch (Exception ex)
                 {
-                    foreach (DataGridViewColumn col in dgv.Columns)
-                    {
-                        if (col != null && !string.IsNullOrWhiteSpace(col.HeaderText))
-                        {
-                            string orig = GetOrStoreOriginalText(col, col.HeaderText);
-                            col.HeaderText = GetString(orig, orig);
-                        }
-                    }
-                }
-                // Special handling for ToolStrip / StatusStrip / MenuStrip
-                else if (control is ToolStrip toolStrip)
-                {
-                    foreach (ToolStripItem item in toolStrip.Items)
-                    {
-                        ApplyLanguageToToolStripItem(item);
-                    }
-                }
-                // Special handling for UltraTabControl (Infragistics Tab Control)
-                else if (control is Infragistics.Win.UltraWinTabControl.UltraTabControl uTabControl)
-                {
-                    foreach (Infragistics.Win.UltraWinTabControl.UltraTab tab in uTabControl.Tabs)
-                    {
-                        if (tab != null && !string.IsNullOrWhiteSpace(tab.Text))
-                        {
-                            string orig = GetOrStoreOriginalText(tab, tab.Text);
-                            tab.Text = GetString(orig, orig);
-                        }
-                    }
-                }
-                // Special handling for standard TabControl
-                else if (control is TabControl stdTabControl)
-                {
-                    foreach (TabPage page in stdTabControl.TabPages)
-                    {
-                        if (page != null && !string.IsNullOrWhiteSpace(page.Text))
-                        {
-                            string orig = GetOrStoreOriginalText(page, page.Text);
-                            page.Text = GetString(orig, orig);
-                        }
-                    }
+                    System.Diagnostics.Debug.WriteLine($"Error processing control '{control?.Name}': {ex.Message}");
                 }
 
                 if (control.HasChildren)
@@ -493,22 +579,70 @@ namespace PosBranch_Win
             }
         }
 
-        private static void ApplyLanguageToToolStripItem(ToolStripItem item)
+        public static void ApplyLanguageToExplorerBar(UltraExplorerBar explorerBar)
         {
-            if (item == null) return;
+            if (explorerBar == null) return;
 
-            if (!string.IsNullOrWhiteSpace(item.Text))
+            try
             {
-                string orig = GetOrStoreOriginalText(item, item.Text);
-                item.Text = GetString(orig, orig);
-            }
-
-            if (item is ToolStripMenuItem menuItem && menuItem.HasDropDownItems)
-            {
-                foreach (ToolStripItem subItem in menuItem.DropDownItems)
+                foreach (UltraExplorerBarGroup group in explorerBar.Groups)
                 {
-                    ApplyLanguageToToolStripItem(subItem);
+                    if (group != null && !string.IsNullOrWhiteSpace(group.Text))
+                    {
+                        string orig = GetOriginalText(group, group.Text);
+                        group.Text = GetString(orig, group.Text);
+                    }
+
+                    foreach (UltraExplorerBarItem item in group.Items)
+                    {
+                        if (item != null && !string.IsNullOrWhiteSpace(item.Text))
+                        {
+                            string orig = GetOriginalText(item, item.Text);
+                            item.Text = GetString(orig, item.Text);
+                        }
+                    }
                 }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error applying language to UltraExplorerBar: {ex.Message}");
+            }
+        }
+
+        public static void ApplyLanguageToStatusBar(object statusBar)
+        {
+            if (statusBar == null) return;
+
+            try
+            {
+                var panelsProp = statusBar.GetType().GetProperty("Panels");
+                if (panelsProp != null)
+                {
+                    var panels = panelsProp.GetValue(statusBar) as System.Collections.IEnumerable;
+                    if (panels != null)
+                    {
+                        foreach (object panel in panels)
+                        {
+                            if (panel != null)
+                            {
+                                var textProp = panel.GetType().GetProperty("Text");
+                                if (textProp != null)
+                                {
+                                    string currentText = textProp.GetValue(panel) as string;
+                                    if (!string.IsNullOrWhiteSpace(currentText))
+                                    {
+                                        string orig = GetOriginalText(panel, currentText);
+                                        textProp.SetValue(panel, GetString(orig, currentText));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error applying language to UltraStatusBar: {ex.Message}");
             }
         }
 
@@ -518,41 +652,52 @@ namespace PosBranch_Win
 
             try
             {
-                // Translate shared tool captions
+                // 1. Shared Tools in manager.Tools
                 foreach (ToolBase tool in manager.Tools)
                 {
-                    if (tool != null && !string.IsNullOrWhiteSpace(tool.SharedProps.Caption))
+                    if (tool != null && tool.SharedProps != null && !string.IsNullOrWhiteSpace(tool.SharedProps.Caption))
                     {
-                        string orig = GetOrStoreOriginalText(tool, tool.SharedProps.Caption);
-                        tool.SharedProps.Caption = GetString(orig, orig);
+                        string orig = GetOriginalText(tool.SharedProps, tool.SharedProps.Caption);
+                        tool.SharedProps.Caption = GetString(orig, tool.SharedProps.Caption);
                     }
                 }
 
-                // Translate ribbon tabs, groups, and tool instances
+                // 2. Ribbon Tabs, Groups, and Group Tools
                 if (manager.Ribbon != null)
                 {
                     foreach (RibbonTab tab in manager.Ribbon.Tabs)
                     {
                         if (tab != null && !string.IsNullOrWhiteSpace(tab.Caption))
                         {
-                            string orig = GetOrStoreOriginalText(tab, tab.Caption);
-                            tab.Caption = GetString(orig, orig);
+                            string orig = GetOriginalText(tab, tab.Caption);
+                            tab.Caption = GetString(orig, tab.Caption);
                         }
 
                         foreach (RibbonGroup group in tab.Groups)
                         {
                             if (group != null && !string.IsNullOrWhiteSpace(group.Caption))
                             {
-                                string orig = GetOrStoreOriginalText(group, group.Caption);
-                                group.Caption = GetString(orig, orig);
+                                string orig = GetOriginalText(group, group.Caption);
+                                group.Caption = GetString(orig, group.Caption);
                             }
 
-                            foreach (ToolBase tool in group.Tools)
+                            if (group != null && group.Tools != null)
                             {
-                                if (tool != null && tool.SharedProps != null && !string.IsNullOrWhiteSpace(tool.SharedProps.Caption))
+                                foreach (ToolBase groupTool in group.Tools)
                                 {
-                                    string orig = GetOrStoreOriginalText(tool.SharedProps, tool.SharedProps.Caption);
-                                    tool.SharedProps.Caption = GetString(orig, orig);
+                                    if (groupTool != null)
+                                    {
+                                        if (groupTool.SharedProps != null && !string.IsNullOrWhiteSpace(groupTool.SharedProps.Caption))
+                                        {
+                                            string orig = GetOriginalText(groupTool.SharedProps, groupTool.SharedProps.Caption);
+                                            groupTool.SharedProps.Caption = GetString(orig, groupTool.SharedProps.Caption);
+                                        }
+                                        if (groupTool.InstanceProps != null && !string.IsNullOrWhiteSpace(groupTool.InstanceProps.Caption))
+                                        {
+                                            string orig = GetOriginalText(groupTool.InstanceProps, groupTool.InstanceProps.Caption);
+                                            groupTool.InstanceProps.Caption = GetString(orig, groupTool.InstanceProps.Caption);
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -562,6 +707,29 @@ namespace PosBranch_Win
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error applying language to ribbon: {ex.Message}");
+            }
+        }
+
+        public static void ApplyLanguageToApplication()
+        {
+            try
+            {
+                List<Form> openForms = Application.OpenForms.Cast<Form>().Where(f => f != null && !f.IsDisposed).ToList();
+                foreach (Form form in openForms)
+                {
+                    if (form is Home homeForm)
+                    {
+                        homeForm.ApplyLanguageToAllForms();
+                    }
+                    else
+                    {
+                        ApplyLanguageToForm(form);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error applying language to application: {ex.Message}");
             }
         }
 

@@ -3864,7 +3864,7 @@ namespace PosBranch_Win.Master
             this.KeyPreview = true;
             this.Name = "frmItemMasterNew";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
-            this.Text = " ";
+            this.Text = "9+";
             this.WindowState = System.Windows.Forms.FormWindowState.Maximized;
             this.Load += new System.EventHandler(this.frmItemMasterNew_Load);
             this.KeyDown += new System.Windows.Forms.KeyEventHandler(this.frmItemMasterNew_KeyDown);
