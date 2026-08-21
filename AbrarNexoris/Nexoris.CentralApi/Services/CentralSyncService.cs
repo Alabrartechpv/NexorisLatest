@@ -800,9 +800,9 @@ namespace Nexoris.CentralApi.Services
                         await conn.ExecuteAsync(updateMasterSql, new
                         {
                             CentralPurchaseID = centralId,
-                            tx.PMaster.PurchaseDate,
+                            PurchaseDate = SafeSqlDate(tx.PMaster.PurchaseDate),
                             tx.PMaster.InvoiceNo,
-                            tx.PMaster.InvoiceDate,
+                            InvoiceDate = SafeSqlDate(tx.PMaster.InvoiceDate),
                             tx.PMaster.LedgerID,
                             tx.PMaster.VendorName,
                             tx.PMaster.PaymodeID,
@@ -1004,9 +1004,9 @@ namespace Nexoris.CentralApi.Services
                         BranchId = branchId,
                         tx.TransactionGuid,
                         tx.PMaster.PurchaseNo,
-                        tx.PMaster.PurchaseDate,
+                        PurchaseDate = SafeSqlDate(tx.PMaster.PurchaseDate),
                         tx.PMaster.InvoiceNo,
-                        tx.PMaster.InvoiceDate,
+                        InvoiceDate = SafeSqlDate(tx.PMaster.InvoiceDate),
                         tx.PMaster.LedgerID,
                         tx.PMaster.VendorName,
                         tx.PMaster.PaymodeID,
@@ -1156,6 +1156,20 @@ namespace Nexoris.CentralApi.Services
                     throw;
                 }
             }
+        }
+        private static DateTime SafeSqlDate(DateTime dt)
+        {
+            if (dt < new DateTime(1753, 1, 1)) return DateTime.UtcNow;
+            if (dt > new DateTime(9999, 12, 31)) return DateTime.UtcNow;
+            return dt;
+        }
+
+        private static DateTime? SafeSqlDate(DateTime? dt)
+        {
+            if (!dt.HasValue) return null;
+            if (dt.Value < new DateTime(1753, 1, 1)) return null;
+            if (dt.Value > new DateTime(9999, 12, 31)) return null;
+            return dt.Value;
         }
         #endregion
     }

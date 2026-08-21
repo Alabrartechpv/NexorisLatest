@@ -83,6 +83,7 @@ namespace Nexoris.SyncService.Services
                                     tx.PMaster = new PMasterSyncDto
                                     {
                                         PurchaseNo = Convert.ToInt32(pMaster.PurchaseNo),
+                                        PurchaseDate = pMaster.PurchaseDate != null ? (DateTime)pMaster.PurchaseDate : DateTime.Now,
                                         InvoiceNo = pMaster.InvoiceNo != null ? (string)pMaster.InvoiceNo : string.Empty,
                                         InvoiceDate = pMaster.InvoiceDate != null ? (DateTime?)pMaster.InvoiceDate : null,
                                         LedgerID = pMaster.LedgerID != null ? (int?)pMaster.LedgerID : null,
