@@ -561,6 +561,26 @@ namespace Repository.MasterRepositry
                 }
                 // ------------------------------------
 
+                // --- ATOMIC SYNC QUEUE ENQUEUE (ITEM_MASTER CREATE) ---
+                try
+                {
+                    int targetBranchId = SessionContext.BranchId > 0 ? SessionContext.BranchId : 1;
+                    SyncQueueRepository.EnqueueTransaction(
+                        DataConnection,
+                        transaction,
+                        targetBranchId,
+                        "ITEM_MASTER",
+                        newItemId.ToString(),
+                        Guid.NewGuid(),
+                        "CREATE",
+                        1
+                    );
+                }
+                catch (Exception syncEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[ItemMasterRepository.SaveItemMaster] SyncQueue enqueue warning: {syncEx.Message}");
+                }
+
                 transaction.Commit();
                 return $"Success|{newItemId}";
             }
@@ -842,6 +862,26 @@ namespace Repository.MasterRepositry
                     throw new Exception($"Failed to update alternative barcodes: {ex.Message}");
                 }
                 // ------------------------------------
+
+                // --- ATOMIC SYNC QUEUE ENQUEUE (ITEM_MASTER UPDATE) ---
+                try
+                {
+                    int targetBranchId = SessionContext.BranchId > 0 ? SessionContext.BranchId : 1;
+                    SyncQueueRepository.EnqueueTransaction(
+                        DataConnection,
+                        transaction,
+                        targetBranchId,
+                        "ITEM_MASTER",
+                        item.ItemId.ToString(),
+                        Guid.NewGuid(),
+                        "UPDATE",
+                        1
+                    );
+                }
+                catch (Exception syncEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[ItemMasterRepository.UpdateItemMaster] SyncQueue enqueue warning: {syncEx.Message}");
+                }
 
                 transaction.Commit();
                 return $"Success|{item.ItemId}";

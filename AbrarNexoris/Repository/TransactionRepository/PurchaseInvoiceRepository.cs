@@ -186,6 +186,7 @@ namespace Repository.TransactionRepository
             p.Add("@BilledBy", ObjPurchaseMaster.BilledBy ?? "");
             p.Add("@TrnsType", !string.IsNullOrWhiteSpace(ObjPurchaseMaster.TrnsType) ? ObjPurchaseMaster.TrnsType : "Purchase");
             p.Add("@NetTotal", ObjPurchaseMaster.NetTotal);
+            p.Add("@TransactionGuid", ObjPurchaseMaster.TransactionGuid != Guid.Empty ? (object)ObjPurchaseMaster.TransactionGuid : (object)Guid.NewGuid());
             p.Add("@_Operation", ObjPurchaseMaster._Operation ?? "");
             return p;
         }
@@ -239,7 +240,10 @@ namespace Repository.TransactionRepository
 
                 // Calculate and set total tax amount in PurchaseMaster
                 float totalTaxAmountForMaster = CalculateTotalTaxAmount(dgvItem);
-                ObjPurchaseMaster.TaxAmt = totalTaxAmountForMaster;
+                if (ObjPurchaseMaster.TransactionGuid == Guid.Empty)
+                {
+                    ObjPurchaseMaster.TransactionGuid = Guid.NewGuid();
+                }
 
                 ObjPurchaseMaster._Operation = "CREATE";
                 var pCreate = GetPurchaseMasterParameters(ObjPurchaseMaster);

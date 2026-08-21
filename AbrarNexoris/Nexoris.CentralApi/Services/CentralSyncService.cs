@@ -13,6 +13,8 @@ namespace Nexoris.CentralApi.Services
         Task<BatchSyncResponse> ProcessBatchAsync(BatchSyncRequest request);
         Task<bool> ValidateBranchKeyAsync(int branchId, string apiKey);
         Task<bool> CheckDatabaseHealthAsync();
+        Task<BranchStatusResponse> GetBranchStatusAsync(int branchId);
+        Task<MasterDataSyncResponse> IngestMasterDataAsync(MasterDataSyncRequest request);
     }
 
     public class CentralSyncService : ICentralSyncService
@@ -23,6 +25,154 @@ namespace Nexoris.CentralApi.Services
         {
             _connectionString = ConfigurationManager.ConnectionStrings["CentralDbConnection"]?.ConnectionString
                 ?? "Server=192.168.1.232\\SQLEXPRESS;Database=NexorisCentralDB;User Id=sa;Password=Abrar@123;Connect Timeout=30;";
+        }
+
+        public async Task<BranchStatusResponse> GetBranchStatusAsync(int branchId)
+        {
+            using (var conn = new SqlConnection(_connectionString))
+            {
+                await conn.OpenAsync();
+
+                var status = await conn.QueryFirstOrDefaultAsync<dynamic>(
+                    "dbo.sp_Central_GetBranchStatus",
+                    new { BranchId = branchId },
+                    commandType: CommandType.StoredProcedure
+                );
+
+                if (status != null)
+                {
+                    int itemCount = Convert.ToInt32(status.ExistingItemCount);
+                    bool isActive = Convert.ToBoolean(status.IsActive);
+                    return new BranchStatusResponse
+                    {
+                        BranchId = branchId,
+                        IsActive = isActive,
+                        InitialSyncRequired = itemCount == 0,
+                        ExistingItemCount = itemCount,
+                        ServerUtc = DateTime.UtcNow
+                    };
+                }
+
+                return new BranchStatusResponse
+                {
+                    BranchId = branchId,
+                    IsActive = false,
+                    InitialSyncRequired = true,
+                    ExistingItemCount = 0,
+                    ServerUtc = DateTime.UtcNow
+                };
+            }
+        }
+
+        public async Task<MasterDataSyncResponse> IngestMasterDataAsync(MasterDataSyncRequest request)
+        {
+            if (request == null || request.PriceSettings == null || request.PriceSettings.Count == 0)
+            {
+                return new MasterDataSyncResponse
+                {
+                    BranchId = request != null ? request.BranchId : 0,
+                    Success = false,
+                    SyncedItemCount = 0,
+                    Message = "No PriceSettings records provided in payload."
+                };
+            }
+
+            using (var conn = new SqlConnection(_connectionString))
+            {
+                await conn.OpenAsync();
+                using (var trans = conn.BeginTransaction())
+                {
+                    try
+                    {
+                        if (request.Item != null)
+                        {
+                            await conn.ExecuteAsync(
+                                "dbo.sp_Central_UpsertItemMaster",
+                                new
+                                {
+                                    CompanyId = request.Item.CompanyId ?? 1,
+                                    BranchId = request.BranchId,
+                                    FinYearId = request.Item.FinYearId ?? 1,
+                                    request.Item.ItemId,
+                                    request.Item.ItemNo,
+                                    request.Item.Description,
+                                    request.Item.BarCode,
+                                    request.Item.ItemTypeId,
+                                    request.Item.VendorId,
+                                    request.Item.BrandId,
+                                    request.Item.GroupId,
+                                    request.Item.CategoryId,
+                                    request.Item.SubCategoryId,
+                                    Active = request.Item.Active,
+                                    Hide = request.Item.Hide,
+                                    request.Item.BaseUnitId,
+                                    request.Item.HSNCode
+                                },
+                                transaction: trans,
+                                commandType: CommandType.StoredProcedure
+                            );
+                        }
+
+                        foreach (var item in request.PriceSettings)
+                        {
+                            await conn.ExecuteAsync(
+                                "dbo.sp_Central_UpsertPriceSetting",
+                                new
+                                {
+                                    CompanyId = item.CompanyId ?? 1,
+                                    FinYearId = item.FinYearId ?? 1,
+                                    BranchId = request.BranchId,
+                                    item.BranchName,
+                                    item.ItemId,
+                                    UnitId = item.UnitId,
+                                    Unit = item.Unit ?? "UNIT",
+                                    Packing = item.Packing > 0 ? item.Packing : 1.0m,
+                                    Cost = item.Cost,
+                                    MarginPer = item.MarginPer,
+                                    MarginAmt = item.MarginAmt,
+                                    TaxPer = item.TaxPer,
+                                    TaxAmt = item.TaxAmt,
+                                    RetailPrice = item.RetailPrice,
+                                    WholeSalePrice = item.WholeSalePrice,
+                                    CreditPrice = item.CreditPrice,
+                                    CardPrice = item.CardPrice,
+                                    Stock = item.Stock,
+                                    StockValue = item.StockValue,
+                                    ReOrder = item.ReOrder,
+                                    BarCode = item.BarCode,
+                                    TaxType = item.TaxType,
+                                    OpnStk = item.OpnStk,
+                                    OpnValue = item.OpnValue,
+                                    IsBaseUnit = string.IsNullOrEmpty(item.IsBaseUnit) ? "Y" : item.IsBaseUnit,
+                                    MRP = item.MRP
+                                },
+                                transaction: trans,
+                                commandType: CommandType.StoredProcedure
+                            );
+                        }
+
+                        trans.Commit();
+                        return new MasterDataSyncResponse
+                        {
+                            BranchId = request.BranchId,
+                            Success = true,
+                            SyncedItemCount = request.PriceSettings.Count,
+                            Message = $"Successfully synced {request.PriceSettings.Count} PriceSettings item(s)."
+                        };
+                    }
+                    catch (Exception ex)
+                    {
+                        trans.Rollback();
+                        return new MasterDataSyncResponse
+                        {
+                            BranchId = request.BranchId,
+                            Success = false,
+                            SyncedItemCount = 0,
+                            Message = "Error ingesting Master Data: " + ex.Message
+                        };
+                    }
+                }
+            }
         }
 
         public async Task<bool> CheckDatabaseHealthAsync()
@@ -52,14 +202,11 @@ namespace Nexoris.CentralApi.Services
                 using (var conn = new SqlConnection(_connectionString))
                 {
                     await conn.OpenAsync();
-                    const string sql = @"
-                        SELECT COUNT(1) 
-                        FROM dbo.BranchApiKeys 
-                        WHERE BranchId = @BranchId 
-                          AND ApiKey = @ApiKey 
-                          AND IsActive = 1";
-
-                    int count = await conn.ExecuteScalarAsync<int>(sql, new { BranchId = branchId, ApiKey = apiKey });
+                    int count = await conn.ExecuteScalarAsync<int>(
+                        "dbo.sp_Central_ValidateApiKey",
+                        new { BranchId = branchId, ApiKey = apiKey },
+                        commandType: CommandType.StoredProcedure
+                    );
                     return count > 0;
                 }
             }
@@ -189,7 +336,7 @@ namespace Nexoris.CentralApi.Services
                             SET PS.Stock = PS.Stock + (SD.Qty * ISNULL(SD.Packing, 1)), PS.LastSyncUtc = GETUTCDATE()
                             FROM dbo.PriceSettings PS
                             INNER JOIN dbo.SDetails SD ON PS.BranchId = SD.BranchId AND PS.ItemId = SD.ItemId
-                            WHERE SD.TransactionGuid = @TransactionGuid;";
+                            WHERE SD.TransactionGuid = @TransactionGuid AND (PS.IsBaseUnit = 'Y' OR PS.IsBaseUnit IS NULL);";
 
                         await conn.ExecuteAsync(cancelSql, new { tx.TransactionGuid }, transaction: cancelTrans);
                         cancelTrans.Commit();
@@ -251,13 +398,13 @@ namespace Nexoris.CentralApi.Services
                             tx.SMaster.Status
                         }, transaction: updateTrans);
 
-                        // Restore previous details stock before replacing (taking Packing into account)
+                        // Restore previous details stock before replacing (targeting BaseUnit)
                         const string restoreOldStockSql = @"
                             UPDATE PS 
                             SET PS.Stock = PS.Stock + (SD.Qty * ISNULL(SD.Packing, 1)), PS.LastSyncUtc = GETUTCDATE()
                             FROM dbo.PriceSettings PS
                             INNER JOIN dbo.SDetails SD ON PS.BranchId = SD.BranchId AND PS.ItemId = SD.ItemId
-                            WHERE SD.CentralTransactionID = @CentralTransactionID;";
+                            WHERE SD.CentralTransactionID = @CentralTransactionID AND (PS.IsBaseUnit = 'Y' OR PS.IsBaseUnit IS NULL);";
 
                         await conn.ExecuteAsync(restoreOldStockSql, new { CentralTransactionID = centralId }, transaction: updateTrans);
 
@@ -279,9 +426,17 @@ namespace Nexoris.CentralApi.Services
                             );";
 
                         const string deductStockSql = @"
-                            UPDATE dbo.PriceSettings 
-                            SET Stock = Stock - (@Qty * ISNULL(@Packing, 1)), LastSyncUtc = GETUTCDATE() 
-                            WHERE BranchId = @BranchId AND ItemId = @ItemId;";
+                            IF EXISTS (SELECT 1 FROM dbo.PriceSettings WHERE BranchId = @BranchId AND ItemId = @ItemId)
+                            BEGIN
+                                UPDATE dbo.PriceSettings 
+                                SET Stock = Stock - (@Qty * ISNULL(@Packing, 1)), LastSyncUtc = GETUTCDATE() 
+                                WHERE BranchId = @BranchId AND ItemId = @ItemId AND (IsBaseUnit = 'Y' OR IsBaseUnit IS NULL);
+                            END
+                            ELSE
+                            BEGIN
+                                INSERT INTO dbo.PriceSettings (BranchId, ItemId, UnitId, Packing, Stock, RetailPrice, IsBaseUnit, LastSyncUtc)
+                                VALUES (@BranchId, @ItemId, @UnitId, ISNULL(@Packing, 1), -(@Qty * ISNULL(@Packing, 1)), @UnitPrice, 'Y', GETUTCDATE());
+                            END";
 
                         foreach (var d in tx.SDetails)
                         {
@@ -306,7 +461,15 @@ namespace Nexoris.CentralApi.Services
                                 d.UnitId
                             }, transaction: updateTrans);
 
-                            await conn.ExecuteAsync(deductStockSql, new { BranchId = branchId, d.ItemId, d.Qty, Packing = packingVal }, transaction: updateTrans);
+                            await conn.ExecuteAsync(deductStockSql, new
+                            {
+                                BranchId = branchId,
+                                d.ItemId,
+                                d.UnitId,
+                                d.Qty,
+                                Packing = packingVal,
+                                d.UnitPrice
+                            }, transaction: updateTrans);
                         }
 
                         // Replace Vouchers if provided
@@ -415,9 +578,17 @@ namespace Nexoris.CentralApi.Services
                         );";
 
                     const string deductStockCreateSql = @"
-                        UPDATE dbo.PriceSettings 
-                        SET Stock = Stock - (@Qty * ISNULL(@Packing, 1)), LastSyncUtc = GETUTCDATE() 
-                        WHERE BranchId = @BranchId AND ItemId = @ItemId;";
+                        IF EXISTS (SELECT 1 FROM dbo.PriceSettings WHERE BranchId = @BranchId AND ItemId = @ItemId)
+                        BEGIN
+                            UPDATE dbo.PriceSettings 
+                            SET Stock = Stock - (@Qty * ISNULL(@Packing, 1)), LastSyncUtc = GETUTCDATE() 
+                            WHERE BranchId = @BranchId AND ItemId = @ItemId AND (IsBaseUnit = 'Y' OR IsBaseUnit IS NULL);
+                        END
+                        ELSE
+                        BEGIN
+                            INSERT INTO dbo.PriceSettings (BranchId, ItemId, UnitId, Packing, Stock, RetailPrice, IsBaseUnit, LastSyncUtc)
+                            VALUES (@BranchId, @ItemId, @UnitId, ISNULL(@Packing, 1), -(@Qty * ISNULL(@Packing, 1)), @UnitPrice, 'Y', GETUTCDATE());
+                        END";
 
                     foreach (var d in tx.SDetails)
                     {
@@ -442,7 +613,15 @@ namespace Nexoris.CentralApi.Services
                             d.UnitId
                         }, transaction: insertTrans);
 
-                        await conn.ExecuteAsync(deductStockCreateSql, new { BranchId = branchId, d.ItemId, d.Qty, Packing = packingVal }, transaction: insertTrans);
+                        await conn.ExecuteAsync(deductStockCreateSql, new
+                        {
+                            BranchId = branchId,
+                            d.ItemId,
+                            d.UnitId,
+                            d.Qty,
+                            Packing = packingVal,
+                            d.UnitPrice
+                        }, transaction: insertTrans);
                     }
 
                     // Insert Vouchers accounting entries
@@ -547,12 +726,12 @@ namespace Nexoris.CentralApi.Services
                             SET CancelFlag = 1 
                             WHERE TransactionGuid = @TransactionGuid;
 
-                            -- Reverse stock added by purchase
+                            -- Reverse stock added by purchase (target BaseUnit)
                             UPDATE PS 
                             SET PS.Stock = PS.Stock - ((PD.Qty + ISNULL(PD.Free, 0)) * ISNULL(PD.Packing, 1)), PS.LastSyncUtc = GETUTCDATE()
                             FROM dbo.PriceSettings PS
                             INNER JOIN dbo.PDetails PD ON PS.BranchId = PD.BranchId AND PS.ItemId = PD.ItemID
-                            WHERE PD.TransactionGuid = @TransactionGuid;";
+                            WHERE PD.TransactionGuid = @TransactionGuid AND (PS.IsBaseUnit = 'Y' OR PS.IsBaseUnit IS NULL);";
 
                         await conn.ExecuteAsync(cancelSql, new { tx.TransactionGuid }, transaction: cancelTrans);
                         cancelTrans.Commit();
@@ -621,9 +800,9 @@ namespace Nexoris.CentralApi.Services
                         await conn.ExecuteAsync(updateMasterSql, new
                         {
                             CentralPurchaseID = centralId,
-                            tx.PMaster.PurchaseDate,
+                            PurchaseDate = SafeSqlDate(tx.PMaster.PurchaseDate),
                             tx.PMaster.InvoiceNo,
-                            tx.PMaster.InvoiceDate,
+                            InvoiceDate = SafeSqlDate(tx.PMaster.InvoiceDate),
                             tx.PMaster.LedgerID,
                             tx.PMaster.VendorName,
                             tx.PMaster.PaymodeID,
@@ -654,13 +833,13 @@ namespace Nexoris.CentralApi.Services
                             tx.PMaster.NetTotal
                         }, transaction: updateTrans);
 
-                        // Reverse previous purchase stock before replacing
+                        // Reverse previous purchase stock before replacing (targeting BaseUnit)
                         const string reverseOldStockSql = @"
                             UPDATE PS 
                             SET PS.Stock = PS.Stock - ((PD.Qty + ISNULL(PD.Free, 0)) * ISNULL(PD.Packing, 1)), PS.LastSyncUtc = GETUTCDATE()
                             FROM dbo.PriceSettings PS
                             INNER JOIN dbo.PDetails PD ON PS.BranchId = PD.BranchId AND PS.ItemId = PD.ItemID
-                            WHERE PD.CentralPurchaseID = @CentralPurchaseID;";
+                            WHERE PD.CentralPurchaseID = @CentralPurchaseID AND (PS.IsBaseUnit = 'Y' OR PS.IsBaseUnit IS NULL);";
 
                         await conn.ExecuteAsync(reverseOldStockSql, new { CentralPurchaseID = centralId }, transaction: updateTrans);
 
@@ -684,9 +863,17 @@ namespace Nexoris.CentralApi.Services
                             );";
 
                         const string addStockSql = @"
-                            UPDATE dbo.PriceSettings 
-                            SET Stock = Stock + ((@Qty + @Free) * ISNULL(@Packing, 1)), LastSyncUtc = GETUTCDATE() 
-                            WHERE BranchId = @BranchId AND ItemId = @ItemId;";
+                            IF EXISTS (SELECT 1 FROM dbo.PriceSettings WHERE BranchId = @BranchId AND ItemId = @ItemId)
+                            BEGIN
+                                UPDATE dbo.PriceSettings 
+                                SET Stock = Stock + ((@Qty + @Free) * ISNULL(@Packing, 1)), LastSyncUtc = GETUTCDATE() 
+                                WHERE BranchId = @BranchId AND ItemId = @ItemId AND (IsBaseUnit = 'Y' OR IsBaseUnit IS NULL);
+                            END
+                            ELSE
+                            BEGIN
+                                INSERT INTO dbo.PriceSettings (BranchId, ItemId, UnitId, Unit, Packing, Stock, Cost, IsBaseUnit, LastSyncUtc)
+                                VALUES (@BranchId, @ItemId, @UnitId, @Unit, ISNULL(@Packing, 1), ((@Qty + @Free) * ISNULL(@Packing, 1)), @Cost, 'Y', GETUTCDATE());
+                            END";
 
                         foreach (var d in tx.PDetails)
                         {
@@ -722,7 +909,17 @@ namespace Nexoris.CentralApi.Services
                                 d.CessPer
                             }, transaction: updateTrans);
 
-                            await conn.ExecuteAsync(addStockSql, new { BranchId = branchId, d.ItemID, d.Qty, d.Free, Packing = packingVal }, transaction: updateTrans);
+                            await conn.ExecuteAsync(addStockSql, new
+                            {
+                                BranchId = branchId,
+                                ItemId = d.ItemID,
+                                UnitId = d.UnitId,
+                                Unit = d.Unit,
+                                d.Qty,
+                                d.Free,
+                                Packing = packingVal,
+                                d.Cost
+                            }, transaction: updateTrans);
                         }
 
                         // Replace Vouchers if provided
@@ -807,9 +1004,9 @@ namespace Nexoris.CentralApi.Services
                         BranchId = branchId,
                         tx.TransactionGuid,
                         tx.PMaster.PurchaseNo,
-                        tx.PMaster.PurchaseDate,
+                        PurchaseDate = SafeSqlDate(tx.PMaster.PurchaseDate),
                         tx.PMaster.InvoiceNo,
-                        tx.PMaster.InvoiceDate,
+                        InvoiceDate = SafeSqlDate(tx.PMaster.InvoiceDate),
                         tx.PMaster.LedgerID,
                         tx.PMaster.VendorName,
                         tx.PMaster.PaymodeID,
@@ -856,9 +1053,17 @@ namespace Nexoris.CentralApi.Services
                         );";
 
                     const string addStockCreateSql = @"
-                        UPDATE dbo.PriceSettings 
-                        SET Stock = Stock + ((@Qty + @Free) * ISNULL(@Packing, 1)), LastSyncUtc = GETUTCDATE() 
-                        WHERE BranchId = @BranchId AND ItemId = @ItemId;";
+                        IF EXISTS (SELECT 1 FROM dbo.PriceSettings WHERE BranchId = @BranchId AND ItemId = @ItemId)
+                        BEGIN
+                            UPDATE dbo.PriceSettings 
+                            SET Stock = Stock + ((@Qty + @Free) * ISNULL(@Packing, 1)), LastSyncUtc = GETUTCDATE() 
+                            WHERE BranchId = @BranchId AND ItemId = @ItemId AND (IsBaseUnit = 'Y' OR IsBaseUnit IS NULL);
+                        END
+                        ELSE
+                        BEGIN
+                            INSERT INTO dbo.PriceSettings (BranchId, ItemId, UnitId, Unit, Packing, Stock, Cost, IsBaseUnit, LastSyncUtc)
+                            VALUES (@BranchId, @ItemId, @UnitId, @Unit, ISNULL(@Packing, 1), ((@Qty + @Free) * ISNULL(@Packing, 1)), @Cost, 'Y', GETUTCDATE());
+                        END";
 
                     foreach (var d in tx.PDetails)
                     {
@@ -894,7 +1099,17 @@ namespace Nexoris.CentralApi.Services
                             d.CessPer
                         }, transaction: insertTrans);
 
-                        await conn.ExecuteAsync(addStockCreateSql, new { BranchId = branchId, d.ItemID, d.Qty, d.Free, Packing = packingVal }, transaction: insertTrans);
+                        await conn.ExecuteAsync(addStockCreateSql, new
+                        {
+                            BranchId = branchId,
+                            ItemId = d.ItemID,
+                            UnitId = d.UnitId,
+                            Unit = d.Unit,
+                            d.Qty,
+                            d.Free,
+                            Packing = packingVal,
+                            d.Cost
+                        }, transaction: insertTrans);
                     }
 
                     // Insert Vouchers accounting entries
@@ -941,6 +1156,20 @@ namespace Nexoris.CentralApi.Services
                     throw;
                 }
             }
+        }
+        private static DateTime SafeSqlDate(DateTime dt)
+        {
+            if (dt < new DateTime(1753, 1, 1)) return DateTime.UtcNow;
+            if (dt > new DateTime(9999, 12, 31)) return DateTime.UtcNow;
+            return dt;
+        }
+
+        private static DateTime? SafeSqlDate(DateTime? dt)
+        {
+            if (!dt.HasValue) return null;
+            if (dt.Value < new DateTime(1753, 1, 1)) return null;
+            if (dt.Value > new DateTime(9999, 12, 31)) return null;
+            return dt.Value;
         }
         #endregion
     }
