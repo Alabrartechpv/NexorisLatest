@@ -307,8 +307,8 @@ namespace PosBranch_Win.Accounts
                     return;
                 }
 
-                // Get payment method ID from the combo box
-                int paymentMethodId = CmboPayment.Value != null ? Convert.ToInt32(CmboPayment.Value) : 1; // Default to Cash (ID: 1)
+                // Get payment method ID from the combo box (Default to Cash ID: 2)
+                int paymentMethodId = CmboPayment.Value != null ? Convert.ToInt32(CmboPayment.Value) : 2;
 
                 // Create master record with all required properties
                 var master = new CustomerReceiptMaster

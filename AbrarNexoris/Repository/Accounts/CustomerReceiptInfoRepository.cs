@@ -515,6 +515,9 @@ namespace Repository.Accounts
 
         public DataTable GetReceiptHistory(int customerLedgerId, long billNo)
         {
+            if (DataConnection.State == ConnectionState.Open)
+                DataConnection.Close();
+
             DataConnection.Open();
             try
             {
@@ -523,6 +526,7 @@ namespace Repository.Accounts
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@CustomerLedgerId", customerLedgerId);
                     cmd.Parameters.AddWithValue("@BillNoUntil", billNo);
+                    cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
                     cmd.Parameters.AddWithValue("@_Operation", "VIEWRECEIPT");
 
                     DataTable dt = new DataTable();
@@ -598,35 +602,35 @@ namespace Repository.Accounts
                 decimal receivedAmount = GetRowDecimal(row, "ReceivedAmount");
                 decimal returnedAmount = invoices.Columns.Contains("ReturnedAmount") ? GetRowDecimal(row, "ReturnedAmount") : 0m;
 
-                // Detect cash sales where full payment was settled at sale time
+                // Detect cash sales where full payment was settled at sale time (Cash = PaymodeID 2)
                 bool isCashSale = false;
                 if (invoices.Columns.Contains("Paymode") && row["Paymode"] != DBNull.Value)
                 {
                     string pm = row["Paymode"].ToString().Trim().ToLower();
-                    if (pm == "cash" || pm == "1") isCashSale = true;
+                    if (pm == "cash" || pm == "2") isCashSale = true;
                 }
                 if (invoices.Columns.Contains("PaymodeID") && row["PaymodeID"] != DBNull.Value)
                 {
-                    if (Convert.ToInt32(row["PaymodeID"]) == 1) isCashSale = true;
+                    if (Convert.ToInt32(row["PaymodeID"]) == 2) isCashSale = true;
                 }
                 if (invoices.Columns.Contains("PayModeID") && row["PayModeID"] != DBNull.Value)
                 {
-                    if (Convert.ToInt32(row["PayModeID"]) == 1) isCashSale = true;
+                    if (Convert.ToInt32(row["PayModeID"]) == 2) isCashSale = true;
                 }
 
-                // Credit sales (PaymodeID = 2 / "credit") must NEVER be treated as cash sales
+                // Credit sales (PaymodeID = 1 / "credit") must NEVER be treated as cash sales
                 if (invoices.Columns.Contains("Paymode") && row["Paymode"] != DBNull.Value)
                 {
                     string pm = row["Paymode"].ToString().Trim().ToLower();
-                    if (pm == "credit" || pm == "2") isCashSale = false;
+                    if (pm == "credit" || pm == "1") isCashSale = false;
                 }
                 if (invoices.Columns.Contains("PaymodeID") && row["PaymodeID"] != DBNull.Value)
                 {
-                    if (Convert.ToInt32(row["PaymodeID"]) == 2) isCashSale = false;
+                    if (Convert.ToInt32(row["PaymodeID"]) == 1) isCashSale = false;
                 }
                 if (invoices.Columns.Contains("PayModeID") && row["PayModeID"] != DBNull.Value)
                 {
-                    if (Convert.ToInt32(row["PayModeID"]) == 2) isCashSale = false;
+                    if (Convert.ToInt32(row["PayModeID"]) == 1) isCashSale = false;
                 }
 
                 if (isCashSale)
