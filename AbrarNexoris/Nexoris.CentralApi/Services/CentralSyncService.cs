@@ -270,6 +270,30 @@ namespace Nexoris.CentralApi.Services
                 {
                     return await IngestPurchaseTransactionAsync(conn, branchId, tx);
                 }
+                else if (tx.EntityType.Equals("CUSTOMER_RECEIPT", StringComparison.OrdinalIgnoreCase))
+                {
+                    return await IngestCustomerReceiptTransactionAsync(conn, branchId, tx);
+                }
+                else if (tx.EntityType.Equals("VENDOR_PAYMENT", StringComparison.OrdinalIgnoreCase))
+                {
+                    return await IngestVendorPaymentTransactionAsync(conn, branchId, tx);
+                }
+                else if (tx.EntityType.Equals("SALES_RETURN", StringComparison.OrdinalIgnoreCase))
+                {
+                    return await IngestSalesReturnTransactionAsync(conn, branchId, tx);
+                }
+                else if (tx.EntityType.Equals("CREDIT_NOTE", StringComparison.OrdinalIgnoreCase))
+                {
+                    return await IngestCreditNoteTransactionAsync(conn, branchId, tx);
+                }
+                else if (tx.EntityType.Equals("PURCHASE_RETURN", StringComparison.OrdinalIgnoreCase))
+                {
+                    return await IngestPurchaseReturnTransactionAsync(conn, branchId, tx);
+                }
+                else if (tx.EntityType.Equals("DEBIT_NOTE", StringComparison.OrdinalIgnoreCase))
+                {
+                    return await IngestDebitNoteTransactionAsync(conn, branchId, tx);
+                }
                 else
                 {
                     return await IngestSalesTransactionAsync(conn, branchId, tx);
@@ -1157,6 +1181,841 @@ namespace Nexoris.CentralApi.Services
                 }
             }
         }
+        #endregion
+
+        #region Customer Receipt Ingest
+        private async Task<SyncItemResult> IngestCustomerReceiptTransactionAsync(SqlConnection conn, int branchId, TransactionSyncDto tx)
+        {
+            string entityId = tx.Receipt != null ? tx.Receipt.BranchReceiptId.ToString() : "Unknown";
+
+            if (tx.Operation.Equals("CANCEL", StringComparison.OrdinalIgnoreCase))
+            {
+                await conn.ExecuteAsync(
+                    "dbo.sp_Central_CancelTransaction",
+                    new { BranchId = branchId, EntityType = "CUSTOMER_RECEIPT", tx.TransactionGuid },
+                    commandType: CommandType.StoredProcedure
+                );
+
+                return new SyncItemResult
+                {
+                    TransactionGuid = tx.TransactionGuid,
+                    EntityType = tx.EntityType,
+                    EntityId = entityId,
+                    Status = "Synced"
+                };
+            }
+
+            if (tx.Receipt == null)
+            {
+                throw new InvalidOperationException($"Payload for Customer Receipt {tx.TransactionGuid} is empty.");
+            }
+
+            using (var trans = conn.BeginTransaction())
+            {
+                try
+                {
+                    var p = new DynamicParameters();
+                    p.Add("@BranchId", branchId);
+                    p.Add("@TransactionGuid", tx.TransactionGuid);
+                    p.Add("@BranchReceiptId", tx.Receipt.BranchReceiptId);
+                    p.Add("@CompanyId", tx.Receipt.CompanyId > 0 ? tx.Receipt.CompanyId : 1);
+                    p.Add("@VoucherId", tx.Receipt.VoucherId);
+                    p.Add("@VoucherDate", SafeSqlDate(tx.Receipt.VoucherDate));
+                    p.Add("@PaymentMethodLedgerId", tx.Receipt.PaymentMethodLedgerId);
+                    p.Add("@PaymentMethodName", tx.Receipt.PaymentMethodName ?? "");
+                    p.Add("@CustomerLedgerId", tx.Receipt.CustomerLedgerId);
+                    p.Add("@CustomerName", tx.Receipt.CustomerName ?? "");
+                    p.Add("@ReceivableAmount", tx.Receipt.ReceivableAmount);
+                    p.Add("@ReceiptAmount", tx.Receipt.ReceiptAmount);
+                    p.Add("@OldReceiptAmount", tx.Receipt.OldReceiptAmount);
+                    p.Add("@Narration", tx.Receipt.Narration ?? "");
+                    p.Add("@BillNoUntil", tx.Receipt.BillNoUntil);
+                    p.Add("@CancelFlag", tx.Receipt.CancelFlag);
+                    p.Add("@UserId", tx.Receipt.UserId > 0 ? tx.Receipt.UserId : 1);
+                    p.Add("@TransporterLedgerId", tx.Receipt.TransporterLedgerId);
+
+                    long centralReceiptId = await conn.ExecuteScalarAsync<long>(
+                        "dbo.sp_Central_UpsertCustomerReceipt",
+                        p,
+                        transaction: trans,
+                        commandType: CommandType.StoredProcedure
+                    );
+
+                    // Insert Details via Stored Procedure
+                    foreach (var d in tx.ReceiptDetails)
+                    {
+                        await conn.ExecuteAsync(
+                            "dbo.sp_Central_UpsertCustomerReceiptDetail",
+                            new
+                            {
+                                CentralReceiptId = centralReceiptId,
+                                BranchId = branchId,
+                                tx.TransactionGuid,
+                                BranchReceiptId = tx.Receipt.BranchReceiptId,
+                                d.BillNo,
+                                BillDate = SafeSqlDate(d.BillDate),
+                                d.BillAmount,
+                                d.ReceivedAmount,
+                                d.ReceiptAmount,
+                                d.BalanceAmount,
+                                d.CancelFlag
+                            },
+                            transaction: trans,
+                            commandType: CommandType.StoredProcedure
+                        );
+                    }
+
+                    // Insert Vouchers via Stored Procedure
+                    foreach (var v in tx.Vouchers)
+                    {
+                        await conn.ExecuteAsync(
+                            "dbo.sp_Central_UpsertVoucher",
+                            new
+                            {
+                                CentralTransactionID = centralReceiptId,
+                                BranchId = branchId,
+                                tx.TransactionGuid,
+                                BranchVoucherID = v.BranchVoucherId,
+                                v.LedgerID,
+                                v.LedgerName,
+                                v.Debit,
+                                v.Credit,
+                                v.Narration,
+                                VoucherType = "CUSTRCPT"
+                            },
+                            transaction: trans,
+                            commandType: CommandType.StoredProcedure
+                        );
+                    }
+
+                    trans.Commit();
+
+                    return new SyncItemResult
+                    {
+                        TransactionGuid = tx.TransactionGuid,
+                        EntityType = tx.EntityType,
+                        EntityId = entityId,
+                        Status = "Synced",
+                        CentralTransactionId = centralReceiptId
+                    };
+                }
+                catch
+                {
+                    trans.Rollback();
+                    throw;
+                }
+            }
+        }
+        #endregion
+
+        #region Vendor Payment Ingest
+        private async Task<SyncItemResult> IngestVendorPaymentTransactionAsync(SqlConnection conn, int branchId, TransactionSyncDto tx)
+        {
+            string entityId = tx.Payment != null ? tx.Payment.BranchPaymentId.ToString() : "Unknown";
+
+            if (tx.Operation.Equals("CANCEL", StringComparison.OrdinalIgnoreCase))
+            {
+                await conn.ExecuteAsync(
+                    "dbo.sp_Central_CancelTransaction",
+                    new { BranchId = branchId, EntityType = "VENDOR_PAYMENT", tx.TransactionGuid },
+                    commandType: CommandType.StoredProcedure
+                );
+
+                return new SyncItemResult
+                {
+                    TransactionGuid = tx.TransactionGuid,
+                    EntityType = tx.EntityType,
+                    EntityId = entityId,
+                    Status = "Synced"
+                };
+            }
+
+            if (tx.Payment == null)
+            {
+                throw new InvalidOperationException($"Payload for Vendor Payment {tx.TransactionGuid} is empty.");
+            }
+
+            using (var trans = conn.BeginTransaction())
+            {
+                try
+                {
+                    var p = new DynamicParameters();
+                    p.Add("@BranchId", branchId);
+                    p.Add("@TransactionGuid", tx.TransactionGuid);
+                    p.Add("@BranchPaymentId", tx.Payment.BranchPaymentId);
+                    p.Add("@CompanyId", tx.Payment.CompanyId > 0 ? tx.Payment.CompanyId : 1);
+                    p.Add("@VoucherId", tx.Payment.VoucherId);
+                    p.Add("@VoucherDate", SafeSqlDate(tx.Payment.VoucherDate));
+                    p.Add("@PaymentMethodLedgerId", tx.Payment.PaymentMethodLedgerId);
+                    p.Add("@PaymentMethodName", tx.Payment.PaymentMethodName ?? "");
+                    p.Add("@VendorLedgerId", tx.Payment.VendorLedgerId);
+                    p.Add("@VendorName", tx.Payment.VendorName ?? "");
+                    p.Add("@PayableAmount", tx.Payment.PayableAmount);
+                    p.Add("@PaymentAmount", tx.Payment.PaymentAmount);
+                    p.Add("@OldPaymentAmount", tx.Payment.OldPaymentAmount);
+                    p.Add("@Narration", tx.Payment.Narration ?? "");
+                    p.Add("@BillNoUntil", tx.Payment.BillNoUntil);
+                    p.Add("@CancelFlag", tx.Payment.CancelFlag);
+                    p.Add("@UserId", tx.Payment.UserId > 0 ? tx.Payment.UserId : 1);
+
+                    long centralPaymentId = await conn.ExecuteScalarAsync<long>(
+                        "dbo.sp_Central_UpsertVendorPayment",
+                        p,
+                        transaction: trans,
+                        commandType: CommandType.StoredProcedure
+                    );
+
+                    // Insert Details via Stored Procedure
+                    foreach (var d in tx.PaymentDetails)
+                    {
+                        await conn.ExecuteAsync(
+                            "dbo.sp_Central_UpsertVendorPaymentDetail",
+                            new
+                            {
+                                CentralPaymentId = centralPaymentId,
+                                BranchId = branchId,
+                                tx.TransactionGuid,
+                                BranchPaymentId = tx.Payment.BranchPaymentId,
+                                d.BillNo,
+                                BillDate = SafeSqlDate(d.BillDate),
+                                d.BillAmount,
+                                d.PayedAmount,
+                                d.PaymentAmount,
+                                d.BalanceAmount,
+                                d.CancelFlag
+                            },
+                            transaction: trans,
+                            commandType: CommandType.StoredProcedure
+                        );
+                    }
+
+                    // Insert Vouchers via Stored Procedure
+                    foreach (var v in tx.Vouchers)
+                    {
+                        await conn.ExecuteAsync(
+                            "dbo.sp_Central_UpsertVoucher",
+                            new
+                            {
+                                CentralTransactionID = centralPaymentId,
+                                BranchId = branchId,
+                                tx.TransactionGuid,
+                                BranchVoucherID = v.BranchVoucherId,
+                                v.LedgerID,
+                                v.LedgerName,
+                                v.Debit,
+                                v.Credit,
+                                v.Narration,
+                                VoucherType = "VENDPAY"
+                            },
+                            transaction: trans,
+                            commandType: CommandType.StoredProcedure
+                        );
+                    }
+
+                    trans.Commit();
+
+                    return new SyncItemResult
+                    {
+                        TransactionGuid = tx.TransactionGuid,
+                        EntityType = tx.EntityType,
+                        EntityId = entityId,
+                        Status = "Synced",
+                        CentralTransactionId = centralPaymentId
+                    };
+                }
+                catch
+                {
+                    trans.Rollback();
+                    throw;
+                }
+            }
+        }
+        #endregion
+
+        #region Sales Return Transaction Ingest
+        private async Task<SyncItemResult> IngestSalesReturnTransactionAsync(SqlConnection conn, int branchId, TransactionSyncDto tx)
+        {
+            string entityId = tx.SalesReturn != null ? tx.SalesReturn.BranchSReturnNo.ToString() : "Unknown";
+
+            if (tx.SalesReturn == null && !tx.Operation.Equals("CANCEL", StringComparison.OrdinalIgnoreCase))
+            {
+                return new SyncItemResult
+                {
+                    TransactionGuid = tx.TransactionGuid,
+                    EntityType = tx.EntityType,
+                    EntityId = entityId,
+                    Status = "Failed",
+                    ErrorMessage = "Payload missing SalesReturn header record."
+                };
+            }
+
+            using (var trans = conn.BeginTransaction())
+            {
+                try
+                {
+                    if (tx.Operation.Equals("CANCEL", StringComparison.OrdinalIgnoreCase))
+                    {
+                        await conn.ExecuteAsync(
+                            "dbo.sp_Central_CancelTransaction",
+                            new
+                            {
+                                BranchId = branchId,
+                                EntityType = "SALES_RETURN",
+                                TransactionGuid = tx.TransactionGuid
+                            },
+                            transaction: trans,
+                            commandType: CommandType.StoredProcedure
+                        );
+
+                        trans.Commit();
+                        return new SyncItemResult
+                        {
+                            TransactionGuid = tx.TransactionGuid,
+                            EntityType = tx.EntityType,
+                            EntityId = entityId,
+                            Status = "Cancelled"
+                        };
+                    }
+
+                    var sr = tx.SalesReturn;
+
+                    var upsertParams = new DynamicParameters();
+                    upsertParams.Add("@BranchId", branchId);
+                    upsertParams.Add("@TransactionGuid", tx.TransactionGuid);
+                    upsertParams.Add("@BranchSReturnNo", sr.BranchSReturnNo);
+                    upsertParams.Add("@SReturnDate", SafeSqlDate(sr.SReturnDate));
+                    upsertParams.Add("@InvoiceNo", sr.InvoiceNo);
+                    upsertParams.Add("@InvoiceDate", SafeSqlDate(sr.InvoiceDate));
+                    upsertParams.Add("@CompanyId", sr.CompanyId > 0 ? sr.CompanyId : 1);
+                    upsertParams.Add("@FinYearId", sr.FinYearId > 0 ? sr.FinYearId : 1);
+                    upsertParams.Add("@LedgerID", sr.LedgerID);
+                    upsertParams.Add("@CustomerName", sr.CustomerName);
+                    upsertParams.Add("@Paymode", sr.Paymode);
+                    upsertParams.Add("@SubTotal", sr.SubTotal);
+                    upsertParams.Add("@TaxAmt", sr.TaxAmt);
+                    upsertParams.Add("@GrandTotal", sr.GrandTotal);
+                    upsertParams.Add("@VoucherID", sr.VoucherID);
+                    upsertParams.Add("@Remarks", sr.Remarks);
+                    upsertParams.Add("@CancelFlag", sr.CancelFlag);
+                    upsertParams.Add("@UserId", sr.UserId > 0 ? sr.UserId : 1);
+
+                    long centralSReturnId = await conn.ExecuteScalarAsync<long>(
+                        "dbo.sp_Central_UpsertSalesReturn",
+                        upsertParams,
+                        transaction: trans,
+                        commandType: CommandType.StoredProcedure
+                    );
+
+                    if (tx.SalesReturnDetails != null)
+                    {
+                        foreach (var d in tx.SalesReturnDetails)
+                        {
+                            var detailParams = new DynamicParameters();
+                            detailParams.Add("@CentralSReturnId", centralSReturnId);
+                            detailParams.Add("@BranchId", branchId);
+                            detailParams.Add("@TransactionGuid", tx.TransactionGuid);
+                            detailParams.Add("@BranchSReturnNo", sr.BranchSReturnNo);
+                            detailParams.Add("@SlNo", d.SlNo);
+                            detailParams.Add("@ItemID", d.ItemID);
+                            detailParams.Add("@ItemName", d.ItemName);
+                            detailParams.Add("@Qty", d.Qty);
+                            detailParams.Add("@Packing", d.Packing);
+                            detailParams.Add("@SalesPrice", d.SalesPrice);
+                            detailParams.Add("@TaxAmt", d.TaxAmt);
+                            detailParams.Add("@TotalSP", d.TotalSP);
+                            detailParams.Add("@UnitId", d.UnitId);
+                            detailParams.Add("@Unit", d.Unit);
+                            detailParams.Add("@CancelFlag", d.CancelFlag);
+
+                            await conn.ExecuteAsync(
+                                "dbo.sp_Central_UpsertSalesReturnDetail",
+                                detailParams,
+                                transaction: trans,
+                                commandType: CommandType.StoredProcedure
+                            );
+                        }
+                    }
+
+                    if (tx.Vouchers != null)
+                    {
+                        foreach (var v in tx.Vouchers)
+                        {
+                            var vParams = new DynamicParameters();
+                            vParams.Add("@BranchId", branchId);
+                            vParams.Add("@TransactionGuid", tx.TransactionGuid);
+                            vParams.Add("@BranchVoucherId", v.BranchVoucherId);
+                            vParams.Add("@CentralTransactionID", centralSReturnId);
+                            vParams.Add("@VoucherType", "SalesReturn");
+                            vParams.Add("@LedgerID", v.LedgerID ?? 0);
+                            vParams.Add("@LedgerName", v.LedgerName);
+                            vParams.Add("@Debit", v.Debit);
+                            vParams.Add("@Credit", v.Credit);
+                            vParams.Add("@Narration", v.Narration);
+                            vParams.Add("@VoucherDate", SafeSqlDate(sr.SReturnDate));
+
+                            await conn.ExecuteAsync(
+                                "dbo.sp_Central_UpsertVoucher",
+                                vParams,
+                                transaction: trans,
+                                commandType: CommandType.StoredProcedure
+                            );
+                        }
+                    }
+
+                    trans.Commit();
+
+                    return new SyncItemResult
+                    {
+                        TransactionGuid = tx.TransactionGuid,
+                        EntityType = tx.EntityType,
+                        EntityId = entityId,
+                        Status = "Synced",
+                        CentralTransactionId = centralSReturnId
+                    };
+                }
+                catch
+                {
+                    trans.Rollback();
+                    throw;
+                }
+            }
+        }
+        #endregion
+
+        #region Credit Note Transaction Ingest
+        private async Task<SyncItemResult> IngestCreditNoteTransactionAsync(SqlConnection conn, int branchId, TransactionSyncDto tx)
+        {
+            string entityId = tx.CreditNote != null ? tx.CreditNote.BranchCreditNoteId.ToString() : "Unknown";
+
+            if (tx.CreditNote == null && !tx.Operation.Equals("CANCEL", StringComparison.OrdinalIgnoreCase))
+            {
+                return new SyncItemResult
+                {
+                    TransactionGuid = tx.TransactionGuid,
+                    EntityType = tx.EntityType,
+                    EntityId = entityId,
+                    Status = "Failed",
+                    ErrorMessage = "Payload missing CreditNote header record."
+                };
+            }
+
+            using (var trans = conn.BeginTransaction())
+            {
+                try
+                {
+                    if (tx.Operation.Equals("CANCEL", StringComparison.OrdinalIgnoreCase))
+                    {
+                        await conn.ExecuteAsync(
+                            "dbo.sp_Central_CancelTransaction",
+                            new
+                            {
+                                BranchId = branchId,
+                                EntityType = "CREDIT_NOTE",
+                                TransactionGuid = tx.TransactionGuid
+                            },
+                            transaction: trans,
+                            commandType: CommandType.StoredProcedure
+                        );
+
+                        trans.Commit();
+                        return new SyncItemResult
+                        {
+                            TransactionGuid = tx.TransactionGuid,
+                            EntityType = tx.EntityType,
+                            EntityId = entityId,
+                            Status = "Cancelled"
+                        };
+                    }
+
+                    var cn = tx.CreditNote;
+
+                    var upsertParams = new DynamicParameters();
+                    upsertParams.Add("@BranchId", branchId);
+                    upsertParams.Add("@TransactionGuid", tx.TransactionGuid);
+                    upsertParams.Add("@BranchCreditNoteId", cn.BranchCreditNoteId);
+                    upsertParams.Add("@CompanyId", cn.CompanyId > 0 ? cn.CompanyId : 1);
+                    upsertParams.Add("@FinYearId", cn.FinYearId > 0 ? cn.FinYearId : 1);
+                    upsertParams.Add("@VoucherId", cn.VoucherId);
+                    upsertParams.Add("@VoucherDate", SafeSqlDate(cn.VoucherDate));
+                    upsertParams.Add("@CustomerLedgerId", cn.CustomerLedgerId);
+                    upsertParams.Add("@CustomerName", cn.CustomerName);
+                    upsertParams.Add("@SReturnNo", cn.SReturnNo);
+                    upsertParams.Add("@InvoiceNo", cn.InvoiceNo);
+                    upsertParams.Add("@CreditAmount", cn.CreditAmount);
+                    upsertParams.Add("@Narration", cn.Narration);
+                    upsertParams.Add("@CancelFlag", cn.CancelFlag);
+                    upsertParams.Add("@UserId", cn.UserId > 0 ? cn.UserId : 1);
+
+                    long centralCreditNoteId = await conn.ExecuteScalarAsync<long>(
+                        "dbo.sp_Central_UpsertCreditNote",
+                        upsertParams,
+                        transaction: trans,
+                        commandType: CommandType.StoredProcedure
+                    );
+
+                    if (tx.CreditNoteDetails != null)
+                    {
+                        foreach (var d in tx.CreditNoteDetails)
+                        {
+                            var detailParams = new DynamicParameters();
+                            detailParams.Add("@CentralCreditNoteId", centralCreditNoteId);
+                            detailParams.Add("@BranchId", branchId);
+                            detailParams.Add("@TransactionGuid", tx.TransactionGuid);
+                            detailParams.Add("@BranchCreditNoteId", cn.BranchCreditNoteId);
+                            detailParams.Add("@BillNo", d.BillNo);
+                            detailParams.Add("@BillDate", SafeSqlDate(d.BillDate));
+                            detailParams.Add("@BillAmount", d.BillAmount);
+                            detailParams.Add("@CreditAmount", d.CreditAmount);
+                            detailParams.Add("@BalanceAmount", d.BalanceAmount);
+                            detailParams.Add("@CancelFlag", d.CancelFlag);
+
+                            await conn.ExecuteAsync(
+                                "dbo.sp_Central_UpsertCreditNoteDetail",
+                                detailParams,
+                                transaction: trans,
+                                commandType: CommandType.StoredProcedure
+                            );
+                        }
+                    }
+
+                    if (tx.Vouchers != null)
+                    {
+                        foreach (var v in tx.Vouchers)
+                        {
+                            var vParams = new DynamicParameters();
+                            vParams.Add("@BranchId", branchId);
+                            vParams.Add("@TransactionGuid", tx.TransactionGuid);
+                            vParams.Add("@BranchVoucherId", v.BranchVoucherId);
+                            vParams.Add("@CentralTransactionID", centralCreditNoteId);
+                            vParams.Add("@VoucherType", "CRNOTE");
+                            vParams.Add("@LedgerID", v.LedgerID ?? 0);
+                            vParams.Add("@LedgerName", v.LedgerName);
+                            vParams.Add("@Debit", v.Debit);
+                            vParams.Add("@Credit", v.Credit);
+                            vParams.Add("@Narration", v.Narration);
+                            vParams.Add("@VoucherDate", SafeSqlDate(cn.VoucherDate));
+
+                            await conn.ExecuteAsync(
+                                "dbo.sp_Central_UpsertVoucher",
+                                vParams,
+                                transaction: trans,
+                                commandType: CommandType.StoredProcedure
+                            );
+                        }
+                    }
+
+                    trans.Commit();
+
+                    return new SyncItemResult
+                    {
+                        TransactionGuid = tx.TransactionGuid,
+                        EntityType = tx.EntityType,
+                        EntityId = entityId,
+                        Status = "Synced",
+                        CentralTransactionId = centralCreditNoteId
+                    };
+                }
+                catch
+                {
+                    trans.Rollback();
+                    throw;
+                }
+            }
+        }
+        #endregion
+
+        #region Purchase Return Transaction Ingest
+        private async Task<SyncItemResult> IngestPurchaseReturnTransactionAsync(SqlConnection conn, int branchId, TransactionSyncDto tx)
+        {
+            string entityId = tx.PurchaseReturn != null ? tx.PurchaseReturn.BranchPReturnNo.ToString() : "Unknown";
+
+            if (tx.PurchaseReturn == null && !tx.Operation.Equals("CANCEL", StringComparison.OrdinalIgnoreCase))
+            {
+                return new SyncItemResult
+                {
+                    TransactionGuid = tx.TransactionGuid,
+                    EntityType = tx.EntityType,
+                    EntityId = entityId,
+                    Status = "Failed",
+                    ErrorMessage = "Payload missing PurchaseReturn header record."
+                };
+            }
+
+            using (var trans = conn.BeginTransaction())
+            {
+                try
+                {
+                    if (tx.Operation.Equals("CANCEL", StringComparison.OrdinalIgnoreCase))
+                    {
+                        await conn.ExecuteAsync(
+                            "dbo.sp_Central_CancelTransaction",
+                            new
+                            {
+                                BranchId = branchId,
+                                EntityType = "PURCHASE_RETURN",
+                                TransactionGuid = tx.TransactionGuid
+                            },
+                            transaction: trans,
+                            commandType: CommandType.StoredProcedure
+                        );
+
+                        trans.Commit();
+                        return new SyncItemResult
+                        {
+                            TransactionGuid = tx.TransactionGuid,
+                            EntityType = tx.EntityType,
+                            EntityId = entityId,
+                            Status = "Cancelled"
+                        };
+                    }
+
+                    var pr = tx.PurchaseReturn;
+
+                    var upsertParams = new DynamicParameters();
+                    upsertParams.Add("@BranchId", branchId);
+                    upsertParams.Add("@TransactionGuid", tx.TransactionGuid);
+                    upsertParams.Add("@BranchPReturnNo", pr.BranchPReturnNo);
+                    upsertParams.Add("@PReturnDate", SafeSqlDate(pr.PReturnDate));
+                    upsertParams.Add("@InvoiceNo", pr.InvoiceNo);
+                    upsertParams.Add("@InvoiceDate", SafeSqlDate(pr.InvoiceDate));
+                    upsertParams.Add("@CompanyId", pr.CompanyId > 0 ? pr.CompanyId : 1);
+                    upsertParams.Add("@FinYearId", pr.FinYearId > 0 ? pr.FinYearId : 1);
+                    upsertParams.Add("@LedgerID", pr.LedgerID);
+                    upsertParams.Add("@VendorName", pr.VendorName);
+                    upsertParams.Add("@Paymode", pr.Paymode);
+                    upsertParams.Add("@SubTotal", pr.SubTotal);
+                    upsertParams.Add("@TaxAmt", pr.TaxAmt);
+                    upsertParams.Add("@GrandTotal", pr.GrandTotal);
+                    upsertParams.Add("@VoucherID", pr.VoucherID);
+                    upsertParams.Add("@Remarks", pr.Remarks);
+                    upsertParams.Add("@CancelFlag", pr.CancelFlag);
+                    upsertParams.Add("@UserId", pr.UserId > 0 ? pr.UserId : 1);
+
+                    long centralPReturnId = await conn.ExecuteScalarAsync<long>(
+                        "dbo.sp_Central_UpsertPurchaseReturn",
+                        upsertParams,
+                        transaction: trans,
+                        commandType: CommandType.StoredProcedure
+                    );
+
+                    if (tx.PurchaseReturnDetails != null)
+                    {
+                        foreach (var d in tx.PurchaseReturnDetails)
+                        {
+                            var detailParams = new DynamicParameters();
+                            detailParams.Add("@CentralPReturnId", centralPReturnId);
+                            detailParams.Add("@BranchId", branchId);
+                            detailParams.Add("@TransactionGuid", tx.TransactionGuid);
+                            detailParams.Add("@BranchPReturnNo", pr.BranchPReturnNo);
+                            detailParams.Add("@SlNo", d.SlNo);
+                            detailParams.Add("@ItemID", d.ItemID);
+                            detailParams.Add("@ItemName", d.ItemName);
+                            detailParams.Add("@Qty", d.Qty);
+                            detailParams.Add("@Packing", d.Packing);
+                            detailParams.Add("@Cost", d.Cost);
+                            detailParams.Add("@TaxAmt", d.TaxAmt);
+                            detailParams.Add("@TotalSP", d.TotalSP);
+                            detailParams.Add("@UnitId", d.UnitId);
+                            detailParams.Add("@Unit", d.Unit);
+                            detailParams.Add("@CancelFlag", d.CancelFlag);
+
+                            await conn.ExecuteAsync(
+                                "dbo.sp_Central_UpsertPurchaseReturnDetail",
+                                detailParams,
+                                transaction: trans,
+                                commandType: CommandType.StoredProcedure
+                            );
+                        }
+                    }
+
+                    if (tx.Vouchers != null)
+                    {
+                        foreach (var v in tx.Vouchers)
+                        {
+                            var vParams = new DynamicParameters();
+                            vParams.Add("@BranchId", branchId);
+                            vParams.Add("@TransactionGuid", tx.TransactionGuid);
+                            vParams.Add("@BranchVoucherId", v.BranchVoucherId);
+                            vParams.Add("@CentralTransactionID", centralPReturnId);
+                            vParams.Add("@VoucherType", "PurchaseReturn");
+                            vParams.Add("@LedgerID", v.LedgerID ?? 0);
+                            vParams.Add("@LedgerName", v.LedgerName);
+                            vParams.Add("@Debit", v.Debit);
+                            vParams.Add("@Credit", v.Credit);
+                            vParams.Add("@Narration", v.Narration);
+                            vParams.Add("@VoucherDate", SafeSqlDate(pr.PReturnDate));
+
+                            await conn.ExecuteAsync(
+                                "dbo.sp_Central_UpsertVoucher",
+                                vParams,
+                                transaction: trans,
+                                commandType: CommandType.StoredProcedure
+                            );
+                        }
+                    }
+
+                    trans.Commit();
+
+                    return new SyncItemResult
+                    {
+                        TransactionGuid = tx.TransactionGuid,
+                        EntityType = tx.EntityType,
+                        EntityId = entityId,
+                        Status = "Synced",
+                        CentralTransactionId = centralPReturnId
+                    };
+                }
+                catch
+                {
+                    trans.Rollback();
+                    throw;
+                }
+            }
+        }
+        #endregion
+
+        #region Debit Note Transaction Ingest
+        private async Task<SyncItemResult> IngestDebitNoteTransactionAsync(SqlConnection conn, int branchId, TransactionSyncDto tx)
+        {
+            string entityId = tx.DebitNote != null ? tx.DebitNote.BranchDebitNoteId.ToString() : "Unknown";
+
+            if (tx.DebitNote == null && !tx.Operation.Equals("CANCEL", StringComparison.OrdinalIgnoreCase))
+            {
+                return new SyncItemResult
+                {
+                    TransactionGuid = tx.TransactionGuid,
+                    EntityType = tx.EntityType,
+                    EntityId = entityId,
+                    Status = "Failed",
+                    ErrorMessage = "Payload missing DebitNote header record."
+                };
+            }
+
+            using (var trans = conn.BeginTransaction())
+            {
+                try
+                {
+                    if (tx.Operation.Equals("CANCEL", StringComparison.OrdinalIgnoreCase))
+                    {
+                        await conn.ExecuteAsync(
+                            "dbo.sp_Central_CancelTransaction",
+                            new
+                            {
+                                BranchId = branchId,
+                                EntityType = "DEBIT_NOTE",
+                                TransactionGuid = tx.TransactionGuid
+                            },
+                            transaction: trans,
+                            commandType: CommandType.StoredProcedure
+                        );
+
+                        trans.Commit();
+                        return new SyncItemResult
+                        {
+                            TransactionGuid = tx.TransactionGuid,
+                            EntityType = tx.EntityType,
+                            EntityId = entityId,
+                            Status = "Cancelled"
+                        };
+                    }
+
+                    var dn = tx.DebitNote;
+
+                    var upsertParams = new DynamicParameters();
+                    upsertParams.Add("@BranchId", branchId);
+                    upsertParams.Add("@TransactionGuid", tx.TransactionGuid);
+                    upsertParams.Add("@BranchDebitNoteId", dn.BranchDebitNoteId);
+                    upsertParams.Add("@CompanyId", dn.CompanyId > 0 ? dn.CompanyId : 1);
+                    upsertParams.Add("@FinYearId", dn.FinYearId > 0 ? dn.FinYearId : 1);
+                    upsertParams.Add("@VoucherId", dn.VoucherId);
+                    upsertParams.Add("@VoucherDate", SafeSqlDate(dn.VoucherDate));
+                    upsertParams.Add("@VendorLedgerId", dn.VendorLedgerId);
+                    upsertParams.Add("@VendorName", dn.VendorName);
+                    upsertParams.Add("@PReturnNo", dn.PReturnNo);
+                    upsertParams.Add("@InvoiceNo", dn.InvoiceNo);
+                    upsertParams.Add("@DebitAmount", dn.DebitAmount);
+                    upsertParams.Add("@Narration", dn.Narration);
+                    upsertParams.Add("@CancelFlag", dn.CancelFlag);
+                    upsertParams.Add("@UserId", dn.UserId > 0 ? dn.UserId : 1);
+
+                    long centralDebitNoteId = await conn.ExecuteScalarAsync<long>(
+                        "dbo.sp_Central_UpsertDebitNote",
+                        upsertParams,
+                        transaction: trans,
+                        commandType: CommandType.StoredProcedure
+                    );
+
+                    if (tx.DebitNoteDetails != null)
+                    {
+                        foreach (var d in tx.DebitNoteDetails)
+                        {
+                            var detailParams = new DynamicParameters();
+                            detailParams.Add("@CentralDebitNoteId", centralDebitNoteId);
+                            detailParams.Add("@BranchId", branchId);
+                            detailParams.Add("@TransactionGuid", tx.TransactionGuid);
+                            detailParams.Add("@BranchDebitNoteId", dn.BranchDebitNoteId);
+                            detailParams.Add("@BillNo", d.BillNo);
+                            detailParams.Add("@BillDate", SafeSqlDate(d.BillDate));
+                            detailParams.Add("@BillAmount", d.BillAmount);
+                            detailParams.Add("@DebitAmount", d.DebitAmount);
+                            detailParams.Add("@BalanceAmount", d.BalanceAmount);
+                            detailParams.Add("@CancelFlag", d.CancelFlag);
+
+                            await conn.ExecuteAsync(
+                                "dbo.sp_Central_UpsertDebitNoteDetail",
+                                detailParams,
+                                transaction: trans,
+                                commandType: CommandType.StoredProcedure
+                            );
+                        }
+                    }
+
+                    if (tx.Vouchers != null)
+                    {
+                        foreach (var v in tx.Vouchers)
+                        {
+                            var vParams = new DynamicParameters();
+                            vParams.Add("@BranchId", branchId);
+                            vParams.Add("@TransactionGuid", tx.TransactionGuid);
+                            vParams.Add("@BranchVoucherId", v.BranchVoucherId);
+                            vParams.Add("@CentralTransactionID", centralDebitNoteId);
+                            vParams.Add("@VoucherType", "DRNOTE");
+                            vParams.Add("@LedgerID", v.LedgerID ?? 0);
+                            vParams.Add("@LedgerName", v.LedgerName);
+                            vParams.Add("@Debit", v.Debit);
+                            vParams.Add("@Credit", v.Credit);
+                            vParams.Add("@Narration", v.Narration);
+                            vParams.Add("@VoucherDate", SafeSqlDate(dn.VoucherDate));
+
+                            await conn.ExecuteAsync(
+                                "dbo.sp_Central_UpsertVoucher",
+                                vParams,
+                                transaction: trans,
+                                commandType: CommandType.StoredProcedure
+                            );
+                        }
+                    }
+
+                    trans.Commit();
+
+                    return new SyncItemResult
+                    {
+                        TransactionGuid = tx.TransactionGuid,
+                        EntityType = tx.EntityType,
+                        EntityId = entityId,
+                        Status = "Synced",
+                        CentralTransactionId = centralDebitNoteId
+                    };
+                }
+                catch
+                {
+                    trans.Rollback();
+                    throw;
+                }
+            }
+        }
+        #endregion
+
         private static DateTime SafeSqlDate(DateTime dt)
         {
             if (dt < new DateTime(1753, 1, 1)) return DateTime.UtcNow;
@@ -1171,6 +2030,5 @@ namespace Nexoris.CentralApi.Services
             if (dt.Value > new DateTime(9999, 12, 31)) return null;
             return dt.Value;
         }
-        #endregion
     }
 }

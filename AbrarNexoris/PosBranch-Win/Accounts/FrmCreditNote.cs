@@ -782,7 +782,7 @@ namespace PosBranch_Win.Accounts
                 if (!invoices.Columns.Contains("SelectionOrder"))
                     invoices.Columns.Add("SelectionOrder", typeof(int));
 
-                // Recalculate and set balances
+                // Recalculate and set balances and initialize UI columns with default values
                 foreach (DataRow row in invoices.Rows)
                 {
                     decimal inv = row.Table.Columns.Contains("InvoiceAmount") && !row.IsNull("InvoiceAmount") ? Convert.ToDecimal(row["InvoiceAmount"]) : 0m;
@@ -797,6 +797,18 @@ namespace PosBranch_Win.Accounts
                     if (invoices.Columns.Contains("Balance"))
                     {
                         row["Balance"] = outstanding;
+                    }
+                    if (invoices.Columns.Contains("Select"))
+                    {
+                        row["Select"] = false;
+                    }
+                    if (invoices.Columns.Contains("Credit Amount"))
+                    {
+                        row["Credit Amount"] = 0m;
+                    }
+                    if (invoices.Columns.Contains("SelectionOrder"))
+                    {
+                        row["SelectionOrder"] = 0;
                     }
                 }
 
@@ -824,7 +836,7 @@ namespace PosBranch_Win.Accounts
                 {
                     if (row.Cells.Exists("Select")) row.Cells["Select"].Value = false;
                     if (row.Cells.Exists("Credit Amount")) row.Cells["Credit Amount"].Value = 0m;
-                    if (row.Cells.Exists("SelectionOrder")) row.Cells["SelectionOrder"].Value = DBNull.Value;
+                    if (row.Cells.Exists("SelectionOrder")) row.Cells["SelectionOrder"].Value = 0;
                 }
 
                 if (ultraGrid1.Rows.Count > 0)

@@ -936,6 +936,31 @@ namespace Repository.TransactionRepository
                         throw new Exception("Failed to create accounting voucher entries for sales return. Sales return was not saved.", ex);
                     }
 
+                    // SyncQueue Integration - Enqueue Sales Return
+                    try
+                    {
+                        Guid returnGuid = Guid.NewGuid();
+                        SyncQueueRepository.SetTransactionGuid(
+                            DataConnection,
+                            trans,
+                            "SALES_RETURN",
+                            sr.SReturnNo.ToString(),
+                            returnGuid);
+
+                        SyncQueueRepository.EnqueueTransaction(
+                            DataConnection,
+                            trans,
+                            sr.BranchId > 0 ? sr.BranchId : SessionContext.BranchId,
+                            "SALES_RETURN",
+                            sr.SReturnNo.ToString(),
+                            returnGuid,
+                            "CREATE");
+                    }
+                    catch (Exception syncEx)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[SalesReturnRepository.SaveSalesReturn] SyncQueue error: {syncEx.Message}");
+                    }
+
                     trans.Commit();
                     return $"Sales return saved successfully! #{sr.SReturnNo}";
                 }
@@ -1573,6 +1598,37 @@ namespace Repository.TransactionRepository
                         // matching saveSR() CREATE behavior and Purchase Return & Debit Note pattern.
                         // Do NOT create voucher entries here to prevent double-posting.
                         System.Diagnostics.Debug.WriteLine($"Credit customer (LedgerID={sr.LedgerID}): GL voucher update deferred to Credit Note screen.");
+                    }
+
+                    // SyncQueue Integration - Enqueue Sales Return Update
+                    try
+                    {
+                        Guid returnGuid = SyncQueueRepository.GetExistingGuid(
+                            DataConnection,
+                            trans,
+                            sr.BranchId > 0 ? sr.BranchId : SessionContext.BranchId,
+                            "SALES_RETURN",
+                            sr.SReturnNo.ToString()) ?? Guid.NewGuid();
+
+                        SyncQueueRepository.SetTransactionGuid(
+                            DataConnection,
+                            trans,
+                            "SALES_RETURN",
+                            sr.SReturnNo.ToString(),
+                            returnGuid);
+
+                        SyncQueueRepository.EnqueueTransaction(
+                            DataConnection,
+                            trans,
+                            sr.BranchId > 0 ? sr.BranchId : SessionContext.BranchId,
+                            "SALES_RETURN",
+                            sr.SReturnNo.ToString(),
+                            returnGuid,
+                            "UPDATE");
+                    }
+                    catch (Exception syncEx)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[SalesReturnRepository.UpdateSalesReturn] SyncQueue error: {syncEx.Message}");
                     }
 
                     trans.Commit();

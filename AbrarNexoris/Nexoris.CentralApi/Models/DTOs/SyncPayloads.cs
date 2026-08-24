@@ -20,6 +20,18 @@ namespace Nexoris.CentralApi.Models.DTOs
         public List<SDetailsSyncDto> SDetails { get; set; } = new List<SDetailsSyncDto>();
         public PMasterSyncDto PMaster { get; set; }
         public List<PDetailsSyncDto> PDetails { get; set; } = new List<PDetailsSyncDto>();
+        public CustomerReceiptSyncDto Receipt { get; set; }
+        public List<CustomerReceiptDetailsSyncDto> ReceiptDetails { get; set; } = new List<CustomerReceiptDetailsSyncDto>();
+        public VendorPaymentSyncDto Payment { get; set; }
+        public List<VendorPaymentDetailsSyncDto> PaymentDetails { get; set; } = new List<VendorPaymentDetailsSyncDto>();
+        public SalesReturnSyncDto SalesReturn { get; set; }
+        public List<SalesReturnDetailsSyncDto> SalesReturnDetails { get; set; } = new List<SalesReturnDetailsSyncDto>();
+        public CreditNoteSyncDto CreditNote { get; set; }
+        public List<CreditNoteDetailsSyncDto> CreditNoteDetails { get; set; } = new List<CreditNoteDetailsSyncDto>();
+        public PurchaseReturnSyncDto PurchaseReturn { get; set; }
+        public List<PurchaseReturnDetailsSyncDto> PurchaseReturnDetails { get; set; } = new List<PurchaseReturnDetailsSyncDto>();
+        public DebitNoteSyncDto DebitNote { get; set; }
+        public List<DebitNoteDetailsSyncDto> DebitNoteDetails { get; set; } = new List<DebitNoteDetailsSyncDto>();
         public List<VoucherSyncDto> Vouchers { get; set; } = new List<VoucherSyncDto>();
     }
 
@@ -214,6 +226,209 @@ namespace Nexoris.CentralApi.Models.DTOs
         public decimal OpnValue { get; set; }
         public string IsBaseUnit { get; set; } = "Y";
         public decimal MRP { get; set; }
+    }
+
+    public class CustomerReceiptSyncDto
+    {
+        public int BranchReceiptId { get; set; }
+        public int CompanyId { get; set; }
+        public int BranchId { get; set; }
+        public long VoucherId { get; set; }
+        public DateTime VoucherDate { get; set; } = DateTime.Now;
+        public int PaymentMethodLedgerId { get; set; }
+        public string PaymentMethodName { get; set; } = string.Empty;
+        public int CustomerLedgerId { get; set; }
+        public string CustomerName { get; set; } = string.Empty;
+        public decimal ReceivableAmount { get; set; }
+        public decimal ReceiptAmount { get; set; }
+        public decimal OldReceiptAmount { get; set; }
+        public string Narration { get; set; } = string.Empty;
+        public long BillNoUntil { get; set; }
+        public bool CancelFlag { get; set; }
+        public int UserId { get; set; }
+        public int? TransporterLedgerId { get; set; }
+    }
+
+    public class CustomerReceiptDetailsSyncDto
+    {
+        public int BranchId { get; set; }
+        public int BranchReceiptId { get; set; }
+        public int BillNo { get; set; }
+        public DateTime BillDate { get; set; } = DateTime.Now;
+        public decimal BillAmount { get; set; }
+        public decimal ReceivedAmount { get; set; }
+        public decimal ReceiptAmount { get; set; }
+        public decimal BalanceAmount { get; set; }
+        public bool CancelFlag { get; set; }
+    }
+
+    public class VendorPaymentSyncDto
+    {
+        public int BranchPaymentId { get; set; }
+        public int CompanyId { get; set; }
+        public int BranchId { get; set; }
+        public long VoucherId { get; set; }
+        public DateTime VoucherDate { get; set; } = DateTime.Now;
+        public int PaymentMethodLedgerId { get; set; }
+        public string PaymentMethodName { get; set; } = string.Empty;
+        public int VendorLedgerId { get; set; }
+        public string VendorName { get; set; } = string.Empty;
+        public decimal PayableAmount { get; set; }
+        public decimal PaymentAmount { get; set; }
+        public decimal OldPaymentAmount { get; set; }
+        public string Narration { get; set; } = string.Empty;
+        public long BillNoUntil { get; set; }
+        public bool CancelFlag { get; set; }
+        public int UserId { get; set; }
+    }
+
+    public class VendorPaymentDetailsSyncDto
+    {
+        public int BranchId { get; set; }
+        public int BranchPaymentId { get; set; }
+        public int BillNo { get; set; }
+        public DateTime BillDate { get; set; } = DateTime.Now;
+        public decimal BillAmount { get; set; }
+        public decimal PayedAmount { get; set; }
+        public decimal PaymentAmount { get; set; }
+        public decimal BalanceAmount { get; set; }
+        public bool CancelFlag { get; set; }
+    }
+
+    public class SalesReturnSyncDto
+    {
+        public int BranchSReturnNo { get; set; }
+        public DateTime SReturnDate { get; set; }
+        public string InvoiceNo { get; set; }
+        public DateTime? InvoiceDate { get; set; }
+        public int CompanyId { get; set; }
+        public int FinYearId { get; set; }
+        public int BranchId { get; set; }
+        public int LedgerID { get; set; }
+        public string CustomerName { get; set; }
+        public string Paymode { get; set; }
+        public decimal SubTotal { get; set; }
+        public decimal TaxAmt { get; set; }
+        public decimal GrandTotal { get; set; }
+        public long? VoucherID { get; set; }
+        public string Remarks { get; set; }
+        public bool CancelFlag { get; set; }
+        public int UserId { get; set; }
+    }
+
+    public class SalesReturnDetailsSyncDto
+    {
+        public int BranchId { get; set; }
+        public int BranchSReturnNo { get; set; }
+        public int SlNo { get; set; }
+        public long ItemID { get; set; }
+        public string ItemName { get; set; }
+        public decimal Qty { get; set; }
+        public decimal Packing { get; set; } = 1.0m;
+        public decimal SalesPrice { get; set; }
+        public decimal TaxAmt { get; set; }
+        public decimal TotalSP { get; set; }
+        public int? UnitId { get; set; }
+        public string Unit { get; set; }
+        public bool CancelFlag { get; set; }
+    }
+
+    public class CreditNoteSyncDto
+    {
+        public int BranchCreditNoteId { get; set; }
+        public int CompanyId { get; set; }
+        public int BranchId { get; set; }
+        public int FinYearId { get; set; }
+        public long? VoucherId { get; set; }
+        public DateTime VoucherDate { get; set; } = DateTime.Now;
+        public int CustomerLedgerId { get; set; }
+        public string CustomerName { get; set; }
+        public int? SReturnNo { get; set; }
+        public string InvoiceNo { get; set; }
+        public decimal CreditAmount { get; set; }
+        public string Narration { get; set; }
+        public bool CancelFlag { get; set; }
+        public int UserId { get; set; }
+    }
+
+    public class CreditNoteDetailsSyncDto
+    {
+        public int BranchId { get; set; }
+        public int BranchCreditNoteId { get; set; }
+        public int BillNo { get; set; }
+        public DateTime? BillDate { get; set; }
+        public decimal BillAmount { get; set; }
+        public decimal CreditAmount { get; set; }
+        public decimal BalanceAmount { get; set; }
+        public bool CancelFlag { get; set; }
+    }
+
+    public class PurchaseReturnSyncDto
+    {
+        public int BranchPReturnNo { get; set; }
+        public DateTime PReturnDate { get; set; }
+        public string InvoiceNo { get; set; }
+        public DateTime? InvoiceDate { get; set; }
+        public int CompanyId { get; set; }
+        public int FinYearId { get; set; }
+        public int BranchId { get; set; }
+        public int LedgerID { get; set; }
+        public string VendorName { get; set; }
+        public string Paymode { get; set; }
+        public decimal SubTotal { get; set; }
+        public decimal TaxAmt { get; set; }
+        public decimal GrandTotal { get; set; }
+        public long? VoucherID { get; set; }
+        public string Remarks { get; set; }
+        public bool CancelFlag { get; set; }
+        public int UserId { get; set; }
+    }
+
+    public class PurchaseReturnDetailsSyncDto
+    {
+        public int BranchId { get; set; }
+        public int BranchPReturnNo { get; set; }
+        public int SlNo { get; set; }
+        public long ItemID { get; set; }
+        public string ItemName { get; set; }
+        public decimal Qty { get; set; }
+        public decimal Packing { get; set; } = 1.0m;
+        public decimal Cost { get; set; }
+        public decimal TaxAmt { get; set; }
+        public decimal TotalSP { get; set; }
+        public int? UnitId { get; set; }
+        public string Unit { get; set; }
+        public bool CancelFlag { get; set; }
+    }
+
+    public class DebitNoteSyncDto
+    {
+        public int BranchDebitNoteId { get; set; }
+        public int CompanyId { get; set; }
+        public int BranchId { get; set; }
+        public int FinYearId { get; set; }
+        public long? VoucherId { get; set; }
+        public DateTime VoucherDate { get; set; } = DateTime.Now;
+        public int VendorLedgerId { get; set; }
+        public string VendorName { get; set; }
+        public int? PReturnNo { get; set; }
+        public string InvoiceNo { get; set; }
+        public decimal DebitAmount { get; set; }
+        public string Narration { get; set; }
+        public bool CancelFlag { get; set; }
+        public int UserId { get; set; }
+    }
+
+    public class DebitNoteDetailsSyncDto
+    {
+        public int BranchId { get; set; }
+        public int BranchDebitNoteId { get; set; }
+        public int BillNo { get; set; }
+        public DateTime? BillDate { get; set; }
+        public decimal BillAmount { get; set; }
+        public decimal DebitAmount { get; set; }
+        public decimal BalanceAmount { get; set; }
+        public bool CancelFlag { get; set; }
     }
 
     public class MasterDataSyncResponse

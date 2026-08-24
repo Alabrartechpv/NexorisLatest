@@ -51,6 +51,40 @@ namespace Repository
         }
 
         /// <summary>
+        /// Updates the TransactionGuid on the entity table using Stored Procedure (POS_SyncQueue).
+        /// </summary>
+        public static void SetTransactionGuid(
+            IDbConnection conn,
+            IDbTransaction trans,
+            string entityType,
+            string entityId,
+            Guid transactionGuid)
+        {
+            if (conn == null) throw new ArgumentNullException(nameof(conn));
+            if (trans == null) throw new ArgumentNullException(nameof(trans));
+
+            try
+            {
+                var parameters = new DynamicParameters();
+                parameters.Add("@_Operation", "SETGUID");
+                parameters.Add("@EntityType", entityType);
+                parameters.Add("@EntityId", entityId);
+                parameters.Add("@TransactionGuid", transactionGuid);
+
+                conn.Execute(
+                    STOREDPROCEDURE.POS_SyncQueue,
+                    parameters,
+                    transaction: trans,
+                    commandType: CommandType.StoredProcedure
+                );
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[SyncQueueRepository.SetTransactionGuid] Warning: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// Fetches existing TransactionGuid for a given entity using Stored Procedure.
         /// </summary>
         public static Guid? GetExistingGuid(

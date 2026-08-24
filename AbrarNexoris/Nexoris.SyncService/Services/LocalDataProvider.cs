@@ -134,6 +134,389 @@ namespace Nexoris.SyncService.Services
                                 }
                             }
                         }
+                        else if (item.EntityType.Equals("CUSTOMER_RECEIPT", StringComparison.OrdinalIgnoreCase))
+                        {
+                            using (var multi = await conn.QueryMultipleAsync(
+                                SyncStoredProcedure,
+                                new { _Operation = "GETRECEIPT", item.TransactionGuid, EntityId = item.EntityID },
+                                commandType: CommandType.StoredProcedure))
+                            {
+                                var rMaster = await multi.ReadFirstOrDefaultAsync<dynamic>();
+                                if (rMaster != null)
+                                {
+                                    tx.Receipt = new CustomerReceiptSyncDto
+                                    {
+                                        BranchReceiptId = Convert.ToInt32(rMaster.BranchReceiptId),
+                                        CompanyId = rMaster.CompanyId != null ? Convert.ToInt32(rMaster.CompanyId) : 1,
+                                        BranchId = rMaster.BranchId != null ? Convert.ToInt32(rMaster.BranchId) : 1,
+                                        VoucherId = Convert.ToInt64(rMaster.VoucherId),
+                                        VoucherDate = rMaster.VoucherDate != null ? (DateTime)rMaster.VoucherDate : DateTime.Now,
+                                        PaymentMethodLedgerId = Convert.ToInt32(rMaster.PaymentMethodLedgerId),
+                                        PaymentMethodName = string.Empty,
+                                        CustomerLedgerId = Convert.ToInt32(rMaster.CustomerLedgerId),
+                                        CustomerName = string.Empty,
+                                        ReceivableAmount = rMaster.ReceivableAmount != null ? Convert.ToDecimal(rMaster.ReceivableAmount) : 0m,
+                                        ReceiptAmount = rMaster.ReceiptAmount != null ? Convert.ToDecimal(rMaster.ReceiptAmount) : 0m,
+                                        OldReceiptAmount = rMaster.OldReceiptAmount != null ? Convert.ToDecimal(rMaster.OldReceiptAmount) : 0m,
+                                        Narration = rMaster.Narration != null ? (string)rMaster.Narration : string.Empty,
+                                        BillNoUntil = rMaster.BillNoUntil != null ? Convert.ToInt64(rMaster.BillNoUntil) : 0,
+                                        CancelFlag = rMaster.CancelFlag != null && Convert.ToBoolean(rMaster.CancelFlag),
+                                        UserId = rMaster.UserId != null ? Convert.ToInt32(rMaster.UserId) : 1,
+                                        TransporterLedgerId = rMaster.TransporterLedgerId != null ? (int?)rMaster.TransporterLedgerId : null
+                                    };
+
+                                    var rDetails = await multi.ReadAsync<dynamic>();
+                                    foreach (var d in rDetails)
+                                    {
+                                        tx.ReceiptDetails.Add(new CustomerReceiptDetailsSyncDto
+                                        {
+                                            BranchId = Convert.ToInt32(d.BranchId),
+                                            BranchReceiptId = Convert.ToInt32(d.BranchReceiptId),
+                                            BillNo = Convert.ToInt32(d.BillNo),
+                                            BillDate = d.BillDate != null ? (DateTime)d.BillDate : DateTime.Now,
+                                            BillAmount = d.BillAmount != null ? Convert.ToDecimal(d.BillAmount) : 0m,
+                                            ReceivedAmount = d.ReceivedAmount != null ? Convert.ToDecimal(d.ReceivedAmount) : 0m,
+                                            ReceiptAmount = d.ReceiptAmount != null ? Convert.ToDecimal(d.ReceiptAmount) : 0m,
+                                            BalanceAmount = d.BalanceAmount != null ? Convert.ToDecimal(d.BalanceAmount) : 0m,
+                                            CancelFlag = d.CancelFlag != null && Convert.ToBoolean(d.CancelFlag)
+                                        });
+                                    }
+
+                                    var vouchers = await multi.ReadAsync<dynamic>();
+                                    foreach (var v in vouchers)
+                                    {
+                                        tx.Vouchers.Add(new VoucherSyncDto
+                                        {
+                                            BranchVoucherId = Convert.ToInt64(v.BranchVoucherId),
+                                            LedgerID = v.LedgerID != null ? (int?)v.LedgerID : null,
+                                            LedgerName = v.LedgerName != null ? (string)v.LedgerName : string.Empty,
+                                            Debit = v.Debit != null ? Convert.ToDecimal(v.Debit) : 0m,
+                                            Credit = v.Credit != null ? Convert.ToDecimal(v.Credit) : 0m,
+                                            Narration = v.Narration != null ? (string)v.Narration : string.Empty
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                        else if (item.EntityType.Equals("VENDOR_PAYMENT", StringComparison.OrdinalIgnoreCase))
+                        {
+                            using (var multi = await conn.QueryMultipleAsync(
+                                SyncStoredProcedure,
+                                new { _Operation = "GETPAYMENT", item.TransactionGuid, EntityId = item.EntityID },
+                                commandType: CommandType.StoredProcedure))
+                            {
+                                var pMaster = await multi.ReadFirstOrDefaultAsync<dynamic>();
+                                if (pMaster != null)
+                                {
+                                    tx.Payment = new VendorPaymentSyncDto
+                                    {
+                                        BranchPaymentId = Convert.ToInt32(pMaster.BranchPaymentId),
+                                        CompanyId = pMaster.CompanyId != null ? Convert.ToInt32(pMaster.CompanyId) : 1,
+                                        BranchId = pMaster.BranchId != null ? Convert.ToInt32(pMaster.BranchId) : 1,
+                                        VoucherId = Convert.ToInt64(pMaster.VoucherId),
+                                        VoucherDate = pMaster.VoucherDate != null ? (DateTime)pMaster.VoucherDate : DateTime.Now,
+                                        PaymentMethodLedgerId = Convert.ToInt32(pMaster.PaymentMethodLedgerId),
+                                        PaymentMethodName = string.Empty,
+                                        VendorLedgerId = Convert.ToInt32(pMaster.VendorLedgerId),
+                                        VendorName = string.Empty,
+                                        PayableAmount = pMaster.PayableAmount != null ? Convert.ToDecimal(pMaster.PayableAmount) : 0m,
+                                        PaymentAmount = pMaster.PaymentAmount != null ? Convert.ToDecimal(pMaster.PaymentAmount) : 0m,
+                                        OldPaymentAmount = pMaster.OldPaymentAmount != null ? Convert.ToDecimal(pMaster.OldPaymentAmount) : 0m,
+                                        Narration = pMaster.Narration != null ? (string)pMaster.Narration : string.Empty,
+                                        BillNoUntil = pMaster.BillNoUntil != null ? Convert.ToInt64(pMaster.BillNoUntil) : 0,
+                                        CancelFlag = pMaster.CancelFlag != null && Convert.ToBoolean(pMaster.CancelFlag),
+                                        UserId = pMaster.UserId != null ? Convert.ToInt32(pMaster.UserId) : 1
+                                    };
+
+                                    var pDetails = await multi.ReadAsync<dynamic>();
+                                    foreach (var d in pDetails)
+                                    {
+                                        tx.PaymentDetails.Add(new VendorPaymentDetailsSyncDto
+                                        {
+                                            BranchId = Convert.ToInt32(d.BranchId),
+                                            BranchPaymentId = Convert.ToInt32(d.BranchPaymentId),
+                                            BillNo = Convert.ToInt32(d.BillNo),
+                                            BillDate = d.BillDate != null ? (DateTime)d.BillDate : DateTime.Now,
+                                            BillAmount = d.BillAmount != null ? Convert.ToDecimal(d.BillAmount) : 0m,
+                                            PayedAmount = d.PayedAmount != null ? Convert.ToDecimal(d.PayedAmount) : 0m,
+                                            PaymentAmount = d.PaymentAmount != null ? Convert.ToDecimal(d.PaymentAmount) : 0m,
+                                            BalanceAmount = d.BalanceAmount != null ? Convert.ToDecimal(d.BalanceAmount) : 0m,
+                                            CancelFlag = d.CancelFlag != null && Convert.ToBoolean(d.CancelFlag)
+                                        });
+                                    }
+
+                                    var vouchers = await multi.ReadAsync<dynamic>();
+                                    foreach (var v in vouchers)
+                                    {
+                                        tx.Vouchers.Add(new VoucherSyncDto
+                                        {
+                                            BranchVoucherId = Convert.ToInt64(v.BranchVoucherId),
+                                            LedgerID = v.LedgerID != null ? (int?)v.LedgerID : null,
+                                            LedgerName = v.LedgerName != null ? (string)v.LedgerName : string.Empty,
+                                            Debit = v.Debit != null ? Convert.ToDecimal(v.Debit) : 0m,
+                                            Credit = v.Credit != null ? Convert.ToDecimal(v.Credit) : 0m,
+                                            Narration = v.Narration != null ? (string)v.Narration : string.Empty
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                        else if (item.EntityType.Equals("SALES_RETURN", StringComparison.OrdinalIgnoreCase))
+                        {
+                            using (var multi = await conn.QueryMultipleAsync(
+                                SyncStoredProcedure,
+                                new { _Operation = "GETSALESRETURN", item.TransactionGuid, EntityId = item.EntityID },
+                                commandType: CommandType.StoredProcedure))
+                            {
+                                var srMaster = await multi.ReadFirstOrDefaultAsync<dynamic>();
+                                if (srMaster != null)
+                                {
+                                    tx.SalesReturn = new SalesReturnSyncDto
+                                    {
+                                        BranchSReturnNo = Convert.ToInt32(srMaster.BranchSReturnNo),
+                                        SReturnDate = srMaster.SReturnDate != null ? (DateTime)srMaster.SReturnDate : DateTime.Now,
+                                        InvoiceNo = srMaster.InvoiceNo != null ? (string)srMaster.InvoiceNo : string.Empty,
+                                        InvoiceDate = srMaster.InvoiceDate != null ? (DateTime?)srMaster.InvoiceDate : null,
+                                        CompanyId = srMaster.CompanyId != null ? Convert.ToInt32(srMaster.CompanyId) : 1,
+                                        FinYearId = srMaster.FinYearId != null ? Convert.ToInt32(srMaster.FinYearId) : 1,
+                                        BranchId = srMaster.BranchId != null ? Convert.ToInt32(srMaster.BranchId) : branchId,
+                                        LedgerID = srMaster.LedgerID != null ? Convert.ToInt32(srMaster.LedgerID) : 0,
+                                        CustomerName = srMaster.CustomerName != null ? (string)srMaster.CustomerName : string.Empty,
+                                        Paymode = srMaster.Paymode != null ? (string)srMaster.Paymode : string.Empty,
+                                        SubTotal = srMaster.SubTotal != null ? Convert.ToDecimal(srMaster.SubTotal) : 0m,
+                                        TaxAmt = srMaster.TaxAmt != null ? Convert.ToDecimal(srMaster.TaxAmt) : 0m,
+                                        GrandTotal = srMaster.GrandTotal != null ? Convert.ToDecimal(srMaster.GrandTotal) : 0m,
+                                        VoucherID = srMaster.VoucherID != null ? (long?)Convert.ToInt64(srMaster.VoucherID) : null,
+                                        Remarks = srMaster.Remarks != null ? (string)srMaster.Remarks : string.Empty,
+                                        CancelFlag = srMaster.CancelFlag != null && Convert.ToBoolean(srMaster.CancelFlag),
+                                        UserId = srMaster.UserID != null ? Convert.ToInt32(srMaster.UserID) : 1
+                                    };
+
+                                    var srDetails = await multi.ReadAsync<dynamic>();
+                                    foreach (var d in srDetails)
+                                    {
+                                        tx.SalesReturnDetails.Add(new SalesReturnDetailsSyncDto
+                                        {
+                                            BranchId = d.BranchID != null ? Convert.ToInt32(d.BranchID) : branchId,
+                                            BranchSReturnNo = Convert.ToInt32(d.BranchSReturnNo),
+                                            SlNo = Convert.ToInt32(d.SlNo),
+                                            ItemID = Convert.ToInt64(d.ItemID),
+                                            ItemName = d.ItemName != null ? (string)d.ItemName : string.Empty,
+                                            Qty = Convert.ToDecimal(d.Qty),
+                                            Packing = d.Packing != null ? Convert.ToDecimal(d.Packing) : 1.0m,
+                                            SalesPrice = d.SalesPrice != null ? Convert.ToDecimal(d.SalesPrice) : 0m,
+                                            TaxAmt = d.TaxAmt != null ? Convert.ToDecimal(d.TaxAmt) : 0m,
+                                            TotalSP = d.TotalSP != null ? Convert.ToDecimal(d.TotalSP) : 0m,
+                                            UnitId = d.UnitId != null ? (int?)d.UnitId : null,
+                                            Unit = d.Unit != null ? (string)d.Unit : string.Empty,
+                                            CancelFlag = d.CancelFlag != null && Convert.ToBoolean(d.CancelFlag)
+                                        });
+                                    }
+
+                                    var vouchers = await multi.ReadAsync<dynamic>();
+                                    foreach (var v in vouchers)
+                                    {
+                                        tx.Vouchers.Add(new VoucherSyncDto
+                                        {
+                                            BranchVoucherId = Convert.ToInt64(v.BranchVoucherId),
+                                            LedgerID = v.LedgerID != null ? (int?)v.LedgerID : null,
+                                            LedgerName = v.LedgerName != null ? (string)v.LedgerName : string.Empty,
+                                            Debit = v.Debit != null ? Convert.ToDecimal(v.Debit) : 0m,
+                                            Credit = v.Credit != null ? Convert.ToDecimal(v.Credit) : 0m,
+                                            Narration = v.Narration != null ? (string)v.Narration : string.Empty
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                        else if (item.EntityType.Equals("CREDIT_NOTE", StringComparison.OrdinalIgnoreCase))
+                        {
+                            using (var multi = await conn.QueryMultipleAsync(
+                                SyncStoredProcedure,
+                                new { _Operation = "GETCREDITNOTE", item.TransactionGuid, EntityId = item.EntityID },
+                                commandType: CommandType.StoredProcedure))
+                            {
+                                var cnMaster = await multi.ReadFirstOrDefaultAsync<dynamic>();
+                                if (cnMaster != null)
+                                {
+                                    tx.CreditNote = new CreditNoteSyncDto
+                                    {
+                                        BranchCreditNoteId = Convert.ToInt32(cnMaster.BranchCreditNoteId),
+                                        CompanyId = cnMaster.CompanyId != null ? Convert.ToInt32(cnMaster.CompanyId) : 1,
+                                        BranchId = cnMaster.BranchId != null ? Convert.ToInt32(cnMaster.BranchId) : branchId,
+                                        FinYearId = cnMaster.FinYearId != null ? Convert.ToInt32(cnMaster.FinYearId) : 1,
+                                        VoucherId = cnMaster.VoucherId != null ? (long?)Convert.ToInt64(cnMaster.VoucherId) : null,
+                                        VoucherDate = cnMaster.VoucherDate != null ? (DateTime)cnMaster.VoucherDate : DateTime.Now,
+                                        CustomerLedgerId = cnMaster.CustomerLedgerId != null ? Convert.ToInt32(cnMaster.CustomerLedgerId) : 0,
+                                        CustomerName = cnMaster.CustomerName != null ? (string)cnMaster.CustomerName : string.Empty,
+                                        SReturnNo = cnMaster.SReturnNo != null ? (int?)Convert.ToInt32(cnMaster.SReturnNo) : null,
+                                        InvoiceNo = cnMaster.InvoiceNo != null ? (string)cnMaster.InvoiceNo : string.Empty,
+                                        CreditAmount = cnMaster.CreditAmount != null ? Convert.ToDecimal(cnMaster.CreditAmount) : 0m,
+                                        Narration = cnMaster.Narration != null ? (string)cnMaster.Narration : string.Empty,
+                                        CancelFlag = cnMaster.CancelFlag != null && Convert.ToBoolean(cnMaster.CancelFlag),
+                                        UserId = cnMaster.UserId != null ? Convert.ToInt32(cnMaster.UserId) : 1
+                                    };
+
+                                    var cnDetails = await multi.ReadAsync<dynamic>();
+                                    foreach (var d in cnDetails)
+                                    {
+                                        tx.CreditNoteDetails.Add(new CreditNoteDetailsSyncDto
+                                        {
+                                            BranchId = d.BranchId != null ? Convert.ToInt32(d.BranchId) : branchId,
+                                            BranchCreditNoteId = Convert.ToInt32(d.BranchCreditNoteId),
+                                            BillNo = Convert.ToInt32(d.BillNo),
+                                            BillDate = d.BillDate != null ? (DateTime?)d.BillDate : null,
+                                            BillAmount = d.BillAmount != null ? Convert.ToDecimal(d.BillAmount) : 0m,
+                                            CreditAmount = d.CreditAmount != null ? Convert.ToDecimal(d.CreditAmount) : 0m,
+                                            BalanceAmount = d.BalanceAmount != null ? Convert.ToDecimal(d.BalanceAmount) : 0m,
+                                            CancelFlag = d.CancelFlag != null && Convert.ToBoolean(d.CancelFlag)
+                                        });
+                                    }
+
+                                    var vouchers = await multi.ReadAsync<dynamic>();
+                                    foreach (var v in vouchers)
+                                    {
+                                        tx.Vouchers.Add(new VoucherSyncDto
+                                        {
+                                            BranchVoucherId = Convert.ToInt64(v.BranchVoucherId),
+                                            LedgerID = v.LedgerID != null ? (int?)v.LedgerID : null,
+                                            LedgerName = v.LedgerName != null ? (string)v.LedgerName : string.Empty,
+                                            Debit = v.Debit != null ? Convert.ToDecimal(v.Debit) : 0m,
+                                            Credit = v.Credit != null ? Convert.ToDecimal(v.Credit) : 0m,
+                                            Narration = v.Narration != null ? (string)v.Narration : string.Empty
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                        else if (item.EntityType.Equals("PURCHASE_RETURN", StringComparison.OrdinalIgnoreCase))
+                        {
+                            using (var multi = await conn.QueryMultipleAsync(
+                                SyncStoredProcedure,
+                                new { _Operation = "GETPURCHASERETURN", item.TransactionGuid, EntityId = item.EntityID },
+                                commandType: CommandType.StoredProcedure))
+                            {
+                                var prMaster = await multi.ReadFirstOrDefaultAsync<dynamic>();
+                                if (prMaster != null)
+                                {
+                                    tx.PurchaseReturn = new PurchaseReturnSyncDto
+                                    {
+                                        BranchPReturnNo = Convert.ToInt32(prMaster.BranchPReturnNo),
+                                        PReturnDate = prMaster.PReturnDate != null ? (DateTime)prMaster.PReturnDate : DateTime.Now,
+                                        InvoiceNo = prMaster.InvoiceNo != null ? (string)prMaster.InvoiceNo : string.Empty,
+                                        InvoiceDate = prMaster.InvoiceDate != null ? (DateTime?)prMaster.InvoiceDate : null,
+                                        CompanyId = prMaster.CompanyId != null ? Convert.ToInt32(prMaster.CompanyId) : 1,
+                                        FinYearId = prMaster.FinYearId != null ? Convert.ToInt32(prMaster.FinYearId) : 1,
+                                        BranchId = prMaster.BranchId != null ? Convert.ToInt32(prMaster.BranchId) : branchId,
+                                        LedgerID = prMaster.LedgerID != null ? Convert.ToInt32(prMaster.LedgerID) : 0,
+                                        VendorName = prMaster.VendorName != null ? (string)prMaster.VendorName : string.Empty,
+                                        Paymode = prMaster.Paymode != null ? (string)prMaster.Paymode : string.Empty,
+                                        SubTotal = prMaster.SubTotal != null ? Convert.ToDecimal(prMaster.SubTotal) : 0m,
+                                        TaxAmt = prMaster.TaxAmt != null ? Convert.ToDecimal(prMaster.TaxAmt) : 0m,
+                                        GrandTotal = prMaster.GrandTotal != null ? Convert.ToDecimal(prMaster.GrandTotal) : 0m,
+                                        VoucherID = prMaster.VoucherID != null ? (long?)Convert.ToInt64(prMaster.VoucherID) : null,
+                                        Remarks = prMaster.Remarks != null ? (string)prMaster.Remarks : string.Empty,
+                                        CancelFlag = prMaster.CancelFlag != null && Convert.ToBoolean(prMaster.CancelFlag),
+                                        UserId = prMaster.UserID != null ? Convert.ToInt32(prMaster.UserID) : 1
+                                    };
+
+                                    var prDetails = await multi.ReadAsync<dynamic>();
+                                    foreach (var d in prDetails)
+                                    {
+                                        tx.PurchaseReturnDetails.Add(new PurchaseReturnDetailsSyncDto
+                                        {
+                                            BranchId = d.BranchID != null ? Convert.ToInt32(d.BranchID) : branchId,
+                                            BranchPReturnNo = Convert.ToInt32(d.BranchPReturnNo),
+                                            SlNo = Convert.ToInt32(d.SlNo),
+                                            ItemID = Convert.ToInt64(d.ItemID),
+                                            ItemName = d.ItemName != null ? (string)d.ItemName : string.Empty,
+                                            Qty = Convert.ToDecimal(d.Qty),
+                                            Packing = d.Packing != null ? Convert.ToDecimal(d.Packing) : 1.0m,
+                                            Cost = d.Cost != null ? Convert.ToDecimal(d.Cost) : 0m,
+                                            TaxAmt = d.TaxAmt != null ? Convert.ToDecimal(d.TaxAmt) : 0m,
+                                            TotalSP = d.TotalSP != null ? Convert.ToDecimal(d.TotalSP) : 0m,
+                                            UnitId = d.UnitId != null ? (int?)d.UnitId : null,
+                                            Unit = d.Unit != null ? (string)d.Unit : string.Empty,
+                                            CancelFlag = d.CancelFlag != null && Convert.ToBoolean(d.CancelFlag)
+                                        });
+                                    }
+
+                                    var vouchers = await multi.ReadAsync<dynamic>();
+                                    foreach (var v in vouchers)
+                                    {
+                                        tx.Vouchers.Add(new VoucherSyncDto
+                                        {
+                                            BranchVoucherId = Convert.ToInt64(v.BranchVoucherId),
+                                            LedgerID = v.LedgerID != null ? (int?)v.LedgerID : null,
+                                            LedgerName = v.LedgerName != null ? (string)v.LedgerName : string.Empty,
+                                            Debit = v.Debit != null ? Convert.ToDecimal(v.Debit) : 0m,
+                                            Credit = v.Credit != null ? Convert.ToDecimal(v.Credit) : 0m,
+                                            Narration = v.Narration != null ? (string)v.Narration : string.Empty
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                        else if (item.EntityType.Equals("DEBIT_NOTE", StringComparison.OrdinalIgnoreCase))
+                        {
+                            using (var multi = await conn.QueryMultipleAsync(
+                                SyncStoredProcedure,
+                                new { _Operation = "GETDEBITNOTE", item.TransactionGuid, EntityId = item.EntityID },
+                                commandType: CommandType.StoredProcedure))
+                            {
+                                var dnMaster = await multi.ReadFirstOrDefaultAsync<dynamic>();
+                                if (dnMaster != null)
+                                {
+                                    tx.DebitNote = new DebitNoteSyncDto
+                                    {
+                                        BranchDebitNoteId = Convert.ToInt32(dnMaster.BranchDebitNoteId),
+                                        CompanyId = dnMaster.CompanyId != null ? Convert.ToInt32(dnMaster.CompanyId) : 1,
+                                        BranchId = dnMaster.BranchId != null ? Convert.ToInt32(dnMaster.BranchId) : branchId,
+                                        FinYearId = dnMaster.FinYearId != null ? Convert.ToInt32(dnMaster.FinYearId) : 1,
+                                        VoucherId = dnMaster.VoucherId != null ? (long?)Convert.ToInt64(dnMaster.VoucherId) : null,
+                                        VoucherDate = dnMaster.VoucherDate != null ? (DateTime)dnMaster.VoucherDate : DateTime.Now,
+                                        VendorLedgerId = dnMaster.VendorLedgerId != null ? Convert.ToInt32(dnMaster.VendorLedgerId) : 0,
+                                        VendorName = dnMaster.VendorName != null ? (string)dnMaster.VendorName : string.Empty,
+                                        PReturnNo = dnMaster.PReturnNo != null ? (int?)Convert.ToInt32(dnMaster.PReturnNo) : null,
+                                        InvoiceNo = dnMaster.InvoiceNo != null ? (string)dnMaster.InvoiceNo : string.Empty,
+                                        DebitAmount = dnMaster.DebitAmount != null ? Convert.ToDecimal(dnMaster.DebitAmount) : 0m,
+                                        Narration = dnMaster.Narration != null ? (string)dnMaster.Narration : string.Empty,
+                                        CancelFlag = dnMaster.CancelFlag != null && Convert.ToBoolean(dnMaster.CancelFlag),
+                                        UserId = dnMaster.UserId != null ? Convert.ToInt32(dnMaster.UserId) : 1
+                                    };
+
+                                    var dnDetails = await multi.ReadAsync<dynamic>();
+                                    foreach (var d in dnDetails)
+                                    {
+                                        tx.DebitNoteDetails.Add(new DebitNoteDetailsSyncDto
+                                        {
+                                            BranchId = d.BranchId != null ? Convert.ToInt32(d.BranchId) : branchId,
+                                            BranchDebitNoteId = Convert.ToInt32(d.BranchDebitNoteId),
+                                            BillNo = Convert.ToInt32(d.BillNo),
+                                            BillDate = d.BillDate != null ? (DateTime?)d.BillDate : null,
+                                            BillAmount = d.BillAmount != null ? Convert.ToDecimal(d.BillAmount) : 0m,
+                                            DebitAmount = d.DebitAmount != null ? Convert.ToDecimal(d.DebitAmount) : 0m,
+                                            BalanceAmount = d.BalanceAmount != null ? Convert.ToDecimal(d.BalanceAmount) : 0m,
+                                            CancelFlag = d.CancelFlag != null && Convert.ToBoolean(d.CancelFlag)
+                                        });
+                                    }
+
+                                    var vouchers = await multi.ReadAsync<dynamic>();
+                                    foreach (var v in vouchers)
+                                    {
+                                        tx.Vouchers.Add(new VoucherSyncDto
+                                        {
+                                            BranchVoucherId = Convert.ToInt64(v.BranchVoucherId),
+                                            LedgerID = v.LedgerID != null ? (int?)v.LedgerID : null,
+                                            LedgerName = v.LedgerName != null ? (string)v.LedgerName : string.Empty,
+                                            Debit = v.Debit != null ? Convert.ToDecimal(v.Debit) : 0m,
+                                            Credit = v.Credit != null ? Convert.ToDecimal(v.Credit) : 0m,
+                                            Narration = v.Narration != null ? (string)v.Narration : string.Empty
+                                        });
+                                    }
+                                }
+                            }
+                        }
                         else
                         {
                             // Default: SALES

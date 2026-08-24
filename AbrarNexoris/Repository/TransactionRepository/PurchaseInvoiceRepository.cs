@@ -240,10 +240,7 @@ namespace Repository.TransactionRepository
 
                 // Calculate and set total tax amount in PurchaseMaster
                 float totalTaxAmountForMaster = CalculateTotalTaxAmount(dgvItem);
-                if (ObjPurchaseMaster.TransactionGuid == Guid.Empty)
-                {
-                    ObjPurchaseMaster.TransactionGuid = Guid.NewGuid();
-                }
+                ObjPurchaseMaster.TransactionGuid = Guid.NewGuid();
 
                 ObjPurchaseMaster._Operation = "CREATE";
                 var pCreate = GetPurchaseMasterParameters(ObjPurchaseMaster);

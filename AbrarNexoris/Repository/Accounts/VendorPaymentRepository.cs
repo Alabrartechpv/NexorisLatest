@@ -257,6 +257,31 @@ namespace Repository.Accounts
                     }
                 }
 
+                // 5. SyncQueue Integration - Enqueue Vendor Payment (via Stored Procedure POS_SyncQueue)
+                try
+                {
+                    Guid paymentGuid = Guid.NewGuid();
+                    SyncQueueRepository.SetTransactionGuid(
+                        DataConnection,
+                        transaction,
+                        "VENDOR_PAYMENT",
+                        paymentMasterId.ToString(),
+                        paymentGuid);
+
+                    SyncQueueRepository.EnqueueTransaction(
+                        DataConnection,
+                        transaction,
+                        branchId > 0 ? branchId : SessionContext.BranchId,
+                        "VENDOR_PAYMENT",
+                        paymentMasterId.ToString(),
+                        paymentGuid,
+                        "CREATE");
+                }
+                catch (Exception syncEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[VendorPaymentRepository.SaveVendorPayment] SyncQueue error: {syncEx.Message}");
+                }
+
                 transaction.Commit();
                 return paymentMasterId;
             }
@@ -1048,7 +1073,30 @@ WHERE BranchID = @BranchId
                     cancelVoucherCmd.Parameters.AddWithValue("@BranchId", branchId);
                     cancelVoucherCmd.Parameters.AddWithValue("@VoucherId", voucherId);
                     cancelVoucherCmd.Parameters.AddWithValue("@VoucherType", VendorPaymentVoucherType);
-                    cancelVoucherCmd.ExecuteNonQuery();
+                }
+
+                // SyncQueue Integration - Enqueue Vendor Payment Cancellation
+                try
+                {
+                    Guid? existingGuid = SyncQueueRepository.GetExistingGuid(
+                        DataConnection,
+                        transaction,
+                        branchId > 0 ? branchId : SessionContext.BranchId,
+                        "VENDOR_PAYMENT",
+                        paymentMasterId.ToString()) ?? Guid.NewGuid();
+
+                    SyncQueueRepository.EnqueueTransaction(
+                        DataConnection,
+                        transaction,
+                        branchId > 0 ? branchId : SessionContext.BranchId,
+                        "VENDOR_PAYMENT",
+                        paymentMasterId.ToString(),
+                        existingGuid.Value,
+                        "CANCEL");
+                }
+                catch (Exception syncEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[VendorPaymentRepository.CancelVendorPayment] SyncQueue error: {syncEx.Message}");
                 }
 
                 transaction.Commit();

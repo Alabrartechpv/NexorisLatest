@@ -267,6 +267,10 @@ namespace PosBranch_Win.Accounts
                 {
                     row["Select"] = false;
                     row["Debit Amount"] = 0m;
+                    if (dt.Columns.Contains("SelectionOrder"))
+                    {
+                        row["SelectionOrder"] = 0;
+                    }
 
                     decimal invoiceAmount = dt.Columns.Contains("InvoiceAmount") && row["InvoiceAmount"] != DBNull.Value ? Convert.ToDecimal(row["InvoiceAmount"]) : 0m;
                     decimal paidAmount = dt.Columns.Contains("PaidAmount") && row["PaidAmount"] != DBNull.Value ? Convert.ToDecimal(row["PaidAmount"]) : 0m;

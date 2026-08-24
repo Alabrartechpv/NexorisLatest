@@ -487,6 +487,31 @@ namespace Repository.Accounts
                                 }
                             }
 
+                            // 6. SyncQueue Integration - Enqueue Customer Receipt (via Stored Procedure POS_SyncQueue)
+                            try
+                            {
+                                Guid receiptGuid = Guid.NewGuid();
+                                SyncQueueRepository.SetTransactionGuid(
+                                    conn,
+                                    transaction,
+                                    "CUSTOMER_RECEIPT",
+                                    master.ReceiptId.ToString(),
+                                    receiptGuid);
+
+                                SyncQueueRepository.EnqueueTransaction(
+                                    conn,
+                                    transaction,
+                                    master.BranchId > 0 ? master.BranchId : SessionContext.BranchId,
+                                    "CUSTOMER_RECEIPT",
+                                    master.ReceiptId.ToString(),
+                                    receiptGuid,
+                                    "CREATE");
+                            }
+                            catch (Exception syncEx)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"[CustomerReceiptInfoRepository.SaveCustomerReceipt] SyncQueue error: {syncEx.Message}");
+                            }
+
                         transaction.Commit();
                         return true;
                     }
@@ -1443,6 +1468,30 @@ WHERE BranchID = @BranchId
                         cancelVoucherCmd.Parameters.AddWithValue("@VoucherId", voucherId);
                         cancelVoucherCmd.ExecuteNonQuery();
                     }
+                }
+
+                // SyncQueue Integration - Enqueue Customer Receipt Cancellation
+                try
+                {
+                    Guid? existingGuid = SyncQueueRepository.GetExistingGuid(
+                        (SqlConnection)DataConnection,
+                        transaction,
+                        branchId > 0 ? branchId : SessionContext.BranchId,
+                        "CUSTOMER_RECEIPT",
+                        receiptMasterId.ToString()) ?? Guid.NewGuid();
+
+                    SyncQueueRepository.EnqueueTransaction(
+                        (SqlConnection)DataConnection,
+                        transaction,
+                        branchId > 0 ? branchId : SessionContext.BranchId,
+                        "CUSTOMER_RECEIPT",
+                        receiptMasterId.ToString(),
+                        existingGuid.Value,
+                        "CANCEL");
+                }
+                catch (Exception syncEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[CustomerReceiptInfoRepository.CancelCustomerReceipt] SyncQueue error: {syncEx.Message}");
                 }
 
                 transaction.Commit();

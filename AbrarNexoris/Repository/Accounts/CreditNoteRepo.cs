@@ -691,6 +691,31 @@ namespace Repository.Accounts
                                 }
                             }
 
+                            // SyncQueue Integration - Enqueue Credit Note
+                            try
+                            {
+                                Guid creditNoteGuid = Guid.NewGuid();
+                                SyncQueueRepository.SetTransactionGuid(
+                                    conn,
+                                    transaction,
+                                    "CREDIT_NOTE",
+                                    master.Id.ToString(),
+                                    creditNoteGuid);
+
+                                SyncQueueRepository.EnqueueTransaction(
+                                    conn,
+                                    transaction,
+                                    master.BranchId > 0 ? master.BranchId : SessionContext.BranchId,
+                                    "CREDIT_NOTE",
+                                    master.Id.ToString(),
+                                    creditNoteGuid,
+                                    "CREATE");
+                            }
+                            catch (Exception syncEx)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"[CreditNoteRepo.SaveCreditNote] SyncQueue error: {syncEx.Message}");
+                            }
+
                             transaction.Commit();
                             return true;
                         }
@@ -816,7 +841,35 @@ namespace Repository.Accounts
                     cmd.Parameters.AddWithValue("@_Operation", "DELETE");
 
                     var result = cmd.ExecuteScalar();
-                    return result != null && result.ToString() == "SUCCESS";
+                    bool success = result != null && result.ToString() == "SUCCESS";
+
+                    if (success)
+                    {
+                        try
+                        {
+                            Guid? existingGuid = SyncQueueRepository.GetExistingGuid(
+                                DataConnection,
+                                null,
+                                SessionContext.BranchId,
+                                "CREDIT_NOTE",
+                                creditNoteId.ToString()) ?? Guid.NewGuid();
+
+                            SyncQueueRepository.EnqueueTransaction(
+                                DataConnection,
+                                null,
+                                SessionContext.BranchId,
+                                "CREDIT_NOTE",
+                                creditNoteId.ToString(),
+                                existingGuid.Value,
+                                "CANCEL");
+                        }
+                        catch (Exception syncEx)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[CreditNoteRepo.DeleteCreditNote] SyncQueue error: {syncEx.Message}");
+                        }
+                    }
+
+                    return success;
                 }
             }
             finally

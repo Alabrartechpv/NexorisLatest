@@ -472,6 +472,31 @@ namespace Repository.Accounts
                                 }
                             }
 
+                            // SyncQueue Integration - Enqueue Debit Note
+                            try
+                            {
+                                Guid debitNoteGuid = Guid.NewGuid();
+                                SyncQueueRepository.SetTransactionGuid(
+                                    conn,
+                                    transaction,
+                                    "DEBIT_NOTE",
+                                    master.Id.ToString(),
+                                    debitNoteGuid);
+
+                                SyncQueueRepository.EnqueueTransaction(
+                                    conn,
+                                    transaction,
+                                    master.BranchId > 0 ? master.BranchId : SessionContext.BranchId,
+                                    "DEBIT_NOTE",
+                                    master.Id.ToString(),
+                                    debitNoteGuid,
+                                    "CREATE");
+                            }
+                            catch (Exception syncEx)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"[DebitNoteRepo.SaveDebitNote] SyncQueue error: {syncEx.Message}");
+                            }
+
                             transaction.Commit();
                             return true;
                         }
@@ -597,7 +622,35 @@ namespace Repository.Accounts
                     cmd.Parameters.AddWithValue("@_Operation", "DELETE");
 
                     var result = cmd.ExecuteScalar();
-                    return result != null && result.ToString() == "SUCCESS";
+                    bool success = result != null && result.ToString() == "SUCCESS";
+
+                    if (success)
+                    {
+                        try
+                        {
+                            Guid? existingGuid = SyncQueueRepository.GetExistingGuid(
+                                DataConnection,
+                                null,
+                                SessionContext.BranchId,
+                                "DEBIT_NOTE",
+                                debitNoteId.ToString()) ?? Guid.NewGuid();
+
+                            SyncQueueRepository.EnqueueTransaction(
+                                DataConnection,
+                                null,
+                                SessionContext.BranchId,
+                                "DEBIT_NOTE",
+                                debitNoteId.ToString(),
+                                existingGuid.Value,
+                                "CANCEL");
+                        }
+                        catch (Exception syncEx)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"[DebitNoteRepo.DeleteDebitNote] SyncQueue error: {syncEx.Message}");
+                        }
+                    }
+
+                    return success;
                 }
             }
             finally

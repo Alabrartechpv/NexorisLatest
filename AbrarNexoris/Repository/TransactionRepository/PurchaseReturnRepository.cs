@@ -1133,6 +1133,31 @@ namespace Repository.TransactionRepository
 
                     System.Diagnostics.Debug.WriteLine($"Purchase Return PR#{pr.PReturnNo} saved as pending stock return. Accounting voucher will be posted from Debit Note.");
 
+                    // SyncQueue Integration - Enqueue Purchase Return
+                    try
+                    {
+                        Guid returnGuid = Guid.NewGuid();
+                        SyncQueueRepository.SetTransactionGuid(
+                            DataConnection,
+                            trans,
+                            "PURCHASE_RETURN",
+                            pr.PReturnNo.ToString(),
+                            returnGuid);
+
+                        SyncQueueRepository.EnqueueTransaction(
+                            DataConnection,
+                            trans,
+                            pr.BranchId > 0 ? pr.BranchId : SessionContext.BranchId,
+                            "PURCHASE_RETURN",
+                            pr.PReturnNo.ToString(),
+                            returnGuid,
+                            "CREATE");
+                    }
+                    catch (Exception syncEx)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[PurchaseReturnRepository.SavePR] SyncQueue error: {syncEx.Message}");
+                    }
+
                     trans.Commit();
 
                     // Update TrackTrans table with the latest PR number for future reference
@@ -1412,6 +1437,30 @@ namespace Repository.TransactionRepository
                 if (VoucherId > 0)
                 {
                     DeleteVoucher(VoucherId, BranchId, ModelClass.VoucherType.DebitNote);
+                }
+
+                // SyncQueue Integration - Enqueue Purchase Return Cancellation
+                try
+                {
+                    Guid? existingGuid = SyncQueueRepository.GetExistingGuid(
+                        DataConnection,
+                        null,
+                        BranchId > 0 ? BranchId : SessionContext.BranchId,
+                        "PURCHASE_RETURN",
+                        PReturnNo.ToString()) ?? Guid.NewGuid();
+
+                    SyncQueueRepository.EnqueueTransaction(
+                        DataConnection,
+                        null,
+                        BranchId > 0 ? BranchId : SessionContext.BranchId,
+                        "PURCHASE_RETURN",
+                        PReturnNo.ToString(),
+                        existingGuid.Value,
+                        "CANCEL");
+                }
+                catch (Exception syncEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[PurchaseReturnRepository.DeletePR] SyncQueue error: {syncEx.Message}");
                 }
             }
             catch (Exception ex)
