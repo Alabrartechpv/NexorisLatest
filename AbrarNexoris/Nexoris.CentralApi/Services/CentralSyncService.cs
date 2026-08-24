@@ -294,6 +294,10 @@ namespace Nexoris.CentralApi.Services
                 {
                     return await IngestDebitNoteTransactionAsync(conn, branchId, tx);
                 }
+                else if (tx.EntityType.Equals("STOCK_ADJUSTMENT", StringComparison.OrdinalIgnoreCase))
+                {
+                    return await IngestStockAdjustmentTransactionAsync(conn, branchId, tx);
+                }
                 else
                 {
                     return await IngestSalesTransactionAsync(conn, branchId, tx);
@@ -2005,6 +2009,168 @@ namespace Nexoris.CentralApi.Services
                         EntityId = entityId,
                         Status = "Synced",
                         CentralTransactionId = centralDebitNoteId
+                    };
+                }
+                catch
+                {
+                    trans.Rollback();
+                    throw;
+                }
+            }
+        }
+        #endregion
+
+        #region Stock Adjustment Transaction Ingest
+        private async Task<SyncItemResult> IngestStockAdjustmentTransactionAsync(SqlConnection conn, int branchId, TransactionSyncDto tx)
+        {
+            string entityId = tx.StockAdjustment != null ? tx.StockAdjustment.StockAdjustmentNo.ToString() : "Unknown";
+
+            if (tx.StockAdjustment == null && !tx.Operation.Equals("CANCEL", StringComparison.OrdinalIgnoreCase))
+            {
+                return new SyncItemResult
+                {
+                    TransactionGuid = tx.TransactionGuid,
+                    EntityType = tx.EntityType,
+                    EntityId = entityId,
+                    Status = "Failed",
+                    ErrorMessage = "Payload missing StockAdjustment header record."
+                };
+            }
+
+            // Check if already synced
+            var existing = await conn.QueryFirstOrDefaultAsync<dynamic>(
+                "SELECT CentralStockAdjustmentID FROM dbo.StockAdjustmentMaster WHERE BranchId = @BranchId AND TransactionGuid = @TransactionGuid",
+                new { BranchId = branchId, tx.TransactionGuid }
+            );
+
+            if (existing != null && tx.Operation.Equals("CREATE", StringComparison.OrdinalIgnoreCase))
+            {
+                return new SyncItemResult
+                {
+                    TransactionGuid = tx.TransactionGuid,
+                    EntityType = tx.EntityType,
+                    EntityId = entityId,
+                    Status = "AlreadySynced",
+                    CentralTransactionId = (long)existing.CentralStockAdjustmentID
+                };
+            }
+
+            using (var trans = conn.BeginTransaction())
+            {
+                try
+                {
+                    if (tx.Operation.Equals("CANCEL", StringComparison.OrdinalIgnoreCase))
+                    {
+                        await conn.ExecuteAsync(
+                            "dbo.sp_Central_CancelTransaction",
+                            new
+                            {
+                                BranchId = branchId,
+                                EntityType = "STOCK_ADJUSTMENT",
+                                TransactionGuid = tx.TransactionGuid
+                            },
+                            transaction: trans,
+                            commandType: CommandType.StoredProcedure
+                        );
+
+                        trans.Commit();
+                        return new SyncItemResult
+                        {
+                            TransactionGuid = tx.TransactionGuid,
+                            EntityType = tx.EntityType,
+                            EntityId = entityId,
+                            Status = "Cancelled"
+                        };
+                    }
+
+                    var sa = tx.StockAdjustment;
+
+                    var upsertParams = new DynamicParameters();
+                    upsertParams.Add("@BranchId", branchId);
+                    upsertParams.Add("@TransactionGuid", tx.TransactionGuid);
+                    upsertParams.Add("@BranchStockAdjustmentId", sa.BranchStockAdjustmentId);
+                    upsertParams.Add("@StockAdjustmentNo", sa.StockAdjustmentNo);
+                    upsertParams.Add("@StockAdjustmentDate", SafeSqlDate(sa.StockAdjustmentDate));
+                    upsertParams.Add("@Comments", sa.Comments);
+                    upsertParams.Add("@LedgerId", sa.LedgerId);
+                    upsertParams.Add("@VoucherId", sa.VoucherId);
+                    upsertParams.Add("@UserId", sa.UserId > 0 ? sa.UserId : 1);
+                    upsertParams.Add("@CancelFlag", sa.CancelFlag);
+                    upsertParams.Add("@CategoryId", sa.CategoryId);
+
+                    long centralStockAdjId = await conn.ExecuteScalarAsync<long>(
+                        "dbo.sp_Central_UpsertStockAdjustment",
+                        upsertParams,
+                        transaction: trans,
+                        commandType: CommandType.StoredProcedure
+                    );
+
+                    if (tx.StockAdjustmentDetails != null)
+                    {
+                        foreach (var d in tx.StockAdjustmentDetails)
+                        {
+                            var detailParams = new DynamicParameters();
+                            detailParams.Add("@CentralStockAdjustmentID", centralStockAdjId);
+                            detailParams.Add("@BranchId", branchId);
+                            detailParams.Add("@TransactionGuid", tx.TransactionGuid);
+                            detailParams.Add("@BranchStockAdjustmentNo", sa.StockAdjustmentNo);
+                            detailParams.Add("@SlNo", d.SlNo);
+                            detailParams.Add("@ItemId", d.ItemId);
+                            detailParams.Add("@UnitId", d.UnitId);
+                            detailParams.Add("@Packing", d.Packing);
+                            detailParams.Add("@IsBaseUnit", d.IsBaseUnit);
+                            detailParams.Add("@Cost", d.Cost);
+                            detailParams.Add("@OriginalCost", d.OriginalCost);
+                            detailParams.Add("@SystemStock", d.SystemStock);
+                            detailParams.Add("@PhysicalStock", d.PhysicalStock);
+                            detailParams.Add("@QtyDifference", d.QtyDifference);
+                            detailParams.Add("@Reason", d.Reason);
+                            detailParams.Add("@CancelFlag", d.CancelFlag);
+
+                            await conn.ExecuteAsync(
+                                "dbo.sp_Central_UpsertStockAdjustmentDetail",
+                                detailParams,
+                                transaction: trans,
+                                commandType: CommandType.StoredProcedure
+                            );
+                        }
+                    }
+
+                    if (tx.Vouchers != null)
+                    {
+                        foreach (var v in tx.Vouchers)
+                        {
+                            var vParams = new DynamicParameters();
+                            vParams.Add("@BranchId", branchId);
+                            vParams.Add("@TransactionGuid", tx.TransactionGuid);
+                            vParams.Add("@BranchVoucherId", v.BranchVoucherId);
+                            vParams.Add("@CentralTransactionID", centralStockAdjId);
+                            vParams.Add("@VoucherType", "PhysicalStock");
+                            vParams.Add("@LedgerID", v.LedgerID ?? 0);
+                            vParams.Add("@LedgerName", v.LedgerName);
+                            vParams.Add("@Debit", v.Debit);
+                            vParams.Add("@Credit", v.Credit);
+                            vParams.Add("@Narration", v.Narration);
+                            vParams.Add("@VoucherDate", SafeSqlDate(sa.StockAdjustmentDate));
+
+                            await conn.ExecuteAsync(
+                                "dbo.sp_Central_UpsertVoucher",
+                                vParams,
+                                transaction: trans,
+                                commandType: CommandType.StoredProcedure
+                            );
+                        }
+                    }
+
+                    trans.Commit();
+
+                    return new SyncItemResult
+                    {
+                        TransactionGuid = tx.TransactionGuid,
+                        EntityType = tx.EntityType,
+                        EntityId = entityId,
+                        Status = "Synced",
+                        CentralTransactionId = centralStockAdjId
                     };
                 }
                 catch

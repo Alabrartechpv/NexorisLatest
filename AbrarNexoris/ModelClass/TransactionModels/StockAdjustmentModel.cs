@@ -40,6 +40,7 @@ namespace ModelClass.TransactionModels
         public string VoucherType { get; set; }
         public int CategoryId { get; set; }
         public int CounterId { get; set; }
+        public Guid TransactionGuid { get; set; }
         public string _Operation { get; set; }
     }
     public class StockAdjPriceDetails

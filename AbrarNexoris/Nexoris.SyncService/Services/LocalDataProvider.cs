@@ -517,6 +517,72 @@ namespace Nexoris.SyncService.Services
                                 }
                             }
                         }
+                        else if (item.EntityType.Equals("STOCK_ADJUSTMENT", StringComparison.OrdinalIgnoreCase))
+                        {
+                            using (var multi = await conn.QueryMultipleAsync(
+                                SyncStoredProcedure,
+                                new { _Operation = "GETSTOCKADJUSTMENT", item.TransactionGuid, EntityId = item.EntityID },
+                                commandType: CommandType.StoredProcedure))
+                            {
+                                var saMaster = await multi.ReadFirstOrDefaultAsync<dynamic>();
+                                if (saMaster != null)
+                                {
+                                    tx.StockAdjustment = new StockAdjustmentSyncDto
+                                    {
+                                        BranchStockAdjustmentId = Convert.ToInt32(saMaster.BranchStockAdjustmentId),
+                                        FinYearId = saMaster.FinYearId != null ? Convert.ToInt32(saMaster.FinYearId) : 1,
+                                        CompanyId = saMaster.CompanyId != null ? Convert.ToInt32(saMaster.CompanyId) : 1,
+                                        BranchId = saMaster.BranchId != null ? Convert.ToInt32(saMaster.BranchId) : branchId,
+                                        StockAdjustmentNo = Convert.ToInt32(saMaster.StockAdjustmentNo),
+                                        StockAdjustmentDate = saMaster.StockAdjustmentDate != null ? (DateTime)saMaster.StockAdjustmentDate : DateTime.Now,
+                                        Comments = saMaster.Comments != null ? (string)saMaster.Comments : string.Empty,
+                                        LedgerId = saMaster.LedgerId != null ? (int?)saMaster.LedgerId : null,
+                                        VoucherId = saMaster.VoucherId != null ? (int?)saMaster.VoucherId : null,
+                                        UserId = saMaster.UserId != null ? Convert.ToInt32(saMaster.UserId) : 1,
+                                        CancelFlag = saMaster.CancelFlag != null && Convert.ToBoolean(saMaster.CancelFlag),
+                                        CategoryId = saMaster.CategoryId != null ? (int?)saMaster.CategoryId : null
+                                    };
+
+                                    var saDetails = await multi.ReadAsync<dynamic>();
+                                    foreach (var d in saDetails)
+                                    {
+                                        tx.StockAdjustmentDetails.Add(new StockAdjustmentDetailsSyncDto
+                                        {
+                                            FinYearId = d.FinYearId != null ? Convert.ToInt32(d.FinYearId) : 1,
+                                            CompanyId = d.CompanyId != null ? Convert.ToInt32(d.CompanyId) : 1,
+                                            BranchId = d.BranchId != null ? Convert.ToInt32(d.BranchId) : branchId,
+                                            BranchStockAdjustmentNo = tx.StockAdjustment.StockAdjustmentNo,
+                                            SlNo = Convert.ToInt32(d.SlNo),
+                                            ItemId = Convert.ToInt32(d.ItemId),
+                                            UnitId = d.UnitId != null ? (int?)d.UnitId : null,
+                                            Packing = d.Packing != null ? Convert.ToDecimal(d.Packing) : 1.0m,
+                                            IsBaseUnit = d.IsBaseUnit != null && Convert.ToBoolean(d.IsBaseUnit),
+                                            Cost = d.Cost != null ? Convert.ToDecimal(d.Cost) : 0m,
+                                            OriginalCost = d.OriginalCost != null ? Convert.ToDecimal(d.OriginalCost) : 0m,
+                                            SystemStock = d.SystemStock != null ? Convert.ToDecimal(d.SystemStock) : 0m,
+                                            PhysicalStock = d.PhysicalStock != null ? Convert.ToDecimal(d.PhysicalStock) : 0m,
+                                            QtyDifference = d.QtyDifference != null ? Convert.ToDecimal(d.QtyDifference) : 0m,
+                                            Reason = d.Reason != null ? (string)d.Reason : string.Empty,
+                                            CancelFlag = d.CancelFlag != null && Convert.ToBoolean(d.CancelFlag)
+                                        });
+                                    }
+
+                                    var vouchers = await multi.ReadAsync<dynamic>();
+                                    foreach (var v in vouchers)
+                                    {
+                                        tx.Vouchers.Add(new VoucherSyncDto
+                                        {
+                                            BranchVoucherId = Convert.ToInt64(v.BranchVoucherId),
+                                            LedgerID = v.LedgerID != null ? (int?)v.LedgerID : null,
+                                            LedgerName = v.LedgerName != null ? (string)v.LedgerName : string.Empty,
+                                            Debit = v.Debit != null ? Convert.ToDecimal(v.Debit) : 0m,
+                                            Credit = v.Credit != null ? Convert.ToDecimal(v.Credit) : 0m,
+                                            Narration = v.Narration != null ? (string)v.Narration : string.Empty
+                                        });
+                                    }
+                                }
+                            }
+                        }
                         else
                         {
                             // Default: SALES

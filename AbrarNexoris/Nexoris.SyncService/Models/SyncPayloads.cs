@@ -41,6 +41,8 @@ namespace Nexoris.SyncService.Models
         public List<PurchaseReturnDetailsSyncDto> PurchaseReturnDetails { get; set; }
         public DebitNoteSyncDto DebitNote { get; set; }
         public List<DebitNoteDetailsSyncDto> DebitNoteDetails { get; set; }
+        public StockAdjustmentSyncDto StockAdjustment { get; set; }
+        public List<StockAdjustmentDetailsSyncDto> StockAdjustmentDetails { get; set; }
         public List<VoucherSyncDto> Vouchers { get; set; }
 
         public TransactionSyncDto()
@@ -56,6 +58,7 @@ namespace Nexoris.SyncService.Models
             CreditNoteDetails = new List<CreditNoteDetailsSyncDto>();
             PurchaseReturnDetails = new List<PurchaseReturnDetailsSyncDto>();
             DebitNoteDetails = new List<DebitNoteDetailsSyncDto>();
+            StockAdjustmentDetails = new List<StockAdjustmentDetailsSyncDto>();
             Vouchers = new List<VoucherSyncDto>();
         }
     }
@@ -613,6 +616,42 @@ namespace Nexoris.SyncService.Models
         public decimal BillAmount { get; set; }
         public decimal DebitAmount { get; set; }
         public decimal BalanceAmount { get; set; }
+        public bool CancelFlag { get; set; }
+    }
+
+    public class StockAdjustmentSyncDto
+    {
+        public int BranchStockAdjustmentId { get; set; }
+        public int FinYearId { get; set; }
+        public int CompanyId { get; set; }
+        public int BranchId { get; set; }
+        public int StockAdjustmentNo { get; set; }
+        public DateTime StockAdjustmentDate { get; set; } = DateTime.Now;
+        public string Comments { get; set; }
+        public int? LedgerId { get; set; }
+        public int? VoucherId { get; set; }
+        public int UserId { get; set; }
+        public bool CancelFlag { get; set; }
+        public int? CategoryId { get; set; }
+    }
+
+    public class StockAdjustmentDetailsSyncDto
+    {
+        public int FinYearId { get; set; }
+        public int CompanyId { get; set; }
+        public int BranchId { get; set; }
+        public int BranchStockAdjustmentNo { get; set; }
+        public int SlNo { get; set; }
+        public int ItemId { get; set; }
+        public int? UnitId { get; set; }
+        public decimal Packing { get; set; } = 1.0m;
+        public bool IsBaseUnit { get; set; } = true;
+        public decimal Cost { get; set; }
+        public decimal OriginalCost { get; set; }
+        public decimal SystemStock { get; set; }
+        public decimal PhysicalStock { get; set; }
+        public decimal QtyDifference { get; set; }
+        public string Reason { get; set; }
         public bool CancelFlag { get; set; }
     }
 
