@@ -202,6 +202,20 @@ namespace Repository.Accounts
                                 {
                                     throw new Exception($"Failed to save payment detail for bill {detail.BillNo}: {result}");
                                 }
+
+                                // Update PMaster PayedAmount directly in PMaster table
+                                using (SqlCommand updatePmasterCmd = new SqlCommand(@"
+                                    UPDATE PMaster 
+                                    SET PayedAmount = ISNULL(PayedAmount, 0) + @AdjustedAmount
+                                    WHERE PurchaseNo = @BillNo 
+                                      AND LedgerID = @VendorLedgerId 
+                                      AND ISNULL(CancelFlag, 0) = 0", (SqlConnection)DataConnection, transaction))
+                                {
+                                    updatePmasterCmd.Parameters.AddWithValue("@AdjustedAmount", detail.AdjustedAmount);
+                                    updatePmasterCmd.Parameters.AddWithValue("@BillNo", billNo);
+                                    updatePmasterCmd.Parameters.AddWithValue("@VendorLedgerId", master.VendorLedgerId);
+                                    updatePmasterCmd.ExecuteNonQuery();
+                                }
                             }
                         }
                         else
@@ -616,6 +630,29 @@ namespace Repository.Accounts
 
             SanitizeInvoiceTable(dt);
             EnhanceInvoiceTableWithCashPaymode(dt);
+            EnhanceInvoiceTableWithActualPayments(dt, vendorLedgerId);
+
+            // Filter out invoices with Balance <= 0 for outstanding invoices
+            if (dt != null && dt.Columns.Contains("Balance"))
+            {
+                var rows = dt.AsEnumerable()
+                    .Where(row => {
+                        var val = row["Balance"];
+                        decimal balance = 0;
+                        if (val != DBNull.Value && val != null)
+                        {
+                            decimal.TryParse(val.ToString(), out balance);
+                        }
+                        return balance > 0;
+                    })
+                    .ToList();
+
+                if (rows.Count > 0)
+                    dt = rows.CopyToDataTable();
+                else
+                    dt = dt.Clone();
+            }
+
             return dt;
         }
 
@@ -716,7 +753,90 @@ namespace Repository.Accounts
 
             SanitizeInvoiceTable(dt);
             EnhanceInvoiceTableWithCashPaymode(dt);
+            EnhanceInvoiceTableWithActualPayments(dt, vendorLedgerId);
             return dt;
+        }
+
+        private void EnhanceInvoiceTableWithActualPayments(DataTable dt, int vendorLedgerId)
+        {
+            if (dt == null || dt.Rows.Count == 0) return;
+
+            try
+            {
+                DataTable paymentTotals = new DataTable();
+                if (DataConnection.State == ConnectionState.Open)
+                    DataConnection.Close();
+
+                DataConnection.Open();
+                using (SqlCommand cmd = new SqlCommand(@"
+                    SELECT 
+                        CAST(D.BillNo AS VARCHAR(50)) AS BillNo,
+                        ISNULL(SUM(D.PaymentAmount), 0) AS TotalPaid
+                    FROM VendorPaymentDetails D
+                    JOIN VendorPaymentMaster M ON D.PaymentMasterId = M.PaymentId
+                    WHERE M.VendorLedgerId = @VendorLedgerId
+                      AND ISNULL(M.CancelFlag, 0) = 0
+                    GROUP BY D.BillNo", (SqlConnection)DataConnection))
+                {
+                    cmd.Parameters.AddWithValue("@VendorLedgerId", vendorLedgerId);
+                    using (SqlDataAdapter da = new SqlDataAdapter(cmd))
+                    {
+                        da.Fill(paymentTotals);
+                    }
+                }
+
+                if (paymentTotals != null && paymentTotals.Rows.Count > 0)
+                {
+                    var paidMap = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+                    foreach (DataRow r in paymentTotals.Rows)
+                    {
+                        if (r["BillNo"] != DBNull.Value && r["TotalPaid"] != DBNull.Value)
+                        {
+                            string bNo = r["BillNo"].ToString().Trim();
+                            decimal totalPaid = Convert.ToDecimal(r["TotalPaid"]);
+                            paidMap[bNo] = totalPaid;
+                        }
+                    }
+
+                    foreach (DataRow row in dt.Rows)
+                    {
+                        string billNo = row["BillNo"]?.ToString()?.Trim();
+                        if (!string.IsNullOrEmpty(billNo) && paidMap.TryGetValue(billNo, out decimal actualPaid))
+                        {
+                            decimal invAmt = dt.Columns.Contains("InvoiceAmount") && row["InvoiceAmount"] != DBNull.Value ? Convert.ToDecimal(row["InvoiceAmount"]) : 0m;
+                            decimal retAmt = dt.Columns.Contains("ReturnedAmount") && row["ReturnedAmount"] != DBNull.Value ? Convert.ToDecimal(row["ReturnedAmount"]) : 0m;
+
+                            if (actualPaid > 0m)
+                            {
+                                decimal paidToSet = actualPaid;
+                                if (invAmt > 0m && paidToSet > invAmt)
+                                {
+                                    paidToSet = invAmt;
+                                }
+                                row["PayedAmount"] = paidToSet;
+                            }
+
+                            decimal paidAmt = dt.Columns.Contains("PayedAmount") && row["PayedAmount"] != DBNull.Value ? Convert.ToDecimal(row["PayedAmount"]) : 0m;
+                            decimal newBal = invAmt - paidAmt - retAmt;
+                            if (newBal < 0m) newBal = 0m;
+
+                            if (dt.Columns.Contains("Balance"))
+                            {
+                                row["Balance"] = newBal;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error enhancing invoice table with actual payments: {ex.Message}");
+            }
+            finally
+            {
+                if (DataConnection.State == ConnectionState.Open)
+                    DataConnection.Close();
+            }
         }
 
         private DataTable MapPurchaseTableToInvoiceTable(DataTable purDt)
