@@ -352,31 +352,33 @@ namespace PosBranch_Win.Accounts
                 if (rdbtnoutstanding.Checked)
                 {
                     invoices = paymentRepo.GetOutstandingInvoices(currentVendorLedgerId);
-                    // Filter out invoices with Balance <= 0
-                    if (invoices != null && invoices.Columns.Contains("Balance"))
-                    {
-                        var rows = invoices.AsEnumerable()
-                            .Where(row => {
-                                var val = row["Balance"];
-                                decimal balance = SafeToDecimal(val);
-                                return balance > 0;
-                            })
-                            .ToList();
-                        if (rows.Count > 0)
-                            invoices = rows.CopyToDataTable();
-                        else
-                            invoices = invoices.Clone(); // Return empty table with same schema
-                    }
                 }
                 else
                 {
                     invoices = paymentRepo.GetAllInvoices(currentVendorLedgerId);
                 }
 
-                ultraGrid1.DataSource = null;
-                if (invoices != null && invoices.Rows.Count > 0)
+                DataTable normalizedInvoices = NormalizeInvoiceTable(invoices);
+
+                if (rdbtnoutstanding.Checked && normalizedInvoices != null && normalizedInvoices.Columns.Contains("Balance"))
                 {
-                    ultraGrid1.DataSource = NormalizeInvoiceTable(invoices);
+                    var rows = normalizedInvoices.AsEnumerable()
+                        .Where(row => {
+                            var val = row["Balance"];
+                            decimal balance = SafeToDecimal(val);
+                            return balance > 0;
+                        })
+                        .ToList();
+                    if (rows.Count > 0)
+                        normalizedInvoices = rows.CopyToDataTable();
+                    else
+                        normalizedInvoices = normalizedInvoices.Clone(); // Return empty table with same schema
+                }
+
+                ultraGrid1.DataSource = null;
+                if (normalizedInvoices != null && normalizedInvoices.Rows.Count > 0)
+                {
+                    ultraGrid1.DataSource = normalizedInvoices;
                     ConfigureGridColumns();
                     // Set all checkboxes to false and AdjustedAmount to 0
                     foreach (UltraGridRow row in ultraGrid1.Rows)
@@ -863,27 +865,6 @@ namespace PosBranch_Win.Accounts
                     decimal invoiceAmount = SafeToDecimal(newRow["InvoiceAmount"]);
                     decimal paidAmount = SafeToDecimal(newRow["PayedAmount"]);
                     decimal returnedAmount = newDt.Columns.Contains("ReturnedAmount") && newRow["ReturnedAmount"] != DBNull.Value ? SafeToDecimal(newRow["ReturnedAmount"]) : 0m;
-
-                    // Detect cash purchases where full payment was settled at purchase time
-                    bool isCashPurchase = false;
-                    if (dt.Columns.Contains("Paymode") && row["Paymode"] != DBNull.Value && row["Paymode"] != null)
-                    {
-                        string pm = row["Paymode"].ToString().Trim().ToLower();
-                        if (pm == "cash" || pm == "2") isCashPurchase = true;
-                    }
-                    if (dt.Columns.Contains("PaymodeID") && row["PaymodeID"] != DBNull.Value && row["PaymodeID"] != null)
-                    {
-                        if (SafeToInt(row["PaymodeID"]) == 2) isCashPurchase = true;
-                    }
-                    if (dt.Columns.Contains("PayModeID") && row["PayModeID"] != DBNull.Value && row["PayModeID"] != null)
-                    {
-                        if (SafeToInt(row["PayModeID"]) == 2) isCashPurchase = true;
-                    }
-
-                    if (isCashPurchase)
-                    {
-                        paidAmount = invoiceAmount;
-                    }
 
                     // Clamping logic to prevent over-allocation and negative balances (similar to FrmReceipt)
                     decimal maxPaidAndReturned = paidAmount + returnedAmount;

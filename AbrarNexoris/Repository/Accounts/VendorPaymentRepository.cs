@@ -521,8 +521,11 @@ namespace Repository.Accounts
                 using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._VendorPaymentMaster, (SqlConnection)DataConnection))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@VendorLedgerId", vendorLedgerId);
+                    cmd.Parameters.AddWithValue("@CompanyId", SessionContext.CompanyId);
                     cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
+                    cmd.Parameters.AddWithValue("@FinYearId", SessionContext.FinYearId);
+                    cmd.Parameters.AddWithValue("@VendorLedgerId", vendorLedgerId);
+                    cmd.Parameters.AddWithValue("@LedgerId", vendorLedgerId);
                     cmd.Parameters.AddWithValue("@_Operation", "GETOUTSTANDING");
 
                     using (SqlDataAdapter da = new SqlDataAdapter(cmd))
@@ -541,42 +544,68 @@ namespace Repository.Accounts
                     DataConnection.Close();
             }
 
-            // Direct SQL fallback if SP returned 0 rows or failed
+            // Fallback Stored Procedure: POS_VendorOutstandingListing
             if (dt == null || dt.Rows.Count == 0)
             {
                 try
                 {
                     DataConnection.Open();
-                    string sql = @"
-SELECT 
-    P.PurchaseNo AS BillNo,
-    ISNULL(P.InvoiceNo, CAST(P.PurchaseNo AS VARCHAR(50))) AS InvoiceNo,
-    ISNULL(P.GrandTotal, ISNULL(P.TotalAmount, 0)) AS InvoiceAmount,
-    ISNULL(P.PayedAmount, 0) AS PayedAmount,
-    ISNULL(P.ReturnedAmount, 0) AS ReturnedAmount,
-    (ISNULL(P.GrandTotal, ISNULL(P.TotalAmount, 0)) - ISNULL(P.PayedAmount, 0) - ISNULL(P.ReturnedAmount, 0)) AS Balance,
-    ISNULL(P.PurchaseDate, GETDATE()) AS BillDate,
-    ISNULL(P.Paymode, '') AS Paymode,
-    ISNULL(P.PaymodeID, 0) AS PaymodeID
-FROM PMaster P
-WHERE P.LedgerID = @VendorLedgerId
-  AND ISNULL(P.CancelFlag, 0) = 0
-  AND (ISNULL(P.GrandTotal, ISNULL(P.TotalAmount, 0)) - ISNULL(P.PayedAmount, 0) - ISNULL(P.ReturnedAmount, 0)) > 0
-ORDER BY P.PurchaseDate ASC, P.PurchaseNo ASC";
-
-                    using (SqlCommand cmd = new SqlCommand(sql, (SqlConnection)DataConnection))
+                    using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_VendorOutstandingListing, (SqlConnection)DataConnection))
                     {
-                        cmd.Parameters.AddWithValue("@VendorLedgerId", vendorLedgerId);
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.Add("@CompanyId", SqlDbType.Int).Value = SessionContext.CompanyId > 0 ? (object)SessionContext.CompanyId : DBNull.Value;
+                        cmd.Parameters.Add("@BranchId", SqlDbType.Int).Value = SessionContext.BranchId > 0 ? (object)SessionContext.BranchId : DBNull.Value;
+                        cmd.Parameters.Add("@FinYearId", SqlDbType.Int).Value = SessionContext.FinYearId > 0 ? (object)SessionContext.FinYearId : DBNull.Value;
+                        cmd.Parameters.Add("@LedgerId", SqlDbType.Int).Value = vendorLedgerId > 0 ? (object)vendorLedgerId : DBNull.Value;
+                        cmd.Parameters.Add("@FromLedgerId", SqlDbType.Int).Value = DBNull.Value;
+                        cmd.Parameters.Add("@ToLedgerId", SqlDbType.Int).Value = DBNull.Value;
+                        cmd.Parameters.Add("@DateFilterMode", SqlDbType.VarChar, 20).Value = DBNull.Value;
+                        cmd.Parameters.Add("@UseDateFilter", SqlDbType.Bit).Value = false;
+                        cmd.Parameters.Add("@FromDate", SqlDbType.Date).Value = DateTime.Today;
+                        cmd.Parameters.Add("@ToDate", SqlDbType.Date).Value = DateTime.Today;
+                        cmd.Parameters.Add("@PaymentDueOnly", SqlDbType.Bit).Value = false;
+                        cmd.Parameters.Add("@GetUnallocatedReturnsOnly", SqlDbType.Bit).Value = false;
+
                         using (SqlDataAdapter da = new SqlDataAdapter(cmd))
                         {
-                            dt = new DataTable();
-                            da.Fill(dt);
+                            DataTable spDt = new DataTable();
+                            da.Fill(spDt);
+                            if (spDt != null && spDt.Rows.Count > 0)
+                            {
+                                dt = new DataTable();
+                                dt.Columns.Add("BillNo", typeof(string));
+                                dt.Columns.Add("InvoiceNo", typeof(string));
+                                dt.Columns.Add("InvoiceAmount", typeof(decimal));
+                                dt.Columns.Add("PayedAmount", typeof(decimal));
+                                dt.Columns.Add("ReturnedAmount", typeof(decimal));
+                                dt.Columns.Add("Balance", typeof(decimal));
+                                dt.Columns.Add("BillDate", typeof(DateTime));
+                                dt.Columns.Add("Paymode", typeof(string));
+                                dt.Columns.Add("PaymodeID", typeof(int));
+
+                                foreach (DataRow r in spDt.Rows)
+                                {
+                                    DataRow newR = dt.NewRow();
+                                    newR["BillNo"] = spDt.Columns.Contains("PurchaseNo") ? r["PurchaseNo"]?.ToString() : "0";
+                                    newR["InvoiceNo"] = spDt.Columns.Contains("Reference") && r["Reference"] != DBNull.Value && !string.IsNullOrEmpty(r["Reference"].ToString()) 
+                                                        ? r["Reference"].ToString() 
+                                                        : newR["BillNo"];
+                                    newR["InvoiceAmount"] = spDt.Columns.Contains("DocAmt") && r["DocAmt"] != DBNull.Value ? Convert.ToDecimal(r["DocAmt"]) : 0m;
+                                    newR["PayedAmount"] = 0m;
+                                    newR["ReturnedAmount"] = 0m;
+                                    newR["Balance"] = spDt.Columns.Contains("Balance") && r["Balance"] != DBNull.Value ? Convert.ToDecimal(r["Balance"]) : Convert.ToDecimal(newR["InvoiceAmount"]);
+                                    newR["BillDate"] = spDt.Columns.Contains("Date") && r["Date"] != DBNull.Value ? Convert.ToDateTime(r["Date"]) : DateTime.Now;
+                                    newR["Paymode"] = "Credit";
+                                    newR["PaymodeID"] = 1;
+                                    dt.Rows.Add(newR);
+                                }
+                            }
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Error running SQL fallback for GETOUTSTANDING: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"Error calling SP POS_VendorOutstandingListing: {ex.Message}");
                 }
                 finally
                 {
@@ -602,8 +631,11 @@ ORDER BY P.PurchaseDate ASC, P.PurchaseNo ASC";
                 using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._VendorPaymentMaster, (SqlConnection)DataConnection))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@VendorLedgerId", vendorLedgerId);
+                    cmd.Parameters.AddWithValue("@CompanyId", SessionContext.CompanyId);
                     cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
+                    cmd.Parameters.AddWithValue("@FinYearId", SessionContext.FinYearId);
+                    cmd.Parameters.AddWithValue("@VendorLedgerId", vendorLedgerId);
+                    cmd.Parameters.AddWithValue("@LedgerId", vendorLedgerId);
                     cmd.Parameters.AddWithValue("@_Operation", "GETALLINVOICES");
 
                     using (SqlDataAdapter da = new SqlDataAdapter(cmd))
@@ -622,41 +654,52 @@ ORDER BY P.PurchaseDate ASC, P.PurchaseNo ASC";
                     DataConnection.Close();
             }
 
-            // Direct SQL fallback if SP returned 0 rows or failed
+            // Fallback Stored Procedure: POS_Purchase GETALL
             if (dt == null || dt.Rows.Count == 0)
             {
                 try
                 {
                     DataConnection.Open();
-                    string sql = @"
-SELECT 
-    P.PurchaseNo AS BillNo,
-    ISNULL(P.InvoiceNo, CAST(P.PurchaseNo AS VARCHAR(50))) AS InvoiceNo,
-    ISNULL(P.GrandTotal, ISNULL(P.TotalAmount, 0)) AS InvoiceAmount,
-    ISNULL(P.PayedAmount, 0) AS PayedAmount,
-    ISNULL(P.ReturnedAmount, 0) AS ReturnedAmount,
-    (ISNULL(P.GrandTotal, ISNULL(P.TotalAmount, 0)) - ISNULL(P.PayedAmount, 0) - ISNULL(P.ReturnedAmount, 0)) AS Balance,
-    ISNULL(P.PurchaseDate, GETDATE()) AS BillDate,
-    ISNULL(P.Paymode, '') AS Paymode,
-    ISNULL(P.PaymodeID, 0) AS PaymodeID
-FROM PMaster P
-WHERE P.LedgerID = @VendorLedgerId
-  AND ISNULL(P.CancelFlag, 0) = 0
-ORDER BY P.PurchaseDate DESC, P.PurchaseNo DESC";
-
-                    using (SqlCommand cmd = new SqlCommand(sql, (SqlConnection)DataConnection))
+                    using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_Purchase, (SqlConnection)DataConnection))
                     {
-                        cmd.Parameters.AddWithValue("@VendorLedgerId", vendorLedgerId);
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.AddWithValue("@CompanyId", SessionContext.CompanyId);
+                        cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
+                        cmd.Parameters.AddWithValue("@FinYearId", SessionContext.FinYearId);
+                        cmd.Parameters.AddWithValue("@_Operation", "GETALL");
+
+                        DataTable purDt = new DataTable();
                         using (SqlDataAdapter da = new SqlDataAdapter(cmd))
                         {
-                            dt = new DataTable();
-                            da.Fill(dt);
+                            da.Fill(purDt);
+                        }
+
+                        if (purDt != null && purDt.Rows.Count > 0)
+                        {
+                            string ledgerCol = purDt.Columns.Contains("LedgerID") ? "LedgerID" :
+                                               purDt.Columns.Contains("LedgerId") ? "LedgerId" :
+                                               purDt.Columns.Contains("VendorLedgerId") ? "VendorLedgerId" :
+                                               purDt.Columns.Contains("VendorLedgerID") ? "VendorLedgerID" :
+                                               purDt.Columns.Contains("VendorID") ? "VendorID" :
+                                               purDt.Columns.Contains("VendorId") ? "VendorId" : null;
+
+                            if (ledgerCol != null)
+                            {
+                                var vendorRows = purDt.AsEnumerable()
+                                    .Where(r => r[ledgerCol] != DBNull.Value && Convert.ToInt32(r[ledgerCol]) == vendorLedgerId);
+
+                                if (vendorRows.Any())
+                                {
+                                    DataTable filteredPur = vendorRows.CopyToDataTable();
+                                    dt = MapPurchaseTableToInvoiceTable(filteredPur);
+                                }
+                            }
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Error running SQL fallback for GETALLINVOICES: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"Error calling SP POS_Purchase GETALL: {ex.Message}");
                 }
                 finally
                 {
@@ -665,8 +708,58 @@ ORDER BY P.PurchaseDate DESC, P.PurchaseNo DESC";
                 }
             }
 
+            // Ultimate Stored Procedure fallback: If all invoices SP returned no records, fallback to outstanding invoices SP
+            if (dt == null || dt.Rows.Count == 0)
+            {
+                dt = GetOutstandingInvoices(vendorLedgerId);
+            }
+
             SanitizeInvoiceTable(dt);
             EnhanceInvoiceTableWithCashPaymode(dt);
+            return dt;
+        }
+
+        private DataTable MapPurchaseTableToInvoiceTable(DataTable purDt)
+        {
+            DataTable dt = new DataTable();
+            dt.Columns.Add("BillNo", typeof(string));
+            dt.Columns.Add("InvoiceNo", typeof(string));
+            dt.Columns.Add("InvoiceAmount", typeof(decimal));
+            dt.Columns.Add("PayedAmount", typeof(decimal));
+            dt.Columns.Add("ReturnedAmount", typeof(decimal));
+            dt.Columns.Add("Balance", typeof(decimal));
+            dt.Columns.Add("BillDate", typeof(DateTime));
+            dt.Columns.Add("Paymode", typeof(string));
+            dt.Columns.Add("PaymodeID", typeof(int));
+
+            if (purDt != null && purDt.Rows.Count > 0)
+            {
+                foreach (DataRow r in purDt.Rows)
+                {
+                    DataRow newR = dt.NewRow();
+                    string billNo = purDt.Columns.Contains("PurchaseNo") ? r["PurchaseNo"]?.ToString() :
+                                   purDt.Columns.Contains("BillNo") ? r["BillNo"]?.ToString() : "0";
+                    newR["BillNo"] = billNo;
+                    newR["InvoiceNo"] = purDt.Columns.Contains("InvoiceNo") && r["InvoiceNo"] != DBNull.Value && !string.IsNullOrEmpty(r["InvoiceNo"].ToString()) 
+                                        ? r["InvoiceNo"].ToString() 
+                                        : billNo;
+
+                    decimal grandTotal = purDt.Columns.Contains("GrandTotal") && r["GrandTotal"] != DBNull.Value ? Convert.ToDecimal(r["GrandTotal"]) :
+                                         purDt.Columns.Contains("TotalAmount") && r["TotalAmount"] != DBNull.Value ? Convert.ToDecimal(r["TotalAmount"]) : 0m;
+                    decimal payedAmount = purDt.Columns.Contains("PayedAmount") && r["PayedAmount"] != DBNull.Value ? Convert.ToDecimal(r["PayedAmount"]) : 0m;
+                    decimal returnedAmount = purDt.Columns.Contains("ReturnedAmount") && r["ReturnedAmount"] != DBNull.Value ? Convert.ToDecimal(r["ReturnedAmount"]) : 0m;
+
+                    newR["InvoiceAmount"] = grandTotal;
+                    newR["PayedAmount"] = payedAmount;
+                    newR["ReturnedAmount"] = returnedAmount;
+                    newR["Balance"] = grandTotal - payedAmount - returnedAmount;
+                    newR["BillDate"] = purDt.Columns.Contains("PurchaseDate") && r["PurchaseDate"] != DBNull.Value ? Convert.ToDateTime(r["PurchaseDate"]) : DateTime.Now;
+                    newR["Paymode"] = purDt.Columns.Contains("Paymode") ? r["Paymode"]?.ToString() : "";
+                    newR["PaymodeID"] = purDt.Columns.Contains("PaymodeID") && r["PaymodeID"] != DBNull.Value ? Convert.ToInt32(r["PaymodeID"]) : 0;
+
+                    dt.Rows.Add(newR);
+                }
+            }
             return dt;
         }
 
@@ -777,27 +870,18 @@ ORDER BY P.PurchaseDate DESC, P.PurchaseNo DESC";
         public decimal GetVendorOutstandingTotal(int vendorLedgerId)
         {
             decimal outstandingTotal = 0;
-            if (DataConnection.State == ConnectionState.Open)
-                DataConnection.Close();
-
-            DataConnection.Open();
             try
             {
-                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._VendorPaymentMaster, (SqlConnection)DataConnection))
+                DataTable dtOut = GetOutstandingInvoices(vendorLedgerId);
+                if (dtOut != null && dtOut.Rows.Count > 0 && dtOut.Columns.Contains("Balance"))
                 {
-                    cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@VendorLedgerId", vendorLedgerId);
-                    cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
-                    cmd.Parameters.AddWithValue("@_Operation", "OUTSTANDINGTOTAL");
-
-                    using (SqlDataReader reader = cmd.ExecuteReader())
+                    foreach (DataRow row in dtOut.Rows)
                     {
-                        if (reader.Read())
+                        if (row["Balance"] != DBNull.Value)
                         {
-                            object result = reader["TotalOutStanding"];
-                            if (result != null && result != DBNull.Value)
+                            if (decimal.TryParse(row["Balance"].ToString(), out decimal bal))
                             {
-                                outstandingTotal = Convert.ToDecimal(result);
+                                outstandingTotal += bal;
                             }
                         }
                     }
@@ -806,44 +890,6 @@ ORDER BY P.PurchaseDate DESC, P.PurchaseNo DESC";
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error getting vendor outstanding total: {ex.Message}");
-            }
-            finally
-            {
-                if (DataConnection.State == ConnectionState.Open)
-                    DataConnection.Close();
-            }
-
-            if (outstandingTotal <= 0)
-            {
-                try
-                {
-                    DataConnection.Open();
-                    string sql = @"
-SELECT ISNULL(SUM(ISNULL(P.GrandTotal, ISNULL(P.TotalAmount, 0)) - ISNULL(P.PayedAmount, 0) - ISNULL(P.ReturnedAmount, 0)), 0)
-FROM PMaster P
-WHERE P.LedgerID = @VendorLedgerId
-  AND ISNULL(P.CancelFlag, 0) = 0
-  AND (ISNULL(P.GrandTotal, ISNULL(P.TotalAmount, 0)) - ISNULL(P.PayedAmount, 0) - ISNULL(P.ReturnedAmount, 0)) > 0";
-
-                    using (SqlCommand cmd = new SqlCommand(sql, (SqlConnection)DataConnection))
-                    {
-                        cmd.Parameters.AddWithValue("@VendorLedgerId", vendorLedgerId);
-                        object res = cmd.ExecuteScalar();
-                        if (res != null && res != DBNull.Value)
-                        {
-                            outstandingTotal = Convert.ToDecimal(res);
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Error getting vendor outstanding total via SQL: {ex.Message}");
-                }
-                finally
-                {
-                    if (DataConnection.State == ConnectionState.Open)
-                        DataConnection.Close();
-                }
             }
 
             return outstandingTotal;
