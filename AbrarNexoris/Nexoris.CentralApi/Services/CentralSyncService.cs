@@ -243,6 +243,8 @@ namespace Nexoris.CentralApi.Services
                     string entityId = "Unknown";
                     if (tx.EntityType.Equals("PURCHASE", StringComparison.OrdinalIgnoreCase) && tx.PMaster != null)
                         entityId = tx.PMaster.PurchaseNo.ToString();
+                    else if (tx.EntityType.Equals("SHIFT_CLOSING", StringComparison.OrdinalIgnoreCase) && tx.ShiftClosing != null)
+                        entityId = tx.ShiftClosing.BranchShiftClosingId.ToString();
                     else if (tx.SMaster != null)
                         entityId = tx.SMaster.BillNo.ToString();
 
@@ -297,6 +299,10 @@ namespace Nexoris.CentralApi.Services
                 else if (tx.EntityType.Equals("STOCK_ADJUSTMENT", StringComparison.OrdinalIgnoreCase))
                 {
                     return await IngestStockAdjustmentTransactionAsync(conn, branchId, tx);
+                }
+                else if (tx.EntityType.Equals("SHIFT_CLOSING", StringComparison.OrdinalIgnoreCase))
+                {
+                    return await IngestShiftClosingTransactionAsync(conn, branchId, tx);
                 }
                 else
                 {
@@ -1651,6 +1657,184 @@ namespace Nexoris.CentralApi.Services
                         EntityId = entityId,
                         Status = "Synced",
                         CentralTransactionId = centralStockAdjId
+                    };
+                }
+                catch
+                {
+                    trans.Rollback();
+                    throw;
+                }
+            }
+        }
+        #endregion
+
+        #region Shift & Counter Day-End Closing
+        private async Task<SyncItemResult> IngestShiftClosingTransactionAsync(SqlConnection conn, int branchId, TransactionSyncDto tx)
+        {
+            string entityId = tx.ShiftClosing != null ? tx.ShiftClosing.BranchShiftClosingId.ToString() : "0";
+
+            if (tx.ShiftClosing == null)
+            {
+                return new SyncItemResult
+                {
+                    TransactionGuid = tx.TransactionGuid,
+                    EntityType = tx.EntityType,
+                    EntityId = entityId,
+                    Status = "Failed",
+                    ErrorMessage = "ShiftClosing payload is missing in TransactionSyncDto"
+                };
+            }
+
+            var checkParams = new DynamicParameters();
+            checkParams.Add("@BranchId", branchId);
+            checkParams.Add("@EntityType", "SHIFT_CLOSING");
+            checkParams.Add("@TransactionGuid", tx.TransactionGuid);
+
+            var existingTx = await conn.QueryFirstOrDefaultAsync<dynamic>(
+                "dbo.sp_Central_CheckTransactionGuid",
+                checkParams,
+                commandType: CommandType.StoredProcedure
+            );
+
+            if (existingTx != null && tx.Operation.Equals("CREATE", StringComparison.OrdinalIgnoreCase))
+            {
+                return new SyncItemResult
+                {
+                    TransactionGuid = tx.TransactionGuid,
+                    EntityType = tx.EntityType,
+                    EntityId = entityId,
+                    Status = "AlreadySynced",
+                    CentralTransactionId = Convert.ToInt64(existingTx.CentralId)
+                };
+            }
+
+            using (var trans = conn.BeginTransaction())
+            {
+                try
+                {
+                    var sc = tx.ShiftClosing;
+
+                    var upsertParams = new DynamicParameters();
+                    upsertParams.Add("@BranchId", branchId);
+                    upsertParams.Add("@TransactionGuid", tx.TransactionGuid);
+                    upsertParams.Add("@BranchShiftClosingId", sc.BranchShiftClosingId);
+                    upsertParams.Add("@CompanyId", sc.CompanyId > 0 ? sc.CompanyId : 1);
+                    upsertParams.Add("@FinYearId", sc.FinYearId > 0 ? sc.FinYearId : 1);
+                    upsertParams.Add("@Counter", sc.Counter ?? string.Empty);
+                    upsertParams.Add("@UserId", sc.UserId > 0 ? sc.UserId : 1);
+                    upsertParams.Add("@ClosingDate", SafeSqlDate(sc.ClosingDate));
+                    upsertParams.Add("@ReportSelection", sc.ReportSelection ?? string.Empty);
+                    upsertParams.Add("@DocNo", sc.DocNo ?? string.Empty);
+                    upsertParams.Add("@TotalGrossSales", sc.TotalGrossSales);
+                    upsertParams.Add("@TotalDiscount", sc.TotalDiscount);
+                    upsertParams.Add("@TotalReturn", sc.TotalReturn);
+                    upsertParams.Add("@NetSales", sc.NetSales);
+                    upsertParams.Add("@CashSale", sc.CashSale);
+                    upsertParams.Add("@CardSale", sc.CardSale);
+                    upsertParams.Add("@UpiSale", sc.UpiSale);
+                    upsertParams.Add("@CreditSale", sc.CreditSale);
+                    upsertParams.Add("@CustomerReceipt", sc.CustomerReceipt);
+                    upsertParams.Add("@TotalCollection", sc.TotalCollection);
+                    upsertParams.Add("@CashRefundAdjusted", sc.CashRefundAdjusted);
+                    upsertParams.Add("@MidDayCashSkim", sc.MidDayCashSkim);
+                    upsertParams.Add("@SystemExpectedCash", sc.SystemExpectedCash);
+                    upsertParams.Add("@PhysicalCashCounted", sc.PhysicalCashCounted);
+                    upsertParams.Add("@CashDifference", sc.CashDifference);
+                    upsertParams.Add("@DifferenceReason", sc.DifferenceReason ?? string.Empty);
+                    upsertParams.Add("@Status", sc.Status ?? "Closed");
+                    upsertParams.Add("@VoucherId", sc.VoucherId);
+                    upsertParams.Add("@CounterSessionId", sc.CounterSessionId);
+
+                    long centralShiftClosingId = await conn.ExecuteScalarAsync<long>(
+                        "dbo.sp_Central_UpsertShiftClosing",
+                        upsertParams,
+                        transaction: trans,
+                        commandType: CommandType.StoredProcedure
+                    );
+
+                    if (tx.ShiftClosingDenominations != null)
+                    {
+                        foreach (var d in tx.ShiftClosingDenominations)
+                        {
+                            var denomParams = new DynamicParameters();
+                            denomParams.Add("@CentralShiftClosingID", centralShiftClosingId);
+                            denomParams.Add("@BranchId", branchId);
+                            denomParams.Add("@TransactionGuid", tx.TransactionGuid);
+                            denomParams.Add("@BranchShiftClosingId", sc.BranchShiftClosingId);
+                            denomParams.Add("@No", d.No);
+                            denomParams.Add("@Denomination", d.Denomination);
+                            denomParams.Add("@Quantity", d.Quantity);
+                            denomParams.Add("@Amount", d.Amount);
+
+                            await conn.ExecuteAsync(
+                                "dbo.sp_Central_UpsertShiftClosingDenomination",
+                                denomParams,
+                                transaction: trans,
+                                commandType: CommandType.StoredProcedure
+                            );
+                        }
+                    }
+
+                    if (tx.CounterSession != null)
+                    {
+                        var cs = tx.CounterSession;
+                        var sessionParams = new DynamicParameters();
+                        sessionParams.Add("@BranchId", branchId);
+                        sessionParams.Add("@BranchSessionID", cs.BranchSessionId);
+                        sessionParams.Add("@CompanyId", cs.CompanyId > 0 ? cs.CompanyId : 1);
+                        sessionParams.Add("@FinYearId", cs.FinYearId > 0 ? cs.FinYearId : 1);
+                        sessionParams.Add("@CounterId", cs.CounterId > 0 ? cs.CounterId : 1);
+                        sessionParams.Add("@CounterName", cs.CounterName ?? string.Empty);
+                        sessionParams.Add("@UserId", cs.UserId > 0 ? cs.UserId : 1);
+                        sessionParams.Add("@LoginTime", SafeSqlDate(cs.LoginTime));
+                        sessionParams.Add("@CloseTime", SafeSqlDate(cs.CloseTime));
+                        sessionParams.Add("@ShiftClosingId", sc.BranchShiftClosingId);
+                        sessionParams.Add("@Status", cs.Status ?? "Closed");
+                        sessionParams.Add("@SystemName", cs.SystemName ?? string.Empty);
+
+                        await conn.ExecuteAsync(
+                            "dbo.sp_Central_UpsertCounterSession",
+                            sessionParams,
+                            transaction: trans,
+                            commandType: CommandType.StoredProcedure
+                        );
+                    }
+
+                    if (tx.Vouchers != null)
+                    {
+                        foreach (var v in tx.Vouchers)
+                        {
+                            var vParams = new DynamicParameters();
+                            vParams.Add("@BranchId", branchId);
+                            vParams.Add("@TransactionGuid", tx.TransactionGuid);
+                            vParams.Add("@BranchVoucherId", v.BranchVoucherId);
+                            vParams.Add("@CentralTransactionID", centralShiftClosingId);
+                            vParams.Add("@VoucherType", "ShiftClosing");
+                            vParams.Add("@LedgerID", v.LedgerID ?? 0);
+                            vParams.Add("@LedgerName", v.LedgerName);
+                            vParams.Add("@Debit", v.Debit);
+                            vParams.Add("@Credit", v.Credit);
+                            vParams.Add("@Narration", v.Narration);
+                            vParams.Add("@VoucherDate", SafeSqlDate(sc.ClosingDate));
+
+                            await conn.ExecuteAsync(
+                                "dbo.sp_Central_UpsertVoucher",
+                                vParams,
+                                transaction: trans,
+                                commandType: CommandType.StoredProcedure
+                            );
+                        }
+                    }
+
+                    trans.Commit();
+
+                    return new SyncItemResult
+                    {
+                        TransactionGuid = tx.TransactionGuid,
+                        EntityType = tx.EntityType,
+                        EntityId = entityId,
+                        Status = "Synced",
+                        CentralTransactionId = centralShiftClosingId
                     };
                 }
                 catch

@@ -583,6 +583,98 @@ namespace Nexoris.SyncService.Services
                                 }
                             }
                         }
+                        else if (item.EntityType.Equals("SHIFT_CLOSING", StringComparison.OrdinalIgnoreCase))
+                        {
+                            using (var multi = await conn.QueryMultipleAsync(
+                                SyncStoredProcedure,
+                                new { _Operation = "GETSHIFTCLOSING", item.TransactionGuid, EntityId = item.EntityID },
+                                commandType: CommandType.StoredProcedure))
+                            {
+                                var scMaster = await multi.ReadFirstOrDefaultAsync<dynamic>();
+                                if (scMaster != null)
+                                {
+                                    tx.ShiftClosing = new ShiftClosingSyncDto
+                                    {
+                                        BranchShiftClosingId = Convert.ToInt32(scMaster.BranchShiftClosingId),
+                                        CompanyId = scMaster.CompanyId != null ? Convert.ToInt32(scMaster.CompanyId) : 1,
+                                        BranchId = scMaster.BranchId != null ? Convert.ToInt32(scMaster.BranchId) : branchId,
+                                        FinYearId = scMaster.FinYearId != null ? Convert.ToInt32(scMaster.FinYearId) : 1,
+                                        Counter = scMaster.Counter != null ? (string)scMaster.Counter : string.Empty,
+                                        UserId = scMaster.UserId != null ? Convert.ToInt32(scMaster.UserId) : 1,
+                                        ClosingDate = scMaster.ClosingDate != null ? (DateTime)scMaster.ClosingDate : DateTime.Now,
+                                        ReportSelection = scMaster.ReportSelection != null ? (string)scMaster.ReportSelection : string.Empty,
+                                        DocNo = scMaster.DocNo != null ? (string)scMaster.DocNo : string.Empty,
+                                        TotalGrossSales = scMaster.TotalGrossSales != null ? Convert.ToDecimal(scMaster.TotalGrossSales) : 0m,
+                                        TotalDiscount = scMaster.TotalDiscount != null ? Convert.ToDecimal(scMaster.TotalDiscount) : 0m,
+                                        TotalReturn = scMaster.TotalReturn != null ? Convert.ToDecimal(scMaster.TotalReturn) : 0m,
+                                        NetSales = scMaster.NetSales != null ? Convert.ToDecimal(scMaster.NetSales) : 0m,
+                                        CashSale = scMaster.CashSale != null ? Convert.ToDecimal(scMaster.CashSale) : 0m,
+                                        CardSale = scMaster.CardSale != null ? Convert.ToDecimal(scMaster.CardSale) : 0m,
+                                        UpiSale = scMaster.UpiSale != null ? Convert.ToDecimal(scMaster.UpiSale) : 0m,
+                                        CreditSale = scMaster.CreditSale != null ? Convert.ToDecimal(scMaster.CreditSale) : 0m,
+                                        CustomerReceipt = scMaster.CustomerReceipt != null ? Convert.ToDecimal(scMaster.CustomerReceipt) : 0m,
+                                        TotalCollection = scMaster.TotalCollection != null ? Convert.ToDecimal(scMaster.TotalCollection) : 0m,
+                                        CashRefundAdjusted = scMaster.CashRefundAdjusted != null ? Convert.ToDecimal(scMaster.CashRefundAdjusted) : 0m,
+                                        MidDayCashSkim = scMaster.MidDayCashSkim != null ? Convert.ToDecimal(scMaster.MidDayCashSkim) : 0m,
+                                        SystemExpectedCash = scMaster.SystemExpectedCash != null ? Convert.ToDecimal(scMaster.SystemExpectedCash) : 0m,
+                                        PhysicalCashCounted = scMaster.PhysicalCashCounted != null ? Convert.ToDecimal(scMaster.PhysicalCashCounted) : 0m,
+                                        CashDifference = scMaster.CashDifference != null ? Convert.ToDecimal(scMaster.CashDifference) : 0m,
+                                        DifferenceReason = scMaster.DifferenceReason != null ? (string)scMaster.DifferenceReason : string.Empty,
+                                        Status = scMaster.Status != null ? (string)scMaster.Status : "Closed",
+                                        VoucherId = scMaster.VoucherId != null ? (long?)Convert.ToInt64(scMaster.VoucherId) : null,
+                                        CounterSessionId = scMaster.CounterSessionId != null ? (long?)Convert.ToInt64(scMaster.CounterSessionId) : null
+                                    };
+
+                                    var scDenoms = await multi.ReadAsync<dynamic>();
+                                    foreach (var d in scDenoms)
+                                    {
+                                        tx.ShiftClosingDenominations.Add(new ShiftClosingDenominationSyncDto
+                                        {
+                                            DenominationId = Convert.ToInt32(d.DenominationId),
+                                            BranchShiftClosingId = Convert.ToInt32(d.BranchShiftClosingId),
+                                            No = Convert.ToInt32(d.No),
+                                            Denomination = Convert.ToDecimal(d.Denomination),
+                                            Quantity = Convert.ToInt32(d.Quantity),
+                                            Amount = Convert.ToDecimal(d.Amount)
+                                        });
+                                    }
+
+                                    var scSession = await multi.ReadFirstOrDefaultAsync<dynamic>();
+                                    if (scSession != null)
+                                    {
+                                        tx.CounterSession = new CounterSessionSyncDto
+                                        {
+                                            BranchSessionId = Convert.ToInt64(scSession.BranchSessionId),
+                                            CompanyId = scSession.CompanyId != null ? Convert.ToInt32(scSession.CompanyId) : 1,
+                                            BranchId = scSession.BranchId != null ? Convert.ToInt32(scSession.BranchId) : branchId,
+                                            FinYearId = scSession.FinYearId != null ? Convert.ToInt32(scSession.FinYearId) : 1,
+                                            CounterId = scSession.CounterId != null ? Convert.ToInt32(scSession.CounterId) : 1,
+                                            CounterName = scSession.CounterName != null ? (string)scSession.CounterName : string.Empty,
+                                            UserId = scSession.UserId != null ? Convert.ToInt32(scSession.UserId) : 1,
+                                            LoginTime = scSession.LoginTime != null ? (DateTime)scSession.LoginTime : DateTime.Now,
+                                            CloseTime = scSession.CloseTime != null ? (DateTime?)scSession.CloseTime : null,
+                                            ShiftClosingId = scSession.ShiftClosingId != null ? (int?)scSession.ShiftClosingId : null,
+                                            Status = scSession.Status != null ? (string)scSession.Status : "Closed",
+                                            SystemName = scSession.SystemName != null ? (string)scSession.SystemName : string.Empty
+                                        };
+                                    }
+
+                                    var vouchers = await multi.ReadAsync<dynamic>();
+                                    foreach (var v in vouchers)
+                                    {
+                                        tx.Vouchers.Add(new VoucherSyncDto
+                                        {
+                                            BranchVoucherId = Convert.ToInt64(v.BranchVoucherId),
+                                            LedgerID = v.LedgerID != null ? (int?)v.LedgerID : null,
+                                            LedgerName = v.LedgerName != null ? (string)v.LedgerName : string.Empty,
+                                            Debit = v.Debit != null ? Convert.ToDecimal(v.Debit) : 0m,
+                                            Credit = v.Credit != null ? Convert.ToDecimal(v.Credit) : 0m,
+                                            Narration = v.Narration != null ? (string)v.Narration : string.Empty
+                                        });
+                                    }
+                                }
+                            }
+                        }
                         else
                         {
                             // Default: SALES

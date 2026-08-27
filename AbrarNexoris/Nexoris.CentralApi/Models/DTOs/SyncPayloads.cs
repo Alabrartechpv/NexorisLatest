@@ -34,6 +34,9 @@ namespace Nexoris.CentralApi.Models.DTOs
         public List<DebitNoteDetailsSyncDto> DebitNoteDetails { get; set; } = new List<DebitNoteDetailsSyncDto>();
         public StockAdjustmentSyncDto StockAdjustment { get; set; }
         public List<StockAdjustmentDetailsSyncDto> StockAdjustmentDetails { get; set; } = new List<StockAdjustmentDetailsSyncDto>();
+        public ShiftClosingSyncDto ShiftClosing { get; set; }
+        public List<ShiftClosingDenominationSyncDto> ShiftClosingDenominations { get; set; } = new List<ShiftClosingDenominationSyncDto>();
+        public CounterSessionSyncDto CounterSession { get; set; }
         public List<VoucherSyncDto> Vouchers { get; set; } = new List<VoucherSyncDto>();
     }
 
@@ -467,6 +470,64 @@ namespace Nexoris.CentralApi.Models.DTOs
         public decimal QtyDifference { get; set; }
         public string Reason { get; set; }
         public bool CancelFlag { get; set; }
+    }
+
+    public class ShiftClosingSyncDto
+    {
+        public int BranchShiftClosingId { get; set; }
+        public int CompanyId { get; set; } = 1;
+        public int BranchId { get; set; }
+        public int FinYearId { get; set; } = 1;
+        public string Counter { get; set; }
+        public int UserId { get; set; } = 1;
+        public DateTime ClosingDate { get; set; } = DateTime.Now;
+        public string ReportSelection { get; set; }
+        public string DocNo { get; set; }
+        public decimal TotalGrossSales { get; set; }
+        public decimal TotalDiscount { get; set; }
+        public decimal TotalReturn { get; set; }
+        public decimal NetSales { get; set; }
+        public decimal CashSale { get; set; }
+        public decimal CardSale { get; set; }
+        public decimal UpiSale { get; set; }
+        public decimal CreditSale { get; set; }
+        public decimal CustomerReceipt { get; set; }
+        public decimal TotalCollection { get; set; }
+        public decimal CashRefundAdjusted { get; set; }
+        public decimal MidDayCashSkim { get; set; }
+        public decimal SystemExpectedCash { get; set; }
+        public decimal PhysicalCashCounted { get; set; }
+        public decimal CashDifference { get; set; }
+        public string DifferenceReason { get; set; }
+        public string Status { get; set; } = "Closed";
+        public long? VoucherId { get; set; }
+        public long? CounterSessionId { get; set; }
+    }
+
+    public class ShiftClosingDenominationSyncDto
+    {
+        public int DenominationId { get; set; }
+        public int BranchShiftClosingId { get; set; }
+        public int No { get; set; }
+        public decimal Denomination { get; set; }
+        public int Quantity { get; set; }
+        public decimal Amount { get; set; }
+    }
+
+    public class CounterSessionSyncDto
+    {
+        public long BranchSessionId { get; set; }
+        public int CompanyId { get; set; } = 1;
+        public int BranchId { get; set; }
+        public int FinYearId { get; set; } = 1;
+        public int CounterId { get; set; } = 1;
+        public string CounterName { get; set; }
+        public int UserId { get; set; } = 1;
+        public DateTime LoginTime { get; set; }
+        public DateTime? CloseTime { get; set; }
+        public int? ShiftClosingId { get; set; }
+        public string Status { get; set; } = "Closed";
+        public string SystemName { get; set; }
     }
 
     public class MasterDataSyncResponse
