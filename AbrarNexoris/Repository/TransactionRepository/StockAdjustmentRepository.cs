@@ -181,6 +181,7 @@ namespace Repository.TransactionRepository
                 }
 
                 // 2. Save stock adjustment master record
+                stockMaster.TransactionGuid = Guid.NewGuid();
                 stockMaster._Operation = "CREATE";
                 stockMaster.Id = 0;
                 stockMaster.CompanyId = SessionContext.CompanyId;
@@ -539,7 +540,24 @@ namespace Repository.TransactionRepository
                     DataConnection.Query<Voucher>(STOREDPROCEDURE.POS_Vouchers, voucher, transaction, commandType: CommandType.StoredProcedure);
                 }
 
-                // 5. Commit the transaction - ALL operations successful
+                // 5. Enqueue to SyncQueue for Head Office sync
+                try
+                {
+                    SyncQueueRepository.EnqueueTransaction(
+                        (SqlConnection)DataConnection,
+                        (SqlTransaction)transaction,
+                        stockMaster.BranchId > 0 ? stockMaster.BranchId : SessionContext.BranchId,
+                        "STOCK_ADJUSTMENT",
+                        masterId.ToString(),
+                        stockMaster.TransactionGuid,
+                        "CREATE");
+                }
+                catch (Exception syncEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[StockAdjustmentRepository.SaveStockAdjustment] SyncQueue warning: {syncEx.Message}");
+                }
+
+                // 6. Commit the transaction - ALL operations successful
                 transaction.Commit();
                 return "success";
             }
@@ -943,6 +961,30 @@ namespace Repository.TransactionRepository
 
                 if (liststock.Count > 0)
                 {
+                    try
+                    {
+                        if (sk.TransactionGuid == Guid.Empty) sk.TransactionGuid = Guid.NewGuid();
+                        SyncQueueRepository.SetTransactionGuid(
+                            (SqlConnection)DataConnection,
+                            (SqlTransaction)trans,
+                            "STOCK_ADJUSTMENT",
+                            sk.Id.ToString(),
+                            sk.TransactionGuid);
+
+                        SyncQueueRepository.EnqueueTransaction(
+                            (SqlConnection)DataConnection,
+                            (SqlTransaction)trans,
+                            sk.BranchId > 0 ? sk.BranchId : SessionContext.BranchId,
+                            "STOCK_ADJUSTMENT",
+                            sk.Id.ToString(),
+                            sk.TransactionGuid,
+                            "CREATE");
+                    }
+                    catch (Exception syncEx)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[StockAdjustmentRepository.updateStock] SyncQueue warning: {syncEx.Message}");
+                    }
+
                     trans.Commit();
                     return "success";
                 }
