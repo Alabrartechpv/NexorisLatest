@@ -2198,7 +2198,7 @@ namespace PosBranch_Win.Master
         {
             try
             {
-                if ((DateTime.Now - lastBarcodeRefreshClickTime).TotalMilliseconds < 500)
+                if ((DateTime.Now - lastBarcodeRefreshClickTime).TotalMilliseconds < 300)
                 {
                     return;
                 }
@@ -2207,21 +2207,12 @@ namespace PosBranch_Win.Master
                 // 1. Refresh autocomplete dropdowns (Category, Group, Brand, ItemType) from DB
                 SetupAutoComplete();
 
+                // 2. Check if current barcode text in txt_barcode matches an item in DB FIRST
                 int itemIdToRefresh = 0;
-                if (ItemMaster != null && ItemMaster.ItemId > 0)
-                {
-                    itemIdToRefresh = ItemMaster.ItemId;
-                }
-                else if (CurrentItemId > 0)
-                {
-                    itemIdToRefresh = CurrentItemId;
-                }
-
-                // 2. Check if current barcode text matches an item in DB
                 var txtBarcodeCtrl = GetMainBarcodeEditor();
                 string barcodeText = txtBarcodeCtrl?.Text?.Trim() ?? txt_barcode?.Text?.Trim();
 
-                if (itemIdToRefresh <= 0 && !string.IsNullOrWhiteSpace(barcodeText))
+                if (!string.IsNullOrWhiteSpace(barcodeText))
                 {
                     ItemMasterRepository itemRepo = new ItemMasterRepository();
                     itemIdToRefresh = itemRepo.GetItemIdByBarcode(barcodeText);
@@ -2235,11 +2226,33 @@ namespace PosBranch_Win.Master
                     }
                 }
 
+                // Fallback to loaded item ID if barcode lookup produced no result
+                if (itemIdToRefresh <= 0)
+                {
+                    if (ItemMaster != null && ItemMaster.ItemId > 0)
+                    {
+                        itemIdToRefresh = ItemMaster.ItemId;
+                    }
+                    else if (CurrentItemId > 0)
+                    {
+                        itemIdToRefresh = CurrentItemId;
+                    }
+                    else if (!string.IsNullOrEmpty(txt_ItemNo?.Text))
+                    {
+                        int itemNo = 0;
+                        if (int.TryParse(txt_ItemNo.Text, out itemNo) && itemNo > 0)
+                        {
+                            ItemMasterRepository itemRepo = new ItemMasterRepository();
+                            itemIdToRefresh = itemRepo.NavigateItem("CURRENT", itemNo);
+                        }
+                    }
+                }
+
                 // 3. Re-fetch and update/refresh complete item master form (stock levels, prices, UOM, status)
                 if (itemIdToRefresh > 0)
                 {
                     LoadItemById(itemIdToRefresh);
-                    System.Diagnostics.Debug.WriteLine($"Barcode click refreshed item master form completely for ItemId: {itemIdToRefresh}");
+                    System.Diagnostics.Debug.WriteLine($"Barcode click/focus refreshed item master form completely for ItemId: {itemIdToRefresh}");
                 }
             }
             catch (Exception ex)
@@ -4055,21 +4068,29 @@ namespace PosBranch_Win.Master
                 return;
             }
 
-            control.Click -= txt_barcode_Click;
-            control.Click += txt_barcode_Click;
-            control.Click -= BarcodeCtrl_ClickToRefresh;
-            control.Click += BarcodeCtrl_ClickToRefresh;
-            control.MouseClick -= txt_barcode_MouseClick;
-            control.MouseClick += txt_barcode_MouseClick;
-            control.MouseClick -= BarcodeCtrl_ClickToRefresh;
-            control.MouseClick += BarcodeCtrl_ClickToRefresh;
-            control.MouseDown -= txt_barcode_MouseDown;
-            control.MouseDown += txt_barcode_MouseDown;
-
-            foreach (Control child in control.Controls)
+            try
             {
-                WireBarcodeRefreshMouseEvents(child);
+                control.Click -= BarcodeCtrl_ClickToRefresh;
+                control.Click += BarcodeCtrl_ClickToRefresh;
+
+                control.MouseClick -= BarcodeCtrl_ClickToRefresh;
+                control.MouseClick += BarcodeCtrl_ClickToRefresh;
+
+                control.MouseDown -= BarcodeCtrl_ClickToRefresh;
+                control.MouseDown += BarcodeCtrl_ClickToRefresh;
+
+                control.GotFocus -= BarcodeCtrl_ClickToRefresh;
+                control.GotFocus += BarcodeCtrl_ClickToRefresh;
+
+                control.Enter -= BarcodeCtrl_ClickToRefresh;
+                control.Enter += BarcodeCtrl_ClickToRefresh;
+
+                foreach (Control child in control.Controls)
+                {
+                    WireBarcodeRefreshMouseEvents(child);
+                }
             }
+            catch { }
         }
 
         private void WireUnitCostRefreshMouseEvents(Control control)
@@ -5855,6 +5876,46 @@ namespace PosBranch_Win.Master
                             // In PriceSettings, Stock already represents (actual stock + held quantity)
                             float stock = (float)getItem.List[0].Stock;          // total stock from PriceSettings (includes held)
                             float orderedStock = (float)getItem.List[0].OrderedStock; // held quantity
+
+                            // Double check directly from DB to guarantee 100% accurate post-purchase stock quantities
+                            try
+                            {
+                                using (Repository.BaseRepostitory bRepo = new Repository.BaseRepostitory())
+                                {
+                                    if (bRepo.DataConnection is System.Data.SqlClient.SqlConnection dbConn)
+                                    {
+                                        bool wasClosed = dbConn.State == ConnectionState.Closed;
+                                        if (wasClosed) dbConn.Open();
+                                        try
+                                        {
+                                            using (System.Data.SqlClient.SqlCommand sCmd = new System.Data.SqlClient.SqlCommand(
+                                                "SELECT ISNULL(SUM(Stock), 0) AS TotalStock, ISNULL(SUM(OrderedStock), 0) AS TotalHold FROM ItemMasterPriceSettings WHERE ItemId = @ItemId AND (IsBaseUnit = 'Y' OR Packing = 1)",
+                                                dbConn))
+                                            {
+                                                sCmd.Parameters.AddWithValue("@ItemId", itemId);
+                                                using (System.Data.SqlClient.SqlDataReader sRdr = sCmd.ExecuteReader())
+                                                {
+                                                    if (sRdr.Read())
+                                                    {
+                                                        double dbStock = Convert.ToDouble(sRdr["TotalStock"]);
+                                                        double dbHold = Convert.ToDouble(sRdr["TotalHold"]);
+                                                        if (dbStock > 0 || stock == 0)
+                                                        {
+                                                            stock = (float)dbStock;
+                                                            orderedStock = (float)dbHold;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        finally
+                                        {
+                                            if (wasClosed && dbConn.State == ConnectionState.Open) dbConn.Close();
+                                        }
+                                    }
+                                }
+                            }
+                            catch { }
 
                             // txt_qty should show the total stock value from PriceSettings
                             txt_qty.Text = stock.ToString("0");
