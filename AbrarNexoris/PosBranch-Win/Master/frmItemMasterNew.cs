@@ -1632,6 +1632,22 @@ namespace PosBranch_Win.Master
             SetupAutoComplete();
             KeyPreview = true;
             this.KeyDown += frmItemMasterNew_KeyDown;
+
+            // Enforce CAPITAL / UPPERCASE always for txt_description & txt_LocalLanguage
+            if (this.txt_description != null)
+            {
+                this.txt_description.CharacterCasing = System.Windows.Forms.CharacterCasing.Upper;
+                this.txt_description.TextChanged -= MaintainUppercaseTxtDescription;
+                this.txt_description.TextChanged += MaintainUppercaseTxtDescription;
+            }
+
+            if (this.txt_LocalLanguage != null)
+            {
+                this.txt_LocalLanguage.CharacterCasing = System.Windows.Forms.CharacterCasing.Upper;
+                this.txt_LocalLanguage.TextChanged -= MaintainUppercaseTxtLocalLanguage;
+                this.txt_LocalLanguage.TextChanged += MaintainUppercaseTxtLocalLanguage;
+            }
+
             this.SetupUltraGrid();
             this.GetPriceDesing();
             // this.GetTaxDesing();
@@ -2136,6 +2152,100 @@ namespace PosBranch_Win.Master
             this.Activated += (s, args) => FocusBarcodeBox();
             this.Enter += (s, args) => FocusBarcodeBox();
             this.VisibleChanged += (s, args) => { if (this.Visible) FocusBarcodeBox(); };
+        }
+
+        private void MaintainUppercaseTxtDescription(object sender, EventArgs e)
+        {
+            try
+            {
+                if (txt_description != null && !string.IsNullOrEmpty(txt_description.Text))
+                {
+                    string upper = txt_description.Text.ToUpper();
+                    if (txt_description.Text != upper)
+                    {
+                        int selStart = txt_description.SelectionStart;
+                        int selLen = txt_description.SelectionLength;
+                        txt_description.Text = upper;
+                        txt_description.SelectionStart = selStart;
+                        txt_description.SelectionLength = selLen;
+                    }
+                }
+            }
+            catch { }
+        }
+
+        private void MaintainUppercaseTxtLocalLanguage(object sender, EventArgs e)
+        {
+            try
+            {
+                if (txt_LocalLanguage != null && !string.IsNullOrEmpty(txt_LocalLanguage.Text))
+                {
+                    string upper = txt_LocalLanguage.Text.ToUpper();
+                    if (txt_LocalLanguage.Text != upper)
+                    {
+                        int selStart = txt_LocalLanguage.SelectionStart;
+                        int selLen = txt_LocalLanguage.SelectionLength;
+                        txt_LocalLanguage.Text = upper;
+                        txt_LocalLanguage.SelectionStart = selStart;
+                        txt_LocalLanguage.SelectionLength = selLen;
+                    }
+                }
+            }
+            catch { }
+        }
+
+        private void BarcodeCtrl_ClickToRefresh(object sender, EventArgs e)
+        {
+            try
+            {
+                if ((DateTime.Now - lastBarcodeRefreshClickTime).TotalMilliseconds < 500)
+                {
+                    return;
+                }
+                lastBarcodeRefreshClickTime = DateTime.Now;
+
+                // 1. Refresh autocomplete dropdowns (Category, Group, Brand, ItemType) from DB
+                SetupAutoComplete();
+
+                int itemIdToRefresh = 0;
+                if (ItemMaster != null && ItemMaster.ItemId > 0)
+                {
+                    itemIdToRefresh = ItemMaster.ItemId;
+                }
+                else if (CurrentItemId > 0)
+                {
+                    itemIdToRefresh = CurrentItemId;
+                }
+
+                // 2. Check if current barcode text matches an item in DB
+                var txtBarcodeCtrl = GetMainBarcodeEditor();
+                string barcodeText = txtBarcodeCtrl?.Text?.Trim() ?? txt_barcode?.Text?.Trim();
+
+                if (itemIdToRefresh <= 0 && !string.IsNullOrWhiteSpace(barcodeText))
+                {
+                    ItemMasterRepository itemRepo = new ItemMasterRepository();
+                    itemIdToRefresh = itemRepo.GetItemIdByBarcode(barcodeText);
+                    if (itemIdToRefresh <= 0)
+                    {
+                        try { itemIdToRefresh = itemRepo.GetItemIdByAliasBarcode(barcodeText); } catch { }
+                    }
+                    if (itemIdToRefresh <= 0)
+                    {
+                        try { itemIdToRefresh = itemRepo.GetItemIdByAlternativeBarcode(barcodeText); } catch { }
+                    }
+                }
+
+                // 3. Re-fetch and update/refresh complete item master form (stock levels, prices, UOM, status)
+                if (itemIdToRefresh > 0)
+                {
+                    LoadItemById(itemIdToRefresh);
+                    System.Diagnostics.Debug.WriteLine($"Barcode click refreshed item master form completely for ItemId: {itemIdToRefresh}");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error in BarcodeCtrl_ClickToRefresh: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -3947,8 +4057,12 @@ namespace PosBranch_Win.Master
 
             control.Click -= txt_barcode_Click;
             control.Click += txt_barcode_Click;
+            control.Click -= BarcodeCtrl_ClickToRefresh;
+            control.Click += BarcodeCtrl_ClickToRefresh;
             control.MouseClick -= txt_barcode_MouseClick;
             control.MouseClick += txt_barcode_MouseClick;
+            control.MouseClick -= BarcodeCtrl_ClickToRefresh;
+            control.MouseClick += BarcodeCtrl_ClickToRefresh;
             control.MouseDown -= txt_barcode_MouseDown;
             control.MouseDown += txt_barcode_MouseDown;
 
