@@ -1,9 +1,12 @@
 using Dapper;
+using Nexoris.CentralApi.Logging;
 using Nexoris.CentralApi.Models.DTOs;
 using System;
 using System.Configuration;
 using System.Data;
 using System.Data.SqlClient;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading.Tasks;
 
 namespace Nexoris.CentralApi.Services
@@ -23,8 +26,11 @@ namespace Nexoris.CentralApi.Services
 
         public CentralSyncService()
         {
-            _connectionString = ConfigurationManager.ConnectionStrings["CentralDbConnection"]?.ConnectionString
-                ?? "Server=192.168.1.232\\SQLEXPRESS;Database=NexorisCentralDB;User Id=sa;Password=Abrar@123;Connect Timeout=30;";
+            _connectionString = ConfigurationManager.ConnectionStrings["CentralDbConnection"]?.ConnectionString;
+            if (string.IsNullOrWhiteSpace(_connectionString))
+            {
+                throw new ConfigurationErrorsException("Database connection string 'CentralDbConnection' is missing or empty in CentralApi configuration.");
+            }
         }
 
         public async Task<BranchStatusResponse> GetBranchStatusAsync(int branchId)
@@ -195,16 +201,32 @@ namespace Nexoris.CentralApi.Services
             }
         }
 
+        private static string ComputeSha256Hash(string rawData)
+        {
+            if (string.IsNullOrEmpty(rawData)) return string.Empty;
+            using (var sha256 = SHA256.Create())
+            {
+                byte[] bytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(rawData));
+                var builder = new StringBuilder(bytes.Length * 2);
+                for (int i = 0; i < bytes.Length; i++)
+                {
+                    builder.Append(bytes[i].ToString("x2"));
+                }
+                return builder.ToString();
+            }
+        }
+
         public async Task<bool> ValidateBranchKeyAsync(int branchId, string apiKey)
         {
             try
             {
+                string keyHash = ComputeSha256Hash(apiKey);
                 using (var conn = new SqlConnection(_connectionString))
                 {
                     await conn.OpenAsync();
                     int count = await conn.ExecuteScalarAsync<int>(
                         "dbo.sp_Central_ValidateApiKey",
-                        new { BranchId = branchId, ApiKey = apiKey },
+                        new { BranchId = branchId, ApiKey = keyHash, RawApiKey = apiKey },
                         commandType: CommandType.StoredProcedure
                     );
                     return count > 0;
@@ -212,9 +234,7 @@ namespace Nexoris.CentralApi.Services
             }
             catch (Exception ex)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine(string.Format("[ERROR] Error validating branch API key for BranchId={0}: {1}", branchId, ex.Message));
-                Console.ResetColor();
+                FileLogger.Error(ex, "Error validating branch API key for BranchId={0}", branchId);
                 return false;
             }
         }

@@ -51,6 +51,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Logging\FileLogger.cs" />
     <Compile Include="Models\DTOs\SyncPayloads.cs" />
     <Compile Include="Services\CentralSyncService.cs" />
     <Compile Include="Program.cs" />

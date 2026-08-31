@@ -1,4 +1,5 @@
 using Nexoris.SyncService.Configuration;
+using Nexoris.SyncService.Logging;
 using Nexoris.SyncService.Services;
 using Nexoris.SyncService.Workers;
 using System;
@@ -32,7 +33,7 @@ namespace Nexoris.SyncService
             Console.CancelKeyPress += (s, e) =>
             {
                 e.Cancel = true;
-                Console.WriteLine("\nStopping sync worker...");
+                FileLogger.Info("Stopping sync worker...");
                 worker.Stop();
                 cts.Cancel();
             };

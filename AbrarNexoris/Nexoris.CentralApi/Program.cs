@@ -1,4 +1,5 @@
 using Newtonsoft.Json;
+using Nexoris.CentralApi.Logging;
 using Nexoris.CentralApi.Models.DTOs;
 using Nexoris.CentralApi.Services;
 using System;
@@ -20,11 +21,9 @@ namespace Nexoris.CentralApi
         static void Main(string[] args)
         {
             Console.Title = "Nexoris Central API (.NET Framework 4.6.1)";
-            Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine("===============================================================");
-            Console.WriteLine("        NEXORIS HEAD OFFICE CENTRAL API SERVER (.NET 4.6.1)   ");
-            Console.WriteLine("===============================================================");
-            Console.ResetColor();
+            FileLogger.Info("===============================================================");
+            FileLogger.Info("        NEXORIS HEAD OFFICE CENTRAL API SERVER (.NET 4.6.1)   ");
+            FileLogger.Info("===============================================================");
 
             _syncService = new CentralSyncService();
 
@@ -35,19 +34,17 @@ namespace Nexoris.CentralApi
             try
             {
                 _listener.Start();
-                Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine(string.Format("[OK] Central API Server listening on http://localhost:{0}/", port));
-                Console.WriteLine("[OK] Endpoints available:");
-                Console.WriteLine("     - GET  /api/v1/health");
-                Console.WriteLine("     - POST /api/v1/sync/transactions");
-                Console.ResetColor();
+                FileLogger.Success("Central API Server listening on http://localhost:{0}/", port);
+                FileLogger.Info("Endpoints available:");
+                FileLogger.Info("     - GET  /api/v1/health");
+                FileLogger.Info("     - GET  /api/v1/sync/branch-status");
+                FileLogger.Info("     - POST /api/v1/sync/master-data");
+                FileLogger.Info("     - POST /api/v1/sync/transactions");
                 Console.WriteLine("\nPress Ctrl+C to stop the server...\n");
             }
             catch (Exception ex)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("[ERROR] Failed to start HttpListener: " + ex.Message);
-                Console.ResetColor();
+                FileLogger.Error(ex, "Failed to start HttpListener");
                 Console.ReadLine();
                 return;
             }
@@ -89,15 +86,86 @@ namespace Nexoris.CentralApi
             }
         }
 
+        private static long GetMaxRequestBodySize()
+        {
+            if (long.TryParse(ConfigurationManager.AppSettings["MaxRequestBodySizeBytes"], out long size) && size > 0)
+            {
+                return size;
+            }
+            return 20 * 1024 * 1024; // Default: 20 MB
+        }
+
+        private static void ApplyCorsHeaders(HttpListenerRequest req, HttpListenerResponse res)
+        {
+            string origin = req.Headers["Origin"];
+            if (string.IsNullOrEmpty(origin))
+            {
+                return;
+            }
+
+            string allowedOriginsSetting = ConfigurationManager.AppSettings["AllowedOrigins"] ?? "http://localhost:5000,http://127.0.0.1:5000";
+            var allowedOrigins = allowedOriginsSetting.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
+
+            bool isAllowed = false;
+            foreach (var rawOrigin in allowedOrigins)
+            {
+                string allowed = rawOrigin.Trim();
+                if (allowed == "*" || string.Equals(origin, allowed, StringComparison.OrdinalIgnoreCase))
+                {
+                    isAllowed = true;
+                    break;
+                }
+                if (allowed.EndsWith("*") && origin.StartsWith(allowed.TrimEnd('*'), StringComparison.OrdinalIgnoreCase))
+                {
+                    isAllowed = true;
+                    break;
+                }
+            }
+
+            if (isAllowed)
+            {
+                res.Headers.Add("Access-Control-Allow-Origin", origin);
+                res.Headers.Add("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+                res.Headers.Add("Access-Control-Allow-Headers", "Content-Type, X-Branch-Id, X-Api-Key");
+                res.Headers.Add("Access-Control-Max-Age", "86400");
+            }
+        }
+
+        private static async Task<string> ReadRequestBodyWithLimitAsync(HttpListenerRequest req, long maxBytes)
+        {
+            if (req.ContentLength64 > maxBytes)
+            {
+                return null;
+            }
+
+            using (var ms = new MemoryStream())
+            {
+                var buffer = new byte[81920]; // 80 KB chunk
+                long totalBytesRead = 0;
+                int bytesRead;
+
+                while ((bytesRead = await req.InputStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                {
+                    totalBytesRead += bytesRead;
+                    if (totalBytesRead > maxBytes)
+                    {
+                        return null;
+                    }
+                    await ms.WriteAsync(buffer, 0, bytesRead);
+                }
+
+                var encoding = req.ContentEncoding ?? Encoding.UTF8;
+                return encoding.GetString(ms.ToArray());
+            }
+        }
+
         private static async Task HandleRequestAsync(HttpListenerContext context)
         {
             var req = context.Request;
             var res = context.Response;
 
-            // Add standard CORS headers
-            res.Headers.Add("Access-Control-Allow-Origin", "*");
-            res.Headers.Add("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-            res.Headers.Add("Access-Control-Allow-Headers", "Content-Type, X-Branch-Id, X-Api-Key");
+            // Restrict and apply CORS headers safely based on validated Origin
+            ApplyCorsHeaders(req, res);
 
             if (req.HttpMethod == "OPTIONS")
             {
@@ -108,6 +176,7 @@ namespace Nexoris.CentralApi
 
             string rawUrl = req.RawUrl?.ToLowerInvariant() ?? "";
             string path = req.Url.AbsolutePath.ToLowerInvariant();
+            long maxBodySize = GetMaxRequestBodySize();
 
             try
             {
@@ -168,10 +237,11 @@ namespace Nexoris.CentralApi
                         return;
                     }
 
-                    string requestBody;
-                    using (var reader = new StreamReader(req.InputStream, req.ContentEncoding))
+                    string requestBody = await ReadRequestBodyWithLimitAsync(req, maxBodySize);
+                    if (requestBody == null)
                     {
-                        requestBody = await reader.ReadToEndAsync();
+                        await WriteJsonResponseAsync(res, new { Error = string.Format("Payload too large. Maximum allowed size is {0} MB.", maxBodySize / (1024 * 1024)) }, 413);
+                        return;
                     }
 
                     var masterRequest = JsonConvert.DeserializeObject<MasterDataSyncRequest>(requestBody);
@@ -181,17 +251,13 @@ namespace Nexoris.CentralApi
                         return;
                     }
 
-                    Console.ForegroundColor = ConsoleColor.Magenta;
-                    Console.WriteLine(string.Format("[ONBOARDING] [{0}] Received Master Data payload from Branch {1} ({2} items)...",
-                        DateTime.Now.ToString("HH:mm:ss"), branchId, masterRequest.PriceSettings.Count));
-                    Console.ResetColor();
+                    FileLogger.Info("[ONBOARDING] Received Master Data payload from Branch {0} ({1} items)...",
+                        branchId, masterRequest.PriceSettings.Count);
 
                     var masterResult = await _syncService.IngestMasterDataAsync(masterRequest);
 
-                    Console.ForegroundColor = ConsoleColor.Green;
-                    Console.WriteLine(string.Format("[OK]          [{0}] Master Data Synced: {1} items saved.",
-                        DateTime.Now.ToString("HH:mm:ss"), masterResult.SyncedItemCount));
-                    Console.ResetColor();
+                    FileLogger.Success("Master Data Synced: {0} items saved for Branch {1}.",
+                        masterResult.SyncedItemCount, branchId);
 
                     await WriteJsonResponseAsync(res, masterResult, 200);
                     return;
@@ -205,9 +271,7 @@ namespace Nexoris.CentralApi
 
                     if (string.IsNullOrEmpty(branchIdHeader) || !int.TryParse(branchIdHeader, out int branchId) || string.IsNullOrEmpty(apiKey))
                     {
-                        Console.ForegroundColor = ConsoleColor.Yellow;
-                        Console.WriteLine(string.Format("[WARN] [{0}] Unauthorized attempt - Missing X-Branch-Id or X-Api-Key headers", DateTime.Now.ToString("HH:mm:ss")));
-                        Console.ResetColor();
+                        FileLogger.Warn("Unauthorized attempt - Missing X-Branch-Id or X-Api-Key headers");
                         await WriteJsonResponseAsync(res, new { Error = "Missing or invalid X-Branch-Id or X-Api-Key headers." }, 401);
                         return;
                     }
@@ -215,18 +279,17 @@ namespace Nexoris.CentralApi
                     bool isValidKey = await _syncService.ValidateBranchKeyAsync(branchId, apiKey);
                     if (!isValidKey)
                     {
-                        Console.ForegroundColor = ConsoleColor.Yellow;
-                        Console.WriteLine(string.Format("[WARN] [{0}] Forbidden attempt - Invalid API Key for Branch {1}", DateTime.Now.ToString("HH:mm:ss"), branchId));
-                        Console.ResetColor();
+                        FileLogger.Warn("Forbidden attempt - Invalid API Key for Branch {0}", branchId);
                         await WriteJsonResponseAsync(res, new { Error = "Forbidden: Invalid API key for branch." }, 403);
                         return;
                     }
 
-                    // Read JSON payload
-                    string requestBody;
-                    using (var reader = new StreamReader(req.InputStream, req.ContentEncoding))
+                    // Read JSON payload with size limit check
+                    string requestBody = await ReadRequestBodyWithLimitAsync(req, maxBodySize);
+                    if (requestBody == null)
                     {
-                        requestBody = await reader.ReadToEndAsync();
+                        await WriteJsonResponseAsync(res, new { Error = string.Format("Payload too large. Maximum allowed size is {0} MB.", maxBodySize / (1024 * 1024)) }, 413);
+                        return;
                     }
 
                     var batchRequest = JsonConvert.DeserializeObject<BatchSyncRequest>(requestBody);
@@ -236,10 +299,8 @@ namespace Nexoris.CentralApi
                         return;
                     }
 
-                    Console.ForegroundColor = ConsoleColor.Cyan;
-                    Console.WriteLine(string.Format("[INFO] [{0}] Received Batch {1} from Branch {2} with {3} transactions...",
-                        DateTime.Now.ToString("HH:mm:ss"), batchRequest.BatchId, branchId, batchRequest.Transactions.Count));
-                    Console.ResetColor();
+                    FileLogger.Info("Received Batch {0} from Branch {1} with {2} transactions...",
+                        batchRequest.BatchId, branchId, batchRequest.Transactions.Count);
 
                     var result = await _syncService.ProcessBatchAsync(batchRequest);
 
@@ -247,14 +308,27 @@ namespace Nexoris.CentralApi
                     int failedCount = 0;
                     foreach (var r in result.Results)
                     {
-                        if (r.Status == "Synced" || r.Status == "AlreadySynced") syncedCount++;
-                        else failedCount++;
+                        if (string.Equals(r.Status, "Synced", StringComparison.OrdinalIgnoreCase) || 
+                            string.Equals(r.Status, "AlreadySynced", StringComparison.OrdinalIgnoreCase)) 
+                        {
+                            syncedCount++;
+                        }
+                        else 
+                        {
+                            failedCount++;
+                        }
                     }
 
-                    Console.ForegroundColor = failedCount == 0 ? ConsoleColor.Green : ConsoleColor.Yellow;
-                    Console.WriteLine(string.Format("[OK]   [{0}] Batch {1} Processed: {2} Synced, {3} Failed",
-                        DateTime.Now.ToString("HH:mm:ss"), batchRequest.BatchId, syncedCount, failedCount));
-                    Console.ResetColor();
+                    if (failedCount == 0)
+                    {
+                        FileLogger.Success("Batch {0} Processed: {1} Synced, {2} Failed",
+                            batchRequest.BatchId, syncedCount, failedCount);
+                    }
+                    else
+                    {
+                        FileLogger.Warn("Batch {0} Processed: {1} Synced, {2} Failed",
+                            batchRequest.BatchId, syncedCount, failedCount);
+                    }
 
                     await WriteJsonResponseAsync(res, result, 200);
                     return;
@@ -265,10 +339,11 @@ namespace Nexoris.CentralApi
             }
             catch (Exception ex)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("[ERROR] Request processing failed: " + ex.ToString());
-                Console.ResetColor();
-                await WriteJsonResponseAsync(res, new { Error = "Internal server error: " + ex.Message }, 500);
+                // Full internal exception logged safely to file and console on server side
+                FileLogger.Error(ex, "Request processing failed ({0})", path);
+
+                // Sanitize user-facing error response to prevent leaking internal database / server details
+                await WriteJsonResponseAsync(res, new { Error = "An internal server error occurred while processing the request." }, 500);
             }
         }
 

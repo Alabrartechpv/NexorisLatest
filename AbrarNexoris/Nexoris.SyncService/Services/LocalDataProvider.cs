@@ -1,4 +1,5 @@
 using Dapper;
+using Nexoris.SyncService.Logging;
 using Nexoris.SyncService.Models;
 using System;
 using System.Collections.Generic;
@@ -17,8 +18,11 @@ namespace Nexoris.SyncService.Services
 
         public LocalDataProvider()
         {
-            _connectionString = ConfigurationManager.ConnectionStrings["LocalDbConnection"]?.ConnectionString
-                ?? "Server=192.168.1.232\\SQLEXPRESS;Database=RambaiTest;User Id=sa;Password=Abrar@123;Connect Timeout=30;";
+            _connectionString = ConfigurationManager.ConnectionStrings["LocalDbConnection"]?.ConnectionString;
+            if (string.IsNullOrWhiteSpace(_connectionString))
+            {
+                throw new ConfigurationErrorsException("Database connection string 'LocalDbConnection' is missing or empty in SyncService configuration.");
+            }
         }
 
         public async Task<List<SyncQueueItem>> GetPendingQueueItemsAsync(int batchSize)
