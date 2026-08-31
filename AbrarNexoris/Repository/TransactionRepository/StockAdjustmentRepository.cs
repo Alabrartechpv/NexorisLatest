@@ -55,38 +55,91 @@ namespace Repository.TransactionRepository
         public int GenerateAdjustNo(SqlTransaction trans = null)
         {
             int AdjNo = 0;
-            // DataConnection.Open();
+            bool wasClosed = DataConnection.State != ConnectionState.Open;
+
             try
             {
-                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_StockAdjustemnt, (SqlConnection)DataConnection, trans))
+                if (wasClosed && trans == null)
                 {
-                    cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@CompanyId", SessionContext.CompanyId);
-                    cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
-                    cmd.Parameters.AddWithValue("@_Operation", "GENERATENUMBER");
+                    DataConnection.Open();
+                }
 
-                    using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
+                // 1. Try POS_StockAdjustemnt stored procedure
+                try
+                {
+                    using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_StockAdjustemnt, (SqlConnection)DataConnection, trans))
                     {
-                        DataSet ds = new DataSet();
-                        adapt.Fill(ds);
-                        if ((ds != null) && (ds.Tables.Count > 0) && (ds.Tables[0] != null) && (ds.Tables[0].Rows.Count > 0))
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.AddWithValue("@CompanyId", SessionContext.CompanyId);
+                        cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
+                        cmd.Parameters.AddWithValue("@FinYearId", SessionContext.FinYearId);
+                        cmd.Parameters.AddWithValue("@_Operation", "GENERATENUMBER");
+
+                        using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
                         {
-                            AdjNo = Convert.ToInt32(ds.Tables[0].Rows[0].ItemArray[0].ToString());
+                            DataSet ds = new DataSet();
+                            adapt.Fill(ds);
+                            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0] != null && ds.Tables[0].Rows.Count > 0)
+                            {
+                                if (int.TryParse(ds.Tables[0].Rows[0].ItemArray[0]?.ToString(), out int parsedNo) && parsedNo > 0)
+                                {
+                                    AdjNo = parsedNo;
+                                }
+                            }
                         }
+                    }
+                }
+                catch (Exception spEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[StockAdjustmentRepository.GenerateAdjustNo] POS_StockAdjustemnt notice: {spEx.Message}");
+                }
+
+                // 2. If not generated, try POS_Vouchers stored procedure for PhysicalStock
+                if (AdjNo <= 0)
+                {
+                    try
+                    {
+                        using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_Vouchers, (SqlConnection)DataConnection, trans))
+                        {
+                            cmd.CommandType = CommandType.StoredProcedure;
+                            cmd.Parameters.AddWithValue("@CompanyID", SessionContext.CompanyId);
+                            cmd.Parameters.AddWithValue("@BranchID", SessionContext.BranchId);
+                            cmd.Parameters.AddWithValue("@FinYearID", SessionContext.FinYearId);
+                            cmd.Parameters.AddWithValue("@VoucherType", "PhysicalStock");
+                            cmd.Parameters.AddWithValue("@_Operation", "GENERATENUMBER");
+
+                            using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
+                            {
+                                DataSet ds = new DataSet();
+                                adapt.Fill(ds);
+                                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0] != null && ds.Tables[0].Rows.Count > 0)
+                                {
+                                    if (int.TryParse(ds.Tables[0].Rows[0].ItemArray[0]?.ToString(), out int parsedVoucherNo) && parsedVoucherNo > 0)
+                                    {
+                                        AdjNo = parsedVoucherNo;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception vEx)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[StockAdjustmentRepository.GenerateAdjustNo] POS_Vouchers notice: {vEx.Message}");
                     }
                 }
             }
             catch (Exception ex)
             {
-                throw ex;
+                System.Diagnostics.Debug.WriteLine($"[StockAdjustmentRepository.GenerateAdjustNo] Error: {ex.Message}");
             }
             finally
             {
-                if (DataConnection.State == ConnectionState.Open)
+                if (wasClosed && trans == null && DataConnection.State == ConnectionState.Open)
                 {
-                    // DataConnection.Close();
+                    DataConnection.Close();
                 }
             }
+
             return AdjNo;
         }
 
@@ -191,6 +244,10 @@ namespace Repository.TransactionRepository
                 stockMaster.UserId = SessionContext.UserId;
                 stockMaster.CancelFlag = 0;
                 stockMaster.VoucherType = "PhysicalStock";
+                if (stockMaster.StockAdjustmentNo <= 0)
+                {
+                    stockMaster.StockAdjustmentNo = GenerateAdjustNo(transaction);
+                }
 
                 List<StockAdjMaster> stockMasterResult = DataConnection.Query<StockAdjMaster>(
                     STOREDPROCEDURE.POS_StockAdjustemnt,
