@@ -1,5 +1,6 @@
 using Newtonsoft.Json;
 using Nexoris.SyncService.Configuration;
+using Nexoris.SyncService.Logging;
 using Nexoris.SyncService.Models;
 using System;
 using System.Net.Http;
@@ -10,8 +11,16 @@ namespace Nexoris.SyncService.Services
 {
     public class CentralApiClient : ICentralApiClient
     {
-        private static readonly HttpClient _httpClient = new HttpClient();
+        private static readonly HttpClient _httpClient;
         private readonly SyncSettings _settings;
+
+        static CentralApiClient()
+        {
+            _httpClient = new HttpClient
+            {
+                Timeout = TimeSpan.FromSeconds(30)
+            };
+        }
 
         public CentralApiClient(SyncSettings settings)
         {
@@ -26,11 +35,14 @@ namespace Nexoris.SyncService.Services
                 var response = await _httpClient.GetAsync(url);
                 return response.IsSuccessStatusCode;
             }
+            catch (TaskCanceledException)
+            {
+                FileLogger.Warn("Health check timed out (30s limit) to Head Office API ({0})", _settings.CentralApiUrl);
+                return false;
+            }
             catch (Exception ex)
             {
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine(string.Format("[WARN] Health check failed to Head Office API ({0}): {1}", _settings.CentralApiUrl, ex.Message));
-                Console.ResetColor();
+                FileLogger.Warn("Health check failed to Head Office API ({0}): {1}", _settings.CentralApiUrl, ex.Message);
                 return false;
             }
         }
@@ -53,9 +65,7 @@ namespace Nexoris.SyncService.Services
                         if (!response.IsSuccessStatusCode)
                         {
                             string errContent = await response.Content.ReadAsStringAsync();
-                            Console.ForegroundColor = ConsoleColor.Red;
-                            Console.WriteLine(string.Format("[ERROR] Central API returned error ({0}): {1}", response.StatusCode, errContent));
-                            Console.ResetColor();
+                            FileLogger.Error("Central API returned error ({0}): {1}", response.StatusCode, errContent);
                             return null;
                         }
 
@@ -64,14 +74,18 @@ namespace Nexoris.SyncService.Services
                     }
                 }
             }
+            catch (TaskCanceledException)
+            {
+                FileLogger.Error("Transmission timed out after 30s for Batch {0} to Head Office.", request.BatchId);
+                return null;
+            }
             catch (Exception ex)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine(string.Format("[ERROR] Failed to transmit batch {0} to Head Office: {1}", request.BatchId, ex.Message));
-                Console.ResetColor();
+                FileLogger.Error(ex, "Failed to transmit batch {0} to Head Office", request.BatchId);
                 return null;
             }
         }
+
         public async Task<BranchStatusResponse> GetBranchStatusAsync(int branchId)
         {
             try
@@ -92,11 +106,13 @@ namespace Nexoris.SyncService.Services
                     }
                 }
             }
+            catch (TaskCanceledException)
+            {
+                FileLogger.Warn("Branch status check timed out after 30s from Central API");
+            }
             catch (Exception ex)
             {
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine(string.Format("[WARN] Failed to fetch branch status from Central API: {0}", ex.Message));
-                Console.ResetColor();
+                FileLogger.Warn("Failed to fetch branch status from Central API: {0}", ex.Message);
             }
             return null;
         }
@@ -124,18 +140,18 @@ namespace Nexoris.SyncService.Services
                         else
                         {
                             string err = await response.Content.ReadAsStringAsync();
-                            Console.ForegroundColor = ConsoleColor.Red;
-                            Console.WriteLine(string.Format("[ERROR] Master data sync failed ({0}): {1}", response.StatusCode, err));
-                            Console.ResetColor();
+                            FileLogger.Error("Master data sync failed ({0}): {1}", response.StatusCode, err);
                         }
                     }
                 }
             }
+            catch (TaskCanceledException)
+            {
+                FileLogger.Error("Master data push timed out after 30s to Central API.");
+            }
             catch (Exception ex)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine(string.Format("[ERROR] Failed to push master data to Central API: {0}", ex.Message));
-                Console.ResetColor();
+                FileLogger.Error(ex, "Failed to push master data to Central API");
             }
             return null;
         }

@@ -14,7 +14,7 @@ namespace ModelClass.TransactionModels
         public Guid TransactionGuid { get; set; }
         public string Operation { get; set; }  // 'CREATE', 'UPDATE', 'CANCEL'
         public int Version { get; set; } = 1;
-        public string Status { get; set; } = "PENDING"; // 'PENDING', 'IN_FLIGHT', 'SYNCED', 'FAILED'
+        public string Status { get; set; } = "Pending"; // 'Pending', 'Retry', 'Synced', 'AlreadySynced', 'Failed', 'Cancelled'
         public int RetryCount { get; set; } = 0;
         public int MaxRetries { get; set; } = 10;
         public string ErrorMessage { get; set; }

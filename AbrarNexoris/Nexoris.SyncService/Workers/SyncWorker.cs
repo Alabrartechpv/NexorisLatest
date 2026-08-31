@@ -1,4 +1,5 @@
 using Nexoris.SyncService.Configuration;
+using Nexoris.SyncService.Logging;
 using Nexoris.SyncService.Models;
 using Nexoris.SyncService.Services;
 using System;
@@ -29,13 +30,11 @@ namespace Nexoris.SyncService.Workers
         public async Task RunAsync(CancellationToken cancellationToken)
         {
             _isRunning = true;
-            Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine("===============================================================");
-            Console.WriteLine(string.Format("   NEXORIS BRANCH SYNC WORKER STARTED (Branch: {0})", _settings.BranchId));
-            Console.WriteLine(string.Format("   Central API Target: {0}", _settings.CentralApiUrl));
-            Console.WriteLine(string.Format("   Polling: Every {0}s | Batch Size: {1}", _settings.PollIntervalSeconds, _settings.BatchSize));
-            Console.WriteLine("===============================================================");
-            Console.ResetColor();
+            FileLogger.Info("===============================================================");
+            FileLogger.Info("   NEXORIS BRANCH SYNC WORKER STARTED (Branch: {0})", _settings.BranchId);
+            FileLogger.Info("   Central API Target: {0}", _settings.CentralApiUrl);
+            FileLogger.Info("   Polling: Every {0}s | Batch Size: {1}", _settings.PollIntervalSeconds, _settings.BatchSize);
+            FileLogger.Info("===============================================================");
 
             // Initial automated onboarding check on startup
             await CheckAndPerformInitialOnboardingAsync();
@@ -53,9 +52,7 @@ namespace Nexoris.SyncService.Workers
                 }
                 catch (Exception ex)
                 {
-                    Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine("[ERROR] Sync cycle error: " + ex.Message);
-                    Console.ResetColor();
+                    FileLogger.Error(ex, "Sync cycle error");
                 }
 
                 try
@@ -68,7 +65,7 @@ namespace Nexoris.SyncService.Workers
                 }
             }
 
-            Console.WriteLine("\nNexoris Branch Sync Worker STOPPED.");
+            FileLogger.Info("Nexoris Branch Sync Worker STOPPED.");
         }
 
         private async Task CheckAndPerformInitialOnboardingAsync()
@@ -80,15 +77,13 @@ namespace Nexoris.SyncService.Workers
                 {
                     if (status.InitialSyncRequired)
                     {
-                        Console.ForegroundColor = ConsoleColor.Magenta;
-                        Console.WriteLine(string.Format("[ONBOARDING] [{0}] Central DB has 0 PriceSettings for Branch {1}. Starting Automated Baseline Sync...",
-                            DateTime.Now.ToString("HH:mm:ss"), _settings.BranchId));
-                        Console.ResetColor();
+                        FileLogger.Info("[ONBOARDING] Central DB has 0 PriceSettings for Branch {0}. Starting Automated Baseline Sync...",
+                            _settings.BranchId);
 
                         var localPrices = await _dataProvider.GetLocalPriceSettingsAsync(_settings.BranchId);
                         if (localPrices != null && localPrices.Any())
                         {
-                            Console.WriteLine(string.Format("[ONBOARDING] Uploading {0} local PriceSettings master records to Head Office...", localPrices.Count));
+                            FileLogger.Info("[ONBOARDING] Uploading {0} local PriceSettings master records to Head Office...", localPrices.Count);
                             var response = await _apiClient.PushMasterDataAsync(new MasterDataSyncRequest
                             {
                                 BranchId = _settings.BranchId,
@@ -97,27 +92,23 @@ namespace Nexoris.SyncService.Workers
 
                             if (response != null && response.Success)
                             {
-                                Console.ForegroundColor = ConsoleColor.Green;
-                                Console.WriteLine(string.Format("[OK]          [{0}] Automated Onboarding Complete! {1} items registered in Central DB.",
-                                    DateTime.Now.ToString("HH:mm:ss"), response.SyncedItemCount));
-                                Console.ResetColor();
+                                FileLogger.Success("Automated Onboarding Complete! {0} items registered in Central DB.",
+                                    response.SyncedItemCount);
                                 _hasCheckedOnboarding = true;
                             }
                         }
                     }
                     else
                     {
-                        Console.ForegroundColor = ConsoleColor.Green;
-                        Console.WriteLine(string.Format("[OK]   [{0}] Branch {1} baseline verified ({2} items registered at Head Office).",
-                            DateTime.Now.ToString("HH:mm:ss"), _settings.BranchId, status.ExistingItemCount));
-                        Console.ResetColor();
+                        FileLogger.Success("Branch {0} baseline verified ({1} items registered at Head Office).",
+                            _settings.BranchId, status.ExistingItemCount);
                         _hasCheckedOnboarding = true;
                     }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine("[WARN] Onboarding handshake check deferred: " + ex.Message);
+                FileLogger.Warn("Onboarding handshake check deferred: {0}", ex.Message);
             }
         }
 
@@ -136,19 +127,13 @@ namespace Nexoris.SyncService.Workers
                 return;
             }
 
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine(string.Format("[INFO] [{0}] Found {1} pending transaction(s) to sync...",
-                DateTime.Now.ToString("HH:mm:ss"), pendingItems.Count));
-            Console.ResetColor();
+            FileLogger.Info("Found {0} pending transaction(s) to sync...", pendingItems.Count);
 
             // 2. Health check to Head Office API
             bool isOnline = await _apiClient.CheckCentralHealthAsync();
             if (!isOnline)
             {
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                Console.WriteLine(string.Format("[WARN] [{0}] Head Office API unreachable. Retrying in {1}s...",
-                    DateTime.Now.ToString("HH:mm:ss"), _settings.PollIntervalSeconds));
-                Console.ResetColor();
+                FileLogger.Warn("Head Office API unreachable. Retrying in {0}s...", _settings.PollIntervalSeconds);
                 return;
             }
 
@@ -160,26 +145,21 @@ namespace Nexoris.SyncService.Workers
             {
                 if (int.TryParse(m.EntityID, out int itemId))
                 {
-                    Console.ForegroundColor = ConsoleColor.Magenta;
-                    Console.WriteLine(string.Format("[ITEM SYNC] [{0}] Syncing ItemId {1} master catalog & units to Head Office...",
-                        DateTime.Now.ToString("HH:mm:ss"), itemId));
-                    Console.ResetColor();
+                    FileLogger.Info("[ITEM SYNC] Syncing ItemId {0} master catalog & units to Head Office...", itemId);
 
                     var masterReq = await _dataProvider.AssembleMasterDataAsync(itemId, _settings.BranchId);
                     var masterResp = await _apiClient.PushMasterDataAsync(masterReq);
 
                     if (masterResp != null && masterResp.Success)
                     {
-                        Console.ForegroundColor = ConsoleColor.Green;
-                        Console.WriteLine(string.Format("[OK]        [{0}] ItemId {1} synced ({2} unit price settings updated).",
-                            DateTime.Now.ToString("HH:mm:ss"), itemId, masterResp.SyncedItemCount));
-                        Console.ResetColor();
-                        await _dataProvider.UpdateQueueStatusAsync(m.TransactionGuid, "SYNCED");
+                        FileLogger.Success("ItemId {0} synced ({1} unit price settings updated).",
+                            itemId, masterResp.SyncedItemCount);
+                        await _dataProvider.UpdateQueueStatusAsync(m.TransactionGuid, "Synced");
                     }
                     else
                     {
                         string err = masterResp != null ? masterResp.Message : "Unknown API error";
-                        await _dataProvider.UpdateQueueStatusAsync(m.TransactionGuid, "FAILED", err);
+                        await _dataProvider.UpdateQueueStatusAsync(m.TransactionGuid, "Failed", err);
                     }
                 }
             }
@@ -194,15 +174,13 @@ namespace Nexoris.SyncService.Workers
 
             if (!batch.Transactions.Any())
             {
-                Console.WriteLine("[WARN] No transactions could be assembled from pending queue items.");
+                FileLogger.Warn("No transactions could be assembled from pending queue items.");
                 return;
             }
 
             // 5. Send batch to Central API
-            Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine(string.Format("[INFO] [{0}] Sending batch {1} ({2} items) to Head Office...",
-                DateTime.Now.ToString("HH:mm:ss"), batch.BatchId, batch.Transactions.Count));
-            Console.ResetColor();
+            FileLogger.Info("Sending batch {0} ({1} items) to Head Office...",
+                batch.BatchId, batch.Transactions.Count);
 
             var response = await _apiClient.SendBatchAsync(batch);
 
@@ -214,17 +192,18 @@ namespace Nexoris.SyncService.Workers
                 int syncedCount = response.Results.Count(r => r.Status.Equals("Synced", StringComparison.OrdinalIgnoreCase) || r.Status.Equals("AlreadySynced", StringComparison.OrdinalIgnoreCase));
                 int failedCount = response.Results.Count(r => r.Status.Equals("Failed", StringComparison.OrdinalIgnoreCase));
 
-                Console.ForegroundColor = failedCount == 0 ? ConsoleColor.Green : ConsoleColor.Yellow;
-                Console.WriteLine(string.Format("[OK]   [{0}] Batch complete: {1} Synced, {2} Failed",
-                    DateTime.Now.ToString("HH:mm:ss"), syncedCount, failedCount));
-                Console.ResetColor();
+                if (failedCount == 0)
+                {
+                    FileLogger.Success("Batch complete: {0} Synced, {1} Failed", syncedCount, failedCount);
+                }
+                else
+                {
+                    FileLogger.Warn("Batch complete: {0} Synced, {1} Failed", syncedCount, failedCount);
+                }
             }
             else
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine(string.Format("[WARN] [{0}] Batch {1} failed or returned empty response.",
-                    DateTime.Now.ToString("HH:mm:ss"), batch.BatchId));
-                Console.ResetColor();
+                FileLogger.Warn("Batch {0} failed or returned empty response.", batch.BatchId);
             }
         }
     }

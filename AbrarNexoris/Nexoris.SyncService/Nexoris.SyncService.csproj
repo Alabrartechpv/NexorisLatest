@@ -52,6 +52,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Logging\FileLogger.cs" />
     <Compile Include="Configuration\SyncSettings.cs" />
     <Compile Include="Models\SyncPayloads.cs" />
     <Compile Include="Services\ILocalDataProvider.cs" />
