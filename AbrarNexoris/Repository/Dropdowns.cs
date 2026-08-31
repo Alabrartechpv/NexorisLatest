@@ -1774,7 +1774,7 @@ namespace Repository
                         {
                             stkGrid.ListMaster = ds.Tables[0].ToListOfObject<StockAdjMasterDialog>();
                         }
-                        if ((ds != null) && (ds.Tables.Count > 0) && (ds.Tables[1] != null) && (ds.Tables[1].Rows.Count > 0))
+                        if ((ds != null) && (ds.Tables.Count > 1) && (ds.Tables[1] != null) && (ds.Tables[1].Rows.Count > 0))
                         {
                             stkGrid.ListDetails = ds.Tables[1].ToListOfObject<StockAdjPriceDetails>();
                         }

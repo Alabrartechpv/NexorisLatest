@@ -234,7 +234,7 @@ namespace PosBranch_Win.Transaction
 
                 // Generate adjustment number
                 int AdjNo = stockrepos.GenerateAdjustNo();
-                txt_Adjno.Text = AdjNo.ToString();
+                txt_Adjno.Text = (AdjNo > 0 ? AdjNo : 1).ToString();
 
 
 
@@ -816,7 +816,7 @@ namespace PosBranch_Win.Transaction
 
                 // Generate new adjustment number
                 int AdjNo = stockrepos.GenerateAdjustNo();
-                txt_Adjno.Text = AdjNo.ToString();
+                txt_Adjno.Text = (AdjNo > 0 ? AdjNo : 1).ToString();
 
                 // Clear ultralblId if it exists
                 if (ultralblId != null)
