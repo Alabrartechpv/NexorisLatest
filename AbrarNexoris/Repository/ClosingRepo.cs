@@ -238,6 +238,19 @@ namespace Repository
                     CloseCounterSession(shiftClosingId, transaction);
                 }
 
+                // 5. Atomic SyncQueue Enqueue for Head Office Sync (via Stored Procedure POS_SyncQueue)
+                Guid shiftClosingGuid = Guid.NewGuid();
+                SyncQueueRepository.SetTransactionGuid(DataConnection, transaction, "SHIFT_CLOSING", shiftClosingId.ToString(), shiftClosingGuid);
+                SyncQueueRepository.EnqueueTransaction(
+                    DataConnection,
+                    transaction,
+                    SessionContext.BranchId,
+                    "SHIFT_CLOSING",
+                    shiftClosingId.ToString(),
+                    shiftClosingGuid,
+                    "CREATE"
+                );
+
                 transaction.Commit();
                 System.Diagnostics.Debug.WriteLine($"Closing saved successfully - ID: {shiftClosingId}, VoucherID: {voucherId}");
                 return true;
