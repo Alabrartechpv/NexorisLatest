@@ -127,6 +127,7 @@ namespace Repository
         public static string POS_GetGeneralVoucherHistory = "POS_GetGeneralVoucherHistory";
         public static string POS_BankReconciliation = "POS_BankReconciliation";
         public static string POS_SyncQueue = "POS_SyncQueue";
+        public static string POS_GSTAndTaxReport = "_POS_GSTAndTaxReport";
 
         #endregion
 

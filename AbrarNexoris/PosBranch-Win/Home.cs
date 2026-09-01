@@ -97,7 +97,8 @@ namespace PosBranch_Win
             new ReportNavigatorDefinition("Analysis", "Counter Closing Report", "ShiftReconciliationReport"),
             new ReportNavigatorDefinition("Analysis", "Bank Statement", "BankStatementReport"),
             new ReportNavigatorDefinition("Others", "Manual Party Balance Report", "ManualPartyBalanceReport"),
-            new ReportNavigatorDefinition("Others", "Combined Party Balance Report", "CombinedPartyBalanceReport")
+            new ReportNavigatorDefinition("Others", "Combined Party Balance Report", "CombinedPartyBalanceReport"),
+            new ReportNavigatorDefinition("Others", "GST & Tax Report", "GSTAndTaxReport")
         };
 
         private static readonly Dictionary<string, string> ReportNavigatorActionAliases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -2700,6 +2701,11 @@ namespace PosBranch_Win
                 PosBranch_Win.Reports.FinancialReports.frmVendorOutstandingReport unallocatedReturnsReport = new PosBranch_Win.Reports.FinancialReports.frmVendorOutstandingReport(true);
                 OpenFormInTab(unallocatedReturnsReport, "Unallocated Purchase Returns");
             }
+            if (e.Tool.Key == "GSTAndTaxReport" || e.Tool.Key == "frmgstandtaxreport")
+            {
+                PosBranch_Win.Reports.FinancialReports.frmgstandtaxreport gstReport = new PosBranch_Win.Reports.FinancialReports.frmgstandtaxreport();
+                OpenFormInTab(gstReport, "GST & Tax Report");
+            }
 
             #region here for reports sections menu
             if (e.Tool.Key == "DSales")
@@ -4846,7 +4852,9 @@ namespace PosBranch_Win
                     keyToExecute == "TradingAccount" ||
                     keyToExecute == "UnallocatedPurchaseReturns" ||
                     keyToExecute == "ProfitLossAccount" ||
-                    keyToExecute == "StockListingReport")
+                    keyToExecute == "StockListingReport" ||
+                    keyToExecute == "GSTAndTaxReport" ||
+                    keyToExecute == "frmgstandtaxreport")
                 {
                     Infragistics.Win.UltraWinToolbars.ToolBase toolToExecute;
 

@@ -120,6 +120,7 @@
     <Compile Include="ReportRepository\StockAdjustmentReportRepository.cs" />
     <Compile Include="ReportRepository\VendorPaymentReportRepository.cs" />
     <Compile Include="ReportRepository\VendorOutstandingReportRepository.cs" />
+    <Compile Include="ReportRepository\GSTAndTaxReportRepository.cs" />
     <Compile Include="ReportRepository\VendorPurchaseReportRepository.cs" />
     <Compile Include="SettingsRepo\ItemStockActivityLogRepository.cs" />
     <Compile Include="SettingsRepo\ItemHistoryLogRepository.cs" />
