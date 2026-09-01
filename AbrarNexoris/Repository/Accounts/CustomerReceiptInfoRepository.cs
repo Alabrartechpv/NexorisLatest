@@ -217,31 +217,11 @@ namespace Repository.Accounts
                                     if (result != null && result != DBNull.Value)
                                     {
                                         master.VoucherId = Convert.ToInt32(result);
-
-                                        // Double check that we have a valid voucher ID that's not 1
-                                        if (master.VoucherId <= 1)
-                                        {
-                                            // Get the maximum voucher ID from Vouchers table
-                                            using (SqlCommand maxCmd = new SqlCommand("SELECT ISNULL(MAX(VoucherID), 0) + 1 FROM Vouchers WHERE VoucherType = @VoucherType", conn, transaction))
-                                            {
-                                                maxCmd.Parameters.AddWithValue("@VoucherType", "CUSTRCPT");
-                                                object maxResult = maxCmd.ExecuteScalar();
-                                                if (maxResult != null && maxResult != DBNull.Value)
-                                                {
-                                                    int maxVoucherId = Convert.ToInt32(maxResult);
-                                                    if (maxVoucherId > master.VoucherId)
-                                                    {
-                                                        master.VoucherId = maxVoucherId;
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                    else
-                                    {
-                                        transaction.Rollback();
-                                        return false; // Failed to generate voucher number
-                                    }
+                                     }
+                                     if (master.VoucherId <= 0)
+                                     {
+                                         throw new Exception("SP returned an invalid VoucherId (<= 0) for CUSTRCPT.");
+                                     }
                                 }
                             }
 
@@ -261,32 +241,39 @@ namespace Repository.Accounts
                                 return false; // Missing payment method
                             }
 
-                            // Resolve the actual Ledger ID for the selected payment mode from the PayMode table
-                            int cashLedgerId = 0;
-                            try
-                            {
-                                string paymodeQuery = "SELECT TOP 1 LedgerID FROM PayMode WHERE PayModeID = @PayModeID";
-                                using (SqlCommand paymodeCmd = new SqlCommand(paymodeQuery, conn, transaction))
-                                {
-                                    paymodeCmd.Parameters.AddWithValue("@PayModeID", paymentMethodId);
-                                    object paymodeResult = paymodeCmd.ExecuteScalar();
-                                    if (paymodeResult != null && paymodeResult != DBNull.Value)
-                                    {
-                                        cashLedgerId = Convert.ToInt32(paymodeResult);
-                                    }
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                System.Diagnostics.Debug.WriteLine($"Error fetching LedgerID from PayMode: {ex.Message}");
-                            }
+                             // Resolve the actual Ledger ID for the selected payment mode via POS_PayMode SP
+                             int cashLedgerId = 0;
+                             try
+                             {
+                                 using (SqlCommand paymodeCmd = new SqlCommand(STOREDPROCEDURE.POS_PayMode, conn, transaction))
+                                 {
+                                     paymodeCmd.CommandType = CommandType.StoredProcedure;
+                                     paymodeCmd.Parameters.AddWithValue("@PaymodeId", paymentMethodId);
+                                     paymodeCmd.Parameters.AddWithValue("@_Operation", "GETBYID");
+                                     using (SqlDataAdapter da = new SqlDataAdapter(paymodeCmd))
+                                     {
+                                         DataTable dtPaymode = new DataTable();
+                                         da.Fill(dtPaymode);
+                                         if (dtPaymode != null && dtPaymode.Rows.Count > 0 &&
+                                             dtPaymode.Columns.Contains("LedgerID") &&
+                                             dtPaymode.Rows[0]["LedgerID"] != DBNull.Value)
+                                         {
+                                             cashLedgerId = Convert.ToInt32(dtPaymode.Rows[0]["LedgerID"]);
+                                         }
+                                     }
+                                 }
+                             }
+                             catch (Exception ex)
+                             {
+                                 System.Diagnostics.Debug.WriteLine($"Error fetching LedgerID from POS_PayMode SP: {ex.Message}");
+                             }
 
-                            // Fallback to cash ledger if not defined in PayMode table
-                            if (cashLedgerId <= 0)
-                            {
-                                cashLedgerId = GetCashLedgerId(paymentMethodId, master.BranchId, ledgerRepository);
-                            }
-                            System.Diagnostics.Debug.WriteLine($"PaymentMethodId: {paymentMethodId}, Resolved LedgerID: {cashLedgerId}");
+                             // Fallback to cash ledger if not resolved from PayMode SP
+                             if (cashLedgerId <= 0)
+                             {
+                                 cashLedgerId = GetCashLedgerId(paymentMethodId, master.BranchId, ledgerRepository);
+                             }
+                             System.Diagnostics.Debug.WriteLine($"PaymentMethodId: {paymentMethodId}, Resolved LedgerID: {cashLedgerId}");
 
                             // Find the highest bill number among selected details
                             long highestBillNo = 0;
@@ -896,125 +883,92 @@ namespace Repository.Accounts
             foreach (var detail in details)
             {
                 if (detail.AdjustedAmount <= 0 || string.IsNullOrWhiteSpace(detail.BillNo))
-                {
                     continue;
-                }
 
                 if (!int.TryParse(detail.BillNo, out int billNo))
-                {
                     continue;
-                }
 
-                SalesSettlementInfo salesData = GetSalesRecordForBill(billNo, master.BranchId, master.CustomerLedgerId, conn, transaction);
-                if (salesData == null)
+                // Fetch current SMaster data via SP
+                decimal netAmount = 0m;
+                decimal receivedFromDb = 0m;
+                int finYearId = SessionContext.FinYearId;
+                int companyId = SessionContext.CompanyId;
+
+                try
                 {
-                    throw new Exception($"Sales record not found for BillNo={billNo}, BranchId={master.BranchId}, CustomerLedgerId={master.CustomerLedgerId}.");
+                    using (SqlCommand fetchCmd = new SqlCommand(STOREDPROCEDURE._POS_Sales_Win, conn, transaction))
+                    {
+                        fetchCmd.CommandType = CommandType.StoredProcedure;
+                        fetchCmd.Parameters.AddWithValue("@BillNo", billNo);
+                        fetchCmd.Parameters.AddWithValue("@BranchId", master.BranchId);
+                        fetchCmd.Parameters.AddWithValue("@CustomerLedgerId", master.CustomerLedgerId);
+                        fetchCmd.Parameters.AddWithValue("@_Operation", "GETBYID");
+                        DataTable fetchDt = new DataTable();
+                        using (SqlDataAdapter da = new SqlDataAdapter(fetchCmd))
+                        {
+                            da.Fill(fetchDt);
+                        }
+                        if (fetchDt != null && fetchDt.Rows.Count > 0)
+                        {
+                            DataRow r = fetchDt.Rows[0];
+                            netAmount = fetchDt.Columns.Contains("NetAmount") && r["NetAmount"] != DBNull.Value ? Convert.ToDecimal(r["NetAmount"]) : 0m;
+                            receivedFromDb = fetchDt.Columns.Contains("ReceivedAmount") && r["ReceivedAmount"] != DBNull.Value ? Convert.ToDecimal(r["ReceivedAmount"]) : 0m;
+                            finYearId = fetchDt.Columns.Contains("FinYearId") && r["FinYearId"] != DBNull.Value ? Convert.ToInt32(r["FinYearId"]) : finYearId;
+                            companyId = fetchDt.Columns.Contains("CompanyId") && r["CompanyId"] != DBNull.Value ? Convert.ToInt32(r["CompanyId"]) : companyId;
+                        }
+                        else
+                        {
+                            throw new Exception($"Sales record not found for BillNo={billNo}, BranchId={master.BranchId}, CustomerLedgerId={master.CustomerLedgerId}.");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"[UpdateSalesRecordsOnReceipt] SP fetch error for BillNo={billNo}: {ex.Message}");
+                    throw;
                 }
 
-                decimal netAmount = salesData.NetAmount;
+                receivedFromDb = Math.Max(0m, receivedFromDb);
                 decimal adjustedAmount = detail.AdjustedAmount;
-                decimal receivedFromDb = Math.Max(0m, salesData.ReceivedAmount);
-
-                decimal outstandingBeforeReceipt = detail.InvoiceAmount;
-                if (outstandingBeforeReceipt <= 0m)
-                {
-                    outstandingBeforeReceipt = Math.Round(netAmount - receivedFromDb, 3, MidpointRounding.AwayFromZero);
-                }
-                outstandingBeforeReceipt = Math.Max(0m, outstandingBeforeReceipt);
+                decimal outstandingBeforeReceipt = detail.InvoiceAmount > 0m ? detail.InvoiceAmount
+                    : Math.Max(0m, Math.Round(netAmount - receivedFromDb, 3, MidpointRounding.AwayFromZero));
 
                 adjustedAmount = Math.Min(adjustedAmount, outstandingBeforeReceipt);
-
-                decimal balanceToSet = Math.Round(outstandingBeforeReceipt - adjustedAmount, 3, MidpointRounding.AwayFromZero);
-                balanceToSet = Math.Max(0m, balanceToSet);
-
+                decimal balanceToSet = Math.Max(0m, Math.Round(outstandingBeforeReceipt - adjustedAmount, 3, MidpointRounding.AwayFromZero));
                 bool isFullyPaid = balanceToSet <= 0.001m;
-                if (isFullyPaid)
-                {
-                    balanceToSet = 0m;
-                }
+                if (isFullyPaid) balanceToSet = 0m;
 
                 decimal receivedAmountToSet = Math.Round(receivedFromDb + adjustedAmount, 3, MidpointRounding.AwayFromZero);
-                if (isFullyPaid)
-                {
-                    receivedAmountToSet = Math.Round(netAmount, 3, MidpointRounding.AwayFromZero);
-                }
-
-                if (netAmount > 0m)
-                {
-                    receivedAmountToSet = Math.Min(receivedAmountToSet, netAmount);
-                }
+                if (isFullyPaid) receivedAmountToSet = Math.Round(netAmount, 3, MidpointRounding.AwayFromZero);
+                if (netAmount > 0m) receivedAmountToSet = Math.Min(receivedAmountToSet, netAmount);
                 receivedAmountToSet = Math.Max(0m, receivedAmountToSet);
 
-                decimal tenderedAmountToSet = receivedAmountToSet;
-                string statusToSet = isFullyPaid ? "Complete" : "Pending";
-
-                using (SqlCommand cmd = new SqlCommand(
-                    @"UPDATE SMaster
-                      SET TenderedAmount = @TenderedAmount,
-                          Balance = @Balance,
-                          ReceivedAmount = @ReceivedAmount,
-                          IsPaid = @IsPaid,
-                          [Status] = @Status
-                      WHERE BillNo = @BillNo
-                        AND BranchId = @BranchId
-                        AND CompanyId = @CompanyId
-                        AND FinYearId = @FinYearId
-                        AND LedgerID = @CustomerLedgerId
-                        AND CancelFlag = 0;", conn, transaction))
+                // Update SMaster settlement fields via SP
+                try
                 {
-                    cmd.Parameters.AddWithValue("@TenderedAmount", tenderedAmountToSet);
-                    cmd.Parameters.AddWithValue("@Balance", balanceToSet);
-                    cmd.Parameters.AddWithValue("@ReceivedAmount", receivedAmountToSet);
-                    cmd.Parameters.AddWithValue("@IsPaid", isFullyPaid);
-                    cmd.Parameters.AddWithValue("@Status", statusToSet);
-                    cmd.Parameters.AddWithValue("@BillNo", billNo);
-                    cmd.Parameters.AddWithValue("@BranchId", master.BranchId);
-                    cmd.Parameters.AddWithValue("@CompanyId", salesData.CompanyId);
-                    cmd.Parameters.AddWithValue("@FinYearId", salesData.FinYearId);
-                    cmd.Parameters.AddWithValue("@CustomerLedgerId", master.CustomerLedgerId);
-
-                    int affectedRows = cmd.ExecuteNonQuery();
-                    if (affectedRows <= 0)
+                    using (SqlCommand updateCmd = new SqlCommand(STOREDPROCEDURE._POS_Sales_Win, conn, transaction))
                     {
-                        throw new Exception($"Failed to update SMaster settlement fields for BillNo={billNo}.");
+                        updateCmd.CommandType = CommandType.StoredProcedure;
+                        updateCmd.Parameters.AddWithValue("@BillNo", billNo);
+                        updateCmd.Parameters.AddWithValue("@BranchId", master.BranchId);
+                        updateCmd.Parameters.AddWithValue("@CompanyId", companyId);
+                        updateCmd.Parameters.AddWithValue("@FinYearId", finYearId);
+                        updateCmd.Parameters.AddWithValue("@CustomerLedgerId", master.CustomerLedgerId);
+                        updateCmd.Parameters.AddWithValue("@TenderedAmount", receivedAmountToSet);
+                        updateCmd.Parameters.AddWithValue("@ReceivedAmount", receivedAmountToSet);
+                        updateCmd.Parameters.AddWithValue("@Balance", balanceToSet);
+                        updateCmd.Parameters.AddWithValue("@IsPaid", isFullyPaid);
+                        updateCmd.Parameters.AddWithValue("@Status", isFullyPaid ? "Complete" : "Pending");
+                        updateCmd.Parameters.AddWithValue("@_Operation", "UPDATESETTLEMENT");
+                        updateCmd.ExecuteNonQuery();
                     }
                 }
-            }
-        }
-
-        /// <summary>
-        /// Gets sales record data for a specific bill number
-        /// </summary>
-        private SalesSettlementInfo GetSalesRecordForBill(int billNo, int branchId, int customerLedgerId, SqlConnection conn, SqlTransaction transaction)
-        {
-            using (SqlCommand cmd = new SqlCommand(
-                @"SELECT TOP 1 NetAmount, ReceivedAmount, FinYearId, CompanyId
-                  FROM SMaster
-                  WHERE BillNo = @BillNo
-                    AND BranchId = @BranchId
-                    AND LedgerID = @CustomerLedgerId
-                    AND CancelFlag = 0
-                  ORDER BY FinYearId DESC, BillDate DESC, VoucherID DESC;", conn, transaction))
-            {
-                cmd.Parameters.AddWithValue("@BillNo", billNo);
-                cmd.Parameters.AddWithValue("@BranchId", branchId);
-                cmd.Parameters.AddWithValue("@CustomerLedgerId", customerLedgerId);
-
-                using (SqlDataReader reader = cmd.ExecuteReader())
+                catch (Exception ex)
                 {
-                    if (reader.Read())
-                    {
-                        return new SalesSettlementInfo
-                        {
-                            NetAmount = reader.GetValue(0) != DBNull.Value ? Convert.ToDecimal(reader.GetValue(0)) : 0m,
-                            ReceivedAmount = reader.GetValue(1) != DBNull.Value ? Convert.ToDecimal(reader.GetValue(1)) : 0m,
-                            FinYearId = reader.GetValue(2) != DBNull.Value ? Convert.ToInt32(reader.GetValue(2)) : 1,
-                            CompanyId = reader.GetValue(3) != DBNull.Value ? Convert.ToInt32(reader.GetValue(3)) : 1
-                        };
-                    }
+                    System.Diagnostics.Debug.WriteLine($"[UpdateSalesRecordsOnReceipt] SP update error for BillNo={billNo}: {ex.Message}");
+                    throw new Exception($"Failed to update sales settlement for BillNo={billNo}: {ex.Message}", ex);
                 }
             }
-            return null;
         }
 
         private sealed class SalesSettlementInfo
@@ -1238,61 +1192,20 @@ namespace Repository.Accounts
 
                 if (voucherId <= 0)
                 {
-                    using (SqlCommand masterCmd = new SqlCommand(@"
-SELECT Id, BranchId, VoucherId, VoucherDate
-FROM CustomerReceiptMaster
-WHERE Id = @ReceiptMasterId
-  AND BranchId = @BranchId
-  AND ISNULL(CancelFlag, 0) = 0", (SqlConnection)DataConnection, transaction))
-                    {
-                        masterCmd.Parameters.AddWithValue("@ReceiptMasterId", receiptMasterId);
-                        masterCmd.Parameters.AddWithValue("@BranchId", branchId);
-
-                        using (SqlDataReader reader = masterCmd.ExecuteReader())
-                        {
-                            if (!reader.Read())
-                                throw new Exception("This customer receipt is already cancelled or could not be found.");
-
-                            voucherId = Convert.ToInt64(reader["VoucherId"]);
-                            voucherDate = reader["VoucherDate"] == DBNull.Value ? DateTime.MinValue : Convert.ToDateTime(reader["VoucherDate"]);
-                        }
-                    }
+                    throw new Exception("This customer receipt is already cancelled or could not be found.");
                 }
 
                 // 2. Fetch details via Stored Procedure STOREDPROCEDURE._CustomerReceiptDetails
-                try
+                using (SqlCommand detailsCmd = new SqlCommand(STOREDPROCEDURE._CustomerReceiptDetails, (SqlConnection)DataConnection, transaction))
                 {
-                    using (SqlCommand detailsCmd = new SqlCommand(STOREDPROCEDURE._CustomerReceiptDetails, (SqlConnection)DataConnection, transaction))
-                    {
-                        detailsCmd.CommandType = CommandType.StoredProcedure;
-                        detailsCmd.Parameters.AddWithValue("@ReceiptMasterId", receiptMasterId);
-                        detailsCmd.Parameters.AddWithValue("@BranchId", branchId);
-                        detailsCmd.Parameters.AddWithValue("@_Operation", "GETBYMASTERID");
+                    detailsCmd.CommandType = CommandType.StoredProcedure;
+                    detailsCmd.Parameters.AddWithValue("@ReceiptMasterId", receiptMasterId);
+                    detailsCmd.Parameters.AddWithValue("@BranchId", branchId);
+                    detailsCmd.Parameters.AddWithValue("@_Operation", "GETBYMASTERID");
 
-                        using (SqlDataAdapter adapter = new SqlDataAdapter(detailsCmd))
-                        {
-                            adapter.Fill(activeDetails);
-                        }
-                    }
-                }
-                catch
-                {
-                    // Fallback if SP operation name differs
-                }
-
-                if (activeDetails.Rows.Count == 0)
-                {
-                    using (SqlCommand detailsCmd = new SqlCommand(@"
-SELECT BranchId, BillNo, CustomerLedgerId, ISNULL(ReceiptAmount, 0) AS ReceiptAmount
-FROM CustomerReceiptDetails
-WHERE ReceiptMasterId = @ReceiptMasterId
-  AND ISNULL(CancelFlag, 0) = 0", (SqlConnection)DataConnection, transaction))
+                    using (SqlDataAdapter adapter = new SqlDataAdapter(detailsCmd))
                     {
-                        detailsCmd.Parameters.AddWithValue("@ReceiptMasterId", receiptMasterId);
-                        using (SqlDataAdapter adapter = new SqlDataAdapter(detailsCmd))
-                        {
-                            adapter.Fill(activeDetails);
-                        }
+                        adapter.Fill(activeDetails);
                     }
                 }
 
@@ -1307,93 +1220,80 @@ WHERE ReceiptMasterId = @ReceiptMasterId
                     int customerLedgerId = Convert.ToInt32(Convert.ToDecimal(detailRow["CustomerLedgerId"]));
                     decimal receiptAmount = Convert.ToDecimal(detailRow["ReceiptAmount"]);
 
+                    // Fetch SMaster data via SP
                     decimal netAmount = 0m;
                     decimal currentReceived = 0m;
-
-                    using (SqlCommand fetchSmasterCmd = new SqlCommand(@"
-SELECT TOP 1 NetAmount, ReceivedAmount
-FROM SMaster
-WHERE CancelFlag = 0
-  AND BillNo = @BillNo
-  AND BranchId = @BranchId
-  AND LedgerID = @CustomerLedgerId
-ORDER BY FinYearId DESC, BillDate DESC, VoucherID DESC", (SqlConnection)DataConnection, transaction))
+                    int finYearId = SessionContext.FinYearId;
+                    int companyId = SessionContext.CompanyId;
+                    try
                     {
-                        fetchSmasterCmd.Parameters.AddWithValue("@BillNo", billNo);
-                        fetchSmasterCmd.Parameters.AddWithValue("@BranchId", detailBranchId);
-                        fetchSmasterCmd.Parameters.AddWithValue("@CustomerLedgerId", customerLedgerId);
-
-                        using (SqlDataReader sReader = fetchSmasterCmd.ExecuteReader())
+                        using (SqlCommand fetchCmd = new SqlCommand(STOREDPROCEDURE._POS_Sales_Win, (SqlConnection)DataConnection, transaction))
                         {
-                            if (sReader.Read())
+                            fetchCmd.CommandType = CommandType.StoredProcedure;
+                            fetchCmd.Parameters.AddWithValue("@BillNo", billNo);
+                            fetchCmd.Parameters.AddWithValue("@BranchId", detailBranchId);
+                            fetchCmd.Parameters.AddWithValue("@CustomerLedgerId", customerLedgerId);
+                            fetchCmd.Parameters.AddWithValue("@_Operation", "GETBYID");
+                            DataTable fetchDt = new DataTable();
+                            using (SqlDataAdapter da = new SqlDataAdapter(fetchCmd))
                             {
-                                netAmount = sReader["NetAmount"] != DBNull.Value ? Convert.ToDecimal(sReader["NetAmount"]) : 0m;
-                                currentReceived = sReader["ReceivedAmount"] != DBNull.Value ? Convert.ToDecimal(sReader["ReceivedAmount"]) : 0m;
+                                da.Fill(fetchDt);
+                            }
+                            if (fetchDt != null && fetchDt.Rows.Count > 0)
+                            {
+                                DataRow r = fetchDt.Rows[0];
+                                netAmount = fetchDt.Columns.Contains("NetAmount") && r["NetAmount"] != DBNull.Value ? Convert.ToDecimal(r["NetAmount"]) : 0m;
+                                currentReceived = fetchDt.Columns.Contains("ReceivedAmount") && r["ReceivedAmount"] != DBNull.Value ? Convert.ToDecimal(r["ReceivedAmount"]) : 0m;
+                                finYearId = fetchDt.Columns.Contains("FinYearId") && r["FinYearId"] != DBNull.Value ? Convert.ToInt32(r["FinYearId"]) : finYearId;
+                                companyId = fetchDt.Columns.Contains("CompanyId") && r["CompanyId"] != DBNull.Value ? Convert.ToInt32(r["CompanyId"]) : companyId;
                             }
                         }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[CancelCustomerReceipt] SP fetch SMaster error for BillNo={billNo}: {ex.Message}");
                     }
 
                     decimal newReceived = Math.Max(0m, currentReceived - receiptAmount);
                     decimal newBalance = Math.Max(0m, netAmount - newReceived);
                     bool isPaid = newBalance <= 0.001m;
                     if (isPaid) newBalance = 0m;
-                    string status = isPaid ? "Complete" : "Pending";
 
-                    using (SqlCommand reverseCmd = new SqlCommand(@"
-UPDATE SMaster
-SET TenderedAmount = @TenderedAmount,
-    ReceivedAmount = @ReceivedAmount,
-    Balance = @Balance,
-    IsPaid = @IsPaid,
-    [Status] = @Status
-WHERE CancelFlag = 0
-  AND BillNo = @BillNo
-  AND BranchId = @BranchId
-  AND LedgerID = @CustomerLedgerId", (SqlConnection)DataConnection, transaction))
+                    // Reverse SMaster settlement via SP
+                    try
                     {
-                        reverseCmd.Parameters.AddWithValue("@TenderedAmount", newReceived);
-                        reverseCmd.Parameters.AddWithValue("@ReceivedAmount", newReceived);
-                        reverseCmd.Parameters.AddWithValue("@Balance", newBalance);
-                        reverseCmd.Parameters.AddWithValue("@IsPaid", isPaid);
-                        reverseCmd.Parameters.AddWithValue("@Status", status);
-                        reverseCmd.Parameters.AddWithValue("@BillNo", billNo);
-                        reverseCmd.Parameters.AddWithValue("@BranchId", detailBranchId);
-                        reverseCmd.Parameters.AddWithValue("@CustomerLedgerId", customerLedgerId);
-                        reverseCmd.ExecuteNonQuery();
+                        using (SqlCommand reverseCmd = new SqlCommand(STOREDPROCEDURE._POS_Sales_Win, (SqlConnection)DataConnection, transaction))
+                        {
+                            reverseCmd.CommandType = CommandType.StoredProcedure;
+                            reverseCmd.Parameters.AddWithValue("@BillNo", billNo);
+                            reverseCmd.Parameters.AddWithValue("@BranchId", detailBranchId);
+                            reverseCmd.Parameters.AddWithValue("@CompanyId", companyId);
+                            reverseCmd.Parameters.AddWithValue("@FinYearId", finYearId);
+                            reverseCmd.Parameters.AddWithValue("@CustomerLedgerId", customerLedgerId);
+                            reverseCmd.Parameters.AddWithValue("@TenderedAmount", newReceived);
+                            reverseCmd.Parameters.AddWithValue("@ReceivedAmount", newReceived);
+                            reverseCmd.Parameters.AddWithValue("@Balance", newBalance);
+                            reverseCmd.Parameters.AddWithValue("@IsPaid", isPaid);
+                            reverseCmd.Parameters.AddWithValue("@Status", isPaid ? "Complete" : "Pending");
+                            reverseCmd.Parameters.AddWithValue("@_Operation", "UPDATESETTLEMENT");
+                            reverseCmd.ExecuteNonQuery();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[CancelCustomerReceipt] SP reverse SMaster error for BillNo={billNo}: {ex.Message}");
                     }
 
                     totalReversed += receiptAmount;
                 }
 
                 // 3. Cancel details using Stored Procedure STOREDPROCEDURE._CustomerReceiptDetails
-                bool detailsCancelled = false;
-                try
+                using (SqlCommand cancelDetailsSp = new SqlCommand(STOREDPROCEDURE._CustomerReceiptDetails, (SqlConnection)DataConnection, transaction))
                 {
-                    using (SqlCommand cancelDetailsSp = new SqlCommand(STOREDPROCEDURE._CustomerReceiptDetails, (SqlConnection)DataConnection, transaction))
-                    {
-                        cancelDetailsSp.CommandType = CommandType.StoredProcedure;
-                        cancelDetailsSp.Parameters.AddWithValue("@ReceiptMasterId", receiptMasterId);
-                        cancelDetailsSp.Parameters.AddWithValue("@_Operation", "CANCEL");
-                        int rows = cancelDetailsSp.ExecuteNonQuery();
-                        detailsCancelled = (rows > 0);
-                    }
-                }
-                catch
-                {
-                    // Fallback to update statement if SP Operation is not 'CANCEL'
-                }
-
-                if (!detailsCancelled)
-                {
-                    using (SqlCommand cancelDetailsCmd = new SqlCommand(@"
-UPDATE CustomerReceiptDetails
-SET CancelFlag = 1
-WHERE ReceiptMasterId = @ReceiptMasterId
-  AND ISNULL(CancelFlag, 0) = 0", (SqlConnection)DataConnection, transaction))
-                    {
-                        cancelDetailsCmd.Parameters.AddWithValue("@ReceiptMasterId", receiptMasterId);
-                        cancelDetailsCmd.ExecuteNonQuery();
-                    }
+                    cancelDetailsSp.CommandType = CommandType.StoredProcedure;
+                    cancelDetailsSp.Parameters.AddWithValue("@ReceiptMasterId", receiptMasterId);
+                    cancelDetailsSp.Parameters.AddWithValue("@_Operation", "CANCEL");
+                    cancelDetailsSp.ExecuteNonQuery();
                 }
 
                 // 4. Cancel Master using Stored Procedure STOREDPROCEDURE._CustomerReceiptMaster
@@ -1401,73 +1301,24 @@ WHERE ReceiptMasterId = @ReceiptMasterId
                 if (!string.IsNullOrWhiteSpace(reason))
                     cancelNote += ": " + reason.Trim();
 
-                bool masterCancelled = false;
-                try
+                using (SqlCommand cancelMasterSp = new SqlCommand(STOREDPROCEDURE._CustomerReceiptMaster, (SqlConnection)DataConnection, transaction))
                 {
-                    using (SqlCommand cancelMasterSp = new SqlCommand(STOREDPROCEDURE._CustomerReceiptMaster, (SqlConnection)DataConnection, transaction))
-                    {
-                        cancelMasterSp.CommandType = CommandType.StoredProcedure;
-                        cancelMasterSp.Parameters.AddWithValue("@Id", receiptMasterId);
-                        cancelMasterSp.Parameters.AddWithValue("@Narration", cancelNote);
-                        cancelMasterSp.Parameters.AddWithValue("@_Operation", "CANCEL");
-                        int rows = cancelMasterSp.ExecuteNonQuery();
-                        masterCancelled = (rows > 0);
-                    }
-                }
-                catch
-                {
-                    // Fallback to update statement if SP Operation is not 'CANCEL'
-                }
-
-                if (!masterCancelled)
-                {
-                    using (SqlCommand cancelMasterCmd = new SqlCommand(@"
-UPDATE CustomerReceiptMaster
-SET CancelFlag = 1,
-    Narration = LEFT(ISNULL(Narration, '') + @CancelNote, 4000)
-WHERE Id = @ReceiptMasterId
-  AND ISNULL(CancelFlag, 0) = 0", (SqlConnection)DataConnection, transaction))
-                    {
-                        cancelMasterCmd.Parameters.AddWithValue("@CancelNote", cancelNote);
-                        cancelMasterCmd.Parameters.AddWithValue("@ReceiptMasterId", receiptMasterId);
-                        cancelMasterCmd.ExecuteNonQuery();
-                    }
+                    cancelMasterSp.CommandType = CommandType.StoredProcedure;
+                    cancelMasterSp.Parameters.AddWithValue("@Id", receiptMasterId);
+                    cancelMasterSp.Parameters.AddWithValue("@Narration", cancelNote);
+                    cancelMasterSp.Parameters.AddWithValue("@_Operation", "CANCEL");
+                    cancelMasterSp.ExecuteNonQuery();
                 }
 
                 // 5. Cancel Vouchers using Stored Procedure STOREDPROCEDURE.POS_Vouchers
-                bool voucherCancelled = false;
-                try
+                using (SqlCommand cancelVoucherSp = new SqlCommand(STOREDPROCEDURE.POS_Vouchers, (SqlConnection)DataConnection, transaction))
                 {
-                    using (SqlCommand cancelVoucherSp = new SqlCommand(STOREDPROCEDURE.POS_Vouchers, (SqlConnection)DataConnection, transaction))
-                    {
-                        cancelVoucherSp.CommandType = CommandType.StoredProcedure;
-                        cancelVoucherSp.Parameters.AddWithValue("@BranchID", branchId);
-                        cancelVoucherSp.Parameters.AddWithValue("@VoucherID", voucherId);
-                        cancelVoucherSp.Parameters.AddWithValue("@VoucherType", "CUSTRCPT");
-                        cancelVoucherSp.Parameters.AddWithValue("@_Operation", "CANCEL");
-                        int rows = cancelVoucherSp.ExecuteNonQuery();
-                        voucherCancelled = (rows > 0);
-                    }
-                }
-                catch
-                {
-                    // Fallback if SP Operation is not 'CANCEL'
-                }
-
-                if (!voucherCancelled)
-                {
-                    using (SqlCommand cancelVoucherCmd = new SqlCommand(@"
-UPDATE Vouchers
-SET CancelFlag = 1
-WHERE BranchID = @BranchId
-  AND VoucherID = @VoucherId
-  AND VoucherType IN ('Receipt', 'CUSTRCPT')
-  AND ISNULL(CancelFlag, 0) = 0", (SqlConnection)DataConnection, transaction))
-                    {
-                        cancelVoucherCmd.Parameters.AddWithValue("@BranchId", branchId);
-                        cancelVoucherCmd.Parameters.AddWithValue("@VoucherId", voucherId);
-                        cancelVoucherCmd.ExecuteNonQuery();
-                    }
+                    cancelVoucherSp.CommandType = CommandType.StoredProcedure;
+                    cancelVoucherSp.Parameters.AddWithValue("@BranchID", branchId);
+                    cancelVoucherSp.Parameters.AddWithValue("@VoucherID", voucherId);
+                    cancelVoucherSp.Parameters.AddWithValue("@VoucherType", "CUSTRCPT");
+                    cancelVoucherSp.Parameters.AddWithValue("@_Operation", "CANCEL");
+                    cancelVoucherSp.ExecuteNonQuery();
                 }
 
                 // SyncQueue Integration - Enqueue Customer Receipt Cancellation
