@@ -163,64 +163,33 @@ namespace Repository.Accounts
                 {
                     if (detail.AdjustedAmount > 0)
                     {
-                        // First check if the bill exists in PMaster
-                        bool billExists = false;
-                        if (int.TryParse(detail.BillNo, out int billNo))
-                        {
-                            using (SqlCommand checkCmd = new SqlCommand("SELECT COUNT(*) FROM PMaster WHERE PurchaseNo = @BillNo AND BranchId = @BranchId AND LedgerID = @VendorLedgerId AND CancelFlag = 0", (SqlConnection)DataConnection, transaction))
-                            {
-                                checkCmd.Parameters.AddWithValue("@BillNo", billNo);
-                                checkCmd.Parameters.AddWithValue("@BranchId", branchId);
-                                checkCmd.Parameters.AddWithValue("@VendorLedgerId", master.VendorLedgerId);
-                                billExists = Convert.ToInt32(checkCmd.ExecuteScalar()) > 0;
-                            }
-
-                            if (!billExists)
-                            {
-                                throw new Exception($"Bill #{billNo} doesn't exist in the system for this vendor. Cannot process payment.");
-                            }
-
-                            using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._VendorPaymentDetails, (SqlConnection)DataConnection, transaction))
-                            {
-                                cmd.CommandType = CommandType.StoredProcedure;
-                                cmd.Parameters.AddWithValue("@BranchId", branchId);
-                                cmd.Parameters.AddWithValue("@VendorLedgerId", master.VendorLedgerId);
-                                cmd.Parameters.AddWithValue("@CreditPaymodeId", paymentMethodId);
-                                cmd.Parameters.AddWithValue("@PaymentMasterId", paymentMasterId);
-                                cmd.Parameters.AddWithValue("@BIllNo", billNo);
-                                cmd.Parameters.AddWithValue("@BillDate", detail.BillDate != default(DateTime) ? detail.BillDate : voucherDate);
-                                cmd.Parameters.AddWithValue("@BillAmount", (float)detail.InvoiceAmount);
-                                cmd.Parameters.AddWithValue("@PayedAmount", 0); // Will be calculated in SP
-                                cmd.Parameters.AddWithValue("@PaymentAmount", (float)detail.AdjustedAmount);
-                                cmd.Parameters.AddWithValue("@BalanceAmount", (float)detail.Balance);
-                                cmd.Parameters.AddWithValue("@OldBillAmount", (float)detail.InvoiceAmount);
-                                cmd.Parameters.AddWithValue("@OldPaymentAmount", 0);
-                                cmd.Parameters.AddWithValue("@_Operation", "CREATE");
-
-                                var result = cmd.ExecuteScalar();
-                                if (result == null || !result.ToString().StartsWith("SUCCESS"))
-                                {
-                                    throw new Exception($"Failed to save payment detail for bill {detail.BillNo}: {result}");
-                                }
-
-                                // Update PMaster PayedAmount directly in PMaster table
-                                using (SqlCommand updatePmasterCmd = new SqlCommand(@"
-                                    UPDATE PMaster 
-                                    SET PayedAmount = ISNULL(PayedAmount, 0) + @AdjustedAmount
-                                    WHERE PurchaseNo = @BillNo 
-                                      AND LedgerID = @VendorLedgerId 
-                                      AND ISNULL(CancelFlag, 0) = 0", (SqlConnection)DataConnection, transaction))
-                                {
-                                    updatePmasterCmd.Parameters.AddWithValue("@AdjustedAmount", detail.AdjustedAmount);
-                                    updatePmasterCmd.Parameters.AddWithValue("@BillNo", billNo);
-                                    updatePmasterCmd.Parameters.AddWithValue("@VendorLedgerId", master.VendorLedgerId);
-                                    updatePmasterCmd.ExecuteNonQuery();
-                                }
-                            }
-                        }
-                        else
+                        if (!int.TryParse(detail.BillNo, out int billNo))
                         {
                             throw new Exception($"Invalid BillNo format: {detail.BillNo}. BillNo must be a valid integer.");
+                        }
+
+                        using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._VendorPaymentDetails, (SqlConnection)DataConnection, transaction))
+                        {
+                            cmd.CommandType = CommandType.StoredProcedure;
+                            cmd.Parameters.AddWithValue("@BranchId", branchId);
+                            cmd.Parameters.AddWithValue("@VendorLedgerId", master.VendorLedgerId);
+                            cmd.Parameters.AddWithValue("@CreditPaymodeId", paymentMethodId);
+                            cmd.Parameters.AddWithValue("@PaymentMasterId", paymentMasterId);
+                            cmd.Parameters.AddWithValue("@BillNo", billNo);
+                            cmd.Parameters.AddWithValue("@BillDate", detail.BillDate != default(DateTime) ? detail.BillDate : voucherDate);
+                            cmd.Parameters.AddWithValue("@BillAmount", (float)detail.InvoiceAmount);
+                            cmd.Parameters.AddWithValue("@PayedAmount", 0); // Will be calculated in SP
+                            cmd.Parameters.AddWithValue("@PaymentAmount", (float)detail.AdjustedAmount);
+                            cmd.Parameters.AddWithValue("@BalanceAmount", (float)detail.Balance);
+                            cmd.Parameters.AddWithValue("@OldBillAmount", (float)detail.InvoiceAmount);
+                            cmd.Parameters.AddWithValue("@OldPaymentAmount", 0);
+                            cmd.Parameters.AddWithValue("@_Operation", "CREATE");
+
+                            var result = cmd.ExecuteScalar();
+                            if (result == null || !result.ToString().StartsWith("SUCCESS"))
+                            {
+                                throw new Exception($"Failed to save payment detail for bill {detail.BillNo}: {result}");
+                            }
                         }
                     }
                 }
@@ -403,31 +372,32 @@ namespace Repository.Accounts
         {
             try
             {
-                // Resolve the actual Ledger ID for the selected payment mode from the PayMode table first
+                // Resolve the actual Ledger ID for the selected payment mode from the PayMode SP or LedgerRepository
                 if (paymentMethodId > 0)
                 {
                     try
                     {
-                        string paymodeQuery = "SELECT TOP 1 LedgerID FROM PayMode WHERE PayModeID = @PayModeID";
-                        using (SqlCommand paymodeCmd = new SqlCommand(paymodeQuery, (SqlConnection)DataConnection))
+                        using (SqlCommand paymodeCmd = new SqlCommand(STOREDPROCEDURE.POS_PayMode, (SqlConnection)DataConnection))
                         {
-                            paymodeCmd.Parameters.AddWithValue("@PayModeID", paymentMethodId);
-                            // Connection is already open from SaveVendorPayment
-                            object paymodeResult = paymodeCmd.ExecuteScalar();
-                            if (paymodeResult != null && paymodeResult != DBNull.Value)
+                            paymodeCmd.CommandType = CommandType.StoredProcedure;
+                            paymodeCmd.Parameters.AddWithValue("@PaymodeId", paymentMethodId);
+                            paymodeCmd.Parameters.AddWithValue("@_Operation", "GETBYID");
+                            using (SqlDataAdapter da = new SqlDataAdapter(paymodeCmd))
                             {
-                                int ledgerId = Convert.ToInt32(paymodeResult);
-                                if (ledgerId > 0)
+                                DataTable dtPaymode = new DataTable();
+                                da.Fill(dtPaymode);
+                                if (dtPaymode != null && dtPaymode.Rows.Count > 0 && dtPaymode.Columns.Contains("LedgerID") && dtPaymode.Rows[0]["LedgerID"] != DBNull.Value)
                                 {
-                                    System.Diagnostics.Debug.WriteLine($"Found LedgerID {ledgerId} for PayModeID {paymentMethodId} in PayMode table.");
-                                    return ledgerId;
+                                    int ledgerId = Convert.ToInt32(dtPaymode.Rows[0]["LedgerID"]);
+                                    if (ledgerId > 0)
+                                        return ledgerId;
                                 }
                             }
                         }
                     }
                     catch (Exception ex)
                     {
-                        System.Diagnostics.Debug.WriteLine($"Error fetching LedgerID from PayMode for vendor payment: {ex.Message}");
+                        System.Diagnostics.Debug.WriteLine($"Error fetching LedgerID from PayMode SP for vendor payment: {ex.Message}");
                     }
                 }
 
@@ -535,11 +505,8 @@ namespace Repository.Accounts
                 using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._VendorPaymentMaster, (SqlConnection)DataConnection))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@CompanyId", SessionContext.CompanyId);
-                    cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
-                    cmd.Parameters.AddWithValue("@FinYearId", SessionContext.FinYearId);
                     cmd.Parameters.AddWithValue("@VendorLedgerId", vendorLedgerId);
-                    cmd.Parameters.AddWithValue("@LedgerId", vendorLedgerId);
+                    cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
                     cmd.Parameters.AddWithValue("@_Operation", "GETOUTSTANDING");
 
                     using (SqlDataAdapter da = new SqlDataAdapter(cmd))
@@ -558,7 +525,100 @@ namespace Repository.Accounts
                     DataConnection.Close();
             }
 
-            // Fallback Stored Procedure: POS_VendorOutstandingListing
+            // Fallback 1: Try with @LedgerId if first attempt returned 0 rows
+            if (dt == null || dt.Rows.Count == 0)
+            {
+                try
+                {
+                    DataConnection.Open();
+                    using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._VendorPaymentMaster, (SqlConnection)DataConnection))
+                    {
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.AddWithValue("@LedgerId", vendorLedgerId);
+                        cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
+                        cmd.Parameters.AddWithValue("@_Operation", "GETOUTSTANDING");
+
+                        using (SqlDataAdapter da = new SqlDataAdapter(cmd))
+                        {
+                            da.Fill(dt);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error calling SP _VendorPaymentMaster with @LedgerId: {ex.Message}");
+                }
+                finally
+                {
+                    if (DataConnection.State == ConnectionState.Open)
+                        DataConnection.Close();
+                }
+            }
+
+            // Fallback 2: Stored Procedure POS_VendorPyamentInfo
+            if (dt == null || dt.Rows.Count == 0)
+            {
+                try
+                {
+                    DataConnection.Open();
+                    using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_VendorPyamentInfo, (SqlConnection)DataConnection))
+                    {
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.AddWithValue("@LedgerId", vendorLedgerId);
+
+                        using (SqlDataAdapter da = new SqlDataAdapter(cmd))
+                        {
+                            DataTable spDt = new DataTable();
+                            da.Fill(spDt);
+                            if (spDt != null && spDt.Rows.Count > 0)
+                            {
+                                dt = new DataTable();
+                                dt.Columns.Add("BillNo", typeof(string));
+                                dt.Columns.Add("InvoiceNo", typeof(string));
+                                dt.Columns.Add("InvoiceAmount", typeof(decimal));
+                                dt.Columns.Add("PayedAmount", typeof(decimal));
+                                dt.Columns.Add("ReturnedAmount", typeof(decimal));
+                                dt.Columns.Add("Balance", typeof(decimal));
+                                dt.Columns.Add("BillDate", typeof(DateTime));
+                                dt.Columns.Add("Paymode", typeof(string));
+                                dt.Columns.Add("PaymodeID", typeof(int));
+
+                                foreach (DataRow r in spDt.Rows)
+                                {
+                                    DataRow newR = dt.NewRow();
+                                    newR["BillNo"] = spDt.Columns.Contains("BillNo") ? r["BillNo"]?.ToString() : "0";
+                                    newR["InvoiceNo"] = spDt.Columns.Contains("InvoiceNo") && r["InvoiceNo"] != DBNull.Value ? r["InvoiceNo"].ToString() : newR["BillNo"];
+                                    decimal inv = spDt.Columns.Contains("InvoiceAmount") && r["InvoiceAmount"] != DBNull.Value ? Convert.ToDecimal(r["InvoiceAmount"]) : 0m;
+                                    decimal bal = spDt.Columns.Contains("Balance") && r["Balance"] != DBNull.Value ? Convert.ToDecimal(r["Balance"]) : inv;
+                                    decimal paid = spDt.Columns.Contains("PayedAmount") && r["PayedAmount"] != DBNull.Value ? Convert.ToDecimal(r["PayedAmount"]) :
+                                                   spDt.Columns.Contains("PaidAmount") && r["PaidAmount"] != DBNull.Value ? Convert.ToDecimal(r["PaidAmount"]) :
+                                                   Math.Max(0m, inv - bal);
+
+                                    newR["InvoiceAmount"] = inv;
+                                    newR["PayedAmount"] = paid;
+                                    newR["ReturnedAmount"] = 0m;
+                                    newR["Balance"] = bal;
+                                    newR["BillDate"] = spDt.Columns.Contains("BillDate") && r["BillDate"] != DBNull.Value ? Convert.ToDateTime(r["BillDate"]) : DateTime.Now;
+                                    newR["Paymode"] = "Credit";
+                                    newR["PaymodeID"] = 1;
+                                    dt.Rows.Add(newR);
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error calling SP POS_VendorPyamentInfo: {ex.Message}");
+                }
+                finally
+                {
+                    if (DataConnection.State == ConnectionState.Open)
+                        DataConnection.Close();
+                }
+            }
+
+            // Fallback 3: Stored Procedure POS_VendorOutstandingListing
             if (dt == null || dt.Rows.Count == 0)
             {
                 try
@@ -604,10 +664,16 @@ namespace Repository.Accounts
                                     newR["InvoiceNo"] = spDt.Columns.Contains("Reference") && r["Reference"] != DBNull.Value && !string.IsNullOrEmpty(r["Reference"].ToString()) 
                                                         ? r["Reference"].ToString() 
                                                         : newR["BillNo"];
-                                    newR["InvoiceAmount"] = spDt.Columns.Contains("DocAmt") && r["DocAmt"] != DBNull.Value ? Convert.ToDecimal(r["DocAmt"]) : 0m;
-                                    newR["PayedAmount"] = 0m;
+                                    decimal docAmt = spDt.Columns.Contains("DocAmt") && r["DocAmt"] != DBNull.Value ? Convert.ToDecimal(r["DocAmt"]) : 0m;
+                                    decimal balAmt = spDt.Columns.Contains("Balance") && r["Balance"] != DBNull.Value ? Convert.ToDecimal(r["Balance"]) : docAmt;
+                                    decimal paidAmt = spDt.Columns.Contains("PaidAmount") && r["PaidAmount"] != DBNull.Value ? Convert.ToDecimal(r["PaidAmount"]) :
+                                                      spDt.Columns.Contains("PayedAmount") && r["PayedAmount"] != DBNull.Value ? Convert.ToDecimal(r["PayedAmount"]) :
+                                                      Math.Max(0m, docAmt - balAmt);
+
+                                    newR["InvoiceAmount"] = docAmt;
+                                    newR["PayedAmount"] = paidAmt;
                                     newR["ReturnedAmount"] = 0m;
-                                    newR["Balance"] = spDt.Columns.Contains("Balance") && r["Balance"] != DBNull.Value ? Convert.ToDecimal(r["Balance"]) : Convert.ToDecimal(newR["InvoiceAmount"]);
+                                    newR["Balance"] = balAmt;
                                     newR["BillDate"] = spDt.Columns.Contains("Date") && r["Date"] != DBNull.Value ? Convert.ToDateTime(r["Date"]) : DateTime.Now;
                                     newR["Paymode"] = "Credit";
                                     newR["PaymodeID"] = 1;
@@ -630,7 +696,7 @@ namespace Repository.Accounts
 
             SanitizeInvoiceTable(dt);
             EnhanceInvoiceTableWithCashPaymode(dt);
-            EnhanceInvoiceTableWithActualPayments(dt, vendorLedgerId);
+            NormalizeInvoiceBalances(dt);
 
             // Filter out invoices with Balance <= 0 for outstanding invoices
             if (dt != null && dt.Columns.Contains("Balance"))
@@ -668,11 +734,8 @@ namespace Repository.Accounts
                 using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._VendorPaymentMaster, (SqlConnection)DataConnection))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@CompanyId", SessionContext.CompanyId);
-                    cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
-                    cmd.Parameters.AddWithValue("@FinYearId", SessionContext.FinYearId);
                     cmd.Parameters.AddWithValue("@VendorLedgerId", vendorLedgerId);
-                    cmd.Parameters.AddWithValue("@LedgerId", vendorLedgerId);
+                    cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
                     cmd.Parameters.AddWithValue("@_Operation", "GETALLINVOICES");
 
                     using (SqlDataAdapter da = new SqlDataAdapter(cmd))
@@ -691,7 +754,37 @@ namespace Repository.Accounts
                     DataConnection.Close();
             }
 
-            // Fallback Stored Procedure: POS_Purchase GETALL
+            // Fallback 1: Try with @LedgerId
+            if (dt == null || dt.Rows.Count == 0)
+            {
+                try
+                {
+                    DataConnection.Open();
+                    using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._VendorPaymentMaster, (SqlConnection)DataConnection))
+                    {
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.AddWithValue("@LedgerId", vendorLedgerId);
+                        cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
+                        cmd.Parameters.AddWithValue("@_Operation", "GETALLINVOICES");
+
+                        using (SqlDataAdapter da = new SqlDataAdapter(cmd))
+                        {
+                            da.Fill(dt);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error calling SP _VendorPaymentMaster GETALLINVOICES with @LedgerId: {ex.Message}");
+                }
+                finally
+                {
+                    if (DataConnection.State == ConnectionState.Open)
+                        DataConnection.Close();
+                }
+            }
+
+            // Fallback 2: Fallback Stored Procedure: POS_Purchase GETALL
             if (dt == null || dt.Rows.Count == 0)
             {
                 try
@@ -745,7 +838,7 @@ namespace Repository.Accounts
                 }
             }
 
-            // Ultimate Stored Procedure fallback: If all invoices SP returned no records, fallback to outstanding invoices SP
+            // Fallback 3: Outstanding invoices SP
             if (dt == null || dt.Rows.Count == 0)
             {
                 dt = GetOutstandingInvoices(vendorLedgerId);
@@ -753,89 +846,138 @@ namespace Repository.Accounts
 
             SanitizeInvoiceTable(dt);
             EnhanceInvoiceTableWithCashPaymode(dt);
-            EnhanceInvoiceTableWithActualPayments(dt, vendorLedgerId);
+            NormalizeInvoiceBalances(dt);
             return dt;
         }
 
-        private void EnhanceInvoiceTableWithActualPayments(DataTable dt, int vendorLedgerId)
+        private static decimal GetRowDecimal(DataRow row, string columnName)
         {
-            if (dt == null || dt.Rows.Count == 0) return;
-
-            try
+            if (row == null || !row.Table.Columns.Contains(columnName) || row[columnName] == DBNull.Value || row[columnName] == null)
             {
-                DataTable paymentTotals = new DataTable();
-                if (DataConnection.State == ConnectionState.Open)
-                    DataConnection.Close();
+                return 0m;
+            }
+            if (decimal.TryParse(row[columnName].ToString(), out decimal result))
+            {
+                return result;
+            }
+            return 0m;
+        }
 
-                DataConnection.Open();
-                using (SqlCommand cmd = new SqlCommand(@"
-                    SELECT 
-                        CAST(D.BillNo AS VARCHAR(50)) AS BillNo,
-                        ISNULL(SUM(D.PaymentAmount), 0) AS TotalPaid
-                    FROM VendorPaymentDetails D
-                    JOIN VendorPaymentMaster M ON D.PaymentMasterId = M.PaymentId
-                    WHERE M.VendorLedgerId = @VendorLedgerId
-                      AND ISNULL(M.CancelFlag, 0) = 0
-                    GROUP BY D.BillNo", (SqlConnection)DataConnection))
+        private void NormalizeInvoiceBalances(DataTable invoices)
+        {
+            if (invoices == null)
+            {
+                return;
+            }
+
+            foreach (DataRow row in invoices.Rows)
+            {
+                decimal invoiceAmount = GetRowDecimal(row, "InvoiceAmount");
+                if (invoiceAmount == 0m)
+                    invoiceAmount = GetRowDecimal(row, "GrandTotal");
+                if (invoiceAmount == 0m)
+                    invoiceAmount = GetRowDecimal(row, "DocAmt");
+                if (invoiceAmount == 0m)
+                    invoiceAmount = GetRowDecimal(row, "TotalAmount");
+
+                decimal payedAmount = GetRowDecimal(row, "PayedAmount");
+                if (payedAmount == 0m)
+                    payedAmount = GetRowDecimal(row, "PaidAmount");
+                if (payedAmount == 0m)
+                    payedAmount = GetRowDecimal(row, "PaymentAmount");
+                if (payedAmount == 0m)
+                    payedAmount = GetRowDecimal(row, "ReceivedAmount");
+
+                decimal returnedAmount = invoices.Columns.Contains("ReturnedAmount") ? GetRowDecimal(row, "ReturnedAmount") : 0m;
+
+                decimal balance = invoices.Columns.Contains("Balance") && row["Balance"] != DBNull.Value ? GetRowDecimal(row, "Balance") : (invoiceAmount - payedAmount - returnedAmount);
+
+                if (payedAmount == 0m && balance > 0m && balance < invoiceAmount && (invoiceAmount - balance - returnedAmount) > 0m)
                 {
-                    cmd.Parameters.AddWithValue("@VendorLedgerId", vendorLedgerId);
-                    using (SqlDataAdapter da = new SqlDataAdapter(cmd))
-                    {
-                        da.Fill(paymentTotals);
-                    }
+                    payedAmount = invoiceAmount - balance - returnedAmount;
                 }
 
-                if (paymentTotals != null && paymentTotals.Rows.Count > 0)
+                // Detect cash purchases where full payment was settled at purchase time (Cash = PaymodeID 2)
+                bool isCashPurchase = false;
+                if (invoices.Columns.Contains("Paymode") && row["Paymode"] != DBNull.Value)
                 {
-                    var paidMap = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
-                    foreach (DataRow r in paymentTotals.Rows)
-                    {
-                        if (r["BillNo"] != DBNull.Value && r["TotalPaid"] != DBNull.Value)
-                        {
-                            string bNo = r["BillNo"].ToString().Trim();
-                            decimal totalPaid = Convert.ToDecimal(r["TotalPaid"]);
-                            paidMap[bNo] = totalPaid;
-                        }
-                    }
-
-                    foreach (DataRow row in dt.Rows)
-                    {
-                        string billNo = row["BillNo"]?.ToString()?.Trim();
-                        if (!string.IsNullOrEmpty(billNo) && paidMap.TryGetValue(billNo, out decimal actualPaid))
-                        {
-                            decimal invAmt = dt.Columns.Contains("InvoiceAmount") && row["InvoiceAmount"] != DBNull.Value ? Convert.ToDecimal(row["InvoiceAmount"]) : 0m;
-                            decimal retAmt = dt.Columns.Contains("ReturnedAmount") && row["ReturnedAmount"] != DBNull.Value ? Convert.ToDecimal(row["ReturnedAmount"]) : 0m;
-
-                            if (actualPaid > 0m)
-                            {
-                                decimal paidToSet = actualPaid;
-                                if (invAmt > 0m && paidToSet > invAmt)
-                                {
-                                    paidToSet = invAmt;
-                                }
-                                row["PayedAmount"] = paidToSet;
-                            }
-
-                            decimal paidAmt = dt.Columns.Contains("PayedAmount") && row["PayedAmount"] != DBNull.Value ? Convert.ToDecimal(row["PayedAmount"]) : 0m;
-                            decimal newBal = invAmt - paidAmt - retAmt;
-                            if (newBal < 0m) newBal = 0m;
-
-                            if (dt.Columns.Contains("Balance"))
-                            {
-                                row["Balance"] = newBal;
-                            }
-                        }
-                    }
+                    string pm = row["Paymode"].ToString().Trim().ToLower();
+                    if (pm == "cash" || pm == "2") isCashPurchase = true;
                 }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error enhancing invoice table with actual payments: {ex.Message}");
-            }
-            finally
-            {
-                if (DataConnection.State == ConnectionState.Open)
-                    DataConnection.Close();
+                if (invoices.Columns.Contains("PaymodeID") && row["PaymodeID"] != DBNull.Value)
+                {
+                    if (Convert.ToInt32(row["PaymodeID"]) == 2) isCashPurchase = true;
+                }
+                if (invoices.Columns.Contains("PayModeID") && row["PayModeID"] != DBNull.Value)
+                {
+                    if (Convert.ToInt32(row["PayModeID"]) == 2) isCashPurchase = true;
+                }
+
+                // Credit purchases (PaymodeID = 1 / "credit") must NEVER be treated as cash purchases
+                if (invoices.Columns.Contains("Paymode") && row["Paymode"] != DBNull.Value)
+                {
+                    string pm = row["Paymode"].ToString().Trim().ToLower();
+                    if (pm == "credit" || pm == "1") isCashPurchase = false;
+                }
+                if (invoices.Columns.Contains("PaymodeID") && row["PaymodeID"] != DBNull.Value)
+                {
+                    if (Convert.ToInt32(row["PaymodeID"]) == 1) isCashPurchase = false;
+                }
+                if (invoices.Columns.Contains("PayModeID") && row["PayModeID"] != DBNull.Value)
+                {
+                    if (Convert.ToInt32(row["PayModeID"]) == 1) isCashPurchase = false;
+                }
+
+                if (isCashPurchase)
+                {
+                    payedAmount = invoiceAmount;
+                }
+
+                if (invoiceAmount < 0m)
+                {
+                    invoiceAmount = 0m;
+                }
+
+                if (payedAmount < 0m)
+                {
+                    payedAmount = 0m;
+                }
+
+                if (returnedAmount < 0m)
+                {
+                    returnedAmount = 0m;
+                }
+
+                if (invoiceAmount > 0m && payedAmount > invoiceAmount)
+                {
+                    payedAmount = invoiceAmount;
+                }
+
+                balance = invoiceAmount - payedAmount - returnedAmount;
+                if (balance < 0m)
+                {
+                    balance = 0m;
+                }
+
+                if (invoices.Columns.Contains("InvoiceAmount"))
+                {
+                    row["InvoiceAmount"] = invoiceAmount;
+                }
+
+                if (invoices.Columns.Contains("PayedAmount"))
+                {
+                    row["PayedAmount"] = payedAmount;
+                }
+
+                if (invoices.Columns.Contains("ReturnedAmount"))
+                {
+                    row["ReturnedAmount"] = returnedAmount;
+                }
+
+                if (invoices.Columns.Contains("Balance"))
+                {
+                    row["Balance"] = balance;
+                }
             }
         }
 
@@ -925,6 +1067,10 @@ namespace Repository.Accounts
                 dt.Columns.Add("Paymode", typeof(string));
             if (!dt.Columns.Contains("PaymodeID"))
                 dt.Columns.Add("PaymodeID", typeof(int));
+            if (!dt.Columns.Contains("PayedAmount"))
+                dt.Columns.Add("PayedAmount", typeof(decimal));
+            if (!dt.Columns.Contains("ReturnedAmount"))
+                dt.Columns.Add("ReturnedAmount", typeof(decimal));
 
             try
             {
@@ -954,6 +1100,8 @@ namespace Repository.Accounts
 
                         var pmIdMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
                         var pmNameMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                        var pmPaidMap = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+                        var pmRetMap = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
 
                         foreach (DataRow r in pmDt.Rows)
                         {
@@ -962,8 +1110,13 @@ namespace Repository.Accounts
                                 string pNo = r["PurchaseNo"].ToString().Trim();
                                 string pm = paymodeCol != null && r[paymodeCol] != DBNull.Value ? r[paymodeCol].ToString().Trim() : "";
                                 int pmId = paymodeIdCol != null && r[paymodeIdCol] != DBNull.Value ? Convert.ToInt32(r[paymodeIdCol]) : 0;
+                                decimal pPaid = r.Table.Columns.Contains("PayedAmount") && r["PayedAmount"] != DBNull.Value ? Convert.ToDecimal(r["PayedAmount"]) : 0m;
+                                decimal pRet = r.Table.Columns.Contains("ReturnedAmount") && r["ReturnedAmount"] != DBNull.Value ? Convert.ToDecimal(r["ReturnedAmount"]) : 0m;
+
                                 pmNameMap[pNo] = pm;
                                 pmIdMap[pNo] = pmId;
+                                pmPaidMap[pNo] = pPaid;
+                                pmRetMap[pNo] = pRet;
                             }
                         }
 
@@ -976,6 +1129,20 @@ namespace Repository.Accounts
                                     row["Paymode"] = pmName;
                                 if (pmIdMap.TryGetValue(billNo, out int pmId))
                                     row["PaymodeID"] = pmId;
+
+                                if (pmPaidMap.TryGetValue(billNo, out decimal pPaid) && pPaid > 0)
+                                {
+                                    decimal currentPaid = dt.Columns.Contains("PayedAmount") && row["PayedAmount"] != DBNull.Value ? Convert.ToDecimal(row["PayedAmount"]) : 0m;
+                                    if (pPaid > currentPaid)
+                                        row["PayedAmount"] = pPaid;
+                                }
+
+                                if (pmRetMap.TryGetValue(billNo, out decimal pRet) && pRet > 0)
+                                {
+                                    decimal currentRet = dt.Columns.Contains("ReturnedAmount") && row["ReturnedAmount"] != DBNull.Value ? Convert.ToDecimal(row["ReturnedAmount"]) : 0m;
+                                    if (pRet > currentRet)
+                                        row["ReturnedAmount"] = pRet;
+                                }
                             }
                         }
                     }
@@ -1047,31 +1214,56 @@ namespace Repository.Accounts
 
         public DataTable GetPaymentHistory(int vendorLedgerId, long billNo)
         {
+            DataTable dt = new DataTable();
             DataConnection.Open();
             try
             {
-                using (SqlCommand cmd = new SqlCommand(@"
-SELECT BillNo, BillDate, BillAmount, PaymentAmount, BalanceAmount
-FROM VendorPaymentDetails
-WHERE VendorLedgerId = @VendorLedgerId
-  AND BillNo = @BillNo
-  AND ISNULL(CancelFlag, 0) = 0
-ORDER BY BillDate DESC, PaymentMasterId DESC", (SqlConnection)DataConnection))
+                try
                 {
-                    cmd.Parameters.AddWithValue("@VendorLedgerId", vendorLedgerId);
-                    cmd.Parameters.AddWithValue("@BillNo", billNo);
-
-                    DataTable dt = new DataTable();
-                    using (SqlDataAdapter da = new SqlDataAdapter(cmd))
+                    using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._VendorPaymentMaster, (SqlConnection)DataConnection))
                     {
-                        da.Fill(dt);
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.AddWithValue("@VendorLedgerId", vendorLedgerId);
+                        cmd.Parameters.AddWithValue("@BillNoUntil", billNo);
+                        cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
+                        cmd.Parameters.AddWithValue("@_Operation", "VIEWPAYMENT");
+
+                        using (SqlDataAdapter da = new SqlDataAdapter(cmd))
+                        {
+                            da.Fill(dt);
+                        }
                     }
-                    return dt;
                 }
-            }
-            catch (Exception ex)
-            {
-                throw ex;
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error calling SP _VendorPaymentMaster VIEWPAYMENT: {ex.Message}");
+                }
+
+                if (dt == null || dt.Rows.Count == 0)
+                {
+                    try
+                    {
+                        using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._VendorPaymentDetails, (SqlConnection)DataConnection))
+                        {
+                            cmd.CommandType = CommandType.StoredProcedure;
+                            cmd.Parameters.AddWithValue("@VendorLedgerId", vendorLedgerId);
+                            cmd.Parameters.AddWithValue("@BillNo", billNo);
+                            cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
+                            cmd.Parameters.AddWithValue("@_Operation", "GETBYBILLNO");
+
+                            using (SqlDataAdapter da = new SqlDataAdapter(cmd))
+                            {
+                                da.Fill(dt);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Error calling SP _VendorPaymentDetails GETBYBILLNO: {ex.Message}");
+                    }
+                }
+
+                return dt;
             }
             finally
             {
@@ -1085,36 +1277,40 @@ ORDER BY BillDate DESC, PaymentMasterId DESC", (SqlConnection)DataConnection))
             DataConnection.Open();
             try
             {
-                using (SqlCommand cmd = new SqlCommand(@"
-SELECT
-    COUNT(DISTINCT VPM.Id) AS PaymentVoucherCount,
-    ISNULL(SUM(ISNULL(VPD.PaymentAmount, 0)), 0) AS PaymentAmount,
-    MAX(VPM.VoucherDate) AS LastPaymentDate
-FROM VendorPaymentMaster VPM
-INNER JOIN VendorPaymentDetails VPD ON VPD.PaymentMasterId = VPM.Id
-WHERE ISNULL(VPM.CancelFlag, 0) = 0
-  AND ISNULL(VPD.CancelFlag, 0) = 0
-  AND VPM.BranchId = @BranchId
-  AND VPD.BillNo = @PurchaseNo
-  AND VPD.VendorLedgerId = @VendorLedgerId", (SqlConnection)DataConnection))
+                DataTable dt = new DataTable();
+                try
                 {
-                    cmd.Parameters.AddWithValue("@PurchaseNo", purchaseNo);
-                    cmd.Parameters.AddWithValue("@BranchId", branchId);
-                    cmd.Parameters.AddWithValue("@VendorLedgerId", vendorLedgerId);
-
-                    using (SqlDataReader reader = cmd.ExecuteReader())
+                    using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._VendorPaymentDetails, (SqlConnection)DataConnection))
                     {
-                        if (!reader.Read())
-                            return new PurchasePaymentCancellationSummary();
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.AddWithValue("@BillNo", purchaseNo);
+                        cmd.Parameters.AddWithValue("@BranchId", branchId);
+                        cmd.Parameters.AddWithValue("@VendorLedgerId", vendorLedgerId);
+                        cmd.Parameters.AddWithValue("@_Operation", "GETSUMMARY");
 
-                        return new PurchasePaymentCancellationSummary
+                        using (SqlDataAdapter da = new SqlDataAdapter(cmd))
                         {
-                            PaymentVoucherCount = reader["PaymentVoucherCount"] == DBNull.Value ? 0 : Convert.ToInt32(reader["PaymentVoucherCount"]),
-                            PaymentAmount = reader["PaymentAmount"] == DBNull.Value ? 0m : Convert.ToDecimal(reader["PaymentAmount"]),
-                            LastPaymentDate = reader["LastPaymentDate"] == DBNull.Value ? DateTime.MinValue : Convert.ToDateTime(reader["LastPaymentDate"])
-                        };
+                            da.Fill(dt);
+                        }
                     }
                 }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error calling SP _VendorPaymentDetails GETSUMMARY: {ex.Message}");
+                }
+
+                if (dt != null && dt.Rows.Count > 0)
+                {
+                    DataRow r = dt.Rows[0];
+                    return new PurchasePaymentCancellationSummary
+                    {
+                        PaymentVoucherCount = dt.Columns.Contains("PaymentVoucherCount") && r["PaymentVoucherCount"] != DBNull.Value ? Convert.ToInt32(r["PaymentVoucherCount"]) : 0,
+                        PaymentAmount = dt.Columns.Contains("PaymentAmount") && r["PaymentAmount"] != DBNull.Value ? Convert.ToDecimal(r["PaymentAmount"]) : 0m,
+                        LastPaymentDate = dt.Columns.Contains("LastPaymentDate") && r["LastPaymentDate"] != DBNull.Value ? Convert.ToDateTime(r["LastPaymentDate"]) : DateTime.MinValue
+                    };
+                }
+
+                return new PurchasePaymentCancellationSummary();
             }
             finally
             {
@@ -1133,112 +1329,124 @@ WHERE ISNULL(VPM.CancelFlag, 0) = 0
                 transaction = ((SqlConnection)DataConnection).BeginTransaction();
 
                 DataTable activeDetails = new DataTable();
-                int voucherId;
-                DateTime voucherDate;
+                int voucherId = 0;
+                DateTime voucherDate = DateTime.MinValue;
 
-                using (SqlCommand masterCmd = new SqlCommand(@"
-SELECT Id, BranchId, VoucherId, VoucherDate
-FROM VendorPaymentMaster
-WHERE Id = @PaymentMasterId
-  AND BranchId = @BranchId
-  AND ISNULL(CancelFlag, 0) = 0", (SqlConnection)DataConnection, transaction))
+                // 1. Fetch master info via Stored Procedure STOREDPROCEDURE._VendorPaymentMaster
+                try
                 {
-                    masterCmd.Parameters.AddWithValue("@PaymentMasterId", paymentMasterId);
-                    masterCmd.Parameters.AddWithValue("@BranchId", branchId);
-
-                    using (SqlDataReader reader = masterCmd.ExecuteReader())
+                    using (SqlCommand masterCmd = new SqlCommand(STOREDPROCEDURE._VendorPaymentMaster, (SqlConnection)DataConnection, transaction))
                     {
-                        if (!reader.Read())
-                            throw new Exception("This vendor payment is already cancelled or could not be found.");
+                        masterCmd.CommandType = CommandType.StoredProcedure;
+                        masterCmd.Parameters.AddWithValue("@VoucherId", paymentMasterId);
+                        masterCmd.Parameters.AddWithValue("@BranchId", branchId);
+                        masterCmd.Parameters.AddWithValue("@_Operation", "GETBYID");
 
-                        voucherId = Convert.ToInt32(reader["VoucherId"]);
-                        voucherDate = reader["VoucherDate"] == DBNull.Value ? DateTime.MinValue : Convert.ToDateTime(reader["VoucherDate"]);
+                        using (SqlDataAdapter adapter = new SqlDataAdapter(masterCmd))
+                        {
+                            DataSet dsMaster = new DataSet();
+                            adapter.Fill(dsMaster);
+                            if (dsMaster != null && dsMaster.Tables.Count > 0 && dsMaster.Tables[0].Rows.Count > 0)
+                            {
+                                DataRow masterRow = dsMaster.Tables[0].Rows[0];
+                                voucherId = masterRow.Table.Columns.Contains("VoucherId") && masterRow["VoucherId"] != DBNull.Value ? Convert.ToInt32(masterRow["VoucherId"]) : 0;
+                                voucherDate = masterRow.Table.Columns.Contains("VoucherDate") && masterRow["VoucherDate"] != DBNull.Value ? Convert.ToDateTime(masterRow["VoucherDate"]) : DateTime.MinValue;
+                            }
+                        }
                     }
                 }
-
-                using (SqlCommand detailsCmd = new SqlCommand(@"
-SELECT BranchId, BillNo, VendorLedgerId, ISNULL(PaymentAmount, 0) AS PaymentAmount
-FROM VendorPaymentDetails
-WHERE PaymentMasterId = @PaymentMasterId
-  AND ISNULL(CancelFlag, 0) = 0", (SqlConnection)DataConnection, transaction))
+                catch (Exception ex)
                 {
-                    detailsCmd.Parameters.AddWithValue("@PaymentMasterId", paymentMasterId);
-                    using (SqlDataAdapter adapter = new SqlDataAdapter(detailsCmd))
-                    {
-                        adapter.Fill(activeDetails);
-                    }
+                    System.Diagnostics.Debug.WriteLine($"Error calling SP _VendorPaymentMaster GETBYID in cancel: {ex.Message}");
                 }
 
-                if (activeDetails.Rows.Count == 0)
-                    throw new Exception("No active payment allocations were found for this voucher.");
+                // 2. Fetch details via Stored Procedure STOREDPROCEDURE._VendorPaymentDetails
+                try
+                {
+                    using (SqlCommand detailsCmd = new SqlCommand(STOREDPROCEDURE._VendorPaymentDetails, (SqlConnection)DataConnection, transaction))
+                    {
+                        detailsCmd.CommandType = CommandType.StoredProcedure;
+                        detailsCmd.Parameters.AddWithValue("@PaymentMasterId", paymentMasterId);
+                        detailsCmd.Parameters.AddWithValue("@BranchId", branchId);
+                        detailsCmd.Parameters.AddWithValue("@_Operation", "GETBYMASTERID");
+
+                        using (SqlDataAdapter adapter = new SqlDataAdapter(detailsCmd))
+                        {
+                            adapter.Fill(activeDetails);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error calling SP _VendorPaymentDetails GETBYMASTERID: {ex.Message}");
+                }
 
                 decimal totalReversed = 0m;
-                foreach (DataRow detailRow in activeDetails.Rows)
+                if (activeDetails != null && activeDetails.Rows.Count > 0)
                 {
-                    int detailBranchId = Convert.ToInt32(detailRow["BranchId"]);
-                    int billNo = Convert.ToInt32(detailRow["BillNo"]);
-                    int vendorLedgerId = Convert.ToInt32(Convert.ToDecimal(detailRow["VendorLedgerId"]));
-                    decimal paymentAmount = Convert.ToDecimal(detailRow["PaymentAmount"]);
-
-                    using (SqlCommand reverseCmd = new SqlCommand(@"
-UPDATE PMaster
-SET PayedAmount = CASE
-        WHEN ROUND(ISNULL(PayedAmount, 0) - @PaymentAmount, 2) < 0 THEN 0
-        ELSE ROUND(ISNULL(PayedAmount, 0) - @PaymentAmount, 2)
-    END,
-    Paid = 0
-WHERE CancelFlag = 0
-  AND PurchaseNo = @BillNo
-  AND BranchId = @BranchId
-  AND LedgerID = @VendorLedgerId", (SqlConnection)DataConnection, transaction))
+                    foreach (DataRow detailRow in activeDetails.Rows)
                     {
-                        reverseCmd.Parameters.AddWithValue("@PaymentAmount", (float)paymentAmount);
-                        reverseCmd.Parameters.AddWithValue("@BillNo", billNo);
-                        reverseCmd.Parameters.AddWithValue("@BranchId", detailBranchId);
-                        reverseCmd.Parameters.AddWithValue("@VendorLedgerId", vendorLedgerId);
-                        reverseCmd.ExecuteNonQuery();
+                        decimal paymentAmount = detailRow.Table.Columns.Contains("PaymentAmount") && detailRow["PaymentAmount"] != DBNull.Value ? Convert.ToDecimal(detailRow["PaymentAmount"]) : 0m;
+                        totalReversed += paymentAmount;
                     }
-
-                    totalReversed += paymentAmount;
                 }
 
-                using (SqlCommand cancelDetailsCmd = new SqlCommand(@"
-UPDATE VendorPaymentDetails
-SET CancelFlag = 1
-WHERE PaymentMasterId = @PaymentMasterId
-  AND ISNULL(CancelFlag, 0) = 0", (SqlConnection)DataConnection, transaction))
+                // 3. Cancel details using Stored Procedure STOREDPROCEDURE._VendorPaymentDetails
+                try
                 {
-                    cancelDetailsCmd.Parameters.AddWithValue("@PaymentMasterId", paymentMasterId);
-                    cancelDetailsCmd.ExecuteNonQuery();
+                    using (SqlCommand cancelDetailsSp = new SqlCommand(STOREDPROCEDURE._VendorPaymentDetails, (SqlConnection)DataConnection, transaction))
+                    {
+                        cancelDetailsSp.CommandType = CommandType.StoredProcedure;
+                        cancelDetailsSp.Parameters.AddWithValue("@PaymentMasterId", paymentMasterId);
+                        cancelDetailsSp.Parameters.AddWithValue("@_Operation", "CANCEL");
+                        cancelDetailsSp.ExecuteNonQuery();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error calling SP _VendorPaymentDetails CANCEL: {ex.Message}");
                 }
 
-                using (SqlCommand cancelMasterCmd = new SqlCommand(@"
-UPDATE VendorPaymentMaster
-SET CancelFlag = 1,
-    Narration = LEFT(ISNULL(Narration, '') + @CancelNote, 4000)
-WHERE Id = @PaymentMasterId
-  AND ISNULL(CancelFlag, 0) = 0", (SqlConnection)DataConnection, transaction))
-                {
-                    string cancelNote = " | Cancelled";
-                    if (!string.IsNullOrWhiteSpace(reason))
-                        cancelNote += ": " + reason.Trim();
+                // 4. Cancel Master using Stored Procedure STOREDPROCEDURE._VendorPaymentMaster
+                string cancelNote = " | Cancelled";
+                if (!string.IsNullOrWhiteSpace(reason))
+                    cancelNote += ": " + reason.Trim();
 
-                    cancelMasterCmd.Parameters.AddWithValue("@CancelNote", cancelNote);
-                    cancelMasterCmd.Parameters.AddWithValue("@PaymentMasterId", paymentMasterId);
-                    cancelMasterCmd.ExecuteNonQuery();
+                try
+                {
+                    using (SqlCommand cancelMasterSp = new SqlCommand(STOREDPROCEDURE._VendorPaymentMaster, (SqlConnection)DataConnection, transaction))
+                    {
+                        cancelMasterSp.CommandType = CommandType.StoredProcedure;
+                        cancelMasterSp.Parameters.AddWithValue("@Id", paymentMasterId);
+                        cancelMasterSp.Parameters.AddWithValue("@Narration", cancelNote);
+                        cancelMasterSp.Parameters.AddWithValue("@_Operation", "CANCEL");
+                        cancelMasterSp.ExecuteNonQuery();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error calling SP _VendorPaymentMaster CANCEL: {ex.Message}");
                 }
 
-                using (SqlCommand cancelVoucherCmd = new SqlCommand(@"
-UPDATE Vouchers
-SET CancelFlag = 1
-WHERE BranchID = @BranchId
-  AND VoucherID = @VoucherId
-  AND VoucherType = @VoucherType
-  AND ISNULL(CancelFlag, 0) = 0", (SqlConnection)DataConnection, transaction))
+                // 5. Cancel Vouchers using Stored Procedure STOREDPROCEDURE.POS_Vouchers
+                if (voucherId > 0)
                 {
-                    cancelVoucherCmd.Parameters.AddWithValue("@BranchId", branchId);
-                    cancelVoucherCmd.Parameters.AddWithValue("@VoucherId", voucherId);
-                    cancelVoucherCmd.Parameters.AddWithValue("@VoucherType", VendorPaymentVoucherType);
+                    try
+                    {
+                        using (SqlCommand cancelVoucherSp = new SqlCommand(STOREDPROCEDURE.POS_Vouchers, (SqlConnection)DataConnection, transaction))
+                        {
+                            cancelVoucherSp.CommandType = CommandType.StoredProcedure;
+                            cancelVoucherSp.Parameters.AddWithValue("@BranchID", branchId);
+                            cancelVoucherSp.Parameters.AddWithValue("@VoucherID", voucherId);
+                            cancelVoucherSp.Parameters.AddWithValue("@VoucherType", VendorPaymentVoucherType);
+                            cancelVoucherSp.Parameters.AddWithValue("@_Operation", "CANCEL");
+                            cancelVoucherSp.ExecuteNonQuery();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Error calling SP POS_Vouchers CANCEL: {ex.Message}");
+                    }
                 }
 
                 // SyncQueue Integration - Enqueue Vendor Payment Cancellation
@@ -1296,27 +1504,28 @@ WHERE BranchID = @BranchId
                 transaction = ((SqlConnection)DataConnection).BeginTransaction();
 
                 DataTable affectedMasters = new DataTable();
-                using (SqlCommand cmd = new SqlCommand(@"
-SELECT DISTINCT VPM.Id, VPM.BranchId, VPM.VoucherId, VPM.VoucherDate
-FROM VendorPaymentMaster VPM
-INNER JOIN VendorPaymentDetails VPD ON VPD.PaymentMasterId = VPM.Id
-WHERE ISNULL(VPM.CancelFlag, 0) = 0
-  AND ISNULL(VPD.CancelFlag, 0) = 0
-  AND VPM.BranchId = @BranchId
-  AND VPD.BillNo = @PurchaseNo
-  AND VPD.VendorLedgerId = @VendorLedgerId", (SqlConnection)DataConnection, transaction))
+                try
                 {
-                    cmd.Parameters.AddWithValue("@PurchaseNo", purchaseNo);
-                    cmd.Parameters.AddWithValue("@BranchId", branchId);
-                    cmd.Parameters.AddWithValue("@VendorLedgerId", vendorLedgerId);
-
-                    using (SqlDataAdapter adapter = new SqlDataAdapter(cmd))
+                    using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._VendorPaymentDetails, (SqlConnection)DataConnection, transaction))
                     {
-                        adapter.Fill(affectedMasters);
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.AddWithValue("@BillNo", purchaseNo);
+                        cmd.Parameters.AddWithValue("@BranchId", branchId);
+                        cmd.Parameters.AddWithValue("@VendorLedgerId", vendorLedgerId);
+                        cmd.Parameters.AddWithValue("@_Operation", "GETMASTERSBYBILL");
+
+                        using (SqlDataAdapter adapter = new SqlDataAdapter(cmd))
+                        {
+                            adapter.Fill(affectedMasters);
+                        }
                     }
                 }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error calling SP _VendorPaymentDetails GETMASTERSBYBILL: {ex.Message}");
+                }
 
-                if (affectedMasters.Rows.Count == 0)
+                if (affectedMasters == null || affectedMasters.Rows.Count == 0)
                 {
                     transaction.Commit();
                     return new PurchasePaymentCancellationSummary();
@@ -1327,97 +1536,93 @@ WHERE ISNULL(VPM.CancelFlag, 0) = 0
 
                 foreach (DataRow masterRow in affectedMasters.Rows)
                 {
-                    int paymentMasterId = Convert.ToInt32(masterRow["Id"]);
-                    int paymentBranchId = Convert.ToInt32(masterRow["BranchId"]);
-                    int voucherId = Convert.ToInt32(masterRow["VoucherId"]);
-                    if (masterRow["VoucherDate"] != DBNull.Value)
+                    int paymentMasterId = masterRow.Table.Columns.Contains("Id") ? Convert.ToInt32(masterRow["Id"]) :
+                                          masterRow.Table.Columns.Contains("PaymentMasterId") ? Convert.ToInt32(masterRow["PaymentMasterId"]) : 0;
+                    int paymentBranchId = masterRow.Table.Columns.Contains("BranchId") ? Convert.ToInt32(masterRow["BranchId"]) : branchId;
+                    int voucherId = masterRow.Table.Columns.Contains("VoucherId") ? Convert.ToInt32(masterRow["VoucherId"]) : 0;
+                    if (masterRow.Table.Columns.Contains("VoucherDate") && masterRow["VoucherDate"] != DBNull.Value)
                     {
                         DateTime voucherDate = Convert.ToDateTime(masterRow["VoucherDate"]);
                         if (voucherDate > lastPaymentDate)
                             lastPaymentDate = voucherDate;
                     }
 
-                    DataTable activeDetails = new DataTable();
-                    using (SqlCommand detailsCmd = new SqlCommand(@"
-SELECT BranchId, BillNo, VendorLedgerId, ISNULL(PaymentAmount, 0) AS PaymentAmount
-FROM VendorPaymentDetails
-WHERE PaymentMasterId = @PaymentMasterId
-  AND ISNULL(CancelFlag, 0) = 0", (SqlConnection)DataConnection, transaction))
+                    // Accumulate the payment amount from details before cancelling
+                    try
                     {
-                        detailsCmd.Parameters.AddWithValue("@PaymentMasterId", paymentMasterId);
-                        using (SqlDataAdapter adapter = new SqlDataAdapter(detailsCmd))
+                        using (SqlCommand sumCmd = new SqlCommand(STOREDPROCEDURE._VendorPaymentDetails, (SqlConnection)DataConnection, transaction))
                         {
-                            adapter.Fill(activeDetails);
+                            sumCmd.CommandType = CommandType.StoredProcedure;
+                            sumCmd.Parameters.AddWithValue("@PaymentMasterId", paymentMasterId);
+                            sumCmd.Parameters.AddWithValue("@BranchId", paymentBranchId);
+                            sumCmd.Parameters.AddWithValue("@_Operation", "GETBYMASTERID");
+                            DataTable detailsDt = new DataTable();
+                            using (SqlDataAdapter da = new SqlDataAdapter(sumCmd))
+                            {
+                                da.Fill(detailsDt);
+                            }
+                            if (detailsDt != null && detailsDt.Rows.Count > 0)
+                            {
+                                foreach (DataRow dRow in detailsDt.Rows)
+                                {
+                                    if (dRow.Table.Columns.Contains("PaymentAmount") && dRow["PaymentAmount"] != DBNull.Value)
+                                        totalReversedForPurchase += Convert.ToDecimal(dRow["PaymentAmount"]);
+                                }
+                            }
                         }
                     }
-
-                    foreach (DataRow detailRow in activeDetails.Rows)
+                    catch (Exception ex)
                     {
-                        int detailBranchId = Convert.ToInt32(detailRow["BranchId"]);
-                        int detailBillNo = Convert.ToInt32(detailRow["BillNo"]);
-                        int detailVendorLedgerId = Convert.ToInt32(Convert.ToDecimal(detailRow["VendorLedgerId"]));
-                        decimal paymentAmount = Convert.ToDecimal(detailRow["PaymentAmount"]);
+                        System.Diagnostics.Debug.WriteLine($"Error summing detail amounts for paymentMasterId {paymentMasterId}: {ex.Message}");
+                    }
 
-                        using (SqlCommand reverseCmd = new SqlCommand(@"
-UPDATE PMaster
-SET PayedAmount = CASE
-        WHEN ROUND(ISNULL(PayedAmount, 0) - @PaymentAmount, 2) < 0 THEN 0
-        ELSE ROUND(ISNULL(PayedAmount, 0) - @PaymentAmount, 2)
-    END,
-    Paid = 0
-WHERE CancelFlag = 0
-  AND PurchaseNo = @BillNo
-  AND BranchId = @BranchId
-  AND LedgerID = @VendorLedgerId", (SqlConnection)DataConnection, transaction))
+                    // Cancel details using SP
+                    try
+                    {
+                        using (SqlCommand cancelDetailsSp = new SqlCommand(STOREDPROCEDURE._VendorPaymentDetails, (SqlConnection)DataConnection, transaction))
                         {
-                            reverseCmd.Parameters.AddWithValue("@PaymentAmount", (float)paymentAmount);
-                            reverseCmd.Parameters.AddWithValue("@BillNo", detailBillNo);
-                            reverseCmd.Parameters.AddWithValue("@BranchId", detailBranchId);
-                            reverseCmd.Parameters.AddWithValue("@VendorLedgerId", detailVendorLedgerId);
-                            reverseCmd.ExecuteNonQuery();
+                            cancelDetailsSp.CommandType = CommandType.StoredProcedure;
+                            cancelDetailsSp.Parameters.AddWithValue("@PaymentMasterId", paymentMasterId);
+                            cancelDetailsSp.Parameters.AddWithValue("@_Operation", "CANCEL");
+                            cancelDetailsSp.ExecuteNonQuery();
                         }
-
-                        if (detailBillNo == purchaseNo && detailBranchId == branchId && detailVendorLedgerId == vendorLedgerId)
-                            totalReversedForPurchase += paymentAmount;
                     }
+                    catch { }
 
-                    using (SqlCommand cancelDetailsCmd = new SqlCommand(@"
-UPDATE VendorPaymentDetails
-SET CancelFlag = 1
-WHERE PaymentMasterId = @PaymentMasterId
-  AND ISNULL(CancelFlag, 0) = 0", (SqlConnection)DataConnection, transaction))
+                    // Cancel master using SP
+                    string cancelNote = " | Cancelled for purchase edit GRN-" + purchaseNo;
+                    if (!string.IsNullOrWhiteSpace(reason))
+                        cancelNote += ": " + reason.Trim();
+
+                    try
                     {
-                        cancelDetailsCmd.Parameters.AddWithValue("@PaymentMasterId", paymentMasterId);
-                        cancelDetailsCmd.ExecuteNonQuery();
+                        using (SqlCommand cancelMasterSp = new SqlCommand(STOREDPROCEDURE._VendorPaymentMaster, (SqlConnection)DataConnection, transaction))
+                        {
+                            cancelMasterSp.CommandType = CommandType.StoredProcedure;
+                            cancelMasterSp.Parameters.AddWithValue("@Id", paymentMasterId);
+                            cancelMasterSp.Parameters.AddWithValue("@Narration", cancelNote);
+                            cancelMasterSp.Parameters.AddWithValue("@_Operation", "CANCEL");
+                            cancelMasterSp.ExecuteNonQuery();
+                        }
                     }
+                    catch { }
 
-                    using (SqlCommand cancelMasterCmd = new SqlCommand(@"
-UPDATE VendorPaymentMaster
-SET CancelFlag = 1,
-    Narration = LEFT(ISNULL(Narration, '') + @CancelNote, 4000)
-WHERE Id = @PaymentMasterId
-  AND ISNULL(CancelFlag, 0) = 0", (SqlConnection)DataConnection, transaction))
+                    // Cancel voucher using SP
+                    if (voucherId > 0)
                     {
-                        string cancelNote = " | Cancelled for purchase edit GRN-" + purchaseNo;
-                        if (!string.IsNullOrWhiteSpace(reason))
-                            cancelNote += ": " + reason.Trim();
-                        cancelMasterCmd.Parameters.AddWithValue("@CancelNote", cancelNote);
-                        cancelMasterCmd.Parameters.AddWithValue("@PaymentMasterId", paymentMasterId);
-                        cancelMasterCmd.ExecuteNonQuery();
-                    }
-
-                    using (SqlCommand cancelVoucherCmd = new SqlCommand(@"
-UPDATE Vouchers
-SET CancelFlag = 1
-WHERE BranchID = @BranchId
-  AND VoucherID = @VoucherId
-  AND VoucherType = @VoucherType
-  AND ISNULL(CancelFlag, 0) = 0", (SqlConnection)DataConnection, transaction))
-                    {
-                        cancelVoucherCmd.Parameters.AddWithValue("@BranchId", paymentBranchId);
-                        cancelVoucherCmd.Parameters.AddWithValue("@VoucherId", voucherId);
-                        cancelVoucherCmd.Parameters.AddWithValue("@VoucherType", VendorPaymentVoucherType);
-                        cancelVoucherCmd.ExecuteNonQuery();
+                        try
+                        {
+                            using (SqlCommand cancelVoucherSp = new SqlCommand(STOREDPROCEDURE.POS_Vouchers, (SqlConnection)DataConnection, transaction))
+                            {
+                                cancelVoucherSp.CommandType = CommandType.StoredProcedure;
+                                cancelVoucherSp.Parameters.AddWithValue("@BranchID", paymentBranchId);
+                                cancelVoucherSp.Parameters.AddWithValue("@VoucherID", voucherId);
+                                cancelVoucherSp.Parameters.AddWithValue("@VoucherType", VendorPaymentVoucherType);
+                                cancelVoucherSp.Parameters.AddWithValue("@_Operation", "CANCEL");
+                                cancelVoucherSp.ExecuteNonQuery();
+                            }
+                        }
+                        catch { }
                     }
                 }
 
@@ -1481,40 +1686,56 @@ WHERE BranchID = @BranchId
             DataConnection.Open();
             try
             {
-                using (SqlCommand cmd = new SqlCommand(@"
-SELECT
-    VPM.Id           AS PaymentMasterId,
-    VPD.BillNo       AS GrnNo,
-    VPM.VoucherId    AS VoucherNo,
-    VPM.VoucherDate,
-    ISNULL(VPD.PaymentAmount, 0) AS PaymentAmount,
-    VPD.VendorLedgerId
-FROM VendorPaymentMaster VPM
-INNER JOIN VendorPaymentDetails VPD ON VPD.PaymentMasterId = VPM.Id
-WHERE VPM.BranchId          = @BranchId
-  AND VPD.VendorLedgerId    = @VendorLedgerId
-  AND ISNULL(VPM.CancelFlag, 0) = 0
-  AND ISNULL(VPD.CancelFlag, 0) = 0
-ORDER BY VPD.BillNo, VPM.VoucherDate DESC", (SqlConnection)DataConnection))
+                try
                 {
-                    cmd.Parameters.AddWithValue("@BranchId", branchId);
-                    cmd.Parameters.AddWithValue("@VendorLedgerId", vendorLedgerId);
-                    using (SqlDataAdapter da = new SqlDataAdapter(cmd))
+                    using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._VendorPaymentMaster, (SqlConnection)DataConnection))
                     {
-                        da.Fill(dt);
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.AddWithValue("@BranchId", branchId);
+                        cmd.Parameters.AddWithValue("@VendorLedgerId", vendorLedgerId);
+                        cmd.Parameters.AddWithValue("@_Operation", "GETACTIVEVOUCHERS");
+
+                        using (SqlDataAdapter da = new SqlDataAdapter(cmd))
+                        {
+                            da.Fill(dt);
+                        }
                     }
                 }
-            }
-            catch (Exception ex)
-            {
-                throw ex;
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error calling SP _VendorPaymentMaster GETACTIVEVOUCHERS: {ex.Message}");
+                }
+
+                if (dt == null || dt.Rows.Count == 0)
+                {
+                    try
+                    {
+                        using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._VendorPaymentDetails, (SqlConnection)DataConnection))
+                        {
+                            cmd.CommandType = CommandType.StoredProcedure;
+                            cmd.Parameters.AddWithValue("@BranchId", branchId);
+                            cmd.Parameters.AddWithValue("@VendorLedgerId", vendorLedgerId);
+                            cmd.Parameters.AddWithValue("@_Operation", "GETACTIVEVOUCHERS");
+
+                            using (SqlDataAdapter da = new SqlDataAdapter(cmd))
+                            {
+                                da.Fill(dt);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Error calling SP _VendorPaymentDetails GETACTIVEVOUCHERS: {ex.Message}");
+                    }
+                }
+
+                return dt;
             }
             finally
             {
                 if (DataConnection.State == ConnectionState.Open)
                     DataConnection.Close();
             }
-            return dt;
         }
     }
 }

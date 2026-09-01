@@ -11,9 +11,26 @@ namespace Nexoris.SyncService
 {
     class Program
     {
+        private static Mutex _appMutex;
+
         static void Main(string[] args)
         {
             Console.Title = "Nexoris Branch Sync Service (.NET Framework 4.6.1)";
+
+            bool isNewInstance;
+            _appMutex = new Mutex(true, "NexorisSyncService_SingleInstanceMutex", out isNewInstance);
+            if (!isNewInstance)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine("\n===============================================================");
+                Console.WriteLine(" [INFO] Nexoris Branch Sync Service is ALREADY running on this PC.");
+                Console.WriteLine(" The sync worker is actively processing queue items in the background.");
+                Console.WriteLine("===============================================================");
+                Console.ResetColor();
+                Console.WriteLine("\nPress any key to exit this duplicate window...");
+                Thread.Sleep(3000);
+                return;
+            }
 
             var settings = new SyncSettings
             {

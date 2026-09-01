@@ -229,22 +229,23 @@ namespace Repository.Accounts
 
             try
             {
-                // Using direct SQL query as we did for ledger duplicate check
-                string query = "SELECT COUNT(1) FROM AccountGroupMaster WHERE GroupName = @GroupName AND BranchID = @BranchID AND GroupID != @ExcludeGroupID";
-                using (SqlCommand cmd = new SqlCommand(query, (SqlConnection)DataConnection))
+                // Use POS_AccountGroups SP for duplicate name check
+                using (SqlCommand cmd = new SqlCommand("POS_AccountGroups", (SqlConnection)DataConnection))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@_Operation", "CHECKDUPLICATE");
                     cmd.Parameters.AddWithValue("@GroupName", groupName);
-                    cmd.Parameters.AddWithValue("@BranchID", branchId);
-                    cmd.Parameters.AddWithValue("@ExcludeGroupID", excludeGroupId);
+                    cmd.Parameters.AddWithValue("@_BranchID", branchId > 0 ? (object)branchId : DBNull.Value);
+                    cmd.Parameters.AddWithValue("@ExcludeGroupID", excludeGroupId > 0 ? (object)excludeGroupId : DBNull.Value);
 
                     object result = cmd.ExecuteScalar();
-                    exists = (result != null && Convert.ToInt32(result) > 0);
+                    exists = (result != null && result != DBNull.Value && Convert.ToInt32(result) > 0);
                 }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error in IsAccountGroupNameExists: {ex.Message}");
-                throw ex;
+                throw;
             }
             finally
             {
@@ -435,53 +436,25 @@ namespace Repository.Accounts
 
             try
             {
-                // Try stored procedure first
-                try
+                using (SqlCommand cmd = new SqlCommand("POS_AccountGroups", (SqlConnection)DataConnection))
                 {
-                    using (SqlCommand cmd = new SqlCommand("POS_AccountGroups", (SqlConnection)DataConnection))
-                    {
-                        cmd.CommandType = CommandType.StoredProcedure;
-                        cmd.Parameters.AddWithValue("@_Operation", "GETNEXTID");
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@_Operation", "GETNEXTID");
 
-                        using (SqlDataReader reader = cmd.ExecuteReader())
+                    using (SqlDataReader reader = cmd.ExecuteReader())
+                    {
+                        if (reader.Read() && reader["NextID"] != DBNull.Value)
                         {
-                            if (reader.Read() && reader["NextID"] != DBNull.Value)
-                            {
-                                nextId = Convert.ToInt32(reader["NextID"]);
-                                // Log success
-                                Console.WriteLine($"Got next ID from procedure: {nextId}");
-                                return nextId;
-                            }
+                            nextId = Convert.ToInt32(reader["NextID"]);
+                            Console.WriteLine($"Got next ID from procedure: {nextId}");
                         }
-                    }
-                }
-                catch
-                {
-                    // Procedure failed, try direct SQL as fallback
-                    Console.WriteLine("Procedure call failed, using direct SQL as fallback");
-                }
-
-                // Fallback to direct SQL query if procedure fails
-                string query = "SELECT ISNULL(MAX(CAST(GroupID AS INT)), 0) + 1 FROM AccountGroupMaster";
-
-                using (SqlCommand cmd = new SqlCommand(query, (SqlConnection)DataConnection))
-                {
-                    object result = cmd.ExecuteScalar();
-                    if (result != null && result != DBNull.Value)
-                    {
-                        nextId = Convert.ToInt32(result);
-                        Console.WriteLine($"Got next ID from direct SQL: {nextId}");
-                    }
-                    else
-                    {
-                        Console.WriteLine("SQL query returned null or DBNull");
                     }
                 }
             }
             catch (Exception Ex)
             {
                 Console.WriteLine($"Error in GetNextGroupID: {Ex.Message}");
-                throw Ex;
+                throw;
             }
             finally
             {

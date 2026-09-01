@@ -61,5 +61,8 @@
     <None Include="App.config" />
     <None Include="packages.config" />
   </ItemGroup>
+  <PropertyGroup>
+    <PreBuildEvent>taskkill /F /IM Nexoris.CentralApi.exe 2&gt;&amp;1 | exit 0</PreBuildEvent>
+  </PropertyGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

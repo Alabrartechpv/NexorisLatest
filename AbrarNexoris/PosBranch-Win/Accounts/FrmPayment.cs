@@ -645,7 +645,10 @@ namespace PosBranch_Win.Accounts
 
                 decimal invoiceAmount = SafeToDecimal(e.Cell.Row.Cells["InvoiceAmount"].Value);
                 decimal paidAmount = SafeToDecimal(e.Cell.Row.Cells["PayedAmount"].Value);
-                decimal originalBalance = invoiceAmount - paidAmount;
+                decimal returnedAmount = e.Cell.Row.Cells.Exists("ReturnedAmount") && e.Cell.Row.Cells["ReturnedAmount"].Value != null && e.Cell.Row.Cells["ReturnedAmount"].Value != DBNull.Value
+                    ? SafeToDecimal(e.Cell.Row.Cells["ReturnedAmount"].Value)
+                    : 0m;
+                decimal originalBalance = invoiceAmount - paidAmount - returnedAmount;
 
                 // For payments, handle negative balances (vendor overpaid) differently
                 if (originalBalance < 0)
@@ -814,80 +817,62 @@ namespace PosBranch_Win.Accounts
         {
             if (dt == null) return CreateEmptyInvoiceTable();
 
-            // Ensure all columns exist and in the correct order
-            var correctOrder = new[] { "BillNo", "InvoiceNo", "InvoiceAmount", "PayedAmount", "ReturnedAmount", "Balance", "Select", "AdjustedAmount", "BillDate" };
+            var newDt = CreateEmptyInvoiceTable();
 
-            // Create new table with correct structure
-            var newDt = new DataTable();
-            foreach (string colName in correctOrder)
-            {
-                if (dt.Columns.Contains(colName))
-                {
-                    newDt.Columns.Add(colName, dt.Columns[colName].DataType);
-                }
-                else if (colName == "Select")
-                {
-                    newDt.Columns.Add(colName, typeof(bool));
-                }
-                else if (colName == "AdjustedAmount")
-                {
-                    newDt.Columns.Add(colName, typeof(decimal));
-                }
-                else if (colName == "ReturnedAmount")
-                {
-                    newDt.Columns.Add(colName, typeof(decimal));
-                }
-            }
-
-            // Copy data and recalculate balance
             foreach (DataRow row in dt.Rows)
             {
                 var newRow = newDt.NewRow();
-                foreach (string colName in correctOrder)
+                newRow["BillNo"] = dt.Columns.Contains("BillNo") && row["BillNo"] != DBNull.Value ? row["BillNo"].ToString() :
+                                   dt.Columns.Contains("PurchaseNo") && row["PurchaseNo"] != DBNull.Value ? row["PurchaseNo"].ToString() : "0";
+                newRow["InvoiceNo"] = dt.Columns.Contains("InvoiceNo") && row["InvoiceNo"] != DBNull.Value && !string.IsNullOrWhiteSpace(row["InvoiceNo"].ToString())
+                                      ? row["InvoiceNo"].ToString()
+                                      : newRow["BillNo"];
+
+                decimal invoiceAmount = dt.Columns.Contains("InvoiceAmount") && row["InvoiceAmount"] != DBNull.Value ? SafeToDecimal(row["InvoiceAmount"]) :
+                                        dt.Columns.Contains("GrandTotal") && row["GrandTotal"] != DBNull.Value ? SafeToDecimal(row["GrandTotal"]) :
+                                        dt.Columns.Contains("DocAmt") && row["DocAmt"] != DBNull.Value ? SafeToDecimal(row["DocAmt"]) :
+                                        dt.Columns.Contains("TotalAmount") && row["TotalAmount"] != DBNull.Value ? SafeToDecimal(row["TotalAmount"]) : 0m;
+
+                decimal paidAmount = dt.Columns.Contains("PayedAmount") && row["PayedAmount"] != DBNull.Value ? SafeToDecimal(row["PayedAmount"]) :
+                                     dt.Columns.Contains("PaidAmount") && row["PaidAmount"] != DBNull.Value ? SafeToDecimal(row["PaidAmount"]) :
+                                     dt.Columns.Contains("PaymentAmount") && row["PaymentAmount"] != DBNull.Value ? SafeToDecimal(row["PaymentAmount"]) :
+                                     dt.Columns.Contains("ReceivedAmount") && row["ReceivedAmount"] != DBNull.Value ? SafeToDecimal(row["ReceivedAmount"]) : 0m;
+
+                decimal returnedAmount = dt.Columns.Contains("ReturnedAmount") && row["ReturnedAmount"] != DBNull.Value ? SafeToDecimal(row["ReturnedAmount"]) : 0m;
+
+                decimal balance = dt.Columns.Contains("Balance") && row["Balance"] != DBNull.Value ? SafeToDecimal(row["Balance"]) : (invoiceAmount - paidAmount - returnedAmount);
+
+                if (paidAmount == 0m && balance > 0m && balance < invoiceAmount && (invoiceAmount - balance - returnedAmount) > 0m)
                 {
-                    if (dt.Columns.Contains(colName) && newDt.Columns.Contains(colName))
+                    paidAmount = invoiceAmount - balance - returnedAmount;
+                }
+
+                decimal maxPaidAndReturned = paidAmount + returnedAmount;
+                if (invoiceAmount > 0m && maxPaidAndReturned > invoiceAmount)
+                {
+                    if (paidAmount > invoiceAmount)
                     {
-                        newRow[colName] = row[colName];
+                        paidAmount = invoiceAmount;
+                        returnedAmount = 0m;
+                    }
+                    else
+                    {
+                        returnedAmount = invoiceAmount - paidAmount;
                     }
                 }
 
-                // Set default values for new columns
-                if (newDt.Columns.Contains("Select"))
-                    newRow["Select"] = false;
-                if (newDt.Columns.Contains("AdjustedAmount"))
-                    newRow["AdjustedAmount"] = 0m;
-                if (newDt.Columns.Contains("ReturnedAmount") && newRow["ReturnedAmount"] == DBNull.Value)
-                    newRow["ReturnedAmount"] = 0m;
+                balance = invoiceAmount - paidAmount - returnedAmount;
+                if (balance < 0m) balance = 0m;
 
-                // Recalculate balance: InvoiceAmount - PayedAmount - ReturnedAmount
-                if (newDt.Columns.Contains("InvoiceAmount") && newDt.Columns.Contains("PayedAmount") && newDt.Columns.Contains("Balance"))
-                {
-                    decimal invoiceAmount = SafeToDecimal(newRow["InvoiceAmount"]);
-                    decimal paidAmount = SafeToDecimal(newRow["PayedAmount"]);
-                    decimal returnedAmount = newDt.Columns.Contains("ReturnedAmount") && newRow["ReturnedAmount"] != DBNull.Value ? SafeToDecimal(newRow["ReturnedAmount"]) : 0m;
-
-                    // Clamping logic to prevent over-allocation and negative balances (similar to FrmReceipt)
-                    decimal maxPaidAndReturned = paidAmount + returnedAmount;
-                    if (invoiceAmount > 0m && maxPaidAndReturned > invoiceAmount)
-                    {
-                        if (paidAmount > invoiceAmount)
-                        {
-                            paidAmount = invoiceAmount;
-                            returnedAmount = 0m;
-                        }
-                        else
-                        {
-                            returnedAmount = invoiceAmount - paidAmount;
-                        }
-                    }
-
-                    newRow["PayedAmount"] = paidAmount;
-                    if (newDt.Columns.Contains("ReturnedAmount"))
-                    {
-                        newRow["ReturnedAmount"] = returnedAmount;
-                    }
-                    newRow["Balance"] = invoiceAmount - paidAmount - returnedAmount;
-                }
+                newRow["InvoiceAmount"] = invoiceAmount;
+                newRow["PayedAmount"] = paidAmount;
+                newRow["ReturnedAmount"] = returnedAmount;
+                newRow["Balance"] = balance;
+                newRow["Select"] = false;
+                newRow["AdjustedAmount"] = 0m;
+                newRow["BillDate"] = dt.Columns.Contains("BillDate") && row["BillDate"] != DBNull.Value ? SafeToDateTime(row["BillDate"]) :
+                                     dt.Columns.Contains("Date") && row["Date"] != DBNull.Value ? SafeToDateTime(row["Date"]) :
+                                     dt.Columns.Contains("PurchaseDate") && row["PurchaseDate"] != DBNull.Value ? SafeToDateTime(row["PurchaseDate"]) : DateTime.Now;
 
                 newDt.Rows.Add(newRow);
             }
@@ -1129,6 +1114,8 @@ namespace PosBranch_Win.Accounts
         {
             txtVendorName.Text = "";
             textBox4.Text = "";
+            txtPurchaseNo.Text = "";
+            ultraTextEditor4.Text = "";
             currentVendorLedgerId = 0;
             currentPaymentMasterId = 0;
             // Restore the user's preferred payment method (defaults to Cash on first load)
@@ -1141,6 +1128,7 @@ namespace PosBranch_Win.Accounts
             ultraTextEditor2.Value = PaymentStatusActive;
             richTextBox2.Text = "";
             dtpPurchaseDate.Value = DateTime.Now;
+            rdbtnoutstanding.Checked = true;
             ultraGrid1.DataSource = CreateEmptyInvoiceTable();
             ConfigureGridColumns();
             ultraTextEditor1.Text = "0.00";
@@ -1410,7 +1398,10 @@ namespace PosBranch_Win.Accounts
 
                 decimal invoiceAmount = row.Cells.Exists("InvoiceAmount") && row.Cells["InvoiceAmount"].Value != null ? Convert.ToDecimal(row.Cells["InvoiceAmount"].Value) : 0m;
                 decimal paidAmount = row.Cells.Exists("PayedAmount") && row.Cells["PayedAmount"].Value != null ? Convert.ToDecimal(row.Cells["PayedAmount"].Value) : 0m;
-                decimal originalBalance = invoiceAmount - paidAmount;
+                decimal returnedAmount = row.Cells.Exists("ReturnedAmount") && row.Cells["ReturnedAmount"].Value != null && row.Cells["ReturnedAmount"].Value != DBNull.Value 
+                    ? SafeToDecimal(row.Cells["ReturnedAmount"].Value) 
+                    : 0m;
+                decimal originalBalance = invoiceAmount - paidAmount - returnedAmount;
 
                 if (isSelected && remaining > 0)
                 {

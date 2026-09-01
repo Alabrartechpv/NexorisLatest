@@ -17,10 +17,27 @@ namespace Nexoris.CentralApi
         private static HttpListener _listener;
         private static ICentralSyncService _syncService;
         private static bool _isRunning = true;
+        private static Mutex _appMutex;
 
         static void Main(string[] args)
         {
             Console.Title = "Nexoris Central API (.NET Framework 4.6.1)";
+
+            bool isNewInstance;
+            _appMutex = new Mutex(true, "NexorisCentralApi_SingleInstanceMutex", out isNewInstance);
+            if (!isNewInstance)
+            {
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine("\n===============================================================");
+                Console.WriteLine(" [INFO] Nexoris Central API is ALREADY running on this PC.");
+                Console.WriteLine(" Port 5000 is actively listening in the background.");
+                Console.WriteLine("===============================================================");
+                Console.ResetColor();
+                Console.WriteLine("\nPress any key to exit this duplicate window...");
+                Thread.Sleep(3000);
+                return;
+            }
+
             FileLogger.Info("===============================================================");
             FileLogger.Info("        NEXORIS HEAD OFFICE CENTRAL API SERVER (.NET 4.6.1)   ");
             FileLogger.Info("===============================================================");
