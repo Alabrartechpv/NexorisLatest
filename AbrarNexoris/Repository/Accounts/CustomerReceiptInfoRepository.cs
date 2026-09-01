@@ -397,10 +397,7 @@ namespace Repository.Accounts
                                 }
                             }
 
-                            // 4. Update Sales Records - Mark credit sales as complete when payment received
-                            UpdateSalesRecordsOnReceipt(master, details, conn, transaction);
-
-                            // 5. Create Voucher Entries - Double entry system
+                            // 4. Create Voucher Entries - Double entry system
                             DateTime userDate = DateTime.Now;
                             string voucherNarration = !string.IsNullOrEmpty(master.SalesPerson) ? master.SalesPerson : "";
 
@@ -875,109 +872,7 @@ namespace Repository.Accounts
             return ds;
         }
 
-        /// <summary>
-        /// Updates SMaster settlement fields based on receipt details
-        /// </summary>
-        private void UpdateSalesRecordsOnReceipt(CustomerReceiptMaster master, List<CustomerReceiptDetails> details, SqlConnection conn, SqlTransaction transaction)
-        {
-            foreach (var detail in details)
-            {
-                if (detail.AdjustedAmount <= 0 || string.IsNullOrWhiteSpace(detail.BillNo))
-                    continue;
 
-                if (!int.TryParse(detail.BillNo, out int billNo))
-                    continue;
-
-                // Fetch current SMaster data via SP
-                decimal netAmount = 0m;
-                decimal receivedFromDb = 0m;
-                int finYearId = SessionContext.FinYearId;
-                int companyId = SessionContext.CompanyId;
-
-                try
-                {
-                    using (SqlCommand fetchCmd = new SqlCommand(STOREDPROCEDURE._POS_Sales_Win, conn, transaction))
-                    {
-                        fetchCmd.CommandType = CommandType.StoredProcedure;
-                        fetchCmd.Parameters.AddWithValue("@BillNo", billNo);
-                        fetchCmd.Parameters.AddWithValue("@BranchId", master.BranchId);
-                        fetchCmd.Parameters.AddWithValue("@CustomerLedgerId", master.CustomerLedgerId);
-                        fetchCmd.Parameters.AddWithValue("@_Operation", "GETBYID");
-                        DataTable fetchDt = new DataTable();
-                        using (SqlDataAdapter da = new SqlDataAdapter(fetchCmd))
-                        {
-                            da.Fill(fetchDt);
-                        }
-                        if (fetchDt != null && fetchDt.Rows.Count > 0)
-                        {
-                            DataRow r = fetchDt.Rows[0];
-                            netAmount = fetchDt.Columns.Contains("NetAmount") && r["NetAmount"] != DBNull.Value ? Convert.ToDecimal(r["NetAmount"]) : 0m;
-                            receivedFromDb = fetchDt.Columns.Contains("ReceivedAmount") && r["ReceivedAmount"] != DBNull.Value ? Convert.ToDecimal(r["ReceivedAmount"]) : 0m;
-                            finYearId = fetchDt.Columns.Contains("FinYearId") && r["FinYearId"] != DBNull.Value ? Convert.ToInt32(r["FinYearId"]) : finYearId;
-                            companyId = fetchDt.Columns.Contains("CompanyId") && r["CompanyId"] != DBNull.Value ? Convert.ToInt32(r["CompanyId"]) : companyId;
-                        }
-                        else
-                        {
-                            throw new Exception($"Sales record not found for BillNo={billNo}, BranchId={master.BranchId}, CustomerLedgerId={master.CustomerLedgerId}.");
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[UpdateSalesRecordsOnReceipt] SP fetch error for BillNo={billNo}: {ex.Message}");
-                    throw;
-                }
-
-                receivedFromDb = Math.Max(0m, receivedFromDb);
-                decimal adjustedAmount = detail.AdjustedAmount;
-                decimal outstandingBeforeReceipt = detail.InvoiceAmount > 0m ? detail.InvoiceAmount
-                    : Math.Max(0m, Math.Round(netAmount - receivedFromDb, 3, MidpointRounding.AwayFromZero));
-
-                adjustedAmount = Math.Min(adjustedAmount, outstandingBeforeReceipt);
-                decimal balanceToSet = Math.Max(0m, Math.Round(outstandingBeforeReceipt - adjustedAmount, 3, MidpointRounding.AwayFromZero));
-                bool isFullyPaid = balanceToSet <= 0.001m;
-                if (isFullyPaid) balanceToSet = 0m;
-
-                decimal receivedAmountToSet = Math.Round(receivedFromDb + adjustedAmount, 3, MidpointRounding.AwayFromZero);
-                if (isFullyPaid) receivedAmountToSet = Math.Round(netAmount, 3, MidpointRounding.AwayFromZero);
-                if (netAmount > 0m) receivedAmountToSet = Math.Min(receivedAmountToSet, netAmount);
-                receivedAmountToSet = Math.Max(0m, receivedAmountToSet);
-
-                // Update SMaster settlement fields via SP
-                try
-                {
-                    using (SqlCommand updateCmd = new SqlCommand(STOREDPROCEDURE._POS_Sales_Win, conn, transaction))
-                    {
-                        updateCmd.CommandType = CommandType.StoredProcedure;
-                        updateCmd.Parameters.AddWithValue("@BillNo", billNo);
-                        updateCmd.Parameters.AddWithValue("@BranchId", master.BranchId);
-                        updateCmd.Parameters.AddWithValue("@CompanyId", companyId);
-                        updateCmd.Parameters.AddWithValue("@FinYearId", finYearId);
-                        updateCmd.Parameters.AddWithValue("@CustomerLedgerId", master.CustomerLedgerId);
-                        updateCmd.Parameters.AddWithValue("@TenderedAmount", receivedAmountToSet);
-                        updateCmd.Parameters.AddWithValue("@ReceivedAmount", receivedAmountToSet);
-                        updateCmd.Parameters.AddWithValue("@Balance", balanceToSet);
-                        updateCmd.Parameters.AddWithValue("@IsPaid", isFullyPaid);
-                        updateCmd.Parameters.AddWithValue("@Status", isFullyPaid ? "Complete" : "Pending");
-                        updateCmd.Parameters.AddWithValue("@_Operation", "UPDATESETTLEMENT");
-                        updateCmd.ExecuteNonQuery();
-                    }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"[UpdateSalesRecordsOnReceipt] SP update error for BillNo={billNo}: {ex.Message}");
-                    throw new Exception($"Failed to update sales settlement for BillNo={billNo}: {ex.Message}", ex);
-                }
-            }
-        }
-
-        private sealed class SalesSettlementInfo
-        {
-            public decimal NetAmount { get; set; }
-            public decimal ReceivedAmount { get; set; }
-            public int FinYearId { get; set; }
-            public int CompanyId { get; set; }
-        }
 
         /// <summary>
         /// Gets the actual cash ledger ID for the given payment method
@@ -1215,76 +1110,10 @@ namespace Repository.Accounts
                 decimal totalReversed = 0m;
                 foreach (DataRow detailRow in activeDetails.Rows)
                 {
-                    int detailBranchId = Convert.ToInt32(detailRow["BranchId"]);
-                    int billNo = Convert.ToInt32(detailRow["BillNo"]);
-                    int customerLedgerId = Convert.ToInt32(Convert.ToDecimal(detailRow["CustomerLedgerId"]));
-                    decimal receiptAmount = Convert.ToDecimal(detailRow["ReceiptAmount"]);
-
-                    // Fetch SMaster data via SP
-                    decimal netAmount = 0m;
-                    decimal currentReceived = 0m;
-                    int finYearId = SessionContext.FinYearId;
-                    int companyId = SessionContext.CompanyId;
-                    try
+                    if (detailRow.Table.Columns.Contains("ReceiptAmount") && detailRow["ReceiptAmount"] != DBNull.Value)
                     {
-                        using (SqlCommand fetchCmd = new SqlCommand(STOREDPROCEDURE._POS_Sales_Win, (SqlConnection)DataConnection, transaction))
-                        {
-                            fetchCmd.CommandType = CommandType.StoredProcedure;
-                            fetchCmd.Parameters.AddWithValue("@BillNo", billNo);
-                            fetchCmd.Parameters.AddWithValue("@BranchId", detailBranchId);
-                            fetchCmd.Parameters.AddWithValue("@CustomerLedgerId", customerLedgerId);
-                            fetchCmd.Parameters.AddWithValue("@_Operation", "GETBYID");
-                            DataTable fetchDt = new DataTable();
-                            using (SqlDataAdapter da = new SqlDataAdapter(fetchCmd))
-                            {
-                                da.Fill(fetchDt);
-                            }
-                            if (fetchDt != null && fetchDt.Rows.Count > 0)
-                            {
-                                DataRow r = fetchDt.Rows[0];
-                                netAmount = fetchDt.Columns.Contains("NetAmount") && r["NetAmount"] != DBNull.Value ? Convert.ToDecimal(r["NetAmount"]) : 0m;
-                                currentReceived = fetchDt.Columns.Contains("ReceivedAmount") && r["ReceivedAmount"] != DBNull.Value ? Convert.ToDecimal(r["ReceivedAmount"]) : 0m;
-                                finYearId = fetchDt.Columns.Contains("FinYearId") && r["FinYearId"] != DBNull.Value ? Convert.ToInt32(r["FinYearId"]) : finYearId;
-                                companyId = fetchDt.Columns.Contains("CompanyId") && r["CompanyId"] != DBNull.Value ? Convert.ToInt32(r["CompanyId"]) : companyId;
-                            }
-                        }
+                        totalReversed += Convert.ToDecimal(detailRow["ReceiptAmount"]);
                     }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[CancelCustomerReceipt] SP fetch SMaster error for BillNo={billNo}: {ex.Message}");
-                    }
-
-                    decimal newReceived = Math.Max(0m, currentReceived - receiptAmount);
-                    decimal newBalance = Math.Max(0m, netAmount - newReceived);
-                    bool isPaid = newBalance <= 0.001m;
-                    if (isPaid) newBalance = 0m;
-
-                    // Reverse SMaster settlement via SP
-                    try
-                    {
-                        using (SqlCommand reverseCmd = new SqlCommand(STOREDPROCEDURE._POS_Sales_Win, (SqlConnection)DataConnection, transaction))
-                        {
-                            reverseCmd.CommandType = CommandType.StoredProcedure;
-                            reverseCmd.Parameters.AddWithValue("@BillNo", billNo);
-                            reverseCmd.Parameters.AddWithValue("@BranchId", detailBranchId);
-                            reverseCmd.Parameters.AddWithValue("@CompanyId", companyId);
-                            reverseCmd.Parameters.AddWithValue("@FinYearId", finYearId);
-                            reverseCmd.Parameters.AddWithValue("@CustomerLedgerId", customerLedgerId);
-                            reverseCmd.Parameters.AddWithValue("@TenderedAmount", newReceived);
-                            reverseCmd.Parameters.AddWithValue("@ReceivedAmount", newReceived);
-                            reverseCmd.Parameters.AddWithValue("@Balance", newBalance);
-                            reverseCmd.Parameters.AddWithValue("@IsPaid", isPaid);
-                            reverseCmd.Parameters.AddWithValue("@Status", isPaid ? "Complete" : "Pending");
-                            reverseCmd.Parameters.AddWithValue("@_Operation", "UPDATESETTLEMENT");
-                            reverseCmd.ExecuteNonQuery();
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"[CancelCustomerReceipt] SP reverse SMaster error for BillNo={billNo}: {ex.Message}");
-                    }
-
-                    totalReversed += receiptAmount;
                 }
 
                 // 3. Cancel details using Stored Procedure STOREDPROCEDURE._CustomerReceiptDetails
