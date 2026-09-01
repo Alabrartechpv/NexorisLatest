@@ -300,28 +300,36 @@ namespace Repository.Accounts
                                 // First check if the linked Sales Return already generated a VoucherID
                                 if (master.SReturnNo > 0)
                                 {
-                                    try
-                                    {
-                                        using (SqlCommand srCmd = new SqlCommand("SELECT VoucherID FROM _POS_SalesReturn WHERE SReturnNo = @SReturnNo AND BranchId = @BranchId", conn, transaction))
-                                        {
-                                            srCmd.Parameters.AddWithValue("@SReturnNo", master.SReturnNo);
-                                            srCmd.Parameters.AddWithValue("@BranchId", master.BranchId);
-                                            object srVoucherResult = srCmd.ExecuteScalar();
-                                            if (srVoucherResult != null && srVoucherResult != DBNull.Value)
-                                            {
-                                                int existingVoucherId = Convert.ToInt32(srVoucherResult);
-                                                if (existingVoucherId > 0)
-                                                {
-                                                    master.VoucherId = existingVoucherId;
-                                                    System.Diagnostics.Debug.WriteLine($"Reusing existing VoucherID {existingVoucherId} from SalesReturn #{master.SReturnNo} for Credit Note.");
-                                                }
-                                            }
-                                        }
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        System.Diagnostics.Debug.WriteLine($"Could not check SalesReturn VoucherID: {ex.Message}");
-                                    }
+                                     try
+                                     {
+                                         using (SqlCommand srCmd = new SqlCommand(STOREDPROCEDURE.POS_SalesReturn, conn, transaction))
+                                         {
+                                             srCmd.CommandType = CommandType.StoredProcedure;
+                                             srCmd.Parameters.AddWithValue("@SReturnNo", master.SReturnNo);
+                                             srCmd.Parameters.AddWithValue("@BranchId", master.BranchId);
+                                             srCmd.Parameters.AddWithValue("@_Operation", "GETBYSRNO");
+                                             DataTable srDt = new DataTable();
+                                             using (SqlDataAdapter srDa = new SqlDataAdapter(srCmd))
+                                             {
+                                                 srDa.Fill(srDt);
+                                             }
+                                             if (srDt != null && srDt.Rows.Count > 0 &&
+                                                 srDt.Columns.Contains("VoucherID") &&
+                                                 srDt.Rows[0]["VoucherID"] != DBNull.Value)
+                                             {
+                                                 int existingVoucherId = Convert.ToInt32(srDt.Rows[0]["VoucherID"]);
+                                                 if (existingVoucherId > 0)
+                                                 {
+                                                     master.VoucherId = existingVoucherId;
+                                                     System.Diagnostics.Debug.WriteLine($"Reusing existing VoucherID {existingVoucherId} from SalesReturn #{master.SReturnNo} for Credit Note.");
+                                                 }
+                                             }
+                                         }
+                                     }
+                                     catch (Exception ex)
+                                     {
+                                         System.Diagnostics.Debug.WriteLine($"Could not check SalesReturn VoucherID: {ex.Message}");
+                                     }
                                 }
 
                                 // If still no VoucherId, generate a new one via stored procedure
