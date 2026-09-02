@@ -251,9 +251,9 @@ namespace PosBranch_Win.Reports.FinancialReports
             layout.Override.SelectTypeRow = SelectType.Single;
             layout.Override.HeaderStyle = HeaderStyle.Standard;
 
-            // Row Selectors & Focus Rect Removal (removing black dotted item highlighter line)
+            // Row Selectors (matching Image 2)
             layout.Override.RowSelectors = DefaultableBoolean.True;
-            layout.Override.RowSelectorWidth = 28;
+            layout.Override.RowSelectorWidth = 20;
             layout.Override.RowSelectorNumberStyle = RowSelectorNumberStyle.RowIndex;
             layout.Override.RowSelectorAppearance.ThemedElementAlpha = Alpha.Transparent;
             layout.Override.RowSelectorAppearance.BackColor = GridHeaderBlueDark;
@@ -263,35 +263,22 @@ namespace PosBranch_Win.Reports.FinancialReports
             layout.Override.RowSelectorAppearance.ForeColor = Color.White;
             layout.Override.RowSelectorAppearance.FontData.Bold = DefaultableBoolean.True;
             layout.Override.RowSelectorAppearance.TextHAlign = HAlign.Center;
-            // Active & Selected Row/Cell Appearance (removing black dotted item highlighter line)
-            layout.Override.ActiveCellAppearance.BackColor = GridSelectedBlue;
-            layout.Override.ActiveCellAppearance.ForeColor = Color.White;
-            layout.Override.ActiveCellAppearance.BorderColor = Color.Transparent;
-            layout.Override.ActiveCellAppearance.BorderAlpha = Alpha.Transparent;
-            layout.Override.ActiveRowAppearance.BackColor = GridSelectedBlue;
-            layout.Override.ActiveRowAppearance.ForeColor = Color.White;
-            layout.Override.ActiveRowAppearance.BorderColor = BorderBlue;
-            layout.Override.SelectedRowAppearance.BackColor = GridSelectedBlue;
-            layout.Override.SelectedRowAppearance.ForeColor = Color.White;
 
-            // Header Appearance matching image1 (Office 2007 blue gradient, crisp white text centered, thin vertical borders)
+            // Header Appearance (matching Image 2: regular font, non-bold 8.25pt)
             layout.Override.HeaderAppearance.ThemedElementAlpha = Alpha.Transparent;
             layout.Override.HeaderAppearance.BackColor = GridHeaderBlue;
             layout.Override.HeaderAppearance.BackColor2 = GridHeaderBlueDark;
             layout.Override.HeaderAppearance.BackGradientStyle = GradientStyle.Vertical;
             layout.Override.HeaderAppearance.ForeColor = Color.White;
             layout.Override.HeaderAppearance.BorderColor = BorderBlue;
-            layout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.True;
+            layout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.False;
             layout.Override.HeaderAppearance.FontData.Name = "Microsoft Sans Serif";
-            layout.Override.HeaderAppearance.FontData.SizeInPoints = 8.5F;
-            layout.Override.HeaderAppearance.TextHAlign = HAlign.Center;
-            layout.Override.HeaderAppearance.TextVAlign = VAlign.Middle;
+            layout.Override.HeaderAppearance.FontData.SizeInPoints = 8.25F;
 
-            // Rows & Cells
-            layout.Override.RowAppearance.BackColor = Color.White;
-            layout.Override.RowAlternateAppearance.BackColor = GridAltRow;
-            layout.Override.RowAppearance.BorderColor = GridRowLine;
-            layout.Override.RowAlternateAppearance.BorderColor = GridRowLine;
+            // Active & Selected Row/Cell Appearance (matching Image 2)
+            layout.Override.ActiveCellAppearance.BackColor = GridSelectedBlue;
+            layout.Override.ActiveCellAppearance.ForeColor = Color.White;
+            layout.Override.ActiveCellAppearance.BorderColor = BorderBlue;
             layout.Override.ActiveRowAppearance.BackColor = GridSelectedBlue;
             layout.Override.ActiveRowAppearance.ForeColor = Color.White;
             layout.Override.ActiveRowAppearance.BorderColor = BorderBlue;
@@ -305,8 +292,8 @@ namespace PosBranch_Win.Reports.FinancialReports
             layout.Override.BorderStyleHeader = UIElementBorderStyle.Solid;
             layout.Override.BorderStyleCell = UIElementBorderStyle.Solid;
             layout.Override.BorderStyleRow = UIElementBorderStyle.Solid;
-            layout.Override.MinRowHeight = 20;
-            layout.Override.DefaultRowHeight = 20;
+            layout.Override.MinRowHeight = 19;
+            layout.Override.DefaultRowHeight = 19;
             layout.RowConnectorStyle = RowConnectorStyle.Solid;
             layout.RowConnectorColor = GridRowLine;
 
@@ -320,6 +307,11 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             gridReport.BackColor = FormBackColor;
             gridReport.Font = new Font("Microsoft Sans Serif", 8.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
+
+            gridReport.AfterColPosChanged += (s, ev) => UpdateFooterCellPositions();
+            gridReport.AfterColRegionScroll += (s, ev) => UpdateFooterCellPositions();
+            gridReport.AfterRowRegionScroll += (s, ev) => UpdateFooterCellPositions();
+            gridReport.Paint += (s, ev) => UpdateFooterCellPositions();
         }
 
         private void LoadReport()
@@ -388,17 +380,21 @@ namespace PosBranch_Win.Reports.FinancialReports
                 col.Header.Appearance.BackColor2 = GridHeaderBlueDark;
                 col.Header.Appearance.BackGradientStyle = GradientStyle.Vertical;
                 col.Header.Appearance.ForeColor = Color.White;
-                col.Header.Appearance.TextHAlign = HAlign.Center;
+                col.Header.Appearance.FontData.Bold = DefaultableBoolean.False;
+                col.Header.Appearance.FontData.Name = "Microsoft Sans Serif";
+                col.Header.Appearance.FontData.SizeInPoints = 8.25F;
 
                 if (col.DataType == typeof(decimal) || col.DataType == typeof(double) || col.DataType == typeof(float) || col.DataType == typeof(int) || col.DataType == typeof(long))
                 {
                     col.CellAppearance.TextHAlign = HAlign.Right;
+                    col.Header.Appearance.TextHAlign = HAlign.Right;
                     if (col.DataType == typeof(decimal) || col.DataType == typeof(double) || col.DataType == typeof(float))
                         col.Format = "N2";
                 }
                 else
                 {
                     col.CellAppearance.TextHAlign = HAlign.Left;
+                    col.Header.Appearance.TextHAlign = HAlign.Left;
                 }
             }
         }
@@ -444,7 +440,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                 _footerLabels[column.Key] = footerLabel;
 
                 if (!_columnAggregations.ContainsKey(column.Key))
-                    _columnAggregations[column.Key] = IsSummableColumn(column) ? "Sum" : "None";
+                    _columnAggregations[column.Key] = "None"; // Defaults to None on page load!
 
                 xOffset += column.Width;
             }
@@ -511,6 +507,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                 {
                     footerLabel.Text = string.Empty;
                     footerLabel.Tag = Tuple.Create(columnKey, string.Empty);
+                    footerLabel.Invalidate();
                     continue;
                 }
 
@@ -518,6 +515,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                 string formattedText = FormatAggregationResult(columnKey, aggregation, result);
                 footerLabel.Text = string.IsNullOrEmpty(formattedText) ? string.Empty : $"{aggregation}: {formattedText}";
                 footerLabel.Tag = Tuple.Create(columnKey, footerLabel.Text);
+                footerLabel.Invalidate();
             }
         }
 
@@ -554,6 +552,7 @@ namespace PosBranch_Win.Reports.FinancialReports
 
         private string FormatAggregationResult(string columnKey, string aggregation, object result)
         {
+            if (string.Equals(aggregation, "None", StringComparison.OrdinalIgnoreCase)) return string.Empty;
             if (result == null) return string.Empty;
             if (aggregation == "Count") return Convert.ToString(result);
 
@@ -611,17 +610,42 @@ namespace PosBranch_Win.Reports.FinancialReports
 
         private void UpdateFooterCellPositions()
         {
-            if (gridReport.DisplayLayout.Bands.Count == 0 || _footerLabels.Count == 0) return;
+            if (gridReport.DisplayLayout == null || gridReport.DisplayLayout.Bands.Count == 0 || _footerLabels.Count == 0 || ultraPanelGridFooter == null)
+                return;
 
-            int xOffset = gridReport.DisplayLayout.Override.RowSelectorWidth;
-            foreach (UltraGridColumn column in gridReport.DisplayLayout.Bands[0].Columns.Cast<UltraGridColumn>().OrderBy(c => c.Header.VisiblePosition))
+            UltraGridBand band = gridReport.DisplayLayout.Bands[0];
+            int rowSelectorWidth = gridReport.DisplayLayout.Override.RowSelectorWidth;
+            int scrollOffset = gridReport.ActiveColScrollRegion != null ? gridReport.ActiveColScrollRegion.Position : 0;
+            int calculatedX = rowSelectorWidth - scrollOffset;
+
+            foreach (UltraGridColumn column in band.Columns.Cast<UltraGridColumn>().OrderBy(c => c.Header.VisiblePosition))
             {
-                if (column.Hidden || !_footerLabels.ContainsKey(column.Key)) continue;
+                if (column.Hidden || !_footerLabels.ContainsKey(column.Key))
+                    continue;
+
                 Label footerLabel = _footerLabels[column.Key];
-                footerLabel.Left = xOffset;
-                footerLabel.Width = column.Width;
-                footerLabel.Height = Math.Max(ultraPanelGridFooter.Height - 2, 20);
-                xOffset += column.Width;
+                var headerUI = column.Header.GetUIElement();
+                int left, width;
+
+                if (headerUI != null)
+                {
+                    left = headerUI.Rect.Left;
+                    width = headerUI.Rect.Width;
+                }
+                else
+                {
+                    left = calculatedX;
+                    width = column.Width;
+                }
+
+                calculatedX += column.Width;
+
+                footerLabel.Left = left;
+                footerLabel.Width = width;
+                footerLabel.Top = 0;
+                footerLabel.Height = ultraPanelGridFooter.Height;
+                footerLabel.Visible = (left + width > 0 && left < ultraPanelGridFooter.Width);
+                footerLabel.Invalidate();
             }
         }
 

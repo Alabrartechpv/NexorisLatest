@@ -61,21 +61,27 @@ namespace Repository.ReportRepository
                     string itemJoin = hasItemMaster ? "LEFT JOIN dbo.ItemMaster i ON d.ItemID = i.ItemID" : "";
                     string hsnSelect = hasItemMaster ? "ISNULL(i.HSNCode, '')" : "''";
 
+                    bool hasLedgerMaster = TableExists("LedgerMaster");
+                    bool hasLedger = TableExists("Ledger");
+                    string ledgerTable = hasLedgerMaster ? "dbo.LedgerMaster" : (hasLedger ? "dbo.Ledger" : "");
+                    string ledgerJoin = !string.IsNullOrEmpty(ledgerTable) ? $"LEFT JOIN {ledgerTable} l ON m.LedgerID = l.LedgerID" : "";
+                    string gstinSelect = !string.IsNullOrEmpty(ledgerTable) ? "ISNULL(l.GSTIN, '')" : "''";
+
                     string sql = $@"
                         SELECT 
                             CAST(ISNULL(m.BillNo, 0) AS NVARCHAR(50)) AS InvoiceNo,
                             m.BillDate AS DocDate,
                             ISNULL(NULLIF(m.CustomerName, ''), 'Walk-in Customer') AS CustomerName,
-                            '' AS CustomerGSTIN,
-                            CASE WHEN ISNULL(m.CustomerName, '') <> '' AND CHARINDEX('32', m.CustomerName) > 0 THEN 'B2B' ELSE 'B2C' END AS SaleType,
+                            {gstinSelect} AS CustomerGSTIN,
+                            CASE WHEN LEN({gstinSelect}) >= 15 THEN 'B2B' ELSE 'B2C' END AS SaleType,
                             ISNULL(d.ItemName, '') AS ItemName,
                             {hsnSelect} AS HSNCode,
                             ISNULL(d.Qty, 0) AS Qty,
                             ISNULL(d.Unit, '') AS Unit,
                             CAST(ISNULL(d.BaseAmount, (ISNULL(d.Qty,0)*ISNULL(d.UnitPrice,0)) - ISNULL(d.TaxAmt,0)) AS DECIMAL(18,2)) AS TaxableValue,
-                            CAST(ISNULL(d.TaxPer, 0)/2.0 AS FLOAT) AS CGSTPer,
+                            CAST((CASE WHEN ISNULL(d.TaxPer, 0) > 100 THEN ISNULL(d.TaxPer, 0)/100.0 ELSE ISNULL(d.TaxPer, 0) END)/2.0 AS FLOAT) AS CGSTPer,
                             CAST(ISNULL(d.TaxAmt, 0)/2.0 AS DECIMAL(18,2)) AS CGSTAmt,
-                            CAST(ISNULL(d.TaxPer, 0)/2.0 AS FLOAT) AS SGSTPer,
+                            CAST((CASE WHEN ISNULL(d.TaxPer, 0) > 100 THEN ISNULL(d.TaxPer, 0)/100.0 ELSE ISNULL(d.TaxPer, 0) END)/2.0 AS FLOAT) AS SGSTPer,
                             CAST(ISNULL(d.TaxAmt, 0)/2.0 AS DECIMAL(18,2)) AS SGSTAmt,
                             CAST(0 AS FLOAT) AS IGSTPer,
                             CAST(0 AS DECIMAL(18,2)) AS IGSTAmt,
@@ -85,23 +91,24 @@ namespace Repository.ReportRepository
                             CAST(ISNULL(d.TotalAmount, (ISNULL(d.Qty,0)*ISNULL(d.UnitPrice,0))) AS DECIMAL(18,2)) AS TotalInvoiceAmount,
                             ISNULL(d.TaxType, 'incl') AS TaxType
                         FROM dbo.SMaster m
-                        INNER JOIN dbo.SDetails d ON m.BillNo = d.BillNo AND m.FinYearId = d.FinYearId AND m.BranchId = d.BranchID
+                        INNER JOIN dbo.SDetails d ON m.BillNo = d.BillNo
                         {itemJoin}
-                        WHERE (@CompanyId IS NULL OR m.CompanyId = @CompanyId)
-                          AND (@BranchId IS NULL OR m.BranchId = @BranchId)
-                          AND (@FinYearId IS NULL OR m.FinYearId = @FinYearId)
-                          AND (CAST(m.BillDate AS DATE) BETWEEN @FromDate AND @ToDate)
-                          AND (@CustomerLedgerId IS NULL OR m.LedgerID = @CustomerLedgerId)
+                        {ledgerJoin}
+                        WHERE (@CompanyId IS NULL OR @CompanyId <= 0 OR ISNULL(m.CompanyId, 0) = 0 OR ISNULL(m.CompanyId, 0) = @CompanyId)
+                          AND (@BranchId IS NULL OR @BranchId <= 0 OR ISNULL(m.BranchId, 0) = 0 OR ISNULL(m.BranchId, 0) = @BranchId)
+                          AND (@FinYearId IS NULL OR @FinYearId <= 0 OR ISNULL(m.FinYearId, 0) = 0 OR ISNULL(m.FinYearId, 0) = @FinYearId)
+                          AND (m.BillDate IS NULL OR CAST(m.BillDate AS DATE) BETWEEN @FromDate AND @ToDate)
+                          AND (@CustomerLedgerId IS NULL OR @CustomerLedgerId <= 0 OR m.LedgerID = @CustomerLedgerId)
                     ";
 
                     using (SqlCommand cmd = new SqlCommand(sql, (SqlConnection)DataConnection))
                     {
-                        cmd.Parameters.AddWithValue("@CompanyId", filter.CompanyId > 0 ? (object)filter.CompanyId : DBNull.Value);
-                        cmd.Parameters.AddWithValue("@BranchId", filter.BranchId > 0 ? (object)filter.BranchId : DBNull.Value);
-                        cmd.Parameters.AddWithValue("@FinYearId", filter.FinYearId > 0 ? (object)filter.FinYearId : DBNull.Value);
+                        cmd.Parameters.AddWithValue("@CompanyId", filter.CompanyId);
+                        cmd.Parameters.AddWithValue("@BranchId", filter.BranchId);
+                        cmd.Parameters.AddWithValue("@FinYearId", filter.FinYearId);
                         cmd.Parameters.AddWithValue("@FromDate", filter.FromDate.Date);
                         cmd.Parameters.AddWithValue("@ToDate", filter.ToDate.Date);
-                        cmd.Parameters.AddWithValue("@CustomerLedgerId", filter.CustomerLedgerId > 0 ? (object)filter.CustomerLedgerId : DBNull.Value);
+                        cmd.Parameters.AddWithValue("@CustomerLedgerId", filter.CustomerLedgerId);
 
                         using (SqlDataAdapter adapter = new SqlDataAdapter(cmd))
                         {
