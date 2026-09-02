@@ -1073,11 +1073,23 @@
     <Compile Include="Reports\FinancialReports\frmVendorOutstandingReport.Designer.cs">
       <DependentUpon>frmVendorOutstandingReport.cs</DependentUpon>
     </Compile>
-    <Compile Include="Reports\FinancialReports\frmgstandtaxreport.cs">
+    <Compile Include="Reports\FinancialReports\frmInputGSTReport.cs">
       <SubType>Form</SubType>
     </Compile>
-    <Compile Include="Reports\FinancialReports\frmgstandtaxreport.Designer.cs">
-      <DependentUpon>frmgstandtaxreport.cs</DependentUpon>
+    <Compile Include="Reports\FinancialReports\frmInputGSTReport.Designer.cs">
+      <DependentUpon>frmInputGSTReport.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Reports\FinancialReports\frmOutputGSTReport.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Reports\FinancialReports\frmOutputGSTReport.Designer.cs">
+      <DependentUpon>frmOutputGSTReport.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Reports\FinancialReports\frmGovtGSTReturnReport.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Reports\FinancialReports\frmGovtGSTReturnReport.Designer.cs">
+      <DependentUpon>frmGovtGSTReturnReport.cs</DependentUpon>
     </Compile>
     <Compile Include="Reports\InventoryReport\FrmSmartReorderDashboard.cs">
       <SubType>Form</SubType>
@@ -1804,11 +1816,17 @@
     <EmbeddedResource Include="Reports\FinancialReports\frmVendorOutstandingReport.resx">
       <DependentUpon>frmVendorOutstandingReport.cs</DependentUpon>
     </EmbeddedResource>
-    <EmbeddedResource Include="Reports\FinancialReports\frmgstandtaxreport.resx">
-      <DependentUpon>frmgstandtaxreport.cs</DependentUpon>
-    </EmbeddedResource>
     <EmbeddedResource Include="Reports\FinancialReports\frmVendorPaymentReport.resx">
       <DependentUpon>frmVendorPaymentReport.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Reports\FinancialReports\frmInputGSTReport.resx">
+      <DependentUpon>frmInputGSTReport.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Reports\FinancialReports\frmOutputGSTReport.resx">
+      <DependentUpon>frmOutputGSTReport.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Reports\FinancialReports\frmGovtGSTReturnReport.resx">
+      <DependentUpon>frmGovtGSTReturnReport.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Reports\InventoryReport\frmItemReport.resx">
       <DependentUpon>frmItemReport.cs</DependentUpon>

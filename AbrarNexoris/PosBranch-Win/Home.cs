@@ -98,7 +98,9 @@ namespace PosBranch_Win
             new ReportNavigatorDefinition("Analysis", "Bank Statement", "BankStatementReport"),
             new ReportNavigatorDefinition("Others", "Manual Party Balance Report", "ManualPartyBalanceReport"),
             new ReportNavigatorDefinition("Others", "Combined Party Balance Report", "CombinedPartyBalanceReport"),
-            new ReportNavigatorDefinition("Others", "GST & Tax Report", "GSTAndTaxReport")
+            new ReportNavigatorDefinition("GST Reports", "Input GST Report", "InputGSTReport"),
+            new ReportNavigatorDefinition("GST Reports", "Output GST Report", "OutputGSTReport"),
+            new ReportNavigatorDefinition("GST Reports", "Government GST Return Report", "GovtGSTReturnReport")
         };
 
         private static readonly Dictionary<string, string> ReportNavigatorActionAliases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -2701,10 +2703,20 @@ namespace PosBranch_Win
                 PosBranch_Win.Reports.FinancialReports.frmVendorOutstandingReport unallocatedReturnsReport = new PosBranch_Win.Reports.FinancialReports.frmVendorOutstandingReport(true);
                 OpenFormInTab(unallocatedReturnsReport, "Unallocated Purchase Returns");
             }
-            if (e.Tool.Key == "GSTAndTaxReport" || e.Tool.Key == "frmgstandtaxreport")
+            if (e.Tool.Key == "InputGSTReport" || e.Tool.Key == "frmInputGSTReport")
             {
-                PosBranch_Win.Reports.FinancialReports.frmgstandtaxreport gstReport = new PosBranch_Win.Reports.FinancialReports.frmgstandtaxreport();
-                OpenFormInTab(gstReport, "GST & Tax Report");
+                PosBranch_Win.Reports.FinancialReports.frmInputGSTReport inputGstReport = new PosBranch_Win.Reports.FinancialReports.frmInputGSTReport();
+                OpenFormInTab(inputGstReport, "Input GST & ITC Report");
+            }
+            if (e.Tool.Key == "OutputGSTReport" || e.Tool.Key == "frmOutputGSTReport")
+            {
+                PosBranch_Win.Reports.FinancialReports.frmOutputGSTReport outputGstReport = new PosBranch_Win.Reports.FinancialReports.frmOutputGSTReport();
+                OpenFormInTab(outputGstReport, "Output GST Report");
+            }
+            if (e.Tool.Key == "GovtGSTReturnReport" || e.Tool.Key == "frmGovtGSTReturnReport")
+            {
+                PosBranch_Win.Reports.FinancialReports.frmGovtGSTReturnReport govtGstReport = new PosBranch_Win.Reports.FinancialReports.frmGovtGSTReturnReport();
+                OpenFormInTab(govtGstReport, "Government GST Return Report");
             }
 
             #region here for reports sections menu
@@ -4853,8 +4865,9 @@ namespace PosBranch_Win
                     keyToExecute == "UnallocatedPurchaseReturns" ||
                     keyToExecute == "ProfitLossAccount" ||
                     keyToExecute == "StockListingReport" ||
-                    keyToExecute == "GSTAndTaxReport" ||
-                    keyToExecute == "frmgstandtaxreport")
+                    keyToExecute == "InputGSTReport" ||
+                    keyToExecute == "OutputGSTReport" ||
+                    keyToExecute == "GovtGSTReturnReport")
                 {
                     Infragistics.Win.UltraWinToolbars.ToolBase toolToExecute;
 
