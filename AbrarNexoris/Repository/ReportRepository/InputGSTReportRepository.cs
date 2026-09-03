@@ -55,49 +55,163 @@ namespace Repository.ReportRepository
                 }
 
                 // 2. Direct Query Fallback
-                if (TableExists("PMaster") && TableExists("PDetails"))
-                {
-                    bool hasItemMaster = TableExists("ItemMaster");
-                    string itemJoin = hasItemMaster ? "LEFT JOIN dbo.ItemMaster i ON d.ItemID = i.ItemID" : "";
-                    string hsnSelect = hasItemMaster ? "ISNULL(i.HSNCode, '')" : "''";
+                string masterTable = TableExists("PMaster") ? "PMaster" : (TableExists("PurchaseMaster") ? "PurchaseMaster" : "");
+                string detailsTable = TableExists("PDetails") ? "PDetails" : (TableExists("PurchaseDetails") ? "PurchaseDetails" : "");
 
-                    bool hasLedgerMaster = TableExists("LedgerMaster");
-                    bool hasLedger = TableExists("Ledger");
-                    string ledgerTable = hasLedgerMaster ? "dbo.LedgerMaster" : (hasLedger ? "dbo.Ledger" : "");
-                    string ledgerJoin = !string.IsNullOrEmpty(ledgerTable) ? $"LEFT JOIN {ledgerTable} l ON m.LedgerID = l.LedgerID" : "";
-                    string gstinSelect = !string.IsNullOrEmpty(ledgerTable) ? "ISNULL(l.GSTIN, '')" : "''";
+                if (!string.IsNullOrEmpty(masterTable))
+                {
+                    string purNoMaster = GetCol(masterTable, "m", "PurchaseNo", "PurchaseID", "PurNo", "InvoiceNo") ?? "m.PurchaseNo";
+                    string invNoMaster = GetCol(masterTable, "m", "InvoiceNo", "InvNo", "PurchaseNo", "BillNo") ?? "m.InvoiceNo";
+                    string dateColMaster = GetCol(masterTable, "m", "InvoiceDate", "PurchaseDate", "DocDate", "CreatedOn") ?? "m.InvoiceDate";
+                    string vendorNameCol = GetCol(masterTable, "m", "VendorName", "SupplierName", "vendorname") ?? "m.VendorName";
+                    string ledgerIdMaster = GetCol(masterTable, "m", "LedgerID", "LedgerId", "VendorID", "VendorId");
+                    string companyCol = GetCol(masterTable, "m", "CompanyId", "CompanyID", "Company_Id");
+                    string branchCol = GetCol(masterTable, "m", "BranchId", "BranchID", "Branch_Id");
+                    string finYearCol = GetCol(masterTable, "m", "FinYearId", "FinYearID", "FinYear_Id");
+                    string taxTypeMasterCol = GetCol(masterTable, "m", "TaxType", "taxtype") ?? "'excl'";
+
+                    string detailsJoin = "";
+                    string itemNameCol = "''";
+                    string qtyCol = "0";
+                    string unitCol = "''";
+                    string costCol = "0";
+                    string taxAmtCol = "0";
+                    string taxPerCol = "0";
+                    string cessPerCol = "0";
+                    string cessAmtCol = "0";
+
+                    if (!string.IsNullOrEmpty(detailsTable))
+                    {
+                        string purNoDetails = GetCol(detailsTable, "d", "PurchaseNo", "PurchaseID", "PurNo", "InvoiceNo") ?? "d.PurchaseNo";
+                        detailsJoin = $"LEFT JOIN dbo.{detailsTable} d ON {purNoMaster} = {purNoDetails}";
+
+                        itemNameCol = GetCol(detailsTable, "d", "ItemName", "Item_Name", "itemname") ?? "''";
+                        qtyCol = GetCol(detailsTable, "d", "Qty", "qty", "Quantity") ?? "0";
+                        unitCol = GetCol(detailsTable, "d", "Unit", "unit", "UOM") ?? "''";
+                        costCol = GetCol(detailsTable, "d", "Cost", "UnitPrice", "Rate", "Price") ?? "0";
+                        taxAmtCol = GetCol(detailsTable, "d", "TaxAmt", "TaxAmount", "GstAmt", "GSTAmount") ?? "0";
+                        taxPerCol = GetCol(detailsTable, "d", "TaxPer", "TaxPercent", "GstPer", "GSTPer") ?? "0";
+                        cessPerCol = GetCol(detailsTable, "d", "CessPer", "CessPercent") ?? "0";
+                        cessAmtCol = GetCol(detailsTable, "d", "CessAmt", "CessAmount") ?? "0";
+                    }
+
+                    string hasItemMaster = TableExists("ItemMaster") ? "ItemMaster" : "";
+                    string itemJoin = "";
+                    string hsnSelect = "''";
+                    if (!string.IsNullOrEmpty(hasItemMaster) && !string.IsNullOrEmpty(detailsTable))
+                    {
+                        string itemKeyDetails = GetCol(detailsTable, "d", "ItemID", "ItemId");
+                        string itemKeyMaster = GetCol("ItemMaster", "i", "ItemID", "ItemId");
+                        string hsnCol = GetCol("ItemMaster", "i", "HSNCode", "HSN", "HsnCode");
+                        if (itemKeyDetails != null && itemKeyMaster != null)
+                        {
+                            itemJoin = $"LEFT JOIN dbo.ItemMaster i ON {itemKeyDetails} = {itemKeyMaster}";
+                            if (hsnCol != null) hsnSelect = $"ISNULL({hsnCol}, '')";
+                        }
+                    }
+
+                    string ledgerTable = TableExists("LedgerMaster") ? "LedgerMaster" : (TableExists("Ledger") ? "Ledger" : "");
+                    string ledgerJoin = "";
+                    string gstinSelect = "''";
+                    if (!string.IsNullOrEmpty(ledgerTable) && ledgerIdMaster != null)
+                    {
+                        string ledgerKey = GetCol(ledgerTable, "l", "LedgerID", "LedgerId");
+                        if (ledgerKey != null)
+                        {
+                            ledgerJoin = $"LEFT JOIN dbo.{ledgerTable} l ON {ledgerIdMaster} = {ledgerKey}";
+                            gstinSelect = GetGstinColumnExpression("l", ledgerTable);
+                        }
+                    }
+
+                    string masterNetCol = GetCol(masterTable, "m", "NetAmount", "NetAmt", "GrandTotal", "TotalAmount") ?? "0";
+                    string masterTaxCol = GetCol(masterTable, "m", "TaxAmt", "TaxAmount", "GstAmt") ?? "0";
+                    string masterSubCol = GetCol(masterTable, "m", "SubTotal", "BaseAmount", "TaxableValue") ?? "0";
+                    string masterTaxPerCol = GetCol(masterTable, "m", "TaxPer", "TaxPercent", "GstPer") ?? "0";
+
+                    List<string> whereClauses = new List<string>();
+                    if (companyCol != null)
+                        whereClauses.Add($"(@CompanyId <= 0 OR ISNULL({companyCol}, 0) = 0 OR ISNULL({companyCol}, 0) = @CompanyId)");
+                    if (branchCol != null)
+                        whereClauses.Add($"(@BranchId <= 0 OR ISNULL({branchCol}, 0) = 0 OR ISNULL({branchCol}, 0) = @BranchId)");
+                    if (finYearCol != null)
+                        whereClauses.Add($"(@FinYearId <= 0 OR ISNULL({finYearCol}, 0) = 0 OR ISNULL({finYearCol}, 0) = @FinYearId)");
+
+                    DateTime exclusiveTo = filter.ToDate.Date.AddDays(1);
+                    whereClauses.Add($"({dateColMaster} IS NULL OR ({dateColMaster} >= @FromDate AND {dateColMaster} < @ExclusiveTo))");
+
+                    if (ledgerIdMaster != null)
+                        whereClauses.Add($"(@SupplierLedgerId <= 0 OR {ledgerIdMaster} = @SupplierLedgerId)");
+
+                    string whereSql = whereClauses.Count > 0 ? "WHERE " + string.Join(" AND ", whereClauses) : "";
 
                     string sql = $@"
                         SELECT 
-                            ISNULL(m.InvoiceNo, CAST(m.PurchaseNo AS NVARCHAR(50))) AS InvoiceNo,
-                            m.InvoiceDate AS DocDate,
-                            ISNULL(NULLIF(m.VendorName, ''), 'General Supplier') AS SupplierName,
+                            ISNULL({invNoMaster}, CAST({purNoMaster} AS NVARCHAR(50))) AS InvoiceNo,
+                            {dateColMaster} AS DocDate,
+                            ISNULL(NULLIF({vendorNameCol}, ''), 'General Supplier') AS SupplierName,
                             {gstinSelect} AS SupplierGSTIN,
-                            ISNULL(d.ItemName, '') AS ItemName,
+                            ISNULL({itemNameCol}, 'Purchase Item') AS ItemName,
                             {hsnSelect} AS HSNCode,
-                            ISNULL(d.Qty, 0) AS Qty,
-                            ISNULL(d.Unit, '') AS Unit,
-                            CAST((ISNULL(d.Qty,0)*ISNULL(d.Cost,0)) - ISNULL(d.TaxAmt,0) AS DECIMAL(18,2)) AS TaxableValue,
-                            CAST((CASE WHEN ISNULL(d.TaxPer, 0) > 100 THEN ISNULL(d.TaxPer, 0)/100.0 ELSE ISNULL(d.TaxPer, 0) END)/2.0 AS FLOAT) AS CGSTPer,
-                            CAST(ISNULL(d.TaxAmt, 0)/2.0 AS DECIMAL(18,2)) AS CGSTAmt,
-                            CAST((CASE WHEN ISNULL(d.TaxPer, 0) > 100 THEN ISNULL(d.TaxPer, 0)/100.0 ELSE ISNULL(d.TaxPer, 0) END)/2.0 AS FLOAT) AS SGSTPer,
-                            CAST(ISNULL(d.TaxAmt, 0)/2.0 AS DECIMAL(18,2)) AS SGSTAmt,
+                            ISNULL({qtyCol}, 1) AS Qty,
+                            ISNULL({unitCol}, 'PCS') AS Unit,
+                            CAST(
+                                CASE 
+                                    WHEN ISNULL({costCol}, 0) > 0 AND ISNULL({qtyCol}, 0) > 0 THEN ((ISNULL({qtyCol},0)*ISNULL({costCol},0)) - ISNULL({taxAmtCol},0))
+                                    WHEN ISNULL({masterSubCol}, 0) > 0 THEN {masterSubCol}
+                                    WHEN ISNULL({masterNetCol}, 0) > 0 THEN ({masterNetCol} - ISNULL({masterTaxCol}, 0))
+                                    ELSE 0
+                                END AS DECIMAL(18,2)
+                            ) AS TaxableValue,
+                            CAST(
+                                (CASE 
+                                    WHEN ISNULL({taxPerCol}, 0) > 0 THEN 
+                                        (CASE WHEN {taxPerCol} > 100 THEN {taxPerCol}/100.0 ELSE {taxPerCol} END)
+                                    ELSE 
+                                        (CASE WHEN ISNULL({masterTaxPerCol}, 0) > 100 THEN {masterTaxPerCol}/100.0 ELSE ISNULL({masterTaxPerCol}, 0) END)
+                                END)/2.0 AS FLOAT
+                            ) AS CGSTPer,
+                            CAST(
+                                (CASE 
+                                    WHEN ISNULL({taxAmtCol}, 0) > 0 THEN {taxAmtCol}
+                                    ELSE ISNULL({masterTaxCol}, 0)
+                                END)/2.0 AS DECIMAL(18,2)
+                            ) AS CGSTAmt,
+                            CAST(
+                                (CASE 
+                                    WHEN ISNULL({taxPerCol}, 0) > 0 THEN 
+                                        (CASE WHEN {taxPerCol} > 100 THEN {taxPerCol}/100.0 ELSE {taxPerCol} END)
+                                    ELSE 
+                                        (CASE WHEN ISNULL({masterTaxPerCol}, 0) > 100 THEN {masterTaxPerCol}/100.0 ELSE ISNULL({masterTaxPerCol}, 0) END)
+                                END)/2.0 AS FLOAT
+                            ) AS SGSTPer,
+                            CAST(
+                                (CASE 
+                                    WHEN ISNULL({taxAmtCol}, 0) > 0 THEN {taxAmtCol}
+                                    ELSE ISNULL({masterTaxCol}, 0)
+                                END)/2.0 AS DECIMAL(18,2)
+                            ) AS SGSTAmt,
                             CAST(0 AS FLOAT) AS IGSTPer,
                             CAST(0 AS DECIMAL(18,2)) AS IGSTAmt,
-                            CAST(ISNULL(d.CessPer, 0) AS FLOAT) AS CessPer,
-                            CAST(ISNULL(d.CessAmt, 0) AS DECIMAL(18,2)) AS CessAmt,
-                            CAST(ISNULL(d.TaxAmt, 0) AS DECIMAL(18,2)) AS TotalInputGST,
-                            CAST((ISNULL(d.Qty,0)*ISNULL(d.Cost,0)) AS DECIMAL(18,2)) AS TotalInvoiceAmount,
-                            ISNULL(m.TaxType, 'excl') AS TaxType
-                        FROM dbo.PMaster m
-                        INNER JOIN dbo.PDetails d ON m.PurchaseNo = d.PurchaseNo
+                            CAST(ISNULL({cessPerCol}, 0) AS FLOAT) AS CessPer,
+                            CAST(ISNULL({cessAmtCol}, 0) AS DECIMAL(18,2)) AS CessAmt,
+                            CAST(
+                                CASE 
+                                    WHEN ISNULL({taxAmtCol}, 0) > 0 THEN {taxAmtCol}
+                                    ELSE ISNULL({masterTaxCol}, 0)
+                                END AS DECIMAL(18,2)
+                            ) AS TotalInputGST,
+                            CAST(
+                                CASE 
+                                    WHEN (ISNULL({qtyCol},0)*ISNULL({costCol},0)) > 0 THEN (ISNULL({qtyCol},0)*ISNULL({costCol},0))
+                                    ELSE ISNULL({masterNetCol}, 0)
+                                END AS DECIMAL(18,2)
+                            ) AS TotalInvoiceAmount,
+                            ISNULL({taxTypeMasterCol}, 'excl') AS TaxType
+                        FROM dbo.{masterTable} m
+                        {detailsJoin}
                         {itemJoin}
                         {ledgerJoin}
-                        WHERE (@CompanyId IS NULL OR @CompanyId <= 0 OR ISNULL(m.CompanyId, 0) = 0 OR ISNULL(m.CompanyId, 0) = @CompanyId)
-                          AND (@BranchId IS NULL OR @BranchId <= 0 OR ISNULL(m.BranchID, 0) = 0 OR ISNULL(m.BranchID, 0) = @BranchId)
-                          AND (@FinYearId IS NULL OR @FinYearId <= 0 OR ISNULL(m.FinYearId, 0) = 0 OR ISNULL(m.FinYearId, 0) = @FinYearId)
-                          AND (m.InvoiceDate IS NULL OR CAST(m.InvoiceDate AS DATE) BETWEEN @FromDate AND @ToDate)
-                          AND (@SupplierLedgerId IS NULL OR @SupplierLedgerId <= 0 OR m.LedgerID = @SupplierLedgerId)
+                        {whereSql}
                     ";
 
                     using (SqlCommand cmd = new SqlCommand(sql, (SqlConnection)DataConnection))
@@ -106,7 +220,7 @@ namespace Repository.ReportRepository
                         cmd.Parameters.AddWithValue("@BranchId", filter.BranchId);
                         cmd.Parameters.AddWithValue("@FinYearId", filter.FinYearId);
                         cmd.Parameters.AddWithValue("@FromDate", filter.FromDate.Date);
-                        cmd.Parameters.AddWithValue("@ToDate", filter.ToDate.Date);
+                        cmd.Parameters.AddWithValue("@ExclusiveTo", exclusiveTo);
                         cmd.Parameters.AddWithValue("@SupplierLedgerId", filter.SupplierLedgerId);
 
                         using (SqlDataAdapter adapter = new SqlDataAdapter(cmd))
@@ -120,6 +234,10 @@ namespace Repository.ReportRepository
                         }
                     }
                 }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("GetPurchaseRegister error: " + ex.Message);
             }
             finally
             {
@@ -227,7 +345,7 @@ namespace Repository.ReportRepository
 
         private static PurchaseGSTRegisterRow MapPurchaseRow(DataRow row)
         {
-            return new PurchaseGSTRegisterRow
+            PurchaseGSTRegisterRow r = new PurchaseGSTRegisterRow
             {
                 InvoiceNo = ToString(row, "InvoiceNo"),
                 DocDate = ToDateTime(row, "DocDate"),
@@ -250,6 +368,34 @@ namespace Repository.ReportRepository
                 TotalInvoiceAmount = ToDecimal(row, "TotalInvoiceAmount"),
                 TaxType = ToString(row, "TaxType")
             };
+
+            if (r.TaxableValue == 0m && r.TotalInvoiceAmount > 0m)
+            {
+                double totalTaxPer = r.CGSTPer + r.SGSTPer + r.IGSTPer;
+                if (totalTaxPer > 0)
+                {
+                    r.TaxableValue = Math.Round(r.TotalInvoiceAmount / (decimal)(1.0 + (totalTaxPer / 100.0)), 2);
+                    r.TotalInputGST = r.TotalInvoiceAmount - r.TaxableValue;
+                    r.CGSTAmt = Math.Round(r.TotalInputGST / 2m, 2);
+                    r.SGSTAmt = r.TotalInputGST - r.CGSTAmt;
+                }
+                else
+                {
+                    r.TaxableValue = r.TotalInvoiceAmount;
+                }
+            }
+
+            return r;
+        }
+
+        private string GetCol(string tableName, string alias, params string[] candidates)
+        {
+            foreach (var c in candidates)
+            {
+                if (ColumnExists(tableName, c))
+                    return string.IsNullOrEmpty(alias) ? $"[{c}]" : $"{alias}.[{c}]";
+            }
+            return null;
         }
 
         private bool TableExists(string tableName)
@@ -267,6 +413,42 @@ namespace Repository.ReportRepository
             {
                 return false;
             }
+        }
+
+        private bool ColumnExists(string tableName, string columnName)
+        {
+            try
+            {
+                string cleanTable = tableName.StartsWith("dbo.") ? tableName.Substring(4) : tableName;
+                using (SqlCommand cmd = new SqlCommand("SELECT CASE WHEN COL_LENGTH(@TableName, @ColumnName) IS NULL THEN 0 ELSE 1 END;", (SqlConnection)DataConnection))
+                {
+                    cmd.Parameters.AddWithValue("@TableName", "dbo." + cleanTable);
+                    cmd.Parameters.AddWithValue("@ColumnName", columnName);
+                    object res = cmd.ExecuteScalar();
+                    return res != null && res != DBNull.Value && Convert.ToInt32(res) == 1;
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private string GetGstinColumnExpression(string tableAlias, string tableName)
+        {
+            if (string.IsNullOrEmpty(tableName) || !TableExists(tableName))
+                return "''";
+
+            string[] candidateColumns = new string[] { "GSTIN", "GSTNo", "GSTINNo", "GST_NO", "GSTNumber", "TINNo", "GSTIN_NO", "GST" };
+            foreach (string col in candidateColumns)
+            {
+                if (ColumnExists(tableName, col))
+                {
+                    return $"ISNULL({tableAlias}.[{col}], '')";
+                }
+            }
+
+            return "''";
         }
 
         private static double ToDouble(DataRow row, string col) => row.Table.Columns.Contains(col) && row[col] != DBNull.Value ? Convert.ToDouble(row[col]) : 0.0;

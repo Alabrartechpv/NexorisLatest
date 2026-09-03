@@ -90,19 +90,19 @@ namespace PosBranch_Win.Reports.FinancialReports
                 StyleFilterControls();
                 SetupGrid();
                 InitializeGridFooter();
-
-                LoadReport();
             }
             finally
             {
                 _isLoading = false;
             }
+
+            LoadReport();
         }
 
         private void InitializeFilterControls()
         {
             DateTime today = DateTime.Today;
-            dtFrom.Value = new DateTime(today.Year, today.Month, 1);
+            dtFrom.Value = today.AddDays(-30);
             dtTo.Value = today;
             dtFrom.MaskInput = "{date}";
             dtTo.MaskInput = "{date}";
@@ -333,27 +333,34 @@ namespace PosBranch_Win.Reports.FinancialReports
                     SearchText = txtSearch.Text.Trim()
                 };
 
-                string mode = Convert.ToString(ultraComboReportView.Value);
-                switch (mode)
+                gridReport.DataSource = null;
+
+                string rawVal = Convert.ToString(ultraComboReportView.Value ?? "");
+                string rawText = Convert.ToString(ultraComboReportView.Text ?? "");
+
+                if (rawVal == "SUMMARY" || rawText.Contains("Summary"))
                 {
-                    case "SUMMARY":
-                        gridReport.DataSource = _repository.GetOutputSummary(filter);
-                        break;
-                    case "RATE_WISE":
-                        gridReport.DataSource = _repository.GetRateWiseSummary(filter);
-                        break;
-                    case "B2B":
-                        gridReport.DataSource = _repository.GetB2BSales(filter);
-                        break;
-                    case "HSN":
-                        gridReport.DataSource = _repository.GetHSNOutputGST(filter);
-                        break;
-                    case "CD_NOTE":
-                        gridReport.DataSource = _repository.GetCreditDebitNotes(filter);
-                        break;
-                    default:
-                        gridReport.DataSource = _repository.GetSalesRegister(filter);
-                        break;
+                    gridReport.DataSource = _repository.GetOutputSummary(filter);
+                }
+                else if (rawVal == "RATE_WISE" || rawText.Contains("Rate"))
+                {
+                    gridReport.DataSource = _repository.GetRateWiseSummary(filter);
+                }
+                else if (rawVal == "B2B" || rawText.Contains("B2B"))
+                {
+                    gridReport.DataSource = _repository.GetB2BSales(filter);
+                }
+                else if (rawVal == "HSN" || rawText.Contains("HSN"))
+                {
+                    gridReport.DataSource = _repository.GetHSNOutputGST(filter);
+                }
+                else if (rawVal == "CD_NOTE" || rawText.Contains("Credit"))
+                {
+                    gridReport.DataSource = _repository.GetCreditDebitNotes(filter);
+                }
+                else
+                {
+                    gridReport.DataSource = _repository.GetSalesRegister(filter);
                 }
 
                 CreateFooterCells();
