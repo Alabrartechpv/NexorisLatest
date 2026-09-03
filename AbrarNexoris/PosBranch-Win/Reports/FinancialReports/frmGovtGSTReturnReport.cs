@@ -90,19 +90,19 @@ namespace PosBranch_Win.Reports.FinancialReports
                 StyleFilterControls();
                 SetupGrid();
                 InitializeGridFooter();
-
-                LoadReport();
             }
             finally
             {
                 _isLoading = false;
             }
+
+            LoadReport();
         }
 
         private void InitializeFilterControls()
         {
             DateTime today = DateTime.Today;
-            dtFrom.Value = new DateTime(today.Year, today.Month, 1);
+            dtFrom.Value = today.AddDays(-30);
             dtTo.Value = today;
             dtFrom.MaskInput = "{date}";
             dtTo.MaskInput = "{date}";
@@ -330,22 +330,27 @@ namespace PosBranch_Win.Reports.FinancialReports
                     FinYearId = SessionContext.FinYearId
                 };
 
-                string mode = Convert.ToString(ultraComboReportView.Value);
-                switch (mode)
+                gridReport.DataSource = null;
+
+                string rawVal = Convert.ToString(ultraComboReportView.Value ?? "");
+                string rawText = Convert.ToString(ultraComboReportView.Text ?? "");
+
+                if (rawVal == "GSTR3B" || rawText.Contains("3B"))
                 {
-                    case "GSTR3B":
-                        gridReport.DataSource = _repository.GetGSTR3BWorking(filter);
-                        break;
-                    case "LIABILITY":
-                        gridReport.DataSource = _repository.GetLiabilityUtilization(filter);
-                        break;
-                    case "EXECUTIVE":
-                        var summary = _repository.GetMonthlyExecutiveSummary(filter);
-                        gridReport.DataSource = new List<MonthlyGSTExecutiveSummary> { summary };
-                        break;
-                    default:
-                        gridReport.DataSource = _repository.GetGSTR1Working(filter);
-                        break;
+                    gridReport.DataSource = _repository.GetGSTR3BWorking(filter);
+                }
+                else if (rawVal == "LIABILITY" || rawText.Contains("Liability") || rawText.Contains("Utilization"))
+                {
+                    gridReport.DataSource = _repository.GetLiabilityUtilization(filter);
+                }
+                else if (rawVal == "EXECUTIVE" || rawText.Contains("Executive") || rawText.Contains("Monthly"))
+                {
+                    var summary = _repository.GetMonthlyExecutiveSummary(filter);
+                    gridReport.DataSource = new List<MonthlyGSTExecutiveSummary> { summary };
+                }
+                else
+                {
+                    gridReport.DataSource = _repository.GetGSTR1Working(filter);
                 }
 
                 CreateFooterCells();

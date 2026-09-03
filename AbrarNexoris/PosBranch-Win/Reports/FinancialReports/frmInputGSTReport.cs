@@ -90,19 +90,19 @@ namespace PosBranch_Win.Reports.FinancialReports
                 StyleFilterControls();
                 SetupGrid();
                 InitializeGridFooter();
-
-                LoadReport();
             }
             finally
             {
                 _isLoading = false;
             }
+
+            LoadReport();
         }
 
         private void InitializeFilterControls()
         {
             DateTime today = DateTime.Today;
-            dtFrom.Value = new DateTime(today.Year, today.Month, 1);
+            dtFrom.Value = today.AddDays(-30);
             dtTo.Value = today;
             dtFrom.MaskInput = "{date}";
             dtTo.MaskInput = "{date}";
@@ -332,24 +332,30 @@ namespace PosBranch_Win.Reports.FinancialReports
                     SearchText = txtSearch.Text.Trim()
                 };
 
-                string mode = Convert.ToString(ultraComboReportView.Value);
-                switch (mode)
+                gridReport.DataSource = null;
+
+                string rawVal = Convert.ToString(ultraComboReportView.Value ?? "");
+                string rawText = Convert.ToString(ultraComboReportView.Text ?? "");
+
+                if (rawVal == "SUMMARY" || rawText.Contains("Summary"))
                 {
-                    case "SUMMARY":
-                        gridReport.DataSource = _repository.GetInputSummary(filter);
-                        break;
-                    case "RATE_WISE":
-                        gridReport.DataSource = _repository.GetRateWiseSummary(filter);
-                        break;
-                    case "ITC":
-                        gridReport.DataSource = _repository.GetITCReport(filter);
-                        break;
-                    case "RECON":
-                        gridReport.DataSource = _repository.GetGSTR2BReconciliation(filter);
-                        break;
-                    default:
-                        gridReport.DataSource = _repository.GetPurchaseRegister(filter);
-                        break;
+                    gridReport.DataSource = _repository.GetInputSummary(filter);
+                }
+                else if (rawVal == "RATE_WISE" || rawText.Contains("Rate"))
+                {
+                    gridReport.DataSource = _repository.GetRateWiseSummary(filter);
+                }
+                else if (rawVal == "ITC" || rawText.Contains("ITC"))
+                {
+                    gridReport.DataSource = _repository.GetITCReport(filter);
+                }
+                else if (rawVal == "RECON" || rawText.Contains("Reconciliation") || rawText.Contains("2B"))
+                {
+                    gridReport.DataSource = _repository.GetGSTR2BReconciliation(filter);
+                }
+                else
+                {
+                    gridReport.DataSource = _repository.GetPurchaseRegister(filter);
                 }
 
                 CreateFooterCells();
