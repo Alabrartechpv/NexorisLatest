@@ -131,15 +131,50 @@ namespace PosBranch_Win.DialogBox
                     col.Hidden = true;
                 }
 
-                // Show columns matching IRS POS format
-                ShowColumn(e, "PH_ACCTCODE", "Account Code", 100);
-                ShowColumn(e, "VENDOR_NAME", "Vendor Name", 250);
-                ShowColumn(e, "PH_DOCNO", "Doc No", 110);
-                ShowColumn(e, "PH_UPDDATE", "Date", 100, "dd/MMM/yyyy");
-                ShowColumn(e, "PH_DOCAMT", "Amount", 110, "N4", HAlign.Right);
-                ShowColumn(e, "PH_MODE", "Mode", 80);
-                ShowColumn(e, "PH_REMARK", "Remark", 200);
-                ShowColumn(e, "PH_STATUS", "Status", 100);
+                // Show columns matching IRS POS format or standard DB names
+                if (e.Layout.Bands[0].Columns.Exists("PH_ACCTCODE"))
+                    ShowColumn(e, "PH_ACCTCODE", "Account Code", 100);
+                else if (e.Layout.Bands[0].Columns.Exists("VendorLedgerId"))
+                    ShowColumn(e, "VendorLedgerId", "Account Code", 100);
+
+                if (e.Layout.Bands[0].Columns.Exists("VENDOR_NAME"))
+                    ShowColumn(e, "VENDOR_NAME", "Vendor Name", 250);
+                else if (e.Layout.Bands[0].Columns.Exists("VendorName"))
+                    ShowColumn(e, "VendorName", "Vendor Name", 250);
+
+                if (e.Layout.Bands[0].Columns.Exists("PH_DOCNO"))
+                    ShowColumn(e, "PH_DOCNO", "Doc No", 110);
+                else if (e.Layout.Bands[0].Columns.Exists("VoucherId"))
+                    ShowColumn(e, "VoucherId", "Doc No", 110);
+
+                if (e.Layout.Bands[0].Columns.Exists("PH_UPDDATE"))
+                    ShowColumn(e, "PH_UPDDATE", "Date", 100, "dd/MMM/yyyy");
+                else if (e.Layout.Bands[0].Columns.Exists("VoucherDate"))
+                    ShowColumn(e, "VoucherDate", "Date", 100, "dd/MMM/yyyy");
+
+                if (e.Layout.Bands[0].Columns.Exists("PH_DOCAMT"))
+                    ShowColumn(e, "PH_DOCAMT", "Amount", 110, "N2", HAlign.Right);
+                else if (e.Layout.Bands[0].Columns.Exists("DebitAmount"))
+                    ShowColumn(e, "DebitAmount", "Amount", 110, "N2", HAlign.Right);
+
+                if (e.Layout.Bands[0].Columns.Exists("PH_MODE"))
+                    ShowColumn(e, "PH_MODE", "Mode", 100);
+                else if (e.Layout.Bands[0].Columns.Exists("PaymentMethodName"))
+                    ShowColumn(e, "PaymentMethodName", "Mode", 100);
+
+                if (e.Layout.Bands[0].Columns.Exists("PH_REMARK"))
+                    ShowColumn(e, "PH_REMARK", "Remark", 200);
+                else if (e.Layout.Bands[0].Columns.Exists("Narration"))
+                    ShowColumn(e, "Narration", "Remark", 200);
+
+                if (e.Layout.Bands[0].Columns.Exists("PH_STATUS"))
+                    ShowColumn(e, "PH_STATUS", "Status", 100);
+
+                if (e.Layout.Bands[0].Columns.Exists("PReturnNo"))
+                    ShowColumn(e, "PReturnNo", "PR No", 90);
+
+                if (e.Layout.Bands[0].Columns.Exists("InvoiceNo"))
+                    ShowColumn(e, "InvoiceNo", "Invoice No", 100);
 
                 if (e.Layout.Bands[0].Columns.Exists("OriginalRowOrder"))
                 {
@@ -241,14 +276,33 @@ namespace PosBranch_Win.DialogBox
                     if (selectedField != "All" && fieldMap.ContainsKey(selectedField))
                     {
                         string col = fieldMap[selectedField];
-                        if (col == "PH_DOCAMT")
+                        if (!fullDataTable.Columns.Contains(col))
+                        {
+                            if (col == "PH_DOCNO") col = "VoucherId";
+                            else if (col == "VENDOR_NAME") col = "VendorName";
+                            else if (col == "PH_ACCTCODE") col = "VendorLedgerId";
+                            else if (col == "PH_DOCAMT") col = "DebitAmount";
+                        }
+                        if (fullDataTable.Columns.Contains(col))
+                        {
                             filter = $"CONVERT({col}, 'System.String') LIKE '%{escapedText}%'";
-                        else
-                            filter = $"{col} LIKE '%{escapedText}%'";
+                        }
                     }
                     else
                     {
-                        filter = $"PH_DOCNO LIKE '%{escapedText}%' OR VENDOR_NAME LIKE '%{escapedText}%' OR PH_ACCTCODE LIKE '%{escapedText}%'";
+                        var conditions = new List<string>();
+                        string[] candidateCols = { "PH_DOCNO", "VENDOR_NAME", "PH_ACCTCODE", "VoucherId", "VendorName", "VendorLedgerId", "InvoiceNo", "Narration", "PH_REMARK" };
+                        foreach (string col in candidateCols)
+                        {
+                            if (fullDataTable.Columns.Contains(col))
+                            {
+                                conditions.Add($"CONVERT({col}, 'System.String') LIKE '%{escapedText}%'");
+                            }
+                        }
+                        if (conditions.Count > 0)
+                        {
+                            filter = string.Join(" OR ", conditions);
+                        }
                     }
 
                     dv.RowFilter = filter;

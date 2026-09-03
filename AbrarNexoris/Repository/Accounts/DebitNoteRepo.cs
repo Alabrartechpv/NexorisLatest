@@ -189,6 +189,11 @@ namespace Repository.Accounts
             return string.Empty;
         }
 
+        public string GetVendorName(int vendorId)
+        {
+            return GetVendorNameByLedgerId(vendorId);
+        }
+
         /// <summary>
         /// Get all invoices for vendor
         /// </summary>
