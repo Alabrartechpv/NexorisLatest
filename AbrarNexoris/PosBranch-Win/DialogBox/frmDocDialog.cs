@@ -1,4 +1,4 @@
-﻿using Infragistics.Win.UltraWinGrid;
+using Infragistics.Win.UltraWinGrid;
 using ModelClass;
 using ModelClass.TransactionModels;
 using PosBranch_Win.Transaction;
@@ -54,6 +54,8 @@ namespace PosBranch_Win.DialogBox
         // Initialize with new list to avoid null reference
         private static List<string> persistentHiddenColumns = new List<string>();
 
+        private FrmStockAdjustment _parentForm = null;
+
         public frmDocDialog()
         {
             InitializeComponent();
@@ -94,6 +96,7 @@ namespace PosBranch_Win.DialogBox
             // Connect key events for grid
             ultraGrid1.KeyPress += ultraGrid1_KeyPress;
             ultraGrid1.KeyDown += ultraGrid1_KeyDown;
+            ultraGrid1.DoubleClickRow += (s, e) => SelectAndLoadDocument();
 
             // FIXED: Add form closing event to save column state
             this.FormClosing += FrmDocDialog_FormClosing;
@@ -105,6 +108,11 @@ namespace PosBranch_Win.DialogBox
             // Add event handlers for better UX
             this.LocationChanged += (s, e) => PositionColumnChooserAtBottomRight();
             this.Activated += (s, e) => PositionColumnChooserAtBottomRight();
+        }
+
+        public frmDocDialog(FrmStockAdjustment parentForm) : this()
+        {
+            _parentForm = parentForm;
         }
 
         private void InitializeStatusLabel()
@@ -159,124 +167,121 @@ namespace PosBranch_Win.DialogBox
         // Load the selected stock adjustment master record and all its details
         private void ultgrid_docNo_KeyPress(object sender, KeyPressEventArgs e)
         {
+            SelectAndLoadDocument();
+        }
+
+        private void SelectAndLoadDocument()
+        {
             try
             {
-                if (sender is Infragistics.Win.UltraWinGrid.UltraGrid grid &&
-                    grid.ActiveRow != null)
+                if (ultraGrid1.ActiveRow == null)
+                    return;
+
+                FrmStockAdjustment targetStock = _parentForm ?? (FrmStockAdjustment)Application.OpenForms["FrmStockAdjustment"];
+
+                if (targetStock == null)
                 {
-                    // Get the FrmStockAdjustment form instance
-                    stockk = (FrmStockAdjustment)Application.OpenForms["FrmStockAdjustment"];
-
-                    if (stockk == null)
-                    {
-                        MessageBox.Show("Stock Adjustment form is not open.", "Error",
-                            MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        return;
-                    }
-
-                    // Get master record data from the selected grid row
-                    UltraGridCell Id = grid.ActiveRow.Cells["Id"];
-                    UltraGridCell StockAdjustmentNo = grid.ActiveRow.Cells["StockAdjustmentNo"];
-                    UltraGridCell StockAdjustmentDate = grid.ActiveRow.Cells["StockAdjustmentDate"];
-                    UltraGridCell Comments = grid.ActiveRow.Cells["Comments"];
-                    UltraGridCell LedgerName = grid.ActiveRow.Cells["LedgerName"];
-                    UltraGridCell LedgerID = grid.ActiveRow.Cells["LedgerId"];
-                    UltraGridCell VoucherId = grid.ActiveRow.Cells["VoucherId"];
-                    UltraGridCell CategoryId = grid.ActiveRow.Cells["CategoryId"];
-
-                    // Clear the existing grid in the stock adjustment form
-                    stockk.ClearGrid();
-
-                    // Load the full master and detail data using Dropdowns
-                    int masterId = Convert.ToInt32(Id.Value);
-                    StockGrid skGrid = drop.getStockAdjustmentById(masterId);
-
-                    if (skGrid == null)
-                    {
-                        MessageBox.Show("Error loading stock adjustment details.", "Error",
-                            MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        return;
-                    }
-
-                    // Populate master data into the form
-                    stockk.txt_Adjno.Text = StockAdjustmentNo.Value?.ToString() ?? "";
-                    stockk.dateTimePicker1.Value = StockAdjustmentDate.Value != null
-                        ? Convert.ToDateTime(StockAdjustmentDate.Value)
-                        : DateTime.Now;
-                    stockk.txtb_reason.Text = LedgerName.Value?.ToString() ?? "";
-                    stockk.txteditor_remark.Text = Comments.Value?.ToString() ?? "";
-                    stockk.ultlbl_ledgerid.Text = LedgerID.Value?.ToString() ?? "0";
-                    stockk.ultravoucherId.Text = VoucherId.Value?.ToString() ?? "0";
-                    stockk.ultralblId.Text = Id.Value?.ToString() ?? "0";
-
-                    // Populate category ID and name
-                    int categoryIdValue = 0;
-                    if (CategoryId != null && CategoryId.Value != null && CategoryId.Value != DBNull.Value)
-                    {
-                        categoryIdValue = Convert.ToInt32(CategoryId.Value);
-                    }
-                    else if (skGrid.ListMaster != null && skGrid.ListMaster.Any())
-                    {
-                        var masterRecord = skGrid.ListMaster.FirstOrDefault();
-                        if (masterRecord != null && masterRecord.CategoryId > 0)
-                        {
-                            categoryIdValue = masterRecord.CategoryId;
-                        }
-                    }
-
-                    if (categoryIdValue > 0 && stockk.ultlbl_catid != null)
-                    {
-                        stockk.ultlbl_catid.Text = categoryIdValue.ToString();
-
-                        try
-                        {
-                            DataBase.Operations = "Category";
-                            var categoryDDl = drop.getCategoryDDl("");
-                            var categoryItem = categoryDDl?.List?.FirstOrDefault(c => c.Id == categoryIdValue);
-                            if (categoryItem != null && !string.IsNullOrEmpty(categoryItem.CategoryName))
-                            {
-                                stockk.txtb_category.Text = categoryItem.CategoryName;
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"Error loading category name: {ex.Message}");
-                        }
-                    }
-                    else if (stockk.ultlbl_catid != null)
-                    {
-                        stockk.ultlbl_catid.Text = "0";
-                        stockk.txtb_category.Text = "";
-                    }
-
-                    // Populate detail data into the grid
-                    if (skGrid.ListDetails != null && skGrid.ListDetails.Any())
-                    {
-                        foreach (StockAdjPriceDetails detail in skGrid.ListDetails)
-                        {
-                            // Calculate Adjustment Qty from PhysicalStock and SystemStock
-                            // Adjustment Qty = PhysicalStock - SystemStock (the amount that was adjusted)
-                            int adjustmentQty = (int)(detail.PhysicalStock - detail.SystemStock);
-
-                            // Add each detail item to the grid
-                            // Note: StockAdjPriceDetails uses Description and UOM, not ItemName and UnitName
-                            int newRowIdx = stockk.AddItemToGrid(
-                                detail.ItemId.ToString(),
-                                detail.BarCode ?? "",
-                                detail.Description ?? "",
-                                detail.UOM ?? "",
-                                detail.SystemStock.ToString(),
-                                adjustmentQty  // Pass the calculated adjustment amount
-                            );
-                        }
-                    }
-
-                    // Set DialogResult to OK so parent form knows we loaded data
-                    this.DialogResult = DialogResult.OK;
-
-                    // Close the dialog
-                    this.Close();
+                    MessageBox.Show("Stock Adjustment form is not open.", "Error",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
                 }
+
+                UltraGridRow row = ultraGrid1.ActiveRow;
+                if (!row.Cells.Exists("Id") || row.Cells["Id"].Value == null || row.Cells["Id"].Value == DBNull.Value)
+                {
+                    MessageBox.Show("Please select a valid document row.", "Selection",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                int masterId = Convert.ToInt32(row.Cells["Id"].Value);
+
+                // Load the full master and detail data using Dropdowns
+                StockGrid skGrid = drop.getStockAdjustmentById(masterId);
+
+                if (skGrid == null || skGrid.ListMaster == null || !skGrid.ListMaster.Any())
+                {
+                    MessageBox.Show("Error loading stock adjustment details.", "Error",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
+                var master = skGrid.ListMaster.FirstOrDefault();
+
+                // Clear the existing grid in the stock adjustment form
+                targetStock.ClearGrid();
+
+                // Populate master data into the form
+                targetStock.txt_Adjno.Text = master.StockAdjustmentNo.ToString();
+                targetStock.dateTimePicker1.Value = master.StockAdjustmentDate != DateTime.MinValue
+                    ? master.StockAdjustmentDate
+                    : DateTime.Now;
+                targetStock.txtb_reason.Text = master.LedgerName ?? "";
+                targetStock.txteditor_remark.Text = master.Comments ?? "";
+                targetStock.ultlbl_ledgerid.Text = master.LedgerID > 0 ? master.LedgerID.ToString() : (row.Cells.Exists("LedgerId") ? row.Cells["LedgerId"].Value?.ToString() ?? "0" : "0");
+                targetStock.ultravoucherId.Text = master.VoucherId.ToString();
+                targetStock.ultralblId.Text = master.Id.ToString();
+
+                // Populate category ID and name
+                int categoryIdValue = master.CategoryId;
+                if (categoryIdValue <= 0 && row.Cells.Exists("CategoryId") && row.Cells["CategoryId"].Value != null && row.Cells["CategoryId"].Value != DBNull.Value)
+                {
+                    int.TryParse(row.Cells["CategoryId"].Value.ToString(), out categoryIdValue);
+                }
+
+                if (categoryIdValue > 0 && targetStock.ultlbl_catid != null)
+                {
+                    targetStock.ultlbl_catid.Text = categoryIdValue.ToString();
+                    try
+                    {
+                        DataBase.Operations = "Category";
+                        var categoryDDl = drop.getCategoryDDl("");
+                        var categoryItem = categoryDDl?.List?.FirstOrDefault(c => c.Id == categoryIdValue);
+                        if (categoryItem != null && !string.IsNullOrEmpty(categoryItem.CategoryName))
+                        {
+                            targetStock.txtb_category.Text = categoryItem.CategoryName;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Error loading category name: {ex.Message}");
+                    }
+                }
+                else if (targetStock.ultlbl_catid != null)
+                {
+                    targetStock.ultlbl_catid.Text = "0";
+                    targetStock.txtb_category.Text = "";
+                }
+
+                // Populate detail data into the grid
+                if (skGrid.ListDetails != null && skGrid.ListDetails.Any())
+                {
+                    foreach (StockAdjPriceDetails detail in skGrid.ListDetails)
+                    {
+                        // In Actual Qty mode (ultraRadioButton2), adjustment qty displayed is PhysicalStock.
+                        // In IN/OUT mode (ultraRadioButton1), adjustment qty displayed is difference (Physical - System).
+                        int adjustmentQty = targetStock.ultraRadioButton2.Checked
+                            ? (int)Math.Round(detail.PhysicalStock)
+                            : (int)Math.Round(detail.PhysicalStock - detail.SystemStock);
+
+                        targetStock.AddItemToGrid(
+                            detail.ItemId.ToString(),
+                            detail.BarCode ?? "",
+                            detail.Description ?? "",
+                            detail.UOM ?? "",
+                            Convert.ToInt32(Math.Round(detail.SystemStock)).ToString(),
+                            adjustmentQty
+                        );
+                    }
+                }
+
+                targetStock.SetUpdateMode();
+
+                // Set DialogResult to OK so parent form knows we loaded data
+                this.DialogResult = DialogResult.OK;
+
+                // Close the dialog
+                this.Close();
             }
             catch (Exception ex)
             {
@@ -1543,10 +1548,12 @@ namespace PosBranch_Win.DialogBox
             // Sort toggle
             ultraPictureBox4.Click += ultraPictureBox4_Click;
             ultraPanel9.Click += (s, e) => ultraPictureBox4_Click(s, e);
-            // OK/Close
-            ultraPanel5.Click += (s, e) => this.Close();
-            label5.Click += (s, e) => this.Close();
-            ultraPictureBox1.Click += (s, e) => this.Close();
+            // OK
+            ultraPanel5.Click += (s, e) => SelectAndLoadDocument();
+            if (ultraPanel5.ClientArea != null) ultraPanel5.ClientArea.Click += (s, e) => SelectAndLoadDocument();
+            label5.Click += (s, e) => SelectAndLoadDocument();
+            ultraPictureBox1.Click += (s, e) => SelectAndLoadDocument();
+            // Close
             ultraPanel6.Click += (s, e) => this.Close();
             label3.Click += (s, e) => this.Close();
             ultraPictureBox2.Click += (s, e) => this.Close();

@@ -1,4 +1,4 @@
-﻿
+
 namespace PosBranch_Win.Transaction
 {
     partial class FrmStockAdjustment
@@ -378,7 +378,7 @@ namespace PosBranch_Win.Transaction
             this.txtb_barcode.Location = new System.Drawing.Point(102, 151);
             this.txtb_barcode.Name = "txtb_barcode";
             this.txtb_barcode.Size = new System.Drawing.Size(339, 30);
-            this.txtb_barcode.TabIndex = 47;
+            this.txtb_barcode.TabIndex = 0;
             // 
             // btn_ItemLoad
             // 

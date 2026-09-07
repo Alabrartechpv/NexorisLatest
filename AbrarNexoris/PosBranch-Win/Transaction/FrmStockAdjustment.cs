@@ -250,8 +250,17 @@ namespace PosBranch_Win.Transaction
                 // Hide the side panel — Save/Clear/Exit are handled via the ribbon
                 ultraPanel6.Visible = false;
 
-                // Register Activated event so barcode textbox always gets focus
+                // Register events so barcode textbox always gets focus
                 this.Activated += FrmStockAdjustment_Activated;
+                this.Shown += (s, args) => barcodeFocus();
+                this.Enter += (s, args) => barcodeFocus();
+                this.VisibleChanged += (s, args) => { if (this.Visible) barcodeFocus(); };
+
+                if (ultraPanel2 != null)
+                {
+                    ultraPanel2.Click += (s, args) => barcodeFocus();
+                    if (ultraPanel2.ClientArea != null) ultraPanel2.ClientArea.Click += (s, args) => barcodeFocus();
+                }
 
                 btnSave.Visible = true;
                 ultraPictureBox7.Visible = false;
@@ -265,7 +274,6 @@ namespace PosBranch_Win.Transaction
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
-
 
         // Activated event: return focus to barcode textbox whenever the form is activated
         private void FrmStockAdjustment_Activated(object sender, EventArgs e)
@@ -349,6 +357,7 @@ namespace PosBranch_Win.Transaction
         {
             frmReasonDialog reasonDialog = new frmReasonDialog();
             reasonDialog.ShowDialog();
+            barcodeFocus();
         }
 
         private void btn_Dial_Categ_Click(object sender, EventArgs e)
@@ -356,6 +365,7 @@ namespace PosBranch_Win.Transaction
             string Params = "FrmStockAdjustment";
             frmCategoryDialog category = new frmCategoryDialog(Params);
             category.ShowDialog();
+            barcodeFocus();
         }
 
         private void btn_ItemLoad_Click(object sender, EventArgs e)
@@ -473,7 +483,24 @@ namespace PosBranch_Win.Transaction
                             ultraGrid1.PerformAction(UltraGridAction.EnterEditMode);
                         }
                     }
+                    else
+                    {
+                        // On the last row, return focus to barcode textbox for scanning the next item
+                        barcodeFocus();
+                    }
 
+                    e.Handled = true;
+                    return;
+                }
+
+                // Handle Escape key to return focus to barcode textbox
+                if (e.KeyCode == Keys.Escape)
+                {
+                    if (ultraGrid1.ActiveCell != null && ultraGrid1.ActiveCell.IsInEditMode)
+                    {
+                        ultraGrid1.PerformAction(UltraGridAction.ExitEditMode);
+                    }
+                    barcodeFocus();
                     e.Handled = true;
                     return;
                 }
@@ -567,12 +594,20 @@ namespace PosBranch_Win.Transaction
 
         private void ultraRadioButton1_CheckedChanged(object sender, EventArgs e)
         {
-            if (ultraRadioButton1.Checked) RefreshGridCalculations();
+            if (ultraRadioButton1.Checked)
+            {
+                RefreshGridCalculations();
+                barcodeFocus();
+            }
         }
 
         private void ultraRadioButton2_CheckedChanged(object sender, EventArgs e)
         {
-            if (ultraRadioButton2.Checked) RefreshGridCalculations();
+            if (ultraRadioButton2.Checked)
+            {
+                RefreshGridCalculations();
+                barcodeFocus();
+            }
         }
 
         /// <summary>
@@ -790,13 +825,36 @@ namespace PosBranch_Win.Transaction
             }
         }
 
-        private void barcodeFocus()
+        public void barcodeFocus(bool clearText = true)
         {
             try
             {
-                this.ActiveControl = txtb_barcode;
-                txtb_barcode.Text  = string.Empty;
-                txtb_barcode.Focus();
+                if (txtb_barcode != null && !txtb_barcode.IsDisposed)
+                {
+                    Action setFocus = () =>
+                    {
+                        if (txtb_barcode != null && !txtb_barcode.IsDisposed && txtb_barcode.CanFocus)
+                        {
+                            if (clearText)
+                            {
+                                txtb_barcode.Text = string.Empty;
+                            }
+                            this.ActiveControl = txtb_barcode;
+                            txtb_barcode.Focus();
+                            txtb_barcode.Select();
+                            txtb_barcode.SelectAll();
+                        }
+                    };
+
+                    if (this.IsHandleCreated)
+                    {
+                        this.BeginInvoke(setFocus);
+                    }
+                    else
+                    {
+                        setFocus();
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -1095,12 +1153,12 @@ namespace PosBranch_Win.Transaction
 
         private void docBtn_Click(object sender, EventArgs e)
         {
-            frmDocDialog docdialo = new frmDocDialog();
+            frmDocDialog docdialo = new frmDocDialog(this);
             if (docdialo.ShowDialog() == DialogResult.OK)
             {
-                btnSave.Visible = false;
-                ultraPictureBox7.Visible = true;
+                SetUpdateMode();
             }
+            barcodeFocus();
         }
 
         private void btn_update_Click(object sender, EventArgs e)
@@ -1199,30 +1257,17 @@ namespace PosBranch_Win.Transaction
         {
             try
             {
-                // Remove call to update status bar
-                // UpdateStatusBar();
-
-                // Optional: Automatically scroll to the last row
+                // Automatically scroll to the last row while keeping focus in barcode textbox
                 if (ultraGrid1.Rows.Count > 0)
                 {
                     int lastRowIndex = ultraGrid1.Rows.Count - 1;
                     ultraGrid1.ActiveRow = ultraGrid1.Rows[lastRowIndex];
-
-                    // Ensure the "Adjustment Qty" column exists before setting the current cell
-                    if (ultraGrid1.DisplayLayout.Bands[0].Columns.Exists("Adjustment Qty"))
-                    {
-                        ultraGrid1.ActiveCell = ultraGrid1.Rows[lastRowIndex].Cells["Adjustment Qty"];
-                        ultraGrid1.PerformAction(UltraGridAction.EnterEditMode);
-                    }
-
-                    // Scroll to make the last row visible
                     ultraGrid1.ActiveRowScrollRegion.ScrollRowIntoView(ultraGrid1.ActiveRow);
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("Error in AfterRowAdded: " + ex.Message);
-                // Don't show a message box for this non-critical error
             }
         }
 
@@ -1252,6 +1297,7 @@ namespace PosBranch_Win.Transaction
                     frmdialForItemMaster itemDialog = new frmdialForItemMaster(Params1);
                     itemDialog.Owner = this; // Set owner for communication
                     itemDialog.ShowDialog();
+                    barcodeFocus();
                     return true;
                 }
 
@@ -1317,14 +1363,31 @@ namespace PosBranch_Win.Transaction
         {
             try
             {
-                // Check if this barcode already exists in the grid
-                foreach (UltraGridRow existingRow in ultraGrid1.Rows)
+                // Check if this item already exists in the grid
+                if (!string.IsNullOrWhiteSpace(barcode))
                 {
-                    if (existingRow.Cells["BarCode"].Value.ToString() == barcode)
+                    foreach (UltraGridRow existingRow in ultraGrid1.Rows)
                     {
-                        MessageBox.Show("Item already selected");
-                        this.barcodeFocus();
-                        return -1;
+                        if (existingRow.Cells["BarCode"].Value != null &&
+                            string.Equals(existingRow.Cells["BarCode"].Value.ToString().Trim(), barcode.Trim(), StringComparison.OrdinalIgnoreCase))
+                        {
+                            MessageBox.Show("Item already selected");
+                            this.barcodeFocus();
+                            return -1;
+                        }
+                    }
+                }
+                else if (!string.IsNullOrWhiteSpace(itemId))
+                {
+                    foreach (UltraGridRow existingRow in ultraGrid1.Rows)
+                    {
+                        if (existingRow.Cells["ItemNo"].Value != null &&
+                            string.Equals(existingRow.Cells["ItemNo"].Value.ToString().Trim(), itemId.Trim(), StringComparison.OrdinalIgnoreCase))
+                        {
+                            MessageBox.Show("Item already selected");
+                            this.barcodeFocus();
+                            return -1;
+                        }
                     }
                 }
 
