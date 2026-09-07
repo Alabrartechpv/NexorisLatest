@@ -123,6 +123,18 @@ namespace Repository.ReportRepository
                         }
                     }
 
+                    string ledgerDetailsTable = TableExists("LedgerDetails") ? "LedgerDetails" : "";
+                    string ledgerDetailsJoin = "";
+                    if (!string.IsNullOrEmpty(ledgerDetailsTable) && ledgerIdMaster != null)
+                    {
+                        string ldKey = GetCol(ledgerDetailsTable, "ld", "LedgerID", "LedgerId");
+                        if (ldKey != null)
+                        {
+                            ledgerDetailsJoin = $"LEFT JOIN dbo.{ledgerDetailsTable} ld ON {ledgerIdMaster} = {ldKey}";
+                            gstinSelect = $"ISNULL(NULLIF(ld.[GSTIN], ''), {gstinSelect})";
+                        }
+                    }
+
                     string masterNetCol = GetCol(masterTable, "m", "NetAmount", "NetAmt", "GrandTotal", "TotalAmount") ?? "0";
                     string masterTaxCol = GetCol(masterTable, "m", "TaxAmt", "TaxAmount", "GstAmt") ?? "0";
                     string masterSubCol = GetCol(masterTable, "m", "SubTotal", "BaseAmount", "TaxableValue") ?? "0";
@@ -211,6 +223,7 @@ namespace Repository.ReportRepository
                         {detailsJoin}
                         {itemJoin}
                         {ledgerJoin}
+                        {ledgerDetailsJoin}
                         {whereSql}
                     ";
 
@@ -243,6 +256,18 @@ namespace Repository.ReportRepository
             {
                 if (DataConnection.State == ConnectionState.Open)
                     DataConnection.Close();
+            }
+
+            if (!string.IsNullOrWhiteSpace(filter.SearchText))
+            {
+                string search = filter.SearchText.Trim();
+                list = list.Where(x =>
+                    (x.InvoiceNo != null && x.InvoiceNo.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                    (x.SupplierName != null && x.SupplierName.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                    (x.SupplierGSTIN != null && x.SupplierGSTIN.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                    (x.ItemName != null && x.ItemName.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                    (x.HSNCode != null && x.HSNCode.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0)
+                ).ToList();
             }
 
             return list;

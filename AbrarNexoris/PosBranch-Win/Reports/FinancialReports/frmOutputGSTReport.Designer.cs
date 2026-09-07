@@ -191,11 +191,11 @@ namespace PosBranch_Win.Reports.FinancialReports
             this.ultraPanelMaster.ClientArea.ResumeLayout(false);
             this.ultraPanelMaster.ResumeLayout(false);
             this.ultraPanelGridFooter.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)(this.gridReport)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.ultraComboReportView)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.dtFrom)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.dtTo)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.txtSearch)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.gridReport)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.ultraComboReportView)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.dtFrom)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.dtTo)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.txtSearch)).EndInit();
             this.ResumeLayout(false);
         }
 

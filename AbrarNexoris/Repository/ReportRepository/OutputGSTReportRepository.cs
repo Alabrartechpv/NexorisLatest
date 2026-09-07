@@ -20,18 +20,19 @@ namespace Repository.ReportRepository
                 if (DataConnection.State != ConnectionState.Open)
                     DataConnection.Open();
 
-                // 1. Stored Procedure Attempt (_POS_Sales_Master_for_Report)
+                // 1. Dedicated Stored Procedure Attempt (POS_OutputGSTReport)
                 try
                 {
-                    using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._POS_Sales_Master_for_Report, (SqlConnection)DataConnection))
+                    using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_OutputGSTReport, (SqlConnection)DataConnection))
                     {
                         cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.AddWithValue("@ReportType", "REGISTER");
+                        cmd.Parameters.AddWithValue("@CompanyId", filter.CompanyId > 0 ? (object)filter.CompanyId : DBNull.Value);
+                        cmd.Parameters.AddWithValue("@BranchId", filter.BranchId > 0 ? (object)filter.BranchId : DBNull.Value);
+                        cmd.Parameters.AddWithValue("@FinYearId", filter.FinYearId > 0 ? (object)filter.FinYearId : DBNull.Value);
                         cmd.Parameters.AddWithValue("@FromDate", filter.FromDate.Date);
-                        cmd.Parameters.AddWithValue("@ToDate", filter.ToDate.Date.AddDays(1));
-                        if (filter.BranchId > 0)
-                        {
-                            cmd.Parameters.AddWithValue("@BranchId", filter.BranchId);
-                        }
+                        cmd.Parameters.AddWithValue("@ToDate", filter.ToDate.Date);
+                        cmd.Parameters.AddWithValue("@CustomerLedgerId", filter.CustomerLedgerId > 0 ? (object)filter.CustomerLedgerId : DBNull.Value);
 
                         using (SqlDataAdapter adapter = new SqlDataAdapter(cmd))
                         {
@@ -41,39 +42,7 @@ namespace Repository.ReportRepository
                             {
                                 foreach (DataRow row in dt.Rows)
                                 {
-                                    decimal netAmt = ToDecimal(row, "NetAmount");
-                                    decimal taxAmt = ToDecimal(row, "TaxAmt");
-                                    decimal subTotal = ToDecimal(row, "SubTotal");
-                                    if (subTotal == 0m && netAmt > 0m) subTotal = netAmt - taxAmt;
-                                    string gstin = ToString(row, "GSTIN");
-                                    string custName = ToString(row, "customername");
-                                    if (string.IsNullOrEmpty(custName)) custName = ToString(row, "CustomerName");
-                                    if (string.IsNullOrEmpty(custName)) custName = "Walk-in Customer";
-
-                                    list.Add(new SalesGSTRegisterRow
-                                    {
-                                        InvoiceNo = ToString(row, "BillNo"),
-                                        DocDate = ToDateTime(row, "BillDate"),
-                                        CustomerName = custName,
-                                        CustomerGSTIN = gstin,
-                                        SaleType = gstin.Length >= 15 ? "B2B" : "B2C",
-                                        ItemName = "Sales Transaction",
-                                        HSNCode = "",
-                                        Qty = 1,
-                                        Unit = "PCS",
-                                        TaxableValue = subTotal,
-                                        CGSTPer = taxAmt > 0 && subTotal > 0 ? (double)Math.Round((taxAmt / subTotal) * 50m, 2) : 0,
-                                        CGSTAmt = Math.Round(taxAmt / 2m, 2),
-                                        SGSTPer = taxAmt > 0 && subTotal > 0 ? (double)Math.Round((taxAmt / subTotal) * 50m, 2) : 0,
-                                        SGSTAmt = Math.Round(taxAmt / 2m, 2),
-                                        IGSTPer = 0,
-                                        IGSTAmt = 0m,
-                                        CessPer = 0,
-                                        CessAmt = 0m,
-                                        TotalOutputGST = taxAmt,
-                                        TotalInvoiceAmount = netAmt,
-                                        TaxType = "incl"
-                                    });
+                                    list.Add(MapSalesRow(row));
                                 }
                                 return list;
                             }
@@ -115,7 +84,19 @@ namespace Repository.ReportRepository
                     if (!string.IsNullOrEmpty(detailsTable))
                     {
                         string billNoDetails = GetCol(detailsTable, "d", "BillNo", "Billno", "Bill_No") ?? "d.BillNo";
-                        detailsJoin = $"LEFT JOIN dbo.{detailsTable} d ON {billNoMaster} = {billNoDetails}";
+                        string branchDetails = GetCol(detailsTable, "d", "BranchId", "BranchID", "Branch_Id");
+                        string finYearDetails = GetCol(detailsTable, "d", "FinYearId", "FinYearID", "FinYear_Id");
+                        string cancelDetails = GetCol(detailsTable, "d", "CancelFlag", "cancelflag");
+
+                        string extraJoin = "";
+                        if (branchCol != null && branchDetails != null)
+                            extraJoin += $" AND {branchCol} = {branchDetails}";
+                        if (finYearCol != null && finYearDetails != null)
+                            extraJoin += $" AND {finYearCol} = {finYearDetails}";
+                        if (cancelDetails != null)
+                            extraJoin += $" AND ISNULL({cancelDetails}, 0) = 0";
+
+                        detailsJoin = $"LEFT JOIN dbo.{detailsTable} d ON {billNoMaster} = {billNoDetails}{extraJoin}";
 
                         itemNameCol = GetCol(detailsTable, "d", "ItemName", "Item_Name", "itemname") ?? "''";
                         qtyCol = GetCol(detailsTable, "d", "Qty", "qty", "Quantity") ?? "0";
@@ -153,6 +134,18 @@ namespace Repository.ReportRepository
                         {
                             ledgerJoin = $"LEFT JOIN dbo.{ledgerTable} l ON {ledgerIdMaster} = {ledgerKey}";
                             gstinSelect = GetGstinColumnExpression("l", ledgerTable);
+                        }
+                    }
+
+                    string ledgerDetailsTable = TableExists("LedgerDetails") ? "LedgerDetails" : "";
+                    string ledgerDetailsJoin = "";
+                    if (!string.IsNullOrEmpty(ledgerDetailsTable) && ledgerIdMaster != null)
+                    {
+                        string ldKey = GetCol(ledgerDetailsTable, "ld", "LedgerID", "LedgerId");
+                        if (ldKey != null)
+                        {
+                            ledgerDetailsJoin = $"LEFT JOIN dbo.{ledgerDetailsTable} ld ON {ledgerIdMaster} = {ldKey}";
+                            gstinSelect = $"ISNULL(NULLIF(ld.[GSTIN], ''), {gstinSelect})";
                         }
                     }
 
@@ -204,13 +197,13 @@ namespace Repository.ReportRepository
                                         (CASE WHEN {taxPerCol} > 100 THEN {taxPerCol}/100.0 ELSE {taxPerCol} END)
                                     ELSE 
                                         (CASE WHEN ISNULL({masterTaxPerCol}, 0) > 100 THEN {masterTaxPerCol}/100.0 ELSE ISNULL({masterTaxPerCol}, 0) END)
-                                END)/2.0 AS FLOAT
+                                 END)/2.0 AS FLOAT
                             ) AS CGSTPer,
                             CAST(
                                 (CASE 
                                     WHEN ISNULL({taxAmtCol}, 0) > 0 THEN {taxAmtCol}
                                     ELSE ISNULL({masterTaxCol}, 0)
-                                END)/2.0 AS DECIMAL(18,2)
+                                 END)/2.0 AS DECIMAL(18,2)
                             ) AS CGSTAmt,
                             CAST(
                                 (CASE 
@@ -218,13 +211,13 @@ namespace Repository.ReportRepository
                                         (CASE WHEN {taxPerCol} > 100 THEN {taxPerCol}/100.0 ELSE {taxPerCol} END)
                                     ELSE 
                                         (CASE WHEN ISNULL({masterTaxPerCol}, 0) > 100 THEN {masterTaxPerCol}/100.0 ELSE ISNULL({masterTaxPerCol}, 0) END)
-                                END)/2.0 AS FLOAT
+                                 END)/2.0 AS FLOAT
                             ) AS SGSTPer,
                             CAST(
                                 (CASE 
                                     WHEN ISNULL({taxAmtCol}, 0) > 0 THEN {taxAmtCol}
                                     ELSE ISNULL({masterTaxCol}, 0)
-                                END)/2.0 AS DECIMAL(18,2)
+                                 END)/2.0 AS DECIMAL(18,2)
                             ) AS SGSTAmt,
                             CAST(0 AS FLOAT) AS IGSTPer,
                             CAST(0 AS DECIMAL(18,2)) AS IGSTAmt,
@@ -248,6 +241,7 @@ namespace Repository.ReportRepository
                         {detailsJoin}
                         {itemJoin}
                         {ledgerJoin}
+                        {ledgerDetailsJoin}
                         {whereSql}
                     ";
 
@@ -280,6 +274,18 @@ namespace Repository.ReportRepository
             {
                 if (DataConnection.State == ConnectionState.Open)
                     DataConnection.Close();
+            }
+
+            if (!string.IsNullOrWhiteSpace(filter.SearchText))
+            {
+                string search = filter.SearchText.Trim();
+                list = list.Where(x =>
+                    (x.InvoiceNo != null && x.InvoiceNo.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                    (x.CustomerName != null && x.CustomerName.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                    (x.CustomerGSTIN != null && x.CustomerGSTIN.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                    (x.ItemName != null && x.ItemName.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                    (x.HSNCode != null && x.HSNCode.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0)
+                ).ToList();
             }
 
             return list;
