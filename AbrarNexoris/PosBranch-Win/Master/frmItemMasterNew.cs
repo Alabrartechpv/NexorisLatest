@@ -5723,28 +5723,30 @@ namespace PosBranch_Win.Master
                     ItemMaster.FinYearId = getItem.FinYearId;
 
                     // Set the item number in UI
-                    txt_ItemNo.Text = getItem.ItemNo.ToString();
+                    if (txt_ItemNo != null)
+                    {
+                        txt_ItemNo.Text = getItem.ItemNo?.ToString() ?? string.Empty;
+                    }
                     int loadedItemNo;
-                    if (int.TryParse(getItem.ItemNo, out loadedItemNo) && loadedItemNo > 0)
+                    if (int.TryParse(getItem.ItemNo ?? "0", out loadedItemNo) && loadedItemNo > 0)
                         lastLoadedItemNo = loadedItemNo;
 
                     // Populate the form fields
-
-                    txt_description.Text = getItem.Description;
-                    txt_LocalLanguage.Text = getItem.NameInLocalLanguage;
+                    if (txt_description != null) txt_description.Text = getItem.Description ?? string.Empty;
+                    if (txt_LocalLanguage != null) txt_LocalLanguage.Text = getItem.NameInLocalLanguage ?? string.Empty;
                     // NOTE: Do NOT set txt_BaseUnit.Text here - set it AFTER populating the UOM grid
                     // to prevent SynchronizeBaseUnitWithGrid from clearing the grid before it's populated.
                     // We will populate ALL saved unit rows into ultraGrid1 below from getItem.List
                     // to ensure multiple units (e.g., 1 UNIT, 4 OTR) are loaded exactly like btn_ItemLoad.
 
                     // Additional item details
-                    txt_Brand.Text = getItem.BrandName;
-                    txt_Category.Text = getItem.CategoryName;
+                    if (txt_Brand != null) txt_Brand.Text = getItem.BrandName ?? string.Empty;
+                    if (txt_Category != null) txt_Category.Text = getItem.CategoryName ?? string.Empty;
 
-                    txt_CustomerType.Text = getItem.ForCustomerType;
-                    txt_Group.Text = getItem.GroupName;
+                    if (txt_CustomerType != null) txt_CustomerType.Text = getItem.ForCustomerType ?? string.Empty;
+                    if (txt_Group != null) txt_Group.Text = getItem.GroupName ?? string.Empty;
 
-                    txt_ItemType.Text = getItem.ItemType;
+                    if (txt_ItemType != null) txt_ItemType.Text = getItem.ItemType ?? string.Empty;
                     EnsureDefaultItemType();
                     SetSmartReorderValues(getItem.Order_Cycle_Days, getItem.Box_Quantity, getItem.Is_Perishable);
 
@@ -8948,17 +8950,10 @@ namespace PosBranch_Win.Master
 
                 // Validate Retail Price
                 string retailPriceText = txt_Retail?.Text?.Trim() ?? string.Empty;
-                if (string.IsNullOrWhiteSpace(retailPriceText))
+                float retailPriceVal;
+                if (string.IsNullOrWhiteSpace(retailPriceText) || !float.TryParse(retailPriceText, out retailPriceVal) || retailPriceVal <= 0)
                 {
                     MessageBox.Show("Please enter Retail Price.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    txt_Retail?.Focus();
-                    return;
-                }
-                // Validate that Retail Price is a valid number
-                float retailPriceVal;
-                if (!float.TryParse(retailPriceText, out retailPriceVal) || retailPriceVal <= 0)
-                {
-                    MessageBox.Show("Please enter a valid Retail Price (must be greater than 0).", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     txt_Retail?.Focus();
                     return;
                 }
@@ -9358,17 +9353,10 @@ namespace PosBranch_Win.Master
 
             // Validate Retail Price
             string retailPriceText = txt_Retail?.Text?.Trim() ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(retailPriceText))
+            float retailPriceVal;
+            if (string.IsNullOrWhiteSpace(retailPriceText) || !float.TryParse(retailPriceText, out retailPriceVal) || retailPriceVal <= 0)
             {
                 MessageBox.Show("Please enter Retail Price.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                txt_Retail?.Focus();
-                return;
-            }
-            // Validate that Retail Price is a valid number
-            float retailPriceVal;
-            if (!float.TryParse(retailPriceText, out retailPriceVal) || retailPriceVal <= 0)
-            {
-                MessageBox.Show("Please enter a valid Retail Price (must be greater than 0).", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 txt_Retail?.Focus();
                 return;
             }
