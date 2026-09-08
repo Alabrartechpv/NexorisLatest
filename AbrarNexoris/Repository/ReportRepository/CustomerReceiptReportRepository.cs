@@ -36,8 +36,8 @@ namespace Repository.ReportRepository
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.Add("@BranchId", SqlDbType.Int).Value = filter.BranchId;
-                    cmd.Parameters.Add("@FromDate", SqlDbType.Date).Value = filter.FromDate.Date;
-                    cmd.Parameters.Add("@ToDate", SqlDbType.Date).Value = filter.ToDate.Date;
+                    cmd.Parameters.Add("@FromDate", SqlDbType.Date).Value = (filter.UseDateFilter && filter.FromDate.HasValue) ? (object)filter.FromDate.Value.Date : DBNull.Value;
+                    cmd.Parameters.Add("@ToDate", SqlDbType.Date).Value = (filter.UseDateFilter && filter.ToDate.HasValue) ? (object)filter.ToDate.Value.Date : DBNull.Value;
                     cmd.Parameters.Add("@CustomerLedgerId", SqlDbType.Int).Value = filter.CustomerLedgerId;
 
                     using (SqlDataAdapter adapter = new SqlDataAdapter(cmd))

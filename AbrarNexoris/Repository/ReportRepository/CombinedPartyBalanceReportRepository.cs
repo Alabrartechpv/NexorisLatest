@@ -107,7 +107,8 @@ namespace Repository.ReportRepository
                 CompanyId = SessionContext.CompanyId,
                 BranchId = SessionContext.BranchId,
                 FinYearId = SessionContext.FinYearId,
-                LedgerId = 0
+                LedgerId = 0,
+                UseDateFilter = true
             });
 
             IEnumerable<CustomerOutstandingReportRow> filteredRows = rows;

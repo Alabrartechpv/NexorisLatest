@@ -59,7 +59,6 @@ namespace PosBranch_Win.Reports.FinancialReports
             btnClearFilters.Click += btnClearFilters_Click;
             btnExport.Click += btnExport_Click;
             comboBox1.ValueChanged += comboBox1_ValueChanged;
-            ultraComboPreset.ValueChanged += ultraComboPreset_ValueChanged;
             txtSearch.TextChanged += txtSearch_TextChanged;
             txtSearch.KeyDown += txtSearch_KeyDown;
             ultraComboCustomer.ValueChanged += ultraComboCustomer_ValueChanged;
@@ -70,6 +69,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             button1.Click += button1_Click;
             ultraButton1.Click += ultraButton1_Click;
             ultraButton2.Click += ultraButton2_Click;
+            ultraButton3.Click += ultraButton3_Click;
 
             KeyPreview = true;
             KeyDown += frmCustomerReceiptReport_KeyDown;
@@ -99,6 +99,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                 InitializeGridFooter();
                 LoadCustomers();
                 ResetReportView();
+                UpdateDateControlState();
             }
             finally
             {
@@ -121,17 +122,14 @@ namespace PosBranch_Win.Reports.FinancialReports
         private void InitializeSearchControls()
         {
             comboBox1.Items.Clear();
+            comboBox1.Items.Add("ALL", "ALL");
             comboBox1.Items.Add("ByRange", "By Range");
             comboBox1.Items.Add("Today", "Today");
             comboBox1.Items.Add("Yesterday", "Yesterday");
             comboBox1.Items.Add("ThisWeek", "This Week");
             comboBox1.Items.Add("ThisMonth", "This Month");
             comboBox1.Items.Add("LastMonth", "Last Month");
-            comboBox1.Value = "ByRange";
-
-            ultraComboPreset.Items.Clear();
-            ultraComboPreset.Items.Add("CustomerReceipt", "Customer Receipt");
-            ultraComboPreset.Value = "CustomerReceipt";
+            comboBox1.Value = "ALL";
 
             txtSearch.Text = string.Empty;
         }
@@ -139,13 +137,16 @@ namespace PosBranch_Win.Reports.FinancialReports
         private void ApplyQuickDateSelection()
         {
             string preset = Convert.ToString(comboBox1.Value);
+            bool isAll = string.IsNullOrWhiteSpace(preset) || string.Equals(preset, "ALL", StringComparison.OrdinalIgnoreCase);
+            bool isRange = string.Equals(preset, "ByRange", StringComparison.OrdinalIgnoreCase);
             DateTime today = DateTime.Today;
             DateTime fromDate = Convert.ToDateTime(dtFrom.Value).Date;
             DateTime toDate = Convert.ToDateTime(dtTo.Value).Date;
-            bool isRange = string.IsNullOrWhiteSpace(preset) || string.Equals(preset, "ByRange", StringComparison.OrdinalIgnoreCase);
 
             switch (preset)
             {
+                case "ALL":
+                    break;
                 case "Today":
                     fromDate = today;
                     toDate = today;
@@ -170,14 +171,28 @@ namespace PosBranch_Win.Reports.FinancialReports
                     break;
             }
 
-            dtFrom.Enabled = isRange;
-            dtTo.Enabled = isRange;
-
-            if (!isRange)
+            if (!isRange && !isAll)
             {
                 dtFrom.Value = fromDate;
                 dtTo.Value = toDate;
             }
+
+            UpdateDateControlState();
+        }
+
+        private void UpdateDateControlState()
+        {
+            string preset = Convert.ToString(comboBox1.Value);
+            bool isAll = string.IsNullOrWhiteSpace(preset) || string.Equals(preset, "ALL", StringComparison.OrdinalIgnoreCase);
+            bool isRange = string.Equals(preset, "ByRange", StringComparison.OrdinalIgnoreCase);
+
+            lblFromDate.Visible = !isAll;
+            dtFrom.Visible = !isAll;
+            dtFrom.Enabled = isRange;
+
+            lblToDate.Visible = !isAll;
+            dtTo.Visible = !isAll;
+            dtTo.Enabled = isRange;
         }
 
         private void InitializePanels()
@@ -198,7 +213,6 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             StyleLabel(lblCustomer);
             StyleLabel(lblSearch);
-            StyleLabel(lblPreset);
             StyleLabel(lblFromDate);
             StyleLabel(lblToDate);
 
@@ -259,7 +273,6 @@ namespace PosBranch_Win.Reports.FinancialReports
         {
             StyleFilterCombo(comboBox1, true);
             StyleFilterCombo(txtSearch, false);
-            StyleUltraCombo(ultraComboPreset);
             StyleUltraCombo(ultraComboCustomer);
             StyleDateEditor(dtFrom);
             StyleDateEditor(dtTo);
@@ -392,8 +405,6 @@ namespace PosBranch_Win.Reports.FinancialReports
             layout.Override.BorderStyleRow = UIElementBorderStyle.Solid;
             layout.Override.MinRowHeight = 19;
             layout.Override.DefaultRowHeight = 19;
-            layout.Override.BorderStyleCell = UIElementBorderStyle.Solid;
-            layout.Override.BorderStyleRow = UIElementBorderStyle.Solid;
             layout.RowConnectorStyle = RowConnectorStyle.Solid;
             layout.RowConnectorColor = GridRowLine;
             layout.ScrollBarLook.Appearance.BackColor = ActionPanelBackColor;
@@ -450,12 +461,15 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             try
             {
+                bool useDateFilter = !string.Equals(Convert.ToString(comboBox1.Value), "ALL", StringComparison.OrdinalIgnoreCase);
+
                 CustomerReceiptReportFilter filter = new CustomerReceiptReportFilter
                 {
-                    FromDate = Convert.ToDateTime(dtFrom.Value).Date,
-                    ToDate = Convert.ToDateTime(dtTo.Value).Date,
+                    FromDate = useDateFilter ? (DateTime?)Convert.ToDateTime(dtFrom.Value).Date : null,
+                    ToDate = useDateFilter ? (DateTime?)Convert.ToDateTime(dtTo.Value).Date : null,
                     BranchId = SessionContext.BranchId,
-                    CustomerLedgerId = GetSelectedLedgerId()
+                    CustomerLedgerId = GetSelectedLedgerId(),
+                    UseDateFilter = useDateFilter
                 };
 
                 _reportRows = _repository.GetReport(filter);
@@ -504,14 +518,14 @@ namespace PosBranch_Win.Reports.FinancialReports
             try
             {
                 DateTime today = DateTime.Today;
-                comboBox1.Value = "ByRange";
+                comboBox1.Value = "ALL";
                 dtFrom.Value = new DateTime(today.Year, today.Month, 1);
                 dtTo.Value = today;
-                ultraComboPreset.Value = "CustomerReceipt";
                 ultraComboCustomer.Value = 0;
                 txtSearch.Text = string.Empty;
                 _reportRows = new List<CustomerReceiptReportRow>();
                 ResetReportView();
+                UpdateDateControlState();
             }
             finally
             {
@@ -527,6 +541,9 @@ namespace PosBranch_Win.Reports.FinancialReports
 
         private bool ValidateDateRange()
         {
+            if (string.Equals(Convert.ToString(comboBox1.Value), "ALL", StringComparison.OrdinalIgnoreCase))
+                return true;
+
             DateTime fromDate = Convert.ToDateTime(dtFrom.Value).Date;
             DateTime toDate = Convert.ToDateTime(dtTo.Value).Date;
 
@@ -640,24 +657,6 @@ namespace PosBranch_Win.Reports.FinancialReports
         private void btnExport_Click(object sender, EventArgs e)
         {
             ExportCsv();
-        }
-
-        private void ultraComboPreset_ValueChanged(object sender, EventArgs e)
-        {
-            if (_isLoading || ultraComboPreset.Value == null)
-                return;
-
-            string preset = ultraComboPreset.Value.ToString();
-            DateTime today = DateTime.Today;
-
-            switch (preset)
-            {
-                case "CustomerReceipt":
-                    comboBox1.Value = "ByRange";
-                    dtFrom.Value = new DateTime(today.Year, today.Month, 1);
-                    dtTo.Value = today;
-                    break;
-            }
         }
 
         private void comboBox1_ValueChanged(object sender, EventArgs e)
@@ -1161,6 +1160,57 @@ namespace PosBranch_Win.Reports.FinancialReports
                 });
         }
 
+        private void ultraButton3_Click(object sender, EventArgs e)
+        {
+            if (gridReport.Rows.Count == 0)
+            {
+                MessageBox.Show("There is no data to print.", "No Data", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            try
+            {
+                Cursor previousCursor = Cursor;
+                Cursor = Cursors.WaitCursor;
+
+                try
+                {
+                    UltraGridPrintDocument printDocument = new UltraGridPrintDocument();
+                    printDocument.Grid = gridReport;
+                    printDocument.DefaultPageSettings.Landscape = true;
+                    printDocument.DefaultPageSettings.Margins = new System.Drawing.Printing.Margins(40, 40, 60, 60);
+
+                    string customerName = ultraComboCustomer.Value == null || Convert.ToInt32(ultraComboCustomer.Value) <= 0
+                        ? "All Customers"
+                        : ultraComboCustomer.Text;
+
+                    printDocument.Header.TextCenter = string.Format("Customer Receipt Report{0}Customer: {1}", Environment.NewLine, customerName);
+                    printDocument.Header.TextRight = string.Format("Print Date: {0:dd-MMM-yyyy hh:mm tt}", DateTime.Now);
+                    printDocument.Header.Appearance.FontData.Bold = DefaultableBoolean.True;
+                    printDocument.Header.Appearance.FontData.SizeInPoints = 12;
+                    printDocument.Header.Appearance.TextHAlign = HAlign.Center;
+                    printDocument.Header.Appearance.TextVAlign = VAlign.Middle;
+                    printDocument.Footer.TextCenter = "Page [Page #]";
+                    printDocument.FitWidthToPages = 1;
+
+                    using (PrintPreviewDialog previewDialog = new PrintPreviewDialog())
+                    {
+                        previewDialog.Document = printDocument;
+                        previewDialog.WindowState = FormWindowState.Maximized;
+                        previewDialog.ShowDialog(this);
+                    }
+                }
+                finally
+                {
+                    Cursor = previousCursor;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(string.Format("Error generating print preview: {0}", ex.Message), "Print Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
         private void UpdateSelectionToggleButtonText()
         {
             ultraButton1.Text = ultraPanelControls.Visible ? "Hide Selection" : "View Selection";
@@ -1323,4 +1373,3 @@ namespace PosBranch_Win.Reports.FinancialReports
         }
     }
 }
-

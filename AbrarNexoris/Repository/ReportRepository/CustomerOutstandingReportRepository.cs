@@ -29,8 +29,8 @@ namespace Repository.ReportRepository
                 using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._CustomerOutstandingReport, (SqlConnection)DataConnection))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.Add("@FromDate", SqlDbType.DateTime).Value = filter.FromDate.Date;
-                    cmd.Parameters.Add("@ToDate", SqlDbType.DateTime).Value = filter.ToDate.Date;
+                    cmd.Parameters.Add("@FromDate", SqlDbType.DateTime).Value = (filter.UseDateFilter && filter.FromDate.HasValue) ? (object)filter.FromDate.Value.Date : DBNull.Value;
+                    cmd.Parameters.Add("@ToDate", SqlDbType.DateTime).Value = (filter.UseDateFilter && filter.ToDate.HasValue) ? (object)filter.ToDate.Value.Date : DBNull.Value;
                     cmd.Parameters.Add("@BranchId", SqlDbType.Int).Value = filter.BranchId > 0 ? filter.BranchId : SessionContext.BranchId;
                     cmd.Parameters.Add("@LedgerId", SqlDbType.Int).Value = filter.LedgerId;
                     cmd.Parameters.Add("@_Operation", SqlDbType.VarChar, 50).Value = "GETOUTSTANDING";

@@ -1688,7 +1688,16 @@ namespace Repository
                         while (reader.Read())
                         {
                             int ledgerId = Convert.ToInt32(reader["LedgerId"]);
-                            string reasonName = reader["ReasonName"].ToString();
+                            string reasonName = reader["ReasonName"] != null ? reader["ReasonName"].ToString().Trim() : "";
+
+                            // Exclude primary Stock In Hand / BEGIN STOCK from reason dropdown
+                            if (string.Equals(reasonName, "BEGIN STOCK", StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(reasonName, "STOCK IN HAND", StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(reasonName, DefaultLedgers.BEGINSTOCK, StringComparison.OrdinalIgnoreCase))
+                            {
+                                continue;
+                            }
+
                             if (addedLedgerIds.Add(ledgerId))
                             {
                                 reasonList.Add(new Reason { LedgerID = ledgerId, ReasonName = reasonName });
