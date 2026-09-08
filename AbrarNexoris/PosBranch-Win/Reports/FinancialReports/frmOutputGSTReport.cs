@@ -314,27 +314,6 @@ namespace PosBranch_Win.Reports.FinancialReports
             gridReport.Paint += (s, ev) => UpdateFooterCellPositions();
         }
 
-        private int GetCompanyId()
-        {
-            if (SessionContext.IsInitialized && SessionContext.CompanyId > 0)
-                return SessionContext.CompanyId;
-            return int.TryParse(DataBase.CompanyId, out var value) && value > 0 ? value : 0;
-        }
-
-        private int GetBranchId()
-        {
-            if (SessionContext.IsInitialized && SessionContext.BranchId > 0)
-                return SessionContext.BranchId;
-            return int.TryParse(DataBase.BranchId, out var value) && value > 0 ? value : 0;
-        }
-
-        private int GetFinYearId()
-        {
-            if (SessionContext.IsInitialized && SessionContext.FinYearId > 0)
-                return SessionContext.FinYearId;
-            return int.TryParse(DataBase.FinyearId, out var value) && value > 0 ? value : 0;
-        }
-
         private void LoadReport()
         {
             if (_isLoading) return;
@@ -344,35 +323,14 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             try
             {
-                DateTime fromDate = DateTime.MinValue;
-                DateTime toDate = DateTime.MaxValue;
-
-                if (dtFrom.Value != null && dtFrom.Value != DBNull.Value)
-                {
-                    try { fromDate = Convert.ToDateTime(dtFrom.Value).Date; } catch { }
-                }
-
-                if (dtTo.Value != null && dtTo.Value != DBNull.Value)
-                {
-                    try { toDate = Convert.ToDateTime(dtTo.Value).Date; } catch { }
-                }
-
-                if (fromDate > toDate && fromDate != DateTime.MinValue && toDate != DateTime.MaxValue)
-                {
-                    DateTime temp = fromDate;
-                    fromDate = toDate;
-                    toDate = temp;
-                }
-
                 OutputGSTReportFilter filter = new OutputGSTReportFilter
                 {
-                    FromDate = fromDate,
-                    ToDate = toDate,
-                    CompanyId = 0,
-                    BranchId = 0,
-                    FinYearId = 0,
-                    CustomerLedgerId = 0,
-                    SearchText = txtSearch.Text != null ? txtSearch.Text.Trim() : string.Empty
+                    FromDate = Convert.ToDateTime(dtFrom.Value).Date,
+                    ToDate = Convert.ToDateTime(dtTo.Value).Date,
+                    CompanyId = SessionContext.CompanyId,
+                    BranchId = SessionContext.BranchId,
+                    FinYearId = SessionContext.FinYearId,
+                    SearchText = txtSearch.Text.Trim()
                 };
 
                 gridReport.DataSource = null;
@@ -380,35 +338,30 @@ namespace PosBranch_Win.Reports.FinancialReports
                 string rawVal = Convert.ToString(ultraComboReportView.Value ?? "");
                 string rawText = Convert.ToString(ultraComboReportView.Text ?? "");
 
-                DataTable dataTable = null;
-
                 if (rawVal == "SUMMARY" || rawText.Contains("Summary"))
                 {
-                    dataTable = ToDataTable(_repository.GetOutputSummary(filter));
+                    gridReport.DataSource = _repository.GetOutputSummary(filter);
                 }
                 else if (rawVal == "RATE_WISE" || rawText.Contains("Rate"))
                 {
-                    dataTable = ToDataTable(_repository.GetRateWiseSummary(filter));
+                    gridReport.DataSource = _repository.GetRateWiseSummary(filter);
                 }
                 else if (rawVal == "B2B" || rawText.Contains("B2B"))
                 {
-                    dataTable = ToDataTable(_repository.GetB2BSales(filter));
+                    gridReport.DataSource = _repository.GetB2BSales(filter);
                 }
                 else if (rawVal == "HSN" || rawText.Contains("HSN"))
                 {
-                    dataTable = ToDataTable(_repository.GetHSNOutputGST(filter));
+                    gridReport.DataSource = _repository.GetHSNOutputGST(filter);
                 }
                 else if (rawVal == "CD_NOTE" || rawText.Contains("Credit"))
                 {
-                    dataTable = ToDataTable(_repository.GetCreditDebitNotes(filter));
+                    gridReport.DataSource = _repository.GetCreditDebitNotes(filter);
                 }
                 else
                 {
-                    dataTable = ToDataTable(_repository.GetSalesRegister(filter));
+                    gridReport.DataSource = _repository.GetSalesRegister(filter);
                 }
-
-                gridReport.DataSource = dataTable;
-                try { gridReport.DataBind(); } catch { }
 
                 CreateFooterCells();
                 UpdateFooterValues();
@@ -422,29 +375,6 @@ namespace PosBranch_Win.Reports.FinancialReports
             {
                 Cursor = previousCursor;
             }
-        }
-
-        private static DataTable ToDataTable<T>(IList<T> data)
-        {
-            System.ComponentModel.PropertyDescriptorCollection properties = System.ComponentModel.TypeDescriptor.GetProperties(typeof(T));
-            DataTable table = new DataTable();
-            foreach (System.ComponentModel.PropertyDescriptor prop in properties)
-            {
-                table.Columns.Add(prop.Name, System.Nullable.GetUnderlyingType(prop.PropertyType) ?? prop.PropertyType);
-            }
-            if (data != null)
-            {
-                foreach (T item in data)
-                {
-                    DataRow row = table.NewRow();
-                    foreach (System.ComponentModel.PropertyDescriptor prop in properties)
-                    {
-                        row[prop.Name] = prop.GetValue(item) ?? DBNull.Value;
-                    }
-                    table.Rows.Add(row);
-                }
-            }
-            return table;
         }
 
         private void gridReport_InitializeLayout(object sender, InitializeLayoutEventArgs e)
