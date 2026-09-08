@@ -102,6 +102,9 @@
     <Compile Include="Report\DayBookModel.cs" />
     <Compile Include="Report\VendorPaymentReportModel.cs" />
     <Compile Include="Report\VendorOutstandingReportModel.cs" />
+    <Compile Include="Report\InputGSTReportModel.cs" />
+    <Compile Include="Report\OutputGSTReportModel.cs" />
+    <Compile Include="Report\GovtGSTReturnReportModel.cs" />
     <Compile Include="Report\CustomerwiseSalesSummaryModel.cs" />
     <Compile Include="Report\SalesmanwiseSalesSummaryModel.cs" />
     <Compile Include="Report\ItemwiseSalesSummaryModel.cs" />

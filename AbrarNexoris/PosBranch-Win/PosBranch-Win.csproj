@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -1073,6 +1073,24 @@
     <Compile Include="Reports\FinancialReports\frmVendorOutstandingReport.Designer.cs">
       <DependentUpon>frmVendorOutstandingReport.cs</DependentUpon>
     </Compile>
+    <Compile Include="Reports\FinancialReports\frmInputGSTReport.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Reports\FinancialReports\frmInputGSTReport.Designer.cs">
+      <DependentUpon>frmInputGSTReport.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Reports\FinancialReports\frmOutputGSTReport.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Reports\FinancialReports\frmOutputGSTReport.Designer.cs">
+      <DependentUpon>frmOutputGSTReport.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Reports\FinancialReports\frmGovtGSTReturnReport.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Reports\FinancialReports\frmGovtGSTReturnReport.Designer.cs">
+      <DependentUpon>frmGovtGSTReturnReport.cs</DependentUpon>
+    </Compile>
     <Compile Include="Reports\InventoryReport\FrmSmartReorderDashboard.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -1780,6 +1798,9 @@
     <EmbeddedResource Include="Reports\FinancialReports\FrmBankStatementReport.resx">
       <DependentUpon>FrmBankStatementReport.cs</DependentUpon>
     </EmbeddedResource>
+    <EmbeddedResource Include="Reports\FinancialReports\frmCustomerOutstandingReport.resx">
+      <DependentUpon>frmCustomerOutstandingReport.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="Reports\FinancialReports\FrmManualPartyBalanceReport.resx">
       <DependentUpon>FrmManualPartyBalanceReport.cs</DependentUpon>
     </EmbeddedResource>
@@ -1800,6 +1821,15 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Reports\FinancialReports\frmVendorPaymentReport.resx">
       <DependentUpon>frmVendorPaymentReport.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Reports\FinancialReports\frmInputGSTReport.resx">
+      <DependentUpon>frmInputGSTReport.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Reports\FinancialReports\frmOutputGSTReport.resx">
+      <DependentUpon>frmOutputGSTReport.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Reports\FinancialReports\frmGovtGSTReturnReport.resx">
+      <DependentUpon>frmGovtGSTReturnReport.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Reports\InventoryReport\frmItemReport.resx">
       <DependentUpon>frmItemReport.cs</DependentUpon>

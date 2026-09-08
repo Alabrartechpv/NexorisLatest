@@ -189,6 +189,11 @@ namespace Repository.Accounts
             return string.Empty;
         }
 
+        public string GetVendorName(int vendorId)
+        {
+            return GetVendorNameByLedgerId(vendorId);
+        }
+
         /// <summary>
         /// Get all invoices for vendor
         /// </summary>
@@ -332,7 +337,7 @@ namespace Repository.Accounts
                             using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._DebitNoteMaster, conn, transaction))
                             {
                                 cmd.CommandType = CommandType.StoredProcedure;
-                                cmd.Parameters.AddWithValue("@CompanyId", master.CompanyId);
+                                cmd.Parameters.AddWithValue("@CompanyId", master.CompanyId > 0 ? master.CompanyId : 1);
                                 cmd.Parameters.AddWithValue("@BranchId", master.BranchId);
                                 cmd.Parameters.AddWithValue("@FinYearId", finYearId);
                                 cmd.Parameters.AddWithValue("@VoucherId", master.VoucherId);
@@ -528,8 +533,6 @@ namespace Repository.Accounts
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@BranchId", branchId);
                     cmd.Parameters.AddWithValue("@FinYearId", finYearId);
-                    cmd.Parameters.AddWithValue("@PageIndex", pageIndex);
-                    cmd.Parameters.AddWithValue("@PageSize", pageSize);
                     cmd.Parameters.AddWithValue("@_Operation", "GETALL");
 
                     using (SqlDataAdapter da = new SqlDataAdapter(cmd))

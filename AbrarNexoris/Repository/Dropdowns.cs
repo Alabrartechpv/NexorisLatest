@@ -1688,7 +1688,16 @@ namespace Repository
                         while (reader.Read())
                         {
                             int ledgerId = Convert.ToInt32(reader["LedgerId"]);
-                            string reasonName = reader["ReasonName"].ToString();
+                            string reasonName = reader["ReasonName"] != null ? reader["ReasonName"].ToString().Trim() : "";
+
+                            // Exclude primary Stock In Hand / BEGIN STOCK from reason dropdown
+                            if (string.Equals(reasonName, "BEGIN STOCK", StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(reasonName, "STOCK IN HAND", StringComparison.OrdinalIgnoreCase) ||
+                                string.Equals(reasonName, DefaultLedgers.BEGINSTOCK, StringComparison.OrdinalIgnoreCase))
+                            {
+                                continue;
+                            }
+
                             if (addedLedgerIds.Add(ledgerId))
                             {
                                 reasonList.Add(new Reason { LedgerID = ledgerId, ReasonName = reasonName });
@@ -1799,7 +1808,8 @@ namespace Repository
         public StockGrid getStockAdjustmentById(int id)
         {
             StockGrid stkGrid = new StockGrid();
-            DataConnection.Open();
+            bool wasClosed = DataConnection.State != ConnectionState.Open;
+            if (wasClosed) DataConnection.Open();
             try
             {
                 using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_StockAdjustemnt, (SqlConnection)DataConnection))
@@ -1816,7 +1826,6 @@ namespace Repository
                         // First table contains master record
                         if ((ds != null) && (ds.Tables.Count > 0) && (ds.Tables[0] != null) && (ds.Tables[0].Rows.Count > 0))
                         {
-                            // Map the master record to a list with single item
                             var masterRecord = ds.Tables[0].Rows[0].ToNullableObject<StockAdjMasterDialog>();
                             stkGrid.ListMaster = new List<StockAdjMasterDialog> { masterRecord };
                         }
@@ -1828,6 +1837,94 @@ namespace Repository
                         }
                     }
                 }
+
+                // Fallback direct SQL query if stored procedure did not return master or detail records
+                if (stkGrid.ListMaster == null || !stkGrid.ListMaster.Any())
+                {
+                    string masterSql = @"
+                        SELECT 
+                            sam.Id,
+                            sam.FinYearId,
+                            sam.CompanyId,
+                            sam.BranchId,
+                            sam.StockAdjustmentNo,
+                            sam.StockAdjustmentDate,
+                            sam.Comments,
+                            sam.LedgerId,
+                            sam.LedgerId AS LedgerID,
+                            sam.VoucherId,
+                            sam.UserId,
+                            sam.CancelFlag,
+                            sam.CategoryId,
+                            lm.LedgerName,
+                            sam.TransactionGuid
+                        FROM StockAdjustmentMaster sam
+                        LEFT JOIN LedgerMaster lm ON lm.LedgerId = sam.LedgerId
+                        WHERE sam.Id = @Id;";
+
+                    using (SqlCommand cmd = new SqlCommand(masterSql, (SqlConnection)DataConnection))
+                    {
+                        cmd.Parameters.AddWithValue("@Id", id);
+                        using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
+                        {
+                            DataTable dt = new DataTable();
+                            adapt.Fill(dt);
+                            if (dt.Rows.Count > 0)
+                            {
+                                var masterRecord = dt.Rows[0].ToNullableObject<StockAdjMasterDialog>();
+                                stkGrid.ListMaster = new List<StockAdjMasterDialog> { masterRecord };
+                            }
+                        }
+                    }
+                }
+
+                if (stkGrid.ListDetails == null || !stkGrid.ListDetails.Any())
+                {
+                    string detailSql = @"
+                        SELECT 
+                            sad.FinYearId,
+                            sad.CompanyId,
+                            sad.BranchId,
+                            sad.StockAdjustmentMasterId,
+                            sad.LedgerId,
+                            sad.SlNo,
+                            sad.ItemId,
+                            sad.UnitId,
+                            sad.Packing,
+                            CAST(sad.IsBaseUnit AS INT) AS IsBaseUnit,
+                            sad.Cost,
+                            sad.OriginalCost,
+                            sad.SystemStock,
+                            sad.PhysicalStock,
+                            sad.QtyDifference,
+                            sad.CancelFlag,
+                            sad.OrderedStock,
+                            sad.Reason,
+                            COALESCE(NULLIF(ps.BarCode, ''), NULLIF(im.BarCode, ''), '') AS BarCode,
+                            ISNULL(im.Description, '') AS Description,
+                            ISNULL(um.UnitName, '') AS UOM
+                        FROM StockAdjustmentDetails sad
+                        LEFT JOIN ItemMaster im ON im.ItemId = sad.ItemId
+                        LEFT JOIN UnitMaster um ON um.UnitID = sad.UnitId
+                        LEFT JOIN PriceSettings ps ON ps.ItemId = sad.ItemId AND ps.UnitId = sad.UnitId AND ps.BranchId = sad.BranchId
+                        WHERE sad.StockAdjustmentMasterId = @Id
+                          AND ISNULL(sad.CancelFlag, 0) = 0
+                        ORDER BY sad.SlNo;";
+
+                    using (SqlCommand cmd = new SqlCommand(detailSql, (SqlConnection)DataConnection))
+                    {
+                        cmd.Parameters.AddWithValue("@Id", id);
+                        using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
+                        {
+                            DataTable dt = new DataTable();
+                            adapt.Fill(dt);
+                            if (dt.Rows.Count > 0)
+                            {
+                                stkGrid.ListDetails = dt.ToListOfObject<StockAdjPriceDetails>();
+                            }
+                        }
+                    }
+                }
             }
             catch (Exception Ex)
             {
@@ -1835,7 +1932,7 @@ namespace Repository
             }
             finally
             {
-                if (DataConnection.State == ConnectionState.Open)
+                if (wasClosed && DataConnection.State == ConnectionState.Open)
                     DataConnection.Close();
             }
             return stkGrid;

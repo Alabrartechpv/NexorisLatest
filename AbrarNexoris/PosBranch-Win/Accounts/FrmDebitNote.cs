@@ -1110,6 +1110,25 @@ namespace PosBranch_Win.Accounts
             {
                 using (var dlg = new frmDebitNoteList())
                 {
+                    dlg.OnDebitNoteSelected += (voucherId) =>
+                    {
+                        try
+                        {
+                            DataSet ds = debitNoteRepo.GetDebitNoteById(voucherId, currentBranchId);
+                            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
+                            {
+                                LoadDebitNoteData(ds);
+                            }
+                            else
+                            {
+                                MessageBox.Show("Debit Note not found.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            MessageBox.Show($"Error loading Debit Note details: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        }
+                    };
                     dlg.ShowDialog(this);
                 }
             }
@@ -1180,36 +1199,7 @@ namespace PosBranch_Win.Accounts
 
         private void btnLoadDebitNote_Click(object sender, EventArgs e)
         {
-            try
-            {
-                using (var form = new DialogBox.frmDebitNoteList())
-                {
-                    form.OnDebitNoteSelected += (voucherId) =>
-                    {
-                        try
-                        {
-                            DataSet ds = debitNoteRepo.GetDebitNoteById(voucherId, currentBranchId);
-                            if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
-                            {
-                                LoadDebitNoteData(ds);
-                            }
-                            else
-                            {
-                                MessageBox.Show("Debit Note not found.", "Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            MessageBox.Show($"Error loading Debit Note details: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        }
-                    };
-                    form.ShowDialog();
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show($"Error opening Debit Note list: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
+            btnViewDebitNote_Click(sender, e);
         }
 
         private void LoadDebitNoteData(DataSet ds)
@@ -1223,9 +1213,28 @@ namespace PosBranch_Win.Accounts
 
             txtPurchaseNo.Text = masterRow["VoucherId"].ToString();
             textBox4.Text = currentVendorLedgerId.ToString();
-            dtpPurchaseDate.Value = Convert.ToDateTime(masterRow["VoucherDate"]);
-            textBox1.Text = Convert.ToDouble(masterRow["DebitAmount"]).ToString("N2");
+
+            string vendorName = masterRow.Table.Columns.Contains("VendorName") ? masterRow["VendorName"]?.ToString() : "";
+            if (string.IsNullOrEmpty(vendorName) && currentVendorLedgerId > 0)
+            {
+                vendorName = debitNoteRepo.GetVendorNameByLedgerId(currentVendorLedgerId);
+            }
+            txtVendorName.Text = vendorName;
+
+            if (masterRow["VoucherDate"] != null && masterRow["VoucherDate"] != DBNull.Value)
+            {
+                dtpPurchaseDate.Value = Convert.ToDateTime(masterRow["VoucherDate"]);
+            }
+
+            isLoadingData = true;
+            double debitAmt = Convert.ToDouble(masterRow["DebitAmount"]);
+            textBox1.Text = debitAmt.ToString("N2");
+            totalDebitAmount = (decimal)debitAmt;
+            isLoadingData = false;
+
             richTextBox2.Text = masterRow["Narration"]?.ToString() ?? "";
+
+            LoadVendorOutstanding();
 
             if (ds.Tables.Count > 1 && ds.Tables[1].Rows.Count > 0)
             {
@@ -1258,20 +1267,20 @@ namespace PosBranch_Win.Accounts
                     row["Select"] = true;
 
                     decimal invoiceAmt = row.Table.Columns.Contains("BillAmount") ? GetSafeDecimal(row["BillAmount"]) : 0m;
-                    decimal debitAmt = row.Table.Columns.Contains("DebitAmount") ? GetSafeDecimal(row["DebitAmount"]) : 0m;
+                    decimal rowDebitAmt = row.Table.Columns.Contains("DebitAmount") ? GetSafeDecimal(row["DebitAmount"]) : 0m;
                     decimal balAmt = row.Table.Columns.Contains("BalanceAmount") ? GetSafeDecimal(row["BalanceAmount"]) : 0m;
 
                     if (row.Table.Columns.Contains("InvoiceAmount"))
                         row["InvoiceAmount"] = invoiceAmt;
 
                     if (row.Table.Columns.Contains("Debit Amount"))
-                        row["Debit Amount"] = debitAmt;
+                        row["Debit Amount"] = rowDebitAmt;
 
                     if (row.Table.Columns.Contains("Balance"))
                         row["Balance"] = balAmt;
 
                     // Since it was saved, the original balance before this debit was (BalanceAmount + DebitAmount)
-                    row["OriginalBalance"] = balAmt + debitAmt;
+                    row["OriginalBalance"] = balAmt + rowDebitAmt;
                 }
 
                 ultraGrid1.DataSource = dtDetails;

@@ -16,11 +16,12 @@ namespace ModelClass.Report
 
     public class CustomerOutstandingReportFilter
     {
-        public DateTime FromDate { get; set; }
-        public DateTime ToDate { get; set; }
+        public DateTime? FromDate { get; set; }
+        public DateTime? ToDate { get; set; }
         public int CompanyId { get; set; }
         public int BranchId { get; set; }
         public int FinYearId { get; set; }
         public int LedgerId { get; set; }
+        public bool UseDateFilter { get; set; }
     }
 }

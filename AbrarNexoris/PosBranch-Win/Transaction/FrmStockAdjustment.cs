@@ -29,6 +29,7 @@ namespace PosBranch_Win.Transaction
 
         // DataTable to hold the grid data
         private DataTable stockAdjustmentTable;
+        private bool _isSaving = false;
 
         // Column state persistence
         private const string GRID_LAYOUT_FILE = "StockAdjustmentGridLayout.xml";
@@ -250,8 +251,17 @@ namespace PosBranch_Win.Transaction
                 // Hide the side panel — Save/Clear/Exit are handled via the ribbon
                 ultraPanel6.Visible = false;
 
-                // Register Activated event so barcode textbox always gets focus
+                // Register events so barcode textbox always gets focus
                 this.Activated += FrmStockAdjustment_Activated;
+                this.Shown += (s, args) => barcodeFocus();
+                this.Enter += (s, args) => barcodeFocus();
+                this.VisibleChanged += (s, args) => { if (this.Visible) barcodeFocus(); };
+
+                if (ultraPanel2 != null)
+                {
+                    ultraPanel2.Click += (s, args) => barcodeFocus();
+                    if (ultraPanel2.ClientArea != null) ultraPanel2.ClientArea.Click += (s, args) => barcodeFocus();
+                }
 
                 btnSave.Visible = true;
                 ultraPictureBox7.Visible = false;
@@ -265,7 +275,6 @@ namespace PosBranch_Win.Transaction
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
-
 
         // Activated event: return focus to barcode textbox whenever the form is activated
         private void FrmStockAdjustment_Activated(object sender, EventArgs e)
@@ -349,6 +358,7 @@ namespace PosBranch_Win.Transaction
         {
             frmReasonDialog reasonDialog = new frmReasonDialog();
             reasonDialog.ShowDialog();
+            barcodeFocus();
         }
 
         private void btn_Dial_Categ_Click(object sender, EventArgs e)
@@ -356,6 +366,7 @@ namespace PosBranch_Win.Transaction
             string Params = "FrmStockAdjustment";
             frmCategoryDialog category = new frmCategoryDialog(Params);
             category.ShowDialog();
+            barcodeFocus();
         }
 
         private void btn_ItemLoad_Click(object sender, EventArgs e)
@@ -473,7 +484,24 @@ namespace PosBranch_Win.Transaction
                             ultraGrid1.PerformAction(UltraGridAction.EnterEditMode);
                         }
                     }
+                    else
+                    {
+                        // On the last row, return focus to barcode textbox for scanning the next item
+                        barcodeFocus();
+                    }
 
+                    e.Handled = true;
+                    return;
+                }
+
+                // Handle Escape key to return focus to barcode textbox
+                if (e.KeyCode == Keys.Escape)
+                {
+                    if (ultraGrid1.ActiveCell != null && ultraGrid1.ActiveCell.IsInEditMode)
+                    {
+                        ultraGrid1.PerformAction(UltraGridAction.ExitEditMode);
+                    }
+                    barcodeFocus();
                     e.Handled = true;
                     return;
                 }
@@ -567,12 +595,20 @@ namespace PosBranch_Win.Transaction
 
         private void ultraRadioButton1_CheckedChanged(object sender, EventArgs e)
         {
-            if (ultraRadioButton1.Checked) RefreshGridCalculations();
+            if (ultraRadioButton1.Checked)
+            {
+                RefreshGridCalculations();
+                barcodeFocus();
+            }
         }
 
         private void ultraRadioButton2_CheckedChanged(object sender, EventArgs e)
         {
-            if (ultraRadioButton2.Checked) RefreshGridCalculations();
+            if (ultraRadioButton2.Checked)
+            {
+                RefreshGridCalculations();
+                barcodeFocus();
+            }
         }
 
         /// <summary>
@@ -611,13 +647,46 @@ namespace PosBranch_Win.Transaction
         }
 
         /// <summary>
-        /// Applies consistent rich color formatting to Adjustment Qty, Qty Difference, and Status cells.
+        /// Applies consistent rich color formatting to Adjustment Qty, Qty Difference, New Balance, and Status cells.
         /// </summary>
         private void ApplyColorFormatting(UltraGridRow row, int difference)
         {
-            var diffCell   = row.Cells["Qty Difference"];
-            var adjCell    = row.Cells["Adjustment Qty"];
-            var statusCell = row.Cells["Status"];
+            var diffCell       = row.Cells["Qty Difference"];
+            var adjCell        = row.Cells["Adjustment Qty"];
+            var newBalanceCell = row.Cells["New Balance"];
+            var statusCell     = row.Cells["Status"];
+
+            int newBalance = newBalanceCell?.Value != null ? Convert.ToInt32(newBalanceCell.Value) : 0;
+
+            if (newBalance < 0)
+            {
+                if (newBalanceCell != null)
+                {
+                    newBalanceCell.Appearance.ForeColor = Color.White;
+                    newBalanceCell.Appearance.BackColor = Color.FromArgb(231, 76, 60);
+                    newBalanceCell.Appearance.FontData.Bold = DefaultableBoolean.True;
+                }
+                if (statusCell != null)
+                {
+                    statusCell.Value = "INVALID (< 0)";
+                    statusCell.Appearance.ForeColor = Color.Red;
+                    statusCell.Appearance.FontData.Bold = DefaultableBoolean.True;
+                }
+            }
+            else
+            {
+                if (newBalanceCell != null)
+                {
+                    newBalanceCell.Appearance.ForeColor = Color.FromArgb(44, 62, 80);
+                    newBalanceCell.Appearance.BackColor = Color.FromArgb(245, 245, 245);
+                    newBalanceCell.Appearance.ResetFontData();
+                }
+                if (statusCell != null)
+                {
+                    statusCell.Appearance.ResetForeColor();
+                    statusCell.Appearance.ResetFontData();
+                }
+            }
 
             if (difference < 0)
             {
@@ -631,7 +700,7 @@ namespace PosBranch_Win.Transaction
                 adjCell.Appearance.BackColor = Color.FromArgb(255, 235, 235);
                 adjCell.Appearance.FontData.Bold = DefaultableBoolean.True;
 
-                if (statusCell != null) statusCell.Value = "Stock OUT";
+                if (statusCell != null && newBalance >= 0) statusCell.Value = "Stock OUT";
             }
             else if (difference > 0)
             {
@@ -645,7 +714,7 @@ namespace PosBranch_Win.Transaction
                 adjCell.Appearance.BackColor = Color.FromArgb(235, 255, 235);
                 adjCell.Appearance.FontData.Bold = DefaultableBoolean.True;
 
-                if (statusCell != null) statusCell.Value = "Stock IN";
+                if (statusCell != null && newBalance >= 0) statusCell.Value = "Stock IN";
             }
             else
             {
@@ -658,7 +727,7 @@ namespace PosBranch_Win.Transaction
                 adjCell.Appearance.BackColor = Color.FromArgb(248, 248, 248);
                 adjCell.Appearance.ResetFontData();
 
-                if (statusCell != null) statusCell.Value = "No Change";
+                if (statusCell != null && newBalance >= 0) statusCell.Value = "No Change";
             }
         }
 
@@ -790,13 +859,36 @@ namespace PosBranch_Win.Transaction
             }
         }
 
-        private void barcodeFocus()
+        public void barcodeFocus(bool clearText = true)
         {
             try
             {
-                this.ActiveControl = txtb_barcode;
-                txtb_barcode.Text  = string.Empty;
-                txtb_barcode.Focus();
+                if (txtb_barcode != null && !txtb_barcode.IsDisposed)
+                {
+                    Action setFocus = () =>
+                    {
+                        if (txtb_barcode != null && !txtb_barcode.IsDisposed && txtb_barcode.CanFocus)
+                        {
+                            if (clearText)
+                            {
+                                txtb_barcode.Text = string.Empty;
+                            }
+                            this.ActiveControl = txtb_barcode;
+                            txtb_barcode.Focus();
+                            txtb_barcode.Select();
+                            txtb_barcode.SelectAll();
+                        }
+                    };
+
+                    if (this.IsHandleCreated)
+                    {
+                        this.BeginInvoke(setFocus);
+                    }
+                    else
+                    {
+                        setFocus();
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -871,6 +963,35 @@ namespace PosBranch_Win.Transaction
             if (ultraGrid1.Rows.Count == 0)
                 return "Please add at least one item to adjust.";
 
+            // Strict Prevention: Check for any item that results in negative stock
+            var negativeStockItems = new List<string>();
+            foreach (UltraGridRow r in ultraGrid1.Rows)
+            {
+                if (r.Cells["NO"].Value == null || string.IsNullOrWhiteSpace(r.Cells["NO"].Value.ToString()))
+                    continue;
+
+                string desc = r.Cells["Description"]?.Value?.ToString() ?? "Item";
+                int currentStock = r.Cells["Qty On Hand"]?.Value != null ? Convert.ToInt32(r.Cells["Qty On Hand"].Value) : 0;
+                int adjQty = r.Cells["Adjustment Qty"]?.Value != null ? Convert.ToInt32(r.Cells["Adjustment Qty"].Value) : 0;
+                int newBalance = r.Cells["New Balance"]?.Value != null ? Convert.ToInt32(r.Cells["New Balance"].Value) : (currentStock + adjQty);
+
+                if (ultraRadioButton2.Checked && adjQty < 0)
+                {
+                    negativeStockItems.Add($"• {desc}: Physical count cannot be negative ({adjQty})");
+                }
+                else if (newBalance < 0)
+                {
+                    negativeStockItems.Add($"• {desc}: Current Stock = {currentStock}, Adjustment = {adjQty:+#;-#;0}, Resulting Stock = {newBalance}");
+                }
+            }
+
+            if (negativeStockItems.Count > 0)
+            {
+                return "Cannot save stock adjustment! The following item(s) would result in negative stock:\n\n" +
+                       string.Join("\n", negativeStockItems) +
+                       "\n\nStock cannot be reduced below 0. Please correct the quantities before saving.";
+            }
+
             // Ensure at least one item actually has a stock change (prevents saving a no-op adjustment)
             bool hasChange = ultraGrid1.Rows.Cast<UltraGridRow>()
                 .Any(r => r.Cells["Qty Difference"].Value != null &&
@@ -884,19 +1005,14 @@ namespace PosBranch_Win.Transaction
 
         private void btnSave_Click(object sender, EventArgs e)
         {
+            if (_isSaving) return;
+
             try
             {
                 if (!ShiftSessionGuard.CanDoTransaction(out string transactionError))
                 {
                     MessageBox.Show(transactionError, "Shift Closing Required",
                         MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                    return;
-                }
-
-                // Confirmation dialog
-                if (MessageBox.Show("Do you want to save this stock adjustment?", "Confirm Save",
-                    MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
-                {
                     return;
                 }
 
@@ -909,7 +1025,23 @@ namespace PosBranch_Win.Transaction
                     return;
                 }
 
+                int totalItems = ultraGrid1.Rows != null ? ultraGrid1.Rows.Count : 0;
+                int totalAdjQty = 0;
+                if (ultraGrid1.Rows != null && ultraGrid1.Rows.Count > 0)
+                {
+                    totalAdjQty = ultraGrid1.Rows.Cast<UltraGridRow>()
+                        .Sum(r => r.Cells["Adjustment Qty"].Value != null ? Convert.ToInt32(r.Cells["Adjustment Qty"].Value) : 0);
+                }
 
+                string confirmMsg = $"Do you want to save this stock adjustment?\n\nTotal Items: {totalItems}\nTotal Adjustment Qty: {totalAdjQty:+#;-#;0}";
+                if (MessageBox.Show(confirmMsg, "Confirm Stock Adjustment",
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+                {
+                    return;
+                }
+
+                _isSaving = true;
+                btnSave.Enabled = false;
 
                 // 2. Prepare master record data
                 stockadjsmaster.LedgerName = txtb_reason.Text;
@@ -962,8 +1094,6 @@ namespace PosBranch_Win.Transaction
                     string adjBarcode = txtb_barcode != null && !string.IsNullOrWhiteSpace(txtb_barcode.Text)
                         ? txtb_barcode.Text.Trim()
                         : ("ADJ-" + stockadjsmaster.StockAdjustmentNo.ToString("D5"));
-                    int totalAdjQty = ultraGrid1.Rows.Cast<UltraGridRow>()
-                        .Sum(r => r.Cells["Adjustment Qty"].Value != null ? Convert.ToInt32(r.Cells["Adjustment Qty"].Value) : 0);
 
                     var details = new Dictionary<string, string>
                     {
@@ -1000,6 +1130,8 @@ namespace PosBranch_Win.Transaction
             }
             finally
             {
+                _isSaving = false;
+                btnSave.Enabled = true;
                 Cursor.Current = Cursors.Default;
             }
         }
@@ -1095,16 +1227,18 @@ namespace PosBranch_Win.Transaction
 
         private void docBtn_Click(object sender, EventArgs e)
         {
-            frmDocDialog docdialo = new frmDocDialog();
+            frmDocDialog docdialo = new frmDocDialog(this);
             if (docdialo.ShowDialog() == DialogResult.OK)
             {
-                btnSave.Visible = false;
-                ultraPictureBox7.Visible = true;
+                SetUpdateMode();
             }
+            barcodeFocus();
         }
 
         private void btn_update_Click(object sender, EventArgs e)
         {
+            if (_isSaving) return;
+
             try
             {
                 // 1. Validate inputs
@@ -1116,7 +1250,23 @@ namespace PosBranch_Win.Transaction
                     return;
                 }
 
+                int totalItems = ultraGrid1.Rows != null ? ultraGrid1.Rows.Count : 0;
+                int totalAdjQty = 0;
+                if (ultraGrid1.Rows != null && ultraGrid1.Rows.Count > 0)
+                {
+                    totalAdjQty = ultraGrid1.Rows.Cast<UltraGridRow>()
+                        .Sum(r => r.Cells["Adjustment Qty"].Value != null ? Convert.ToInt32(r.Cells["Adjustment Qty"].Value) : 0);
+                }
 
+                string confirmMsg = $"Do you want to update this stock adjustment?\n\nTotal Items: {totalItems}\nTotal Adjustment Qty: {totalAdjQty:+#;-#;0}";
+                if (MessageBox.Show(confirmMsg, "Confirm Stock Adjustment Update",
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+                {
+                    return;
+                }
+
+                _isSaving = true;
+                ultraPictureBox7.Enabled = false;
 
                 // 2. Prepare master record data
                 stockadjsmaster.LedgerName = txtb_reason.Text;
@@ -1152,8 +1302,6 @@ namespace PosBranch_Win.Transaction
                     string adjBarcode = txtb_barcode != null && !string.IsNullOrWhiteSpace(txtb_barcode.Text)
                         ? txtb_barcode.Text.Trim()
                         : ("ADJ-" + stockadjsmaster.StockAdjustmentNo.ToString("D5"));
-                    int totalAdjQty = ultraGrid1.Rows.Cast<UltraGridRow>()
-                        .Sum(r => r.Cells["Adjustment Qty"].Value != null ? Convert.ToInt32(r.Cells["Adjustment Qty"].Value) : 0);
 
                     var details = new Dictionary<string, string>
                     {
@@ -1190,6 +1338,8 @@ namespace PosBranch_Win.Transaction
             }
             finally
             {
+                _isSaving = false;
+                ultraPictureBox7.Enabled = true;
                 Cursor.Current = Cursors.Default;
             }
         }
@@ -1199,30 +1349,17 @@ namespace PosBranch_Win.Transaction
         {
             try
             {
-                // Remove call to update status bar
-                // UpdateStatusBar();
-
-                // Optional: Automatically scroll to the last row
+                // Automatically scroll to the last row while keeping focus in barcode textbox
                 if (ultraGrid1.Rows.Count > 0)
                 {
                     int lastRowIndex = ultraGrid1.Rows.Count - 1;
                     ultraGrid1.ActiveRow = ultraGrid1.Rows[lastRowIndex];
-
-                    // Ensure the "Adjustment Qty" column exists before setting the current cell
-                    if (ultraGrid1.DisplayLayout.Bands[0].Columns.Exists("Adjustment Qty"))
-                    {
-                        ultraGrid1.ActiveCell = ultraGrid1.Rows[lastRowIndex].Cells["Adjustment Qty"];
-                        ultraGrid1.PerformAction(UltraGridAction.EnterEditMode);
-                    }
-
-                    // Scroll to make the last row visible
                     ultraGrid1.ActiveRowScrollRegion.ScrollRowIntoView(ultraGrid1.ActiveRow);
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("Error in AfterRowAdded: " + ex.Message);
-                // Don't show a message box for this non-critical error
             }
         }
 
@@ -1252,6 +1389,7 @@ namespace PosBranch_Win.Transaction
                     frmdialForItemMaster itemDialog = new frmdialForItemMaster(Params1);
                     itemDialog.Owner = this; // Set owner for communication
                     itemDialog.ShowDialog();
+                    barcodeFocus();
                     return true;
                 }
 
@@ -1317,14 +1455,31 @@ namespace PosBranch_Win.Transaction
         {
             try
             {
-                // Check if this barcode already exists in the grid
-                foreach (UltraGridRow existingRow in ultraGrid1.Rows)
+                // Check if this item already exists in the grid
+                if (!string.IsNullOrWhiteSpace(barcode))
                 {
-                    if (existingRow.Cells["BarCode"].Value.ToString() == barcode)
+                    foreach (UltraGridRow existingRow in ultraGrid1.Rows)
                     {
-                        MessageBox.Show("Item already selected");
-                        this.barcodeFocus();
-                        return -1;
+                        if (existingRow.Cells["BarCode"].Value != null &&
+                            string.Equals(existingRow.Cells["BarCode"].Value.ToString().Trim(), barcode.Trim(), StringComparison.OrdinalIgnoreCase))
+                        {
+                            MessageBox.Show("Item already selected");
+                            this.barcodeFocus();
+                            return -1;
+                        }
+                    }
+                }
+                else if (!string.IsNullOrWhiteSpace(itemId))
+                {
+                    foreach (UltraGridRow existingRow in ultraGrid1.Rows)
+                    {
+                        if (existingRow.Cells["ItemNo"].Value != null &&
+                            string.Equals(existingRow.Cells["ItemNo"].Value.ToString().Trim(), itemId.Trim(), StringComparison.OrdinalIgnoreCase))
+                        {
+                            MessageBox.Show("Item already selected");
+                            this.barcodeFocus();
+                            return -1;
+                        }
                     }
                 }
 

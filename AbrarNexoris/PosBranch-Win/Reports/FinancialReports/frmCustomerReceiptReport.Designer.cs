@@ -22,8 +22,6 @@ namespace PosBranch_Win.Reports.FinancialReports
             this.button1 = new System.Windows.Forms.Button();
             this.txtSearch = new Infragistics.Win.UltraWinEditors.UltraComboEditor();
             this.lblSearch = new Infragistics.Win.Misc.UltraLabel();
-            this.ultraComboPreset = new Infragistics.Win.UltraWinEditors.UltraComboEditor();
-            this.lblPreset = new Infragistics.Win.Misc.UltraLabel();
             this.ultraComboCustomer = new Infragistics.Win.UltraWinEditors.UltraComboEditor();
             this.lblCustomer = new Infragistics.Win.Misc.UltraLabel();
             this.dtTo = new Infragistics.Win.UltraWinEditors.UltraDateTimeEditor();
@@ -43,7 +41,6 @@ namespace PosBranch_Win.Reports.FinancialReports
             this.ultraPanelControls.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.comboBox1)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.txtSearch)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.ultraComboPreset)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.ultraComboCustomer)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.dtTo)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.dtFrom)).BeginInit();
@@ -62,8 +59,6 @@ namespace PosBranch_Win.Reports.FinancialReports
             this.ultraPanelControls.ClientArea.Controls.Add(this.button1);
             this.ultraPanelControls.ClientArea.Controls.Add(this.txtSearch);
             this.ultraPanelControls.ClientArea.Controls.Add(this.lblSearch);
-            this.ultraPanelControls.ClientArea.Controls.Add(this.ultraComboPreset);
-            this.ultraPanelControls.ClientArea.Controls.Add(this.lblPreset);
             this.ultraPanelControls.ClientArea.Controls.Add(this.ultraComboCustomer);
             this.ultraPanelControls.ClientArea.Controls.Add(this.lblCustomer);
             this.ultraPanelControls.ClientArea.Controls.Add(this.dtTo);
@@ -73,7 +68,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             this.ultraPanelControls.Dock = System.Windows.Forms.DockStyle.Top;
             this.ultraPanelControls.Location = new System.Drawing.Point(0, 0);
             this.ultraPanelControls.Name = "ultraPanelControls";
-            this.ultraPanelControls.Size = new System.Drawing.Size(1349, 127);
+            this.ultraPanelControls.Size = new System.Drawing.Size(1349, 90);
             this.ultraPanelControls.TabIndex = 0;
             // 
             // comboBox1
@@ -85,7 +80,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             // 
             // button1
             // 
-            this.button1.Location = new System.Drawing.Point(424, 46);
+            this.button1.Location = new System.Drawing.Point(424, 44);
             this.button1.Name = "button1";
             this.button1.Size = new System.Drawing.Size(42, 26);
             this.button1.TabIndex = 17;
@@ -94,46 +89,30 @@ namespace PosBranch_Win.Reports.FinancialReports
             // 
             // txtSearch
             // 
-            this.txtSearch.Location = new System.Drawing.Point(116, 42);
+            this.txtSearch.Location = new System.Drawing.Point(116, 44);
             this.txtSearch.Name = "txtSearch";
             this.txtSearch.Size = new System.Drawing.Size(164, 25);
             this.txtSearch.TabIndex = 7;
             // 
             // lblSearch
             // 
-            this.lblSearch.Location = new System.Drawing.Point(60, 46);
+            this.lblSearch.Location = new System.Drawing.Point(46, 48);
             this.lblSearch.Name = "lblSearch";
             this.lblSearch.Size = new System.Drawing.Size(72, 23);
             this.lblSearch.TabIndex = 6;
             this.lblSearch.Text = "Customer";
             // 
-            // ultraComboPreset
-            // 
-            this.ultraComboPreset.DropDownStyle = Infragistics.Win.DropDownStyle.DropDownList;
-            this.ultraComboPreset.Location = new System.Drawing.Point(116, 74);
-            this.ultraComboPreset.Name = "ultraComboPreset";
-            this.ultraComboPreset.Size = new System.Drawing.Size(164, 25);
-            this.ultraComboPreset.TabIndex = 9;
-            // 
-            // lblPreset
-            // 
-            this.lblPreset.Location = new System.Drawing.Point(66, 78);
-            this.lblPreset.Name = "lblPreset";
-            this.lblPreset.Size = new System.Drawing.Size(66, 23);
-            this.lblPreset.TabIndex = 8;
-            this.lblPreset.Text = "Options";
-            // 
             // ultraComboCustomer
             // 
             this.ultraComboCustomer.AutoCompleteMode = Infragistics.Win.AutoCompleteMode.SuggestAppend;
-            this.ultraComboCustomer.Location = new System.Drawing.Point(472, 46);
+            this.ultraComboCustomer.Location = new System.Drawing.Point(472, 44);
             this.ultraComboCustomer.Name = "ultraComboCustomer";
             this.ultraComboCustomer.Size = new System.Drawing.Size(406, 25);
             this.ultraComboCustomer.TabIndex = 5;
             // 
             // lblCustomer
             // 
-            this.lblCustomer.Location = new System.Drawing.Point(83, 15);
+            this.lblCustomer.Location = new System.Drawing.Point(74, 15);
             this.lblCustomer.Name = "lblCustomer";
             this.lblCustomer.Size = new System.Drawing.Size(46, 23);
             this.lblCustomer.TabIndex = 4;
@@ -147,6 +126,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             this.dtTo.Size = new System.Drawing.Size(134, 25);
             this.dtTo.TabIndex = 3;
             this.dtTo.Value = new System.DateTime(2026, 4, 16, 0, 0, 0, 0);
+            this.dtTo.Visible = false;
             // 
             // lblToDate
             // 
@@ -155,6 +135,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             this.lblToDate.Size = new System.Drawing.Size(57, 23);
             this.lblToDate.TabIndex = 2;
             this.lblToDate.Text = "To Date";
+            this.lblToDate.Visible = false;
             // 
             // dtFrom
             // 
@@ -164,6 +145,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             this.dtFrom.Size = new System.Drawing.Size(134, 25);
             this.dtFrom.TabIndex = 1;
             this.dtFrom.Value = new System.DateTime(2026, 4, 16, 0, 0, 0, 0);
+            this.dtFrom.Visible = false;
             // 
             // lblFromDate
             // 
@@ -172,6 +154,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             this.lblFromDate.Size = new System.Drawing.Size(74, 23);
             this.lblFromDate.TabIndex = 0;
             this.lblFromDate.Text = "From Date";
+            this.lblFromDate.Visible = false;
             // 
             // btnClearFilters
             // 
@@ -211,9 +194,9 @@ namespace PosBranch_Win.Reports.FinancialReports
             this.ultraPanelMaster.ClientArea.Controls.Add(this.btnSearch);
             this.ultraPanelMaster.ClientArea.Controls.Add(this.btnExport);
             this.ultraPanelMaster.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.ultraPanelMaster.Location = new System.Drawing.Point(0, 127);
+            this.ultraPanelMaster.Location = new System.Drawing.Point(0, 90);
             this.ultraPanelMaster.Name = "ultraPanelMaster";
-            this.ultraPanelMaster.Size = new System.Drawing.Size(1349, 434);
+            this.ultraPanelMaster.Size = new System.Drawing.Size(1349, 471);
             this.ultraPanelMaster.TabIndex = 1;
             // 
             // ultraButton3
@@ -245,7 +228,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             // 
             this.ultraPanelGridFooter.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.ultraPanelGridFooter.Location = new System.Drawing.Point(3, 314);
+            this.ultraPanelGridFooter.Location = new System.Drawing.Point(3, 351);
             this.ultraPanelGridFooter.Name = "ultraPanelGridFooter";
             this.ultraPanelGridFooter.Size = new System.Drawing.Size(1343, 26);
             this.ultraPanelGridFooter.TabIndex = 18;
@@ -257,7 +240,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             | System.Windows.Forms.AnchorStyles.Right)));
             this.gridReport.Location = new System.Drawing.Point(3, 42);
             this.gridReport.Name = "gridReport";
-            this.gridReport.Size = new System.Drawing.Size(1343, 298);
+            this.gridReport.Size = new System.Drawing.Size(1343, 335);
             this.gridReport.TabIndex = 0;
             this.gridReport.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
             // 
@@ -280,7 +263,6 @@ namespace PosBranch_Win.Reports.FinancialReports
             this.ultraPanelControls.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.comboBox1)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.txtSearch)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.ultraComboPreset)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.ultraComboCustomer)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.dtTo)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.dtFrom)).EndInit();
@@ -289,6 +271,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             this.ultraPanelGridFooter.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.gridReport)).EndInit();
             this.ResumeLayout(false);
+
         }
 
         #endregion
@@ -298,8 +281,6 @@ namespace PosBranch_Win.Reports.FinancialReports
         private Infragistics.Win.Misc.UltraButton btnSearch;
         private Infragistics.Win.UltraWinEditors.UltraComboEditor txtSearch;
         private Infragistics.Win.Misc.UltraLabel lblSearch;
-        private Infragistics.Win.UltraWinEditors.UltraComboEditor ultraComboPreset;
-        private Infragistics.Win.Misc.UltraLabel lblPreset;
         private Infragistics.Win.UltraWinEditors.UltraComboEditor ultraComboCustomer;
         private Infragistics.Win.Misc.UltraLabel lblCustomer;
         private Infragistics.Win.Misc.UltraButton btnExport;
