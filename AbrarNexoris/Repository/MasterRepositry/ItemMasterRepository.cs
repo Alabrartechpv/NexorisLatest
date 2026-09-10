@@ -926,27 +926,28 @@ namespace Repository.MasterRepositry
             if (value == null || value == DBNull.Value)
                 return 0.0;
 
-            if (value is double)
-                return (double)value;
+            double res = 0.0;
+            if (value is double d)
+                res = d;
+            else if (value is float f)
+                res = (double)f;
+            else if (value is int i)
+                res = (double)i;
+            else if (value is decimal dec)
+                res = (double)dec;
+            else
+            {
+                string stringValue = value.ToString().Trim();
+                if (string.IsNullOrWhiteSpace(stringValue))
+                    return 0.0;
 
-            if (value is float)
-                return (double)(float)value;
+                double.TryParse(stringValue, out res);
+            }
 
-            if (value is int)
-                return (double)(int)value;
-
-            if (value is decimal)
-                return (double)(decimal)value;
-
-            string stringValue = value.ToString().Trim();
-            if (string.IsNullOrWhiteSpace(stringValue))
+            if (double.IsNaN(res) || double.IsInfinity(res))
                 return 0.0;
 
-            double result;
-            if (double.TryParse(stringValue, out result))
-                return result;
-
-            return 0.0;
+            return res;
         }
 
         #endregion
@@ -1079,6 +1080,16 @@ namespace Repository.MasterRepositry
                             {
                                 val = null;
                             }
+                        }
+
+                        // Sanitize numeric double/float values to prevent TDS RPC protocol error on NaN/Infinity
+                        if (val is double dVal)
+                        {
+                            if (double.IsNaN(dVal) || double.IsInfinity(dVal)) val = 0.0;
+                        }
+                        else if (val is float fVal)
+                        {
+                            if (float.IsNaN(fVal) || float.IsInfinity(fVal)) val = 0.0f;
                         }
 
                         dyn.Add("@" + pName, val);

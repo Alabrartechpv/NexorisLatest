@@ -131,6 +131,7 @@ namespace PosBranch_Win.Reports.InventoryReport
         private void InitializePeriodCombo()
         {
             comboPeriod.Items.Clear();
+            comboPeriod.Items.Add("ALL",          "ALL");
             comboPeriod.Items.Add("Today",        "Today");
             comboPeriod.Items.Add("This Week",    "This Week");
             comboPeriod.Items.Add("This Month",   "This Month");
@@ -138,7 +139,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             comboPeriod.Items.Add("This Quarter", "This Quarter");
             comboPeriod.Items.Add("This Year",    "This Year");
             comboPeriod.Items.Add("Custom",       "Custom");
-            comboPeriod.Text = "This Year";
+            comboPeriod.Text = "ALL";
         }
 
         private void InitializeStockFilterCombo()
@@ -558,7 +559,9 @@ namespace PosBranch_Win.Reports.InventoryReport
         {
             if (_searchWorker.IsBusy) return;
 
-            if (dtFrom.Value == null || dtTo.Value == null)
+            bool isAll = string.Equals(Convert.ToString(comboPeriod.Value ?? comboPeriod.Text), "ALL", StringComparison.OrdinalIgnoreCase);
+
+            if (!isAll && (dtFrom.Value == null || dtTo.Value == null))
             {
                 MessageBox.Show("Please select a valid date range.", "Validation",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -572,8 +575,8 @@ namespace PosBranch_Win.Reports.InventoryReport
 
             var filter = new StockReportFilter
             {
-                FromDate   = ((DateTime)dtFrom.Value).Date,
-                ToDate     = ((DateTime)dtTo.Value).Date.AddDays(1).AddTicks(-1),
+                FromDate   = isAll ? new DateTime(1753, 1, 1) : ((DateTime)dtFrom.Value).Date,
+                ToDate     = isAll ? DateTime.Today.AddDays(1).AddTicks(-1) : ((DateTime)dtTo.Value).Date.AddDays(1).AddTicks(-1),
                 CompanyId  = !string.IsNullOrEmpty(DataBase.CompanyId)  ? int.Parse(DataBase.CompanyId)  : 1,
                 BranchId   = !string.IsNullOrEmpty(DataBase.BranchId)   ? (int.TryParse(DataBase.BranchId, out int bid) ? bid : 0) : 1,
                 FinYearId  = !string.IsNullOrEmpty(DataBase.FinyearId)  ? int.Parse(DataBase.FinyearId)  : 1,
@@ -712,7 +715,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             DateTime now = DateTime.Now;
             dtFrom.Value = new DateTime(now.Year, 1, 1);
             dtTo.Value   = now;
-            comboPeriod.Text      = "This Year";
+            comboPeriod.Text      = "ALL";
             comboGroup.Value      = null;
             comboCategory.Value   = null;
             comboStockFilter.Text = "All Items";
@@ -838,6 +841,8 @@ namespace PosBranch_Win.Reports.InventoryReport
                 DateTime now = DateTime.Now;
                 switch (val)
                 {
+                    case "ALL":
+                    case "All":           dtFrom.Value = new DateTime(1753, 1, 1);              dtTo.Value = now.Date;                              break;
                     case "Today":         dtFrom.Value = now.Date;                              dtTo.Value = now.Date;                              break;
                     case "This Week":     dtFrom.Value = now.Date.AddDays(-(int)now.DayOfWeek); dtTo.Value = now.Date;                              break;
                     case "This Month":    dtFrom.Value = new DateTime(now.Year, now.Month, 1);  dtTo.Value = now.Date;                              break;
