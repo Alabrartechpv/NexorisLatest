@@ -24,6 +24,7 @@ namespace PosBranch_Win.Accounts
         Dropdowns ObjDrop = new Dropdowns();
         private decimal totalPaymentAmount = 0;
         private bool isAdjusting = false;
+        private bool isSaving = false;
         private VendorPaymentRepository paymentRepo;
         private int currentVendorLedgerId = 0;
         private int currentCompanyId = ModelClass.SessionContext.CompanyId;
@@ -939,6 +940,8 @@ namespace PosBranch_Win.Accounts
 
         private void btnSave_Click(object sender, EventArgs e)
         {
+            if (isSaving) return;
+
             try
             {
                 if (IsCancelStatusSelected())
@@ -1007,6 +1010,15 @@ namespace PosBranch_Win.Accounts
                     return;
                 }
 
+                // Confirmation dialog before saving to prevent accidental/duplicate entry
+                DialogResult dialogResult = MessageBox.Show("Do you want to save?", "Confirm Save", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                if (dialogResult != DialogResult.Yes)
+                {
+                    return;
+                }
+
+                isSaving = true;
+
                 // Create voucher entries
                 var vouchers = new List<VoucherEntry>();
 
@@ -1049,6 +1061,10 @@ namespace PosBranch_Win.Accounts
             {
                 MessageBox.Show($"Error saving payment: {ex.Message}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                isSaving = false;
             }
         }
 
