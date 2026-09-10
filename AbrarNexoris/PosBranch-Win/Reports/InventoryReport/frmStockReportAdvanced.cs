@@ -102,12 +102,14 @@ namespace PosBranch_Win.Reports.InventoryReport
         private void InitializePresetDates()
         {
             ultraComboPresetDates.Items.Clear();
+            ultraComboPresetDates.Items.Add("ALL", "ALL");
             ultraComboPresetDates.Items.Add("Today", "Today");
             ultraComboPresetDates.Items.Add("Yesterday", "Yesterday");
             ultraComboPresetDates.Items.Add("This Week", "This Week");
             ultraComboPresetDates.Items.Add("Last Week", "Last Week");
             ultraComboPresetDates.Items.Add("This Month", "This Month");
             ultraComboPresetDates.Items.Add("Last Month", "Last Month");
+            ultraComboPresetDates.Value = "ALL";
         }
 
         private void LoadGroups()
@@ -560,11 +562,13 @@ namespace PosBranch_Win.Reports.InventoryReport
                 return;
             }
 
+            bool isAll = string.Equals(Convert.ToString(ultraComboPresetDates.Value ?? ultraComboPresetDates.Text), "ALL", StringComparison.OrdinalIgnoreCase);
+
             // Build filter from UI
             var filter = new ModelClass.Report.StockReportFilter
             {
-                FromDate = (DateTime)ultraDateTimeEditorFrom.Value,
-                ToDate = (DateTime)ultraDateTimeEditorTo.Value,
+                FromDate = isAll ? new DateTime(1753, 1, 1) : (DateTime)ultraDateTimeEditorFrom.Value,
+                ToDate = isAll ? DateTime.Now : (DateTime)ultraDateTimeEditorTo.Value,
                 CompanyId = !string.IsNullOrEmpty(DataBase.CompanyId) ? int.Parse(DataBase.CompanyId) : 1,
                 BranchId = !string.IsNullOrEmpty(DataBase.BranchId) ? (int.TryParse(DataBase.BranchId, out int bid) ? bid : 0) : 1,
                 FinYearId = !string.IsNullOrEmpty(DataBase.FinyearId) ? int.Parse(DataBase.FinyearId) : 1,
@@ -714,7 +718,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             ultraComboSubCategory.Value = null;
             ultraComboLedger.Value = null;
             ultraTextEditorBarcode.Text = "";
-            ultraComboPresetDates.Value = null;
+            ultraComboPresetDates.Value = "ALL";
         }
 
         private void btnExport_Click(object sender, EventArgs e)
@@ -797,6 +801,8 @@ namespace PosBranch_Win.Reports.InventoryReport
 
             switch (val)
             {
+                case "ALL":
+                case "All": ultraDateTimeEditorFrom.Value = new DateTime(1753, 1, 1); ultraDateTimeEditorTo.Value = now; break;
                 case "Today": ultraDateTimeEditorFrom.Value = now.Date; ultraDateTimeEditorTo.Value = now.Date; break;
                 case "Yesterday": ultraDateTimeEditorFrom.Value = now.AddDays(-1).Date; ultraDateTimeEditorTo.Value = now.AddDays(-1).Date; break;
                 case "This Week": ultraDateTimeEditorFrom.Value = now.AddDays(-(int)now.DayOfWeek); ultraDateTimeEditorTo.Value = now; break;

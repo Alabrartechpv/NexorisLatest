@@ -46,6 +46,8 @@ namespace PosBranch_Win.Reports.InventoryReport
         private BackgroundWorker _searchWorker;
         private List<StockAdjustmentReportRow> _allRows = new List<StockAdjustmentReportRow>();
         private bool _accentPanelsCreated;
+        private Infragistics.Win.Misc.UltraLabel lblPeriod;
+        private Infragistics.Win.UltraWinEditors.UltraComboEditor comboPeriod;
 
         public frmStockAdjustmentReport()
         {
@@ -65,8 +67,77 @@ namespace PosBranch_Win.Reports.InventoryReport
 
         private void InitializeForm()
         {
-            dtpFromDate.Value = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
-            dtpToDate.Value = DateTime.Today;
+            lblPeriod = new Infragistics.Win.Misc.UltraLabel();
+            comboPeriod = new Infragistics.Win.UltraWinEditors.UltraComboEditor();
+
+            lblPeriod.Text = "Period:";
+            lblPeriod.Location = new Point(12, 20);
+            lblPeriod.Size = new Size(45, 20);
+
+            comboPeriod.Location = new Point(58, 16);
+            comboPeriod.Size = new Size(95, 25);
+            comboPeriod.DropDownStyle = Infragistics.Win.DropDownStyle.DropDownList;
+
+            comboPeriod.Items.Clear();
+            comboPeriod.Items.Add("ALL", "ALL");
+            comboPeriod.Items.Add("Today", "Today");
+            comboPeriod.Items.Add("Yesterday", "Yesterday");
+            comboPeriod.Items.Add("This Week", "This Week");
+            comboPeriod.Items.Add("This Month", "This Month");
+            comboPeriod.Items.Add("Last Month", "Last Month");
+            comboPeriod.Items.Add("This Quarter", "This Quarter");
+            comboPeriod.Items.Add("This Year", "This Year");
+            comboPeriod.Items.Add("Custom Range", "Custom Range");
+
+            lblFromDate.Text = "From:";
+            lblFromDate.Location = new Point(158, 20);
+            lblFromDate.Size = new Size(38, 20);
+
+            dtpFromDate.Location = new Point(198, 16);
+            dtpFromDate.Size = new Size(100, 25);
+
+            lblToDate.Text = "To:";
+            lblToDate.Location = new Point(303, 20);
+            lblToDate.Size = new Size(24, 20);
+
+            dtpToDate.Location = new Point(329, 16);
+            dtpToDate.Size = new Size(100, 25);
+
+            lblType.Text = "Type:";
+            lblType.Location = new Point(434, 20);
+            lblType.Size = new Size(36, 20);
+
+            comboType.Location = new Point(472, 16);
+            comboType.Size = new Size(90, 25);
+
+            lblSearch.Text = "Search:";
+            lblSearch.Location = new Point(567, 20);
+            lblSearch.Size = new Size(48, 20);
+
+            txtSearch.Location = new Point(617, 16);
+            txtSearch.Size = new Size(110, 25);
+
+            btnSearch.Text = "Search (F5)";
+            btnSearch.Location = new Point(735, 15);
+            btnSearch.Size = new Size(95, 27);
+
+            btnReset.Location = new Point(836, 15);
+            btnReset.Size = new Size(68, 27);
+
+            btnExport.Location = new Point(910, 15);
+            btnExport.Size = new Size(105, 27);
+
+            btnPrint.Location = new Point(1021, 15);
+            btnPrint.Size = new Size(98, 27);
+
+            btnClose.Location = new Point(1125, 15);
+            btnClose.Size = new Size(68, 27);
+
+            panelFilters.ClientArea.Controls.Add(lblPeriod);
+            panelFilters.ClientArea.Controls.Add(comboPeriod);
+
+            comboPeriod.ValueChanged += ComboPeriod_ValueChanged;
+            comboPeriod.Value = "ALL";
 
             comboType.Items.Clear();
             comboType.Items.Add("", "All");
@@ -101,6 +172,72 @@ namespace PosBranch_Win.Reports.InventoryReport
             };
         }
 
+        private void ComboPeriod_ValueChanged(object sender, EventArgs e)
+        {
+            if (comboPeriod.Value == null) return;
+            string val = comboPeriod.Value.ToString();
+            DateTime today = DateTime.Today;
+
+            switch (val)
+            {
+                case "ALL":
+                    dtpFromDate.Value = new DateTime(1753, 1, 1);
+                    dtpToDate.Value = today;
+                    dtpFromDate.Enabled = false;
+                    dtpToDate.Enabled = false;
+                    break;
+                case "Today":
+                    dtpFromDate.Value = today;
+                    dtpToDate.Value = today;
+                    dtpFromDate.Enabled = false;
+                    dtpToDate.Enabled = false;
+                    break;
+                case "Yesterday":
+                    dtpFromDate.Value = today.AddDays(-1);
+                    dtpToDate.Value = today.AddDays(-1);
+                    dtpFromDate.Enabled = false;
+                    dtpToDate.Enabled = false;
+                    break;
+                case "This Week":
+                    int daysFromMonday = (7 + (today.DayOfWeek - DayOfWeek.Monday)) % 7;
+                    dtpFromDate.Value = today.AddDays(-daysFromMonday);
+                    dtpToDate.Value = today;
+                    dtpFromDate.Enabled = false;
+                    dtpToDate.Enabled = false;
+                    break;
+                case "This Month":
+                    dtpFromDate.Value = new DateTime(today.Year, today.Month, 1);
+                    dtpToDate.Value = today;
+                    dtpFromDate.Enabled = false;
+                    dtpToDate.Enabled = false;
+                    break;
+                case "Last Month":
+                    DateTime lm = today.AddMonths(-1);
+                    dtpFromDate.Value = new DateTime(lm.Year, lm.Month, 1);
+                    dtpToDate.Value = dtpFromDate.Value.AddMonths(1).AddDays(-1);
+                    dtpFromDate.Enabled = false;
+                    dtpToDate.Enabled = false;
+                    break;
+                case "This Quarter":
+                    int qtrMonth = ((today.Month - 1) / 3) * 3 + 1;
+                    dtpFromDate.Value = new DateTime(today.Year, qtrMonth, 1);
+                    dtpToDate.Value = today;
+                    dtpFromDate.Enabled = false;
+                    dtpToDate.Enabled = false;
+                    break;
+                case "This Year":
+                    dtpFromDate.Value = new DateTime(today.Year, 1, 1);
+                    dtpToDate.Value = today;
+                    dtpFromDate.Enabled = false;
+                    dtpToDate.Enabled = false;
+                    break;
+                case "Custom Range":
+                    dtpFromDate.Enabled = true;
+                    dtpToDate.Enabled = true;
+                    break;
+            }
+        }
+
         private void InitializeRuntimeAppearance()
         {
             BackColor = FormBackColor;
@@ -120,12 +257,14 @@ namespace PosBranch_Win.Reports.InventoryReport
             }
 
             // Style Labels
+            StyleLabel(lblPeriod);
             StyleLabel(lblFromDate);
             StyleLabel(lblToDate);
             StyleLabel(lblType);
             StyleLabel(lblSearch);
 
             // Style Inputs
+            StyleFilterCombo(comboPeriod);
             StyleFilterCombo(comboType);
             StyleTextEditor(txtSearch);
         }
@@ -324,19 +463,25 @@ namespace PosBranch_Win.Reports.InventoryReport
             button.Appearance.BackGradientStyle = GradientStyle.Vertical;
             button.Appearance.BorderColor = ButtonBorderColor;
             button.Appearance.ForeColor = ButtonTextBlue;
-            button.Appearance.FontData.Name = "Microsoft Sans Serif";
-            button.Appearance.FontData.SizeInPoints = 9F;
+            button.Appearance.FontData.Name = "Segoe UI";
+            button.Appearance.FontData.SizeInPoints = 8.75F;
             button.Appearance.FontData.Bold = DefaultableBoolean.False;
+            button.Appearance.TextHAlign = HAlign.Center;
+            button.Appearance.TextVAlign = VAlign.Middle;
 
             button.HotTrackAppearance.BackColor = PanelHoverTopColor;
             button.HotTrackAppearance.BackColor2 = PanelHoverBottomColor;
             button.HotTrackAppearance.BorderColor = ButtonBorderColor;
             button.HotTrackAppearance.ForeColor = ButtonTextBlue;
+            button.HotTrackAppearance.TextHAlign = HAlign.Center;
+            button.HotTrackAppearance.TextVAlign = VAlign.Middle;
 
             button.PressedAppearance.BackColor = PanelPressedTopColor;
             button.PressedAppearance.BackColor2 = PanelPressedBottomColor;
             button.PressedAppearance.BorderColor = ButtonBorderColor;
             button.PressedAppearance.ForeColor = ButtonTextBlue;
+            button.PressedAppearance.TextHAlign = HAlign.Center;
+            button.PressedAppearance.TextVAlign = VAlign.Middle;
         }
 
         private void SetupCardControls(Infragistics.Win.Misc.UltraPanel card, Infragistics.Win.Misc.UltraLabel caption, Infragistics.Win.Misc.UltraLabel value, string captionText, Color valueColor)
@@ -414,7 +559,8 @@ namespace PosBranch_Win.Reports.InventoryReport
 
         private void BtnReset_Click(object sender, EventArgs e)
         {
-            dtpFromDate.Value = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
+            comboPeriod.Value = "ALL";
+            dtpFromDate.Value = new DateTime(1753, 1, 1);
             dtpToDate.Value = DateTime.Today;
             comboType.Value = "";
             txtSearch.Text = string.Empty;

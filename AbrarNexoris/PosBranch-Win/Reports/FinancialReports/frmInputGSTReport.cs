@@ -23,7 +23,7 @@ namespace PosBranch_Win.Reports.FinancialReports
         private static readonly Color ControlTextColor = Color.FromArgb(18, 49, 102);
         private static readonly Color GridHeaderBlue = Color.FromArgb(93, 151, 214);
         private static readonly Color GridHeaderBlueDark = Color.FromArgb(67, 118, 184);
-        private static readonly Color GridSelectedBlue = Color.FromArgb(126, 126, 245);
+        private static readonly Color GridSelectedBlue = Color.FromArgb(173, 216, 255);
         private static readonly Color GridRowLine = Color.FromArgb(197, 217, 241);
         private static readonly Color GridAltRow = Color.FromArgb(246, 250, 255);
         private static readonly Color GridFooterBorder = Color.FromArgb(144, 181, 223);
@@ -37,6 +37,7 @@ namespace PosBranch_Win.Reports.FinancialReports
         private readonly Dictionary<string, Label> _footerLabels;
         private readonly Dictionary<string, string> _columnAggregations;
         private bool _isLoading;
+        private Infragistics.Win.UltraWinEditors.UltraComboEditor comboPeriod;
 
         public frmInputGSTReport()
         {
@@ -101,13 +102,41 @@ namespace PosBranch_Win.Reports.FinancialReports
 
         private void InitializeFilterControls()
         {
-            DateTime today = DateTime.Today;
-            dtFrom.Value = today.AddDays(-30);
-            dtTo.Value = today;
             dtFrom.MaskInput = "{date}";
             dtTo.MaskInput = "{date}";
             dtFrom.FormatString = "dd/MM/yyyy";
             dtTo.FormatString = "dd/MM/yyyy";
+
+            if (comboPeriod == null)
+            {
+                comboPeriod = new Infragistics.Win.UltraWinEditors.UltraComboEditor();
+                comboPeriod.Name = "comboPeriod";
+                comboPeriod.Location = new Point(400, 10);
+                comboPeriod.Size = new Size(110, 23);
+                comboPeriod.DropDownStyle = Infragistics.Win.DropDownStyle.DropDownList;
+
+                comboPeriod.Items.Clear();
+                comboPeriod.Items.Add("ALL", "ALL");
+                comboPeriod.Items.Add("Today", "Today");
+                comboPeriod.Items.Add("Yesterday", "Yesterday");
+                comboPeriod.Items.Add("This Week", "This Week");
+                comboPeriod.Items.Add("This Month", "This Month");
+                comboPeriod.Items.Add("Last Month", "Last Month");
+                comboPeriod.Items.Add("This Quarter", "This Quarter");
+                comboPeriod.Items.Add("This Year", "This Year");
+                comboPeriod.Items.Add("Custom Range", "Custom Range");
+
+                lblFromDate.Location = new Point(520, 12);
+                dtFrom.Location = new Point(560, 10);
+                dtFrom.Size = new Size(105, 23);
+
+                lblToDate.Location = new Point(675, 12);
+                dtTo.Location = new Point(700, 10);
+                dtTo.Size = new Size(105, 23);
+
+                ultraPanelControls.ClientArea.Controls.Add(comboPeriod);
+                comboPeriod.ValueChanged += comboPeriod_ValueChanged;
+            }
 
             ultraComboReportView.Items.Clear();
             ultraComboReportView.Items.Add("REGISTER", "Purchase GST Register");
@@ -118,6 +147,88 @@ namespace PosBranch_Win.Reports.FinancialReports
             ultraComboReportView.Value = "REGISTER";
 
             txtSearch.Text = string.Empty;
+            comboPeriod.Value = "ALL";
+            ApplyPeriodSelection();
+        }
+
+        private void comboPeriod_ValueChanged(object sender, EventArgs e)
+        {
+            if (comboPeriod.Value == null || _isLoading) return;
+            ApplyPeriodSelection();
+            LoadReport();
+        }
+
+        private void ApplyPeriodSelection()
+        {
+            if (comboPeriod == null || comboPeriod.Value == null) return;
+            string val = comboPeriod.Value.ToString();
+            DateTime today = DateTime.Today;
+
+            bool isAll = string.Equals(val, "ALL", StringComparison.OrdinalIgnoreCase);
+            lblFromDate.Visible = !isAll;
+            dtFrom.Visible = !isAll;
+            lblToDate.Visible = !isAll;
+            dtTo.Visible = !isAll;
+
+            switch (val)
+            {
+                case "ALL":
+                    dtFrom.Value = new DateTime(1753, 1, 1);
+                    dtTo.Value = today;
+                    dtFrom.Enabled = false;
+                    dtTo.Enabled = false;
+                    break;
+                case "Today":
+                    dtFrom.Value = today;
+                    dtTo.Value = today;
+                    dtFrom.Enabled = false;
+                    dtTo.Enabled = false;
+                    break;
+                case "Yesterday":
+                    dtFrom.Value = today.AddDays(-1);
+                    dtTo.Value = today.AddDays(-1);
+                    dtFrom.Enabled = false;
+                    dtTo.Enabled = false;
+                    break;
+                case "This Week":
+                    int daysFromMonday = (7 + (today.DayOfWeek - DayOfWeek.Monday)) % 7;
+                    dtFrom.Value = today.AddDays(-daysFromMonday);
+                    dtTo.Value = today;
+                    dtFrom.Enabled = false;
+                    dtTo.Enabled = false;
+                    break;
+                case "This Month":
+                    dtFrom.Value = new DateTime(today.Year, today.Month, 1);
+                    dtTo.Value = today;
+                    dtFrom.Enabled = false;
+                    dtTo.Enabled = false;
+                    break;
+                case "Last Month":
+                    DateTime lm = today.AddMonths(-1);
+                    DateTime firstOfLastMonth = new DateTime(lm.Year, lm.Month, 1);
+                    dtFrom.Value = firstOfLastMonth;
+                    dtTo.Value = firstOfLastMonth.AddMonths(1).AddDays(-1);
+                    dtFrom.Enabled = false;
+                    dtTo.Enabled = false;
+                    break;
+                case "This Quarter":
+                    int qtrMonth = ((today.Month - 1) / 3) * 3 + 1;
+                    dtFrom.Value = new DateTime(today.Year, qtrMonth, 1);
+                    dtTo.Value = today;
+                    dtFrom.Enabled = false;
+                    dtTo.Enabled = false;
+                    break;
+                case "This Year":
+                    dtFrom.Value = new DateTime(today.Year, 1, 1);
+                    dtTo.Value = today;
+                    dtFrom.Enabled = false;
+                    dtTo.Enabled = false;
+                    break;
+                case "Custom Range":
+                    dtFrom.Enabled = true;
+                    dtTo.Enabled = true;
+                    break;
+            }
         }
 
         private void InitializePanels()
@@ -178,6 +289,7 @@ namespace PosBranch_Win.Reports.FinancialReports
         private void StyleFilterControls()
         {
             StyleFilterCombo(ultraComboReportView, true);
+            if (comboPeriod != null) StyleFilterCombo(comboPeriod, true);
             StyleFilterCombo(txtSearch, false);
             StyleDateEditor(dtFrom);
             StyleDateEditor(dtTo);
@@ -227,34 +339,28 @@ namespace PosBranch_Win.Reports.FinancialReports
             gridReport.UseOsThemes = DefaultableBoolean.False;
 
             UltraGridLayout layout = gridReport.DisplayLayout;
+            layout.Appearance.BackColor = FormBackColor;
+            layout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
             layout.CaptionVisible = DefaultableBoolean.False;
             layout.BorderStyle = UIElementBorderStyle.Solid;
-            layout.GroupByBox.Hidden = false;
-            layout.GroupByBox.Prompt = "Drag a column header here to group by supplier, date, or rate";
-            layout.GroupByBox.BandLabelAppearance.BackColor = GridHeaderBlueDark;
-            layout.GroupByBox.BandLabelAppearance.ForeColor = Color.White;
-            layout.GroupByBox.BandLabelAppearance.FontData.Bold = DefaultableBoolean.True;
-            layout.GroupByBox.PromptAppearance.BackColor = GridHeaderBlue;
-            layout.GroupByBox.PromptAppearance.BackColor2 = GridHeaderBlueDark;
-            layout.GroupByBox.PromptAppearance.BackGradientStyle = GradientStyle.Horizontal;
-            layout.GroupByBox.PromptAppearance.ForeColor = Color.White;
-            layout.GroupByBox.Appearance.BackColor = Color.FromArgb(109, 167, 226);
-            layout.GroupByBox.Appearance.BackColor2 = Color.FromArgb(69, 125, 190);
-            layout.GroupByBox.Appearance.BackGradientStyle = GradientStyle.Vertical;
+            layout.GroupByBox.Hidden = true;
 
+            layout.Override.HeaderStyle = HeaderStyle.Standard;
+            layout.Override.HeaderClickAction = HeaderClickAction.SortSingle;
             layout.Override.AllowAddNew = AllowAddNew.No;
             layout.Override.AllowDelete = DefaultableBoolean.False;
             layout.Override.AllowUpdate = DefaultableBoolean.False;
+            layout.Override.AllowColMoving = AllowColMoving.WithinBand;
+            layout.Override.AllowColSizing = AllowColSizing.Free;
+            layout.Override.AllowRowFiltering = DefaultableBoolean.False;
             layout.Override.CellClickAction = CellClickAction.RowSelect;
-            layout.Override.HeaderClickAction = HeaderClickAction.SortSingle;
             layout.Override.SelectTypeRow = SelectType.Single;
-            layout.Override.HeaderStyle = HeaderStyle.Standard;
 
             // Row Selectors (matching Image 2)
             layout.Override.RowSelectors = DefaultableBoolean.True;
-            layout.Override.RowSelectorWidth = 20;
+            layout.Override.RowSelectorHeaderStyle = RowSelectorHeaderStyle.ColumnChooserButton;
+            layout.Override.RowSelectorWidth = 25;
             layout.Override.RowSelectorNumberStyle = RowSelectorNumberStyle.RowIndex;
-            layout.Override.RowSelectorAppearance.ThemedElementAlpha = Alpha.Transparent;
             layout.Override.RowSelectorAppearance.BackColor = GridHeaderBlueDark;
             layout.Override.RowSelectorAppearance.BackColor2 = GridHeaderBlue;
             layout.Override.RowSelectorAppearance.BackGradientStyle = GradientStyle.Vertical;
@@ -263,7 +369,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             layout.Override.RowSelectorAppearance.FontData.Bold = DefaultableBoolean.True;
             layout.Override.RowSelectorAppearance.TextHAlign = HAlign.Center;
 
-            // Header Appearance (matching Image 2: regular font, non-bold 8.25pt)
+            // Header Appearance (matching Image 2)
             layout.Override.HeaderAppearance.ThemedElementAlpha = Alpha.Transparent;
             layout.Override.HeaderAppearance.BackColor = GridHeaderBlue;
             layout.Override.HeaderAppearance.BackColor2 = GridHeaderBlueDark;
@@ -274,27 +380,34 @@ namespace PosBranch_Win.Reports.FinancialReports
             layout.Override.HeaderAppearance.FontData.Name = "Microsoft Sans Serif";
             layout.Override.HeaderAppearance.FontData.SizeInPoints = 8.25F;
 
-            // Active & Selected Row/Cell Appearance (matching Image 2)
+            // Row & Alternate Row Appearance (matching Image 2)
+            layout.Override.MinRowHeight = 24;
+            layout.Override.DefaultRowHeight = 24;
+            layout.Override.RowAppearance.BackColor = Color.White;
+            layout.Override.RowAppearance.ForeColor = ControlTextColor;
+            layout.Override.RowAppearance.BorderColor = GridRowLine;
+            layout.Override.RowAlternateAppearance.BackColor = GridAltRow;
+            layout.Override.RowAlternateAppearance.BorderColor = GridRowLine;
+
+            // Active & Selected Row/Cell Appearance (matching Image 2 without cell border highlight)
             layout.Override.ActiveCellAppearance.BackColor = GridSelectedBlue;
-            layout.Override.ActiveCellAppearance.ForeColor = Color.White;
-            layout.Override.ActiveCellAppearance.BorderColor = BorderBlue;
+            layout.Override.ActiveCellAppearance.ForeColor = ControlTextColor;
+            layout.Override.ActiveCellAppearance.BorderColor = GridSelectedBlue;
+            layout.Override.ActiveCellAppearance.BorderAlpha = Alpha.Transparent;
             layout.Override.ActiveRowAppearance.BackColor = GridSelectedBlue;
-            layout.Override.ActiveRowAppearance.ForeColor = Color.White;
+            layout.Override.ActiveRowAppearance.ForeColor = ControlTextColor;
             layout.Override.ActiveRowAppearance.BorderColor = BorderBlue;
             layout.Override.SelectedRowAppearance.BackColor = GridSelectedBlue;
-            layout.Override.SelectedRowAppearance.ForeColor = Color.White;
-            layout.Override.CellAppearance.BorderColor = GridRowLine;
-            layout.Override.CellAppearance.ForeColor = Color.FromArgb(10, 31, 79);
-            layout.Override.CellAppearance.FontData.Name = "Microsoft Sans Serif";
-            layout.Override.CellAppearance.FontData.SizeInPoints = 8.25F;
+            layout.Override.SelectedRowAppearance.ForeColor = ControlTextColor;
 
             layout.Override.BorderStyleHeader = UIElementBorderStyle.Solid;
             layout.Override.BorderStyleCell = UIElementBorderStyle.Solid;
             layout.Override.BorderStyleRow = UIElementBorderStyle.Solid;
-            layout.Override.MinRowHeight = 19;
-            layout.Override.DefaultRowHeight = 19;
-            layout.RowConnectorStyle = RowConnectorStyle.Solid;
-            layout.RowConnectorColor = GridRowLine;
+            layout.Override.CellAppearance.BorderColor = GridRowLine;
+            layout.Override.CellAppearance.ForeColor = ControlTextColor;
+            layout.Override.CellAppearance.FontData.Name = "Microsoft Sans Serif";
+            layout.Override.CellAppearance.FontData.SizeInPoints = 8.25F;
+            layout.Override.RowSizing = RowSizing.AutoFree;
 
             layout.ScrollBarLook.Appearance.BackColor = ActionPanelBackColor;
             layout.ScrollBarLook.Appearance.BorderColor = BorderBlue;

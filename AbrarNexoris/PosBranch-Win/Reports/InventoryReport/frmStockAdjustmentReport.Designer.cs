@@ -186,41 +186,41 @@ namespace PosBranch_Win.Reports.InventoryReport
             // 
             // btnSearch
             // 
-            this.btnSearch.Location = new System.Drawing.Point(708, 17);
+            this.btnSearch.Location = new System.Drawing.Point(735, 15);
             this.btnSearch.Name = "btnSearch";
-            this.btnSearch.Size = new System.Drawing.Size(92, 28);
+            this.btnSearch.Size = new System.Drawing.Size(95, 27);
             this.btnSearch.TabIndex = 8;
-            this.btnSearch.Text = "Search [F5]";
+            this.btnSearch.Text = "Search (F5)";
             // 
             // btnReset
             // 
-            this.btnReset.Location = new System.Drawing.Point(805, 17);
+            this.btnReset.Location = new System.Drawing.Point(836, 15);
             this.btnReset.Name = "btnReset";
-            this.btnReset.Size = new System.Drawing.Size(72, 28);
+            this.btnReset.Size = new System.Drawing.Size(68, 27);
             this.btnReset.TabIndex = 9;
             this.btnReset.Text = "Reset";
             // 
             // btnExport
             // 
-            this.btnExport.Location = new System.Drawing.Point(882, 17);
+            this.btnExport.Location = new System.Drawing.Point(910, 15);
             this.btnExport.Name = "btnExport";
-            this.btnExport.Size = new System.Drawing.Size(96, 28);
+            this.btnExport.Size = new System.Drawing.Size(105, 27);
             this.btnExport.TabIndex = 10;
             this.btnExport.Text = "Export (Ctrl+E)";
             // 
             // btnPrint
             // 
-            this.btnPrint.Location = new System.Drawing.Point(983, 17);
+            this.btnPrint.Location = new System.Drawing.Point(1021, 15);
             this.btnPrint.Name = "btnPrint";
-            this.btnPrint.Size = new System.Drawing.Size(90, 28);
+            this.btnPrint.Size = new System.Drawing.Size(98, 27);
             this.btnPrint.TabIndex = 11;
             this.btnPrint.Text = "Print (Ctrl+P)";
             // 
             // btnClose
             // 
-            this.btnClose.Location = new System.Drawing.Point(1078, 17);
+            this.btnClose.Location = new System.Drawing.Point(1125, 15);
             this.btnClose.Name = "btnClose";
-            this.btnClose.Size = new System.Drawing.Size(72, 28);
+            this.btnClose.Size = new System.Drawing.Size(68, 27);
             this.btnClose.TabIndex = 12;
             this.btnClose.Text = "Close";
             // 

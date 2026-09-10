@@ -99,6 +99,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                 InitializeGridFooter();
                 LoadVendors();
                 ResetReportView();
+                UpdateDateControlState();
             }
             finally
             {
@@ -121,13 +122,14 @@ namespace PosBranch_Win.Reports.FinancialReports
         private void InitializeSearchControls()
         {
             comboBox1.Items.Clear();
+            comboBox1.Items.Add("ALL", "ALL");
             comboBox1.Items.Add("ByRange", "By Range");
             comboBox1.Items.Add("Today", "Today");
             comboBox1.Items.Add("Yesterday", "Yesterday");
             comboBox1.Items.Add("ThisWeek", "This Week");
             comboBox1.Items.Add("ThisMonth", "This Month");
             comboBox1.Items.Add("LastMonth", "Last Month");
-            comboBox1.Value = "ByRange";
+            comboBox1.Value = "ALL";
 
             ultraComboPreset.Items.Clear();
             ultraComboPreset.Items.Add("DebitNote", "Debit Note");
@@ -140,13 +142,18 @@ namespace PosBranch_Win.Reports.FinancialReports
         private void ApplyQuickDateSelection()
         {
             string preset = Convert.ToString(comboBox1.Value);
+            bool isAll = string.IsNullOrWhiteSpace(preset) || string.Equals(preset, "ALL", StringComparison.OrdinalIgnoreCase);
+            bool isRange = string.Equals(preset, "ByRange", StringComparison.OrdinalIgnoreCase);
             DateTime today = DateTime.Today;
             DateTime fromDate = Convert.ToDateTime(dtFrom.Value).Date;
             DateTime toDate = Convert.ToDateTime(dtTo.Value).Date;
-            bool isRange = string.IsNullOrWhiteSpace(preset) || string.Equals(preset, "ByRange", StringComparison.OrdinalIgnoreCase);
 
             switch (preset)
             {
+                case "ALL":
+                    fromDate = new DateTime(1753, 1, 1);
+                    toDate = today;
+                    break;
                 case "Today":
                     fromDate = today;
                     toDate = today;
@@ -171,14 +178,28 @@ namespace PosBranch_Win.Reports.FinancialReports
                     break;
             }
 
-            dtFrom.Enabled = isRange;
-            dtTo.Enabled = isRange;
-
-            if (!isRange)
+            if (!isRange && !isAll)
             {
                 dtFrom.Value = fromDate;
                 dtTo.Value = toDate;
             }
+
+            UpdateDateControlState();
+        }
+
+        private void UpdateDateControlState()
+        {
+            string preset = Convert.ToString(comboBox1.Value);
+            bool isAll = string.IsNullOrWhiteSpace(preset) || string.Equals(preset, "ALL", StringComparison.OrdinalIgnoreCase);
+            bool isRange = string.Equals(preset, "ByRange", StringComparison.OrdinalIgnoreCase);
+
+            lblFromDate.Visible = !isAll;
+            dtFrom.Visible = !isAll;
+            dtFrom.Enabled = isRange;
+
+            lblToDate.Visible = !isAll;
+            dtTo.Visible = !isAll;
+            dtTo.Enabled = isRange;
         }
 
         private void InitializePanels()
@@ -451,10 +472,12 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             try
             {
+                bool isAll = string.Equals(Convert.ToString(comboBox1.Value), "ALL", StringComparison.OrdinalIgnoreCase);
+
                 VendorPaymentReportFilter filter = new VendorPaymentReportFilter
                 {
-                    FromDate = Convert.ToDateTime(dtFrom.Value).Date,
-                    ToDate = Convert.ToDateTime(dtTo.Value).Date,
+                    FromDate = isAll ? new DateTime(1753, 1, 1) : Convert.ToDateTime(dtFrom.Value).Date,
+                    ToDate = isAll ? DateTime.Today : Convert.ToDateTime(dtTo.Value).Date,
                     CompanyId = SessionContext.CompanyId,
                     BranchId = SessionContext.BranchId,
                     VendorLedgerId = GetSelectedLedgerId()
@@ -509,7 +532,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             try
             {
                 DateTime today = DateTime.Today;
-                comboBox1.Value = "ByRange";
+                comboBox1.Value = "ALL";
                 dtFrom.Value = new DateTime(today.Year, today.Month, 1);
                 dtTo.Value = today;
                 ultraComboPreset.Value = "DebitNote";
@@ -517,6 +540,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                 txtSearch.Text = string.Empty;
                 _reportRows = new List<VendorPaymentReportRow>();
                 ResetReportView();
+                UpdateDateControlState();
             }
             finally
             {
@@ -532,6 +556,9 @@ namespace PosBranch_Win.Reports.FinancialReports
 
         private bool ValidateDateRange()
         {
+            if (string.Equals(Convert.ToString(comboBox1.Value), "ALL", StringComparison.OrdinalIgnoreCase))
+                return true;
+
             DateTime fromDate = Convert.ToDateTime(dtFrom.Value).Date;
             DateTime toDate = Convert.ToDateTime(dtTo.Value).Date;
 
