@@ -26,6 +26,7 @@ namespace PosBranch_Win.Accounts
         // LedgerRepository ledgerRepo = new LedgerRepository();
         private decimal totalReceivedAmount = 0;
         private bool isAdjusting = false;
+        private bool isSaving = false;
         private CustomerReceiptInfoRepository receiptRepo;
         private int currentCustomerLedgerId = 0;
         private int currentBranchId = 0; // Will be set from DataBase.BranchId in constructor
@@ -294,6 +295,8 @@ namespace PosBranch_Win.Accounts
 
         private void btnSave_Click(object sender, EventArgs e)
         {
+            if (isSaving) return;
+
             try
             {
                 if (IsCancelStatusSelected())
@@ -385,6 +388,15 @@ namespace PosBranch_Win.Accounts
                     return;
                 }
 
+                // Confirmation dialog before saving to prevent accidental/duplicate entry
+                DialogResult dialogResult = MessageBox.Show("Do you want to save?", "Confirm Save", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                if (dialogResult != DialogResult.Yes)
+                {
+                    return;
+                }
+
+                isSaving = true;
+
                 // Create voucher entries
                 var voucherEntries = new List<VoucherEntry>();
 
@@ -431,6 +443,10 @@ namespace PosBranch_Win.Accounts
             {
                 MessageBox.Show($"Error saving receipt: {ex.Message}\n\nStack trace: {ex.StackTrace}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                isSaving = false;
             }
         }
 
