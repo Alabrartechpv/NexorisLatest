@@ -110,6 +110,7 @@
     <Compile Include="Report\ItemwiseSalesSummaryModel.cs" />
     <Compile Include="Report\LowStockAlertModel.cs" />
     <Compile Include="Report\StockAdjustmentReportModel.cs" />
+    <Compile Include="Report\ExecutiveKpiModel.cs" />
     <Compile Include="SessionContext.cs" />
     <Compile Include="Settings\POSSetting.cs" />
     <Compile Include="Settings\FinancialYearModel.cs" />

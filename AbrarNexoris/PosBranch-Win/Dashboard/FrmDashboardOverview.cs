@@ -138,8 +138,39 @@ namespace PosBranch_Win.Dashboard
             ConfigureDashboardDateEditor(dtTo, false);
             ConfigureQuickDateCombo();
             ConfigureApplyButton();
+            ConfigureExecutiveDashboardButton();
             btnApply.Click += BtnApply_Click;
             SetHeaderDateValue();
+        }
+
+        private void ConfigureExecutiveDashboardButton()
+        {
+            Button btnExec = new Button
+            {
+                Text = "📊 30 KPIs Executive Dashboard",
+                Font = new Font("Segoe UI Semibold", 8.5F, FontStyle.Bold),
+                BackColor = Color.FromArgb(31, 78, 121),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand,
+                Size = new Size(205, 26),
+                Location = new Point(lblTitle.Right + 20, 12),
+                Anchor = AnchorStyles.Top | AnchorStyles.Left
+            };
+            btnExec.FlatAppearance.BorderSize = 0;
+            btnExec.Click += (s, e) =>
+            {
+                FrmExecutiveKpiDashboard execDashboard = new FrmExecutiveKpiDashboard(_openFormInTab);
+                if (_openFormInTab != null)
+                {
+                    _openFormInTab(execDashboard, "Executive Dashboard");
+                    return;
+                }
+                execDashboard.StartPosition = FormStartPosition.CenterScreen;
+                execDashboard.Show();
+            };
+            headerPanel.Controls.Add(btnExec);
+            btnExec.BringToFront();
         }
 
         private void ConfigureApplyButton()

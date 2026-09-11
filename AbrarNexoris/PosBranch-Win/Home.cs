@@ -88,6 +88,7 @@ namespace PosBranch_Win
             new ReportNavigatorDefinition("Vendor", "Vendor Outstanding Listing", "VendorOutstandingReport"),
             new ReportNavigatorDefinition("Vendor", "DN/payment", "VendorDNPaymentReport"),
             new ReportNavigatorDefinition("Vendor", "Unallocated Purchase Returns", "UnallocatedPurchaseReturns"),
+            new ReportNavigatorDefinition("Analysis", "Executive Dashboard (30 KPIs)", "ExecutiveDashboard"),
             new ReportNavigatorDefinition("Analysis", "Trading Account", "TradingAccount"),
             new ReportNavigatorDefinition("Analysis", "Profit & Loss Account", "ProfitLossAccount"),
             new ReportNavigatorDefinition("Analysis", "Balance Sheet", "BalanceSheet"),
@@ -1912,6 +1913,13 @@ namespace PosBranch_Win
                 return;
             }
 
+            if (toolKey == "ExecutiveDashboard" || toolKey == "BossDashboard" || toolKey == "ExecutiveKPI")
+            {
+                Dashboard.FrmExecutiveKpiDashboard execDashboard = new Dashboard.FrmExecutiveKpiDashboard(OpenFormInTabSafe);
+                OpenFormInTabSafe(execDashboard, "Executive Dashboard");
+                return;
+            }
+
             if (toolKey == "BusinessSummary")
             {
                 Settings.FinalAnalysis finalAnalysis = new Settings.FinalAnalysis();
@@ -1941,6 +1949,7 @@ namespace PosBranch_Win
                                  toolKey == "LogIn" ||
                                  toolKey == "ReOrder" ||
                                  toolKey == "Overview" ||
+                                 toolKey == "ExecutiveDashboard" ||
                                  toolKey == "Hold" ||
                                  toolKey == "LastBill";
 
@@ -3974,6 +3983,56 @@ namespace PosBranch_Win
 
                         if (string.IsNullOrEmpty(matchedToolKey))
                         {
+                            // Smart fallback: determine tool key from active form type or tab title
+                            Form activeForm = GetActiveTabForm();
+                            string formTypeName = activeForm?.GetType().Name;
+                            string tabTextClean = activeTabText.Split('(')[0].Trim();
+
+                            if (formTypeName == "frmSalesInvoice" || tabTextClean == "Sales Invoice" || tabTextClean == "Sales") matchedToolKey = "Sales";
+                            else if (formTypeName == "frmItemMasterNew" || formTypeName == "FrmItemMaster" || tabTextClean == "Item Master") matchedToolKey = "ItemMaster";
+                            else if (formTypeName == "frmPos" || tabTextClean == "POS") matchedToolKey = "Pos";
+                            else if (formTypeName == "FrmCustomer" || tabTextClean == "Customer") matchedToolKey = "Customer";
+                            else if (formTypeName == "FrmVendor" || tabTextClean == "Vendor") matchedToolKey = "frmvendor";
+                            else if (formTypeName == "FrmPurchase" && tabTextClean == "Goods Received") matchedToolKey = "Goods Received";
+                            else if (formTypeName == "frmPurchaseOrder" || tabTextClean == "Purchase Order") matchedToolKey = "Purchase Order";
+                            else if (formTypeName == "frmPurchaseReturn" || tabTextClean == "Purchase Return") matchedToolKey = "Purchase R/n";
+                            else if (formTypeName == "frmSalesReturn" || tabTextClean == "Sales Return") matchedToolKey = "Sales Return";
+                            else if (formTypeName == "FrmGeneralPayment" || tabTextClean == "General Payment" || tabTextClean == "Accounts Payment") matchedToolKey = "GeneralPayment";
+                            else if (formTypeName == "FrmGeneralReceipt" || tabTextClean == "General Receipt" || tabTextClean == "Accounts Receipt") matchedToolKey = "GeneralReceipt";
+                            else if (formTypeName == "FrmReceipt" || tabTextClean == "Receipt") matchedToolKey = "Receipt";
+                            else if (formTypeName == "FrmPayment" || tabTextClean == "Payment") matchedToolKey = "Payment";
+                            else if (formTypeName == "FrmContra" || tabTextClean == "Contra") matchedToolKey = "Contra";
+                            else if (formTypeName == "FrmJournal" || tabTextClean == "Journal") matchedToolKey = "Journal";
+                            else if (formTypeName == "FrmManualPartyBalance" || tabTextClean == "Manual Party Balance") matchedToolKey = "ManualPartyBalance";
+                            else if (formTypeName == "FrmExcelImport" || tabTextClean == "Excel Import/Export") matchedToolKey = "ExcelImport";
+                            else if (formTypeName == "frmOpeningStock" || tabTextClean == "OpeningStock" || tabTextClean == "Opening Stock") matchedToolKey = "OpeningStock";
+                            else if (formTypeName == "frmClosing" || tabTextClean == "Closing") matchedToolKey = "BtnClosing";
+                            else if (formTypeName == "frmBarcode" || tabTextClean == "Print Barcode") matchedToolKey = "Print Barcode";
+                            else if (formTypeName == "FrmPlu" || tabTextClean == "PLU Weighing") matchedToolKey = "PLU Weighing";
+                            else if (formTypeName == "frmCompany" || tabTextClean == "Company") matchedToolKey = "Company";
+                            else if (formTypeName == "FrmBranch" || tabTextClean == "Branch") matchedToolKey = "Branch";
+                            else if (formTypeName == "FrmCategory" || tabTextClean == "Category") matchedToolKey = "Category";
+                            else if (formTypeName == "FrmGroup" || tabTextClean == "Group") matchedToolKey = "Group";
+                            else if (formTypeName == "FrmUsers" || tabTextClean == "Users") matchedToolKey = "Users";
+                            else if (formTypeName == "FrmRolePermissions" || tabTextClean == "Roles") matchedToolKey = "Roles";
+                            else if (formTypeName == "FrmTaxManagement" || tabTextClean == "TaxManagement") matchedToolKey = "TaxManagement";
+                            else if (formTypeName == "FrmCurrency" || tabTextClean == "Currency") matchedToolKey = "Currency";
+                            else if (formTypeName == "FrmStockAdjustment" || tabTextClean == "Stock Adjustment") matchedToolKey = "stockadjustment";
+                            else if (formTypeName == "FrmStockTransfer" || tabTextClean == "Stock Transfer") matchedToolKey = "stocktransfer";
+                            else if (formTypeName == "FrmTradingPLAccount" || tabTextClean == "Trading Account") matchedToolKey = "TradingPLAccount";
+                            else if (formTypeName == "FrmProfitLossAccount" || tabTextClean == "Profit & Loss Account") matchedToolKey = "ProfitLossAccount";
+                            else if (formTypeName == "FrmBalanceSheet" || tabTextClean == "Balance Sheet") matchedToolKey = "BalanceSheet";
+                            else if (formTypeName == "FrmTrialBalance" || tabTextClean == "Trial Balance") matchedToolKey = "TrialBalance";
+                            else if (formTypeName == "FrmCashBankBook" || tabTextClean == "Cash & Bank Book") matchedToolKey = "CashBankBook";
+                            else if (formTypeName == "FrmDayBook" || tabTextClean == "Day Book") matchedToolKey = "DayBook";
+                            else if (formTypeName == "FrmBankReconciliation" || tabTextClean == "Bank Reconciliation") matchedToolKey = "BankReconciliation";
+                            else if (formTypeName == "FrmBankStatementReport" || tabTextClean == "Bank Statement") matchedToolKey = "BankStatementReport";
+                            else if (formTypeName == "FrmDebitNote" || tabTextClean == "DebitNote") matchedToolKey = "DebitNote";
+                            else if (formTypeName == "FrmCreditNote" || tabTextClean == "CreditNote") matchedToolKey = "CreditNote";
+                        }
+
+                        if (string.IsNullOrEmpty(matchedToolKey))
+                        {
                             MessageBox.Show("Could not determine the toolbar action for this form.");
                             return;
                         }
@@ -4003,6 +4062,20 @@ namespace PosBranch_Win
                 {
                     // It's a favorite item click — always open a new instance
                     string keyToExecute = e.Item.Key;
+                    if (!ultraToolbarsManager1.Tools.Exists(keyToExecute))
+                    {
+                        if (keyToExecute == "Vendor" && ultraToolbarsManager1.Tools.Exists("frmvendor"))
+                            keyToExecute = "frmvendor";
+                        else if (keyToExecute == "frmvendor" && ultraToolbarsManager1.Tools.Exists("Vendor"))
+                            keyToExecute = "Vendor";
+                        else if (keyToExecute == "Sales Invoice" && ultraToolbarsManager1.Tools.Exists("Sales"))
+                            keyToExecute = "Sales";
+                        else if (keyToExecute == "Opening Stock" && ultraToolbarsManager1.Tools.Exists("OpeningStock"))
+                            keyToExecute = "OpeningStock";
+                        else if (keyToExecute == "Change Item No" && ultraToolbarsManager1.Tools.Exists("Change Item No"))
+                            keyToExecute = "Change Item No";
+                    }
+
                     if (ultraToolbarsManager1.Tools.Exists(keyToExecute))
                     {
                         _openingFromFavourite = true;

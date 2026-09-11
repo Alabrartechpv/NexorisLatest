@@ -531,6 +531,11 @@ END", (SqlConnection)DataConnection))
             add("stockvaluation", "Stock Valuation Report", "Reports");
             add("lowstockalert", "Low Stock Alert Report", "Reports");
             add("stockadjustmentreport", "Stock Adjustment Report", "Reports");
+            add("manualpartybalancereport", "Manual Party Balance Report", "Reports");
+            add("combinedpartybalancereport", "Combined Party Balance Report", "Reports");
+            add("inputgst", "Input GST Report", "Reports");
+            add("outputgst", "Output GST Report", "Reports");
+            add("govtgst", "Government GST Return Report", "Reports");
 
             // Settings & Utilities
             add("possettings", "Sale Settings", "Settings");
@@ -548,6 +553,7 @@ END", (SqlConnection)DataConnection))
             add("plu", "PLU Weighing Setup", "Utilities");
             add("openingstock", "Opening Stock Setup", "Utilities");
             add("counterclosing", "Counter Closing Utility", "Utilities");
+            add("changeitemno", "Change Item No Utility", "Utilities");
             add("databasemaintenance", "Database Maintenance Utility", "Utilities");
 
             return list;
