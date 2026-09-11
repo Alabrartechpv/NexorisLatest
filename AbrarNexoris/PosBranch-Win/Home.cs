@@ -2487,6 +2487,15 @@ namespace PosBranch_Win
                 frmPurchaseReturn preturn = new frmPurchaseReturn();
                 OpenFormInTabSafe(preturn, "Purchase Return");
             }
+            if (e.Tool.Key == "PurchaseReturnWithoutGR")
+            {
+                frmPurchaseReturn preturn = new frmPurchaseReturn();
+                OpenFormInTabSafe(preturn, "Purchase Return");
+                if (preturn.chkWithoutGRN != null)
+                {
+                    preturn.chkWithoutGRN.Checked = true;
+                }
+            }
             if (e.Tool.Key == "Country")
             {
                 FrmCountry country = new FrmCountry();
@@ -2552,6 +2561,27 @@ namespace PosBranch_Win
             {
                 Utilities.frmDataBase frmDb = new Utilities.frmDataBase();
                 OpenFormInTab(frmDb, "Database Backup");
+            }
+
+            if (e.Tool.Key == "StockLookup")
+            {
+                PosBranch_Win.DialogBox.FrmFormSearch.ShowFormSearch(this);
+            }
+
+            if (e.Tool.Key == "SalesLookup")
+            {
+                DialogBox.frmSalesListDialog salesListDialog = new DialogBox.frmSalesListDialog();
+                salesListDialog.ShowDialog(this);
+            }
+
+            if (e.Tool.Key == "PointsLookup")
+            {
+                MessageBox.Show("Points Lookup is ready.", "Points Lookup", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+
+            if (e.Tool.Key == "TopUpLookup")
+            {
+                MessageBox.Show("TopUp Lookup is ready.", "TopUp Lookup", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
 
 
@@ -2769,10 +2799,53 @@ namespace PosBranch_Win
             // Report Navigator Toggle
             if (toolKey == "Report")
             {
+                string targetCategory = null;
+                if (ultraToolbarsManager1.Ribbon.SelectedTab != null)
+                {
+                    string tabKey = ultraToolbarsManager1.Ribbon.SelectedTab.Key ?? "";
+                    string tabCaption = ultraToolbarsManager1.Ribbon.SelectedTab.Caption ?? "";
+
+                    if (tabKey == "ribbonCustomer" || tabCaption.Equals("Customer", StringComparison.OrdinalIgnoreCase))
+                    {
+                        targetCategory = "Customer";
+                    }
+                    else if (tabKey == "ribbon4" || tabCaption.Equals("Vendor", StringComparison.OrdinalIgnoreCase))
+                    {
+                        targetCategory = "Vendor";
+                    }
+                    else if (tabKey == "ribbon1" || tabCaption.Equals("Item", StringComparison.OrdinalIgnoreCase))
+                    {
+                        targetCategory = "Item";
+                    }
+                }
+
                 if (_isReportNavigatorVisible)
+                {
+                    if (!string.IsNullOrEmpty(targetCategory) && ultraExplorerBarReportNavigator != null)
+                    {
+                        var targetGrp = ultraExplorerBarReportNavigator.Groups[$"Grp_{targetCategory}"];
+                        if (targetGrp != null && !targetGrp.Expanded)
+                        {
+                            ShowReportNavigator(targetCategory);
+                            return;
+                        }
+                    }
+                    else if (string.IsNullOrEmpty(targetCategory) && ultraExplorerBarReportNavigator != null)
+                    {
+                        bool anyCollapsed = ultraExplorerBarReportNavigator.Groups.Cast<Infragistics.Win.UltraWinExplorerBar.UltraExplorerBarGroup>().Any(g => !g.Expanded);
+                        if (anyCollapsed)
+                        {
+                            ShowReportNavigator(null);
+                            return;
+                        }
+                    }
+
                     HideReportNavigator();
+                }
                 else
-                    ShowReportNavigator();
+                {
+                    ShowReportNavigator(targetCategory);
+                }
             }
 
             #endregion
@@ -3100,12 +3173,34 @@ namespace PosBranch_Win
                 OpenFormInTab(itemMaster, "Item Master");
                 e.Handled = true;
             }
+            else if (e.Control && e.KeyCode == Keys.U)
+            {
+                // Open Customer Master tab
+                Accounts.FrmCustomer frmCustomer = new Accounts.FrmCustomer();
+                OpenFormInTab(frmCustomer, "Customer");
+                e.Handled = true;
+            }
             else if (e.KeyCode == Keys.F2)
             {
                 if (_isReportNavigatorVisible)
                     HideReportNavigator();
                 else
                     ShowReportNavigator();
+                e.Handled = true;
+            }
+            else if (e.KeyCode == Keys.F12)
+            {
+                // Trigger Delete action on active tab
+                if (ultraToolbarsManager1.Tools.Exists("Delete"))
+                {
+                    ultraToolbarsManager1_ToolClick_1(this, new Infragistics.Win.UltraWinToolbars.ToolClickEventArgs(ultraToolbarsManager1.Tools["Delete"], null));
+                    e.Handled = true;
+                }
+            }
+            else if (e.KeyCode == Keys.F4 && !e.Alt)
+            {
+                // Exit / Close current tab
+                CloseCurrentTab();
                 e.Handled = true;
             }
         }
@@ -4783,7 +4878,7 @@ namespace PosBranch_Win
             ClearActiveReportNavigatorItem();
         }
 
-        private void ShowReportNavigator()
+        private void ShowReportNavigator(string targetGroupKey = null)
         {
             if (ultraExplorerBarSideMenu != null)
                 ultraExplorerBarSideMenu.Visible = false;
@@ -4792,6 +4887,47 @@ namespace PosBranch_Win
                 panelReportNavigatorWrapper.Visible = true;
 
             _isReportNavigatorVisible = true;
+
+            if (ultraExplorerBarReportNavigator != null && ultraExplorerBarReportNavigator.Groups.Count > 0)
+            {
+                if (!string.IsNullOrEmpty(targetGroupKey))
+                {
+                    foreach (Infragistics.Win.UltraWinExplorerBar.UltraExplorerBarGroup group in ultraExplorerBarReportNavigator.Groups)
+                    {
+                        if (group.Key.Equals(targetGroupKey, StringComparison.OrdinalIgnoreCase) ||
+                            group.Key.Equals($"Grp_{targetGroupKey}", StringComparison.OrdinalIgnoreCase) ||
+                            group.Text.Equals(targetGroupKey, StringComparison.OrdinalIgnoreCase))
+                        {
+                            group.Expanded = true;
+                            try
+                            {
+                                ultraExplorerBarReportNavigator.ActiveGroup = group;
+                            }
+                            catch { }
+                        }
+                        else
+                        {
+                            group.Expanded = false;
+                        }
+                    }
+                }
+                else
+                {
+                    // Opened from Home tab or general shortcut -> Expand all report categories
+                    foreach (Infragistics.Win.UltraWinExplorerBar.UltraExplorerBarGroup group in ultraExplorerBarReportNavigator.Groups)
+                    {
+                        group.Expanded = true;
+                    }
+                    try
+                    {
+                        if (ultraExplorerBarReportNavigator.Groups.Count > 0)
+                        {
+                            ultraExplorerBarReportNavigator.ActiveGroup = ultraExplorerBarReportNavigator.Groups[0];
+                        }
+                    }
+                    catch { }
+                }
+            }
         }
 
         private void HideReportNavigator()
