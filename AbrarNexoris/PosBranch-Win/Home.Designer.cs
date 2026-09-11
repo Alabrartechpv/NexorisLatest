@@ -70,6 +70,7 @@ namespace PosBranch_Win
             Infragistics.Win.UltraWinToolbars.RibbonGroup ribbonGroup12 = new Infragistics.Win.UltraWinToolbars.RibbonGroup("Dashboard");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolOverviewInstance = new Infragistics.Win.UltraWinToolbars.ButtonTool("Overview");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolBusinessSummaryHome = new Infragistics.Win.UltraWinToolbars.ButtonTool("BusinessSummary");
+            Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolExecutiveDashboardHome = new Infragistics.Win.UltraWinToolbars.ButtonTool("ExecutiveDashboard");
             Infragistics.Win.UltraWinToolbars.RibbonTab ribbonTab2 = new Infragistics.Win.UltraWinToolbars.RibbonTab("ribbonGeneralSetup");
             Infragistics.Win.UltraWinToolbars.RibbonGroup ribbonGroup13 = new Infragistics.Win.UltraWinToolbars.RibbonGroup("CompanyProfile");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolGSCompany = new Infragistics.Win.UltraWinToolbars.ButtonTool("Company");
@@ -353,6 +354,7 @@ namespace PosBranch_Win
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolOverview = new Infragistics.Win.UltraWinToolbars.ButtonTool("Overview");
             Infragistics.Win.Appearance appearance94 = new Infragistics.Win.Appearance();
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolBusinessSummary = new Infragistics.Win.UltraWinToolbars.ButtonTool("BusinessSummary");
+            Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolExecutiveDashboard = new Infragistics.Win.UltraWinToolbars.ButtonTool("ExecutiveDashboard");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonTool131 = new Infragistics.Win.UltraWinToolbars.ButtonTool("ActivityLog ");
             Infragistics.Win.Appearance appearance95 = new Infragistics.Win.Appearance();
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonTool132 = new Infragistics.Win.UltraWinToolbars.ButtonTool("ButtonTool6");
@@ -598,9 +600,12 @@ namespace PosBranch_Win
             buttonToolOverviewInstance.InstanceProps.MinimumSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
             buttonToolOverviewInstance.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
             buttonToolBusinessSummaryHome.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
+            buttonToolExecutiveDashboardHome.InstanceProps.MinimumSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
+            buttonToolExecutiveDashboardHome.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
             ribbonGroup12.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
             buttonToolOverviewInstance,
-            buttonToolBusinessSummaryHome});
+            buttonToolBusinessSummaryHome,
+            buttonToolExecutiveDashboardHome});
             ribbonTab1.Groups.AddRange(new Infragistics.Win.UltraWinToolbars.RibbonGroup[] {
             ribbonGroup1,
             ribbonGroup2,
@@ -1258,6 +1263,10 @@ namespace PosBranch_Win
             buttonToolBusinessSummary.SharedPropsInternal.Caption = "Business Summary";
             buttonToolBusinessSummary.SharedPropsInternal.DisplayStyle = Infragistics.Win.UltraWinToolbars.ToolDisplayStyle.ImageAndText;
             buttonToolBusinessSummary.SharedPropsInternal.ToolTipTitle = "Final Analysis - Business Summary";
+            buttonToolExecutiveDashboard.SharedPropsInternal.AppearancesLarge.Appearance = appearance94;
+            buttonToolExecutiveDashboard.SharedPropsInternal.Caption = "Executive Dashboard";
+            buttonToolExecutiveDashboard.SharedPropsInternal.DisplayStyle = Infragistics.Win.UltraWinToolbars.ToolDisplayStyle.ImageAndText;
+            buttonToolExecutiveDashboard.SharedPropsInternal.ToolTipTitle = "Executive Business Dashboard (30 KPIs)";
             appearance95.Image = ((object)(resources.GetObject("appearance95.Image")));
             buttonTool131.SharedPropsInternal.AppearancesLarge.Appearance = appearance95;
             buttonTool131.SharedPropsInternal.Caption = "ActivityLog ";
@@ -1410,6 +1419,7 @@ namespace PosBranch_Win
             buttonTool130,
             buttonToolOverview,
             buttonToolBusinessSummary,
+            buttonToolExecutiveDashboard,
             buttonTool131,
             buttonTool132,
             buttonToolGeneralPayment,

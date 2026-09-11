@@ -118,6 +118,7 @@
     <Compile Include="ReportRepository\ItemwiseSalesSummaryRepo.cs" />
     <Compile Include="ReportRepository\LowStockAlertRepo.cs" />
     <Compile Include="ReportRepository\StockAdjustmentReportRepository.cs" />
+    <Compile Include="ReportRepository\ExecutiveKpiRepository.cs" />
     <Compile Include="ReportRepository\VendorPaymentReportRepository.cs" />
     <Compile Include="ReportRepository\VendorOutstandingReportRepository.cs" />
     <Compile Include="ReportRepository\InputGSTReportRepository.cs" />
