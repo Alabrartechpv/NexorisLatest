@@ -1833,10 +1833,9 @@ namespace PosBranch_Win.Master
             // Connect txt_TaxAmount TextChanged event for real-time updates
             try
             {
-                var txtTaxAmount = this.Controls.Find("txt_TaxAmount", true).FirstOrDefault() as TextBox;
-                if (txtTaxAmount != null)
+                if (txt_TaxAmount != null)
                 {
-                    txtTaxAmount.TextChanged += txt_TaxAmount_TextChanged;
+                    txt_TaxAmount.TextChanged += txt_TaxAmount_TextChanged;
                 }
             }
             catch (Exception ex)
@@ -3872,6 +3871,8 @@ namespace PosBranch_Win.Master
                 if (txt_Brand != null) txt_Brand.Clear();
                 if (txt_BaseUnit != null) txt_BaseUnit.Clear();
                 if (txt_CustomerType != null) txt_CustomerType.Clear();
+                if (textBox4 != null) textBox4.Clear();
+                if (isinclexcl != null) isinclexcl.Text = "0.00";
                 if (txt_TaxType != null) txt_TaxType.Clear();
                 if (txt_TaxPer != null) txt_TaxPer.Clear();
                 if (txt_TaxAmount != null) txt_TaxAmount.Text = "0";
@@ -5753,12 +5754,44 @@ namespace PosBranch_Win.Master
                     // Load H.S.N code into textBox4 using repository's enriched result (which explicitly fetched HSNCode)
                     try
                     {
-                        var hsnTextBox = this.Controls.Find("textBox4", true).FirstOrDefault() as TextBox;
-                        if (hsnTextBox != null)
+                        if (textBox4 != null)
                         {
-                            string hsn = string.Empty;
-                            try { hsn = getItem.HSNCode; } catch { hsn = string.Empty; }
-                            hsnTextBox.Text = hsn ?? string.Empty;
+                            string hsn = getItem.HSNCode;
+                            if (string.IsNullOrWhiteSpace(hsn) && itemId > 0)
+                            {
+                                try
+                                {
+                                    using (Repository.BaseRepostitory bRepo = new Repository.BaseRepostitory())
+                                    {
+                                        if (bRepo.DataConnection is System.Data.SqlClient.SqlConnection dbConn)
+                                        {
+                                            bool wasClosed = dbConn.State == ConnectionState.Closed;
+                                            if (wasClosed) dbConn.Open();
+                                            try
+                                            {
+                                                using (System.Data.SqlClient.SqlCommand sCmd = new System.Data.SqlClient.SqlCommand(
+                                                    "SELECT TOP 1 HSNCode FROM ItemMaster WHERE ItemId = @ItemId OR ItemNo = @ItemId", dbConn))
+                                                {
+                                                    sCmd.Parameters.AddWithValue("@ItemId", itemId);
+                                                    object res = sCmd.ExecuteScalar();
+                                                    if (res != null && res != DBNull.Value)
+                                                    {
+                                                        hsn = res.ToString();
+                                                    }
+                                                }
+                                            }
+                                            finally
+                                            {
+                                                if (wasClosed && dbConn.State == ConnectionState.Open) dbConn.Close();
+                                            }
+                                        }
+                                    }
+                                }
+                                catch { }
+                            }
+                            textBox4.Text = hsn ?? string.Empty;
+                            getItem.HSNCode = textBox4.Text;
+                            if (ItemMaster != null) ItemMaster.HSNCode = textBox4.Text;
                         }
                     }
                     catch { }
@@ -8524,6 +8557,7 @@ namespace PosBranch_Win.Master
                     ItemMaster.Order_Cycle_Days = GetSmartReorderOrderCycleDays();
                     ItemMaster.Box_Quantity = GetSmartReorderBoxQuantity();
                     ItemMaster.Is_Perishable = GetSmartReorderIsPerishable();
+                    ItemMaster.HSNCode = textBox4?.Text?.Trim() ?? string.Empty;
                     // Resolve IDs from text controls where only names are present
                     ResolveAndAssignMasterIds();
                 }
@@ -9067,6 +9101,7 @@ namespace PosBranch_Win.Master
                     ItemMaster.Order_Cycle_Days = GetSmartReorderOrderCycleDays();
                     ItemMaster.Box_Quantity = GetSmartReorderBoxQuantity();
                     ItemMaster.Is_Perishable = GetSmartReorderIsPerishable();
+                    ItemMaster.HSNCode = textBox4?.Text?.Trim() ?? string.Empty;
                     // Resolve IDs from text controls where only names are present
                     ResolveAndAssignMasterIds();
                 }
@@ -9463,6 +9498,7 @@ namespace PosBranch_Win.Master
                 ItemMaster.Order_Cycle_Days = GetSmartReorderOrderCycleDays();
                 ItemMaster.Box_Quantity = GetSmartReorderBoxQuantity();
                 ItemMaster.Is_Perishable = GetSmartReorderIsPerishable();
+                ItemMaster.HSNCode = textBox4?.Text?.Trim() ?? string.Empty;
                 ResolveAndAssignMasterIds();
             }
             catch { }
@@ -9753,10 +9789,9 @@ namespace PosBranch_Win.Master
                 // HSN Code
                 try
                 {
-                    var hsnTextBox = this.Controls.Find("textBox4", true).FirstOrDefault() as TextBox;
-                    if (hsnTextBox != null)
+                    if (textBox4 != null)
                     {
-                        ItemMaster.HSNCode = hsnTextBox.Text ?? string.Empty;
+                        ItemMaster.HSNCode = textBox4.Text?.Trim() ?? string.Empty;
                     }
                 }
                 catch { }
@@ -9955,6 +9990,10 @@ namespace PosBranch_Win.Master
                     ItemMaster.BaseUnitId = sourceMaster.BaseUnitId;
                     ItemMaster.ForCustomerType = sourceMaster.ForCustomerType;
                     ItemMaster.HSNCode = sourceMaster.HSNCode;
+                    if (textBox4 != null)
+                    {
+                        textBox4.Text = sourceMaster.HSNCode ?? string.Empty;
+                    }
                 }
 
                 GenerateNextItemNumberOnly();
@@ -11675,7 +11714,7 @@ namespace PosBranch_Win.Master
         {
             try
             {
-                var isinclexclCtrl = this.Controls.Find("isinclexcl", true).FirstOrDefault() as TextBox;
+                var isinclexclCtrl = this.isinclexcl ?? (this.Controls.Find("isinclexcl", true).FirstOrDefault() as Infragistics.Win.UltraWinEditors.UltraTextEditor);
                 // isinclexcl is optional; but txt_TaxAmount is required per request
                 var taxAmountCtrl = txt_TaxAmount;
                 if (isinclexclCtrl == null && taxAmountCtrl == null) return;

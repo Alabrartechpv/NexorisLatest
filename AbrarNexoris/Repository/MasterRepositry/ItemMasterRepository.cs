@@ -125,7 +125,7 @@ namespace Repository.MasterRepositry
                             try
                             {
                                 using (SqlCommand hsnCmd = new SqlCommand(
-                                    "SELECT Barcode, HSNCode, Order_Cycle_Days, Box_Quantity, Is_Perishable FROM ItemMaster WHERE ItemId = @ItemId",
+                                    "SELECT TOP 1 Barcode, HSNCode, Order_Cycle_Days, Box_Quantity, Is_Perishable FROM ItemMaster WHERE ItemId = @ItemId OR ItemNo = @ItemId",
                                     (SqlConnection)DataConnection))
                                 {
                                     hsnCmd.Parameters.AddWithValue("@ItemId", selectedId);
@@ -134,7 +134,8 @@ namespace Repository.MasterRepositry
                                         if (reader.Read())
                                         {
                                             item.Barcode = reader["Barcode"] == DBNull.Value ? item.Barcode : Convert.ToString(reader["Barcode"]);
-                                            item.HSNCode = reader["HSNCode"] == DBNull.Value ? item.HSNCode : Convert.ToString(reader["HSNCode"]);
+                                            string dbHsn = reader["HSNCode"] == DBNull.Value ? null : Convert.ToString(reader["HSNCode"]);
+                                            if (!string.IsNullOrWhiteSpace(dbHsn)) item.HSNCode = dbHsn;
                                             item.Order_Cycle_Days = reader["Order_Cycle_Days"] == DBNull.Value ? item.Order_Cycle_Days : Convert.ToInt32(reader["Order_Cycle_Days"]);
                                             item.Box_Quantity = reader["Box_Quantity"] == DBNull.Value ? item.Box_Quantity : Convert.ToInt32(reader["Box_Quantity"]);
                                             item.Is_Perishable = reader["Is_Perishable"] != DBNull.Value && Convert.ToBoolean(reader["Is_Perishable"]);
@@ -1158,7 +1159,8 @@ namespace Repository.MasterRepositry
 UPDATE ItemMaster
 SET Order_Cycle_Days = @Order_Cycle_Days,
     Box_Quantity = @Box_Quantity,
-    Is_Perishable = @Is_Perishable
+    Is_Perishable = @Is_Perishable,
+    HSNCode = @HSNCode
 WHERE ItemId = @ItemId";
 
             DataConnection.Execute(
@@ -1168,7 +1170,8 @@ WHERE ItemId = @ItemId";
                     ItemId = item.ItemId,
                     Order_Cycle_Days = item.Order_Cycle_Days > 0 ? item.Order_Cycle_Days : 0,
                     Box_Quantity = item.Box_Quantity > 0 ? item.Box_Quantity : 0,
-                    Is_Perishable = item.Is_Perishable
+                    Is_Perishable = item.Is_Perishable,
+                    HSNCode = item.HSNCode ?? ""
                 },
                 transaction,
                 commandType: CommandType.Text

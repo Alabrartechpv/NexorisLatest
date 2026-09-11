@@ -3610,15 +3610,62 @@ namespace PosBranch_Win.DialogBox
                 // Load and set HSN code into textBox4 if present
                 try
                 {
-                    TextBox hsnTextBox = FindControlRecursive(ItemMaster, "textBox4") as TextBox;
-                    if (hsnTextBox != null)
+                    string hsn = getItem != null ? getItem.HSNCode : string.Empty;
+                    if (string.IsNullOrWhiteSpace(hsn) && ItemID > 0)
                     {
-                        string hsn = string.Empty;
-                        try { hsn = getItem.HSNCode; } catch { hsn = string.Empty; }
-                        hsnTextBox.Text = hsn ?? string.Empty;
+                        try
+                        {
+                            using (Repository.BaseRepostitory bRepo = new Repository.BaseRepostitory())
+                            {
+                                if (bRepo.DataConnection is System.Data.SqlClient.SqlConnection dbConn)
+                                {
+                                    bool wasClosed = dbConn.State == ConnectionState.Closed;
+                                    if (wasClosed) dbConn.Open();
+                                    try
+                                    {
+                                        using (System.Data.SqlClient.SqlCommand sCmd = new System.Data.SqlClient.SqlCommand(
+                                            "SELECT TOP 1 HSNCode FROM ItemMaster WHERE ItemId = @ItemId OR ItemNo = @ItemId", dbConn))
+                                        {
+                                            sCmd.Parameters.AddWithValue("@ItemId", ItemID);
+                                            object res = sCmd.ExecuteScalar();
+                                            if (res != null && res != DBNull.Value)
+                                            {
+                                                hsn = res.ToString();
+                                            }
+                                        }
+                                    }
+                                    finally
+                                    {
+                                        if (wasClosed && dbConn.State == ConnectionState.Open) dbConn.Close();
+                                    }
+                                }
+                            }
+                        }
+                        catch { }
+                    }
+
+                    hsn = hsn ?? string.Empty;
+
+                    if (ItemMaster != null)
+                    {
+                        if (ItemMaster.textBox4 != null)
+                        {
+                            ItemMaster.textBox4.Text = hsn;
+                        }
+                        else
+                        {
+                            Control hsnCtrl = FindControlRecursive(ItemMaster, "textBox4") as Control;
+                            if (hsnCtrl != null)
+                            {
+                                hsnCtrl.Text = hsn;
+                            }
+                        }
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error loading HSN code into textBox4: {ex.Message}");
+                }
 
                 // Load and set item photo early so it's visible immediately
                 try
@@ -3770,11 +3817,12 @@ namespace PosBranch_Win.DialogBox
 
                         try
                         {
-                            TextBox barcodeTextBox = FindControlRecursive(ItemMaster, "txt_barcode") as TextBox;
+                            Control barcodeTextBox = FindControlRecursive(ItemMaster, "txt_barcode") as Control;
                             if (barcodeTextBox != null)
                             {
                                 barcodeTextBox.Text = loadedBarcode;
-                                barcodeTextBox.ReadOnly = true;
+                                if (barcodeTextBox is TextBox stdTb) stdTb.ReadOnly = true;
+                                else if (barcodeTextBox is Infragistics.Win.UltraWinEditors.UltraTextEditor ultTb) ultTb.ReadOnly = true;
                             }
                             else
                             {
