@@ -2836,8 +2836,22 @@ namespace Repository.TransactionRepository
                             ledgerName = DefaultLedgers.CASH;
                         }
 
+                        // Resolve the correct GroupID from LedgerMaster for the payment ledger
+                        int resolvedGroupId = (int)AccountGroup.CASH_IN_HAND;
+                        try
+                        {
+                            using (SqlCommand grpCmd = new SqlCommand("SELECT GroupID FROM LedgerMaster WHERE LedgerID = @LedgerId", (SqlConnection)DataConnection, (SqlTransaction)trans))
+                            {
+                                grpCmd.Parameters.AddWithValue("@LedgerId", ledgerId);
+                                object grpResult = grpCmd.ExecuteScalar();
+                                if (grpResult != null && grpResult != DBNull.Value)
+                                    resolvedGroupId = Convert.ToInt32(grpResult);
+                            }
+                        }
+                        catch { }
+
                         PopulateBaseVoucherProperties(voucher, sales, voucherDate);
-                        voucher.GroupID = Convert.ToInt32(AccountGroup.CASH_IN_HAND);
+                        voucher.GroupID = resolvedGroupId;
                         voucher.LedgerID = ledgerId;
                         voucher.LedgerName = ledgerName;
                         voucher.Debit = Math.Round(amount, 2);
@@ -2904,8 +2918,22 @@ namespace Repository.TransactionRepository
                     targetLedgerId = ledgerRepository.GetLedgerId(DefaultLedgers.CASH, (int)AccountGroup.CASH_IN_HAND, SessionContext.BranchId);
                 }
 
+                // Resolve the correct GroupID from LedgerMaster for the payment ledger
+                int targetGroupId = (int)AccountGroup.CASH_IN_HAND;
+                try
+                {
+                    using (SqlCommand grpCmd = new SqlCommand("SELECT GroupID FROM LedgerMaster WHERE LedgerID = @LedgerId", (SqlConnection)DataConnection, (SqlTransaction)trans))
+                    {
+                        grpCmd.Parameters.AddWithValue("@LedgerId", targetLedgerId);
+                        object grpResult = grpCmd.ExecuteScalar();
+                        if (grpResult != null && grpResult != DBNull.Value)
+                            targetGroupId = Convert.ToInt32(grpResult);
+                    }
+                }
+                catch { }
+
                 PopulateBaseVoucherProperties(voucher, sales, voucherDate);
-                voucher.GroupID = Convert.ToInt32(AccountGroup.CASH_IN_HAND);
+                voucher.GroupID = targetGroupId;
                 voucher.LedgerID = targetLedgerId;
                 voucher.LedgerName = targetLedgerName;
                 voucher.Debit = Netamount;

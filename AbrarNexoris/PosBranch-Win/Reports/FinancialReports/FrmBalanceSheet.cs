@@ -218,19 +218,20 @@ namespace PosBranch_Win.Reports.FinancialReports
             foreach (var col in band.Columns)
                 col.Hidden = true;
 
-            ConfigureColumn(band, "ParentGroupName", "Category", 160, HAlign.Left);
+            ConfigureColumn(band, "LedgerName", "Particulars", 200, HAlign.Left, 0);
+            ConfigureColumn(band, "GroupName", "Account Group", 130, HAlign.Left, 1);
+            
+            ConfigureColumn(band, "ParentGroupName", "Category", 120, HAlign.Left, 2);
             band.Columns["ParentGroupName"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
             band.Columns["ParentGroupName"].CellAppearance.ForeColor = Color.FromArgb(183, 28, 28);
 
-            ConfigureColumn(band, "GroupName", "Account Group", 180, HAlign.Left);
-            ConfigureColumn(band, "LedgerName", "Particulars", 250, HAlign.Left);
-            
-            ConfigureColumn(band, "ClosingBalance", "Amount (₹)", 140, HAlign.Right);
+            ConfigureColumn(band, "ClosingBalance", "Amount (₹)", 120, HAlign.Right, 3);
             band.Columns["ClosingBalance"].Format = "N2";
             band.Columns["ClosingBalance"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
+            band.Columns["ClosingBalance"].Header.Appearance.TextHAlign = HAlign.Right;
             
             band.Override.AllowColSizing = AllowColSizing.Free;
-            e.Layout.AutoFitStyle = AutoFitStyle.ExtendLastColumn;
+            e.Layout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
         }
 
         private void UltraGridAssets_InitializeLayout(object sender, InitializeLayoutEventArgs e)
@@ -240,22 +241,23 @@ namespace PosBranch_Win.Reports.FinancialReports
             foreach (var col in band.Columns)
                 col.Hidden = true;
 
-            ConfigureColumn(band, "ParentGroupName", "Category", 160, HAlign.Left);
+            ConfigureColumn(band, "LedgerName", "Particulars", 200, HAlign.Left, 0);
+            ConfigureColumn(band, "GroupName", "Account Group", 130, HAlign.Left, 1);
+
+            ConfigureColumn(band, "ParentGroupName", "Category", 120, HAlign.Left, 2);
             band.Columns["ParentGroupName"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
             band.Columns["ParentGroupName"].CellAppearance.ForeColor = Color.FromArgb(27, 94, 32);
 
-            ConfigureColumn(band, "GroupName", "Account Group", 180, HAlign.Left);
-            ConfigureColumn(band, "LedgerName", "Particulars", 250, HAlign.Left);
-            
-            ConfigureColumn(band, "ClosingBalance", "Amount (₹)", 140, HAlign.Right);
+            ConfigureColumn(band, "ClosingBalance", "Amount (₹)", 120, HAlign.Right, 3);
             band.Columns["ClosingBalance"].Format = "N2";
             band.Columns["ClosingBalance"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
+            band.Columns["ClosingBalance"].Header.Appearance.TextHAlign = HAlign.Right;
             
             band.Override.AllowColSizing = AllowColSizing.Free;
-            e.Layout.AutoFitStyle = AutoFitStyle.ExtendLastColumn;
+            e.Layout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
         }
 
-        private void ConfigureColumn(UltraGridBand band, string key, string headerText, int width, HAlign align)
+        private void ConfigureColumn(UltraGridBand band, string key, string headerText, int width, HAlign align, int visiblePosition = -1)
         {
             if (band.Columns.Exists(key))
             {
@@ -264,6 +266,10 @@ namespace PosBranch_Win.Reports.FinancialReports
                 col.Header.Caption = headerText;
                 col.Width = width;
                 col.CellAppearance.TextHAlign = align;
+                if (visiblePosition >= 0)
+                {
+                    col.Header.VisiblePosition = visiblePosition;
+                }
             }
         }
         #endregion
