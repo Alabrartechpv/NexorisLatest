@@ -95,18 +95,32 @@ namespace PosBranch_Win.Dashboard
         private void InitPeriodCombo()
         {
             comboPeriod.Items.Clear();
+            comboPeriod.Items.Add("All", "All");
             comboPeriod.Items.Add("Today", "Today");
             comboPeriod.Items.Add("This Week", "This Week");
             comboPeriod.Items.Add("This Month", "This Month");
             comboPeriod.Items.Add("This Quarter", "This Quarter");
             comboPeriod.Items.Add("This Year", "This Year");
             comboPeriod.Items.Add("Custom", "Custom");
-            comboPeriod.SelectedIndex = 4; // Default: This Year
+            comboPeriod.SelectedIndex = 0; // Default: All
 
             comboPeriod.ValueChanged += (s, e) =>
             {
                 string sel = comboPeriod.Text;
                 DateTime now = DateTime.Today;
+
+                if (sel == "All")
+                {
+                    dtFrom.Enabled = false;
+                    dtTo.Enabled = false;
+                    dtFrom.Value = new DateTime(1990, 1, 1);
+                    dtTo.Value = now;
+                    return;
+                }
+
+                dtFrom.Enabled = true;
+                dtTo.Enabled = true;
+
                 switch (sel)
                 {
                     case "Today":
@@ -141,7 +155,9 @@ namespace PosBranch_Win.Dashboard
         private void SetDefaultDates()
         {
             DateTime now = DateTime.Today;
-            dtFrom.Value = new DateTime(now.Year, 1, 1);
+            dtFrom.Enabled = false;
+            dtTo.Enabled = false;
+            dtFrom.Value = new DateTime(1990, 1, 1);
             dtTo.Value = now;
         }
 
@@ -151,8 +167,20 @@ namespace PosBranch_Win.Dashboard
             btnRefresh.Enabled = false;
             Cursor = Cursors.WaitCursor;
 
-            DateTime from = dtFrom.Value != null ? Convert.ToDateTime(dtFrom.Value).Date : new DateTime(DateTime.Today.Year, 1, 1);
-            DateTime to = dtTo.Value != null ? Convert.ToDateTime(dtTo.Value).Date : DateTime.Today;
+            DateTime from;
+            DateTime to;
+
+            if (comboPeriod.Text == "All")
+            {
+                from = new DateTime(1990, 1, 1);
+                to = DateTime.Today;
+            }
+            else
+            {
+                from = dtFrom.Value != null ? Convert.ToDateTime(dtFrom.Value).Date : new DateTime(1990, 1, 1);
+                to = dtTo.Value != null ? Convert.ToDateTime(dtTo.Value).Date : DateTime.Today;
+            }
+
             if (to < from)
             {
                 DateTime swap = from;
@@ -214,7 +242,7 @@ namespace PosBranch_Win.Dashboard
                 FormatCurr(_model.ActualNetProfit),
                 $"Operating Margin: {_model.OperatingProfitMarginPercent:N2}% | Gross: {FormatCurr(_model.GrossProfit)}",
                 _model.ActualNetProfit >= 0 ? Color.FromArgb(46, 125, 50) : Color.FromArgb(198, 40, 40),
-                () => DrillDown("TradingPL")));
+                () => DrillDown("ProfitLoss")));
 
             heroFlow.Controls.Add(CreateHeroCard(
                 "Total Cash & Bank Liquidity",
@@ -281,8 +309,8 @@ namespace PosBranch_Win.Dashboard
             var flow3 = CreateCardsFlow(containerWidth);
             flow3.Controls.Add(CreateKpiCard("3. Total Sales Revenue", "Total net billing revenue for the selected date period", FormatCurr(_model.TotalSalesRevenue), $"{_model.TotalSalesBillCount:N0} Invoices | Pur: {FormatCurr(_model.TotalPurchases)}", Color.FromArgb(41, 128, 185), () => DrillDown("SalesAnalytics")));
             flow3.Controls.Add(CreateKpiCard("4. Total Business Expenses", "Combined operational overheads, utilities, and running costs", FormatCurr(_model.TotalBusinessExpenses), $"Direct: {FormatCurr(_model.DirectExpenses)} | Indir: {FormatCurr(_model.IndirectExpenses)}", Color.FromArgb(192, 57, 43), () => DrillDown("ProfitLoss")));
-            flow3.Controls.Add(CreateKpiCard("11. Actual Net Profit", "Bottom-line net earnings after deducting cost of sales and expenses", FormatCurr(_model.ActualNetProfit), $"Gross Profit: {FormatCurr(_model.GrossProfit)}", Color.FromArgb(39, 174, 96), () => DrillDown("TradingPL")));
-            flow3.Controls.Add(CreateKpiCard("19. Operating Profit Margin %", "Ratio of net profit generated from sales turnover", $"{_model.OperatingProfitMarginPercent:N2}%", "Net Profit / Sales Revenue", Color.FromArgb(22, 160, 133), () => DrillDown("TradingPL")));
+            flow3.Controls.Add(CreateKpiCard("11. Actual Net Profit", "Bottom-line net earnings after deducting cost of sales and expenses", FormatCurr(_model.ActualNetProfit), $"Gross Profit: {FormatCurr(_model.GrossProfit)}", Color.FromArgb(39, 174, 96), () => DrillDown("ProfitLoss")));
+            flow3.Controls.Add(CreateKpiCard("19. Operating Profit Margin %", "Ratio of net profit generated from sales turnover", $"{_model.OperatingProfitMarginPercent:N2}%", "Net Profit / Sales Revenue", Color.FromArgb(22, 160, 133), () => DrillDown("ProfitLoss")));
             flow3.Controls.Add(CreateKpiCard("12. Owner Drawings", "Capital withdrawals and personal drawings taken by proprietors", FormatCurr(_model.OwnerDrawings), "Capital Account Withdrawals", Color.FromArgb(155, 89, 182), () => DrillDown("DayBook")));
             flow3.Controls.Add(CreateKpiCard("23. Customer Bad Debts", "Uncollectible customer credit balances written off", FormatCurr(_model.CustomerBadDebts), "Credit Loss Write-Offs", Color.FromArgb(149, 165, 166), () => DrillDown("CustomerOutstanding")));
             flow3.Controls.Add(CreateKpiCard("24. Supplier Write-Offs", "Vendor invoice write-offs and negotiated settlement discounts", FormatCurr(_model.SupplierWriteOffs), "Discounts / Write-Off Settled", Color.FromArgb(127, 140, 141), () => DrillDown("VendorOutstanding")));
@@ -835,7 +863,8 @@ namespace PosBranch_Win.Dashboard
             sb.AppendLine("</style></head><body><div class='container'>");
 
             sb.AppendLine("<h1>Executive Business KPI Cockpit — 30 Key Metrics</h1>");
-            sb.AppendLine($"<div class='meta'>Period: <b>{_model.FromDate:dd-MMM-yyyy}</b> to <b>{_model.ToDate:dd-MMM-yyyy}</b> | Generated: <b>{_model.GeneratedAt:dd-MMM-yyyy hh:mm tt}</b></div>");
+            string periodLabel = _model.FromDate <= new DateTime(1990, 1, 1) ? $"All Time (Up to {_model.ToDate:dd-MMM-yyyy})" : $"{_model.FromDate:dd-MMM-yyyy} to {_model.ToDate:dd-MMM-yyyy}";
+            sb.AppendLine($"<div class='meta'>Period: <b>{periodLabel}</b> | Generated: <b>{_model.GeneratedAt:dd-MMM-yyyy hh:mm tt}</b></div>");
 
             decimal totalLiquidity = _model.CashInHand + _model.BankBalance;
             sb.AppendLine("<div class='hero-box'>");
