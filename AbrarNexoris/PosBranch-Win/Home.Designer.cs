@@ -161,23 +161,7 @@ namespace PosBranch_Win
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolVendorHistory = new Infragistics.Win.UltraWinToolbars.ButtonTool("ActivityLog ");
             Infragistics.Win.UltraWinToolbars.RibbonGroup ribbonGroup36 = new Infragistics.Win.UltraWinToolbars.RibbonGroup("ribbonGroup2");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolVendorReport = new Infragistics.Win.UltraWinToolbars.ButtonTool("Report");
-            Infragistics.Win.UltraWinToolbars.RibbonTab ribbonTab7 = new Infragistics.Win.UltraWinToolbars.RibbonTab("ribbonBranch");
-            Infragistics.Win.UltraWinToolbars.RibbonGroup ribbonGroup37 = new Infragistics.Win.UltraWinToolbars.RibbonGroup("BranchGeneral");
-            Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolBranchMaster = new Infragistics.Win.UltraWinToolbars.ButtonTool("Branch");
-            Infragistics.Win.UltraWinToolbars.RibbonGroup ribbonGroup38 = new Infragistics.Win.UltraWinToolbars.RibbonGroup("BranchTransaction");
-            Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolBranchStockTransfer = new Infragistics.Win.UltraWinToolbars.ButtonTool("stocktransfer");
-            Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolBranchGoodsReceived = new Infragistics.Win.UltraWinToolbars.ButtonTool("Goods Received");
-            Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolBranchPO = new Infragistics.Win.UltraWinToolbars.ButtonTool("Purchase Order");
-            Infragistics.Win.UltraWinToolbars.RibbonGroup ribbonGroup39 = new Infragistics.Win.UltraWinToolbars.RibbonGroup("BranchStockLookup");
-            Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolBranchStockLookup = new Infragistics.Win.UltraWinToolbars.ButtonTool("StockLookup");
-            Infragistics.Win.UltraWinToolbars.RibbonGroup ribbonGroup40 = new Infragistics.Win.UltraWinToolbars.RibbonGroup("BranchSalesLookup");
-            Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolBranchSalesLookup = new Infragistics.Win.UltraWinToolbars.ButtonTool("SalesLookup");
-            Infragistics.Win.UltraWinToolbars.RibbonGroup ribbonGroup41 = new Infragistics.Win.UltraWinToolbars.RibbonGroup("BranchPointsLookup");
-            Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolBranchPointsLookup = new Infragistics.Win.UltraWinToolbars.ButtonTool("PointsLookup");
-            Infragistics.Win.UltraWinToolbars.RibbonGroup ribbonGroup42 = new Infragistics.Win.UltraWinToolbars.RibbonGroup("BranchTopUpLookup");
-            Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolBranchTopUpLookup = new Infragistics.Win.UltraWinToolbars.ButtonTool("TopUpLookup");
-            Infragistics.Win.UltraWinToolbars.RibbonGroup ribbonGroup43 = new Infragistics.Win.UltraWinToolbars.RibbonGroup("BranchView");
-            Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolBranchHistory = new Infragistics.Win.UltraWinToolbars.ButtonTool("ActivityLog ");
+
             Infragistics.Win.UltraWinToolbars.RibbonTab ribbonTab8 = new Infragistics.Win.UltraWinToolbars.RibbonTab("ribbon6");
             Infragistics.Win.UltraWinToolbars.RibbonGroup ribbonGroup44 = new Infragistics.Win.UltraWinToolbars.RibbonGroup("StockUtilities");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonTool100 = new Infragistics.Win.UltraWinToolbars.ButtonTool("OpeningStock");
@@ -194,14 +178,7 @@ namespace PosBranch_Win
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolManualPBReport_Instance = new Infragistics.Win.UltraWinToolbars.ButtonTool("ManualPartyBalanceReport");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolCombinedPBReport_Instance = new Infragistics.Win.UltraWinToolbars.ButtonTool("CombinedPartyBalanceReport");
             Infragistics.Win.UltraWinToolbars.UltraToolbar ultraToolbar1 = new Infragistics.Win.UltraWinToolbars.UltraToolbar("UltraToolbar1");
-            Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolStockLookupRoot = new Infragistics.Win.UltraWinToolbars.ButtonTool("StockLookup");
-            Infragistics.Win.Appearance appearance10 = new Infragistics.Win.Appearance();
-            Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolSalesLookupRoot = new Infragistics.Win.UltraWinToolbars.ButtonTool("SalesLookup");
-            Infragistics.Win.Appearance appearance11 = new Infragistics.Win.Appearance();
-            Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolPointsLookupRoot = new Infragistics.Win.UltraWinToolbars.ButtonTool("PointsLookup");
-            Infragistics.Win.Appearance appearance12 = new Infragistics.Win.Appearance();
-            Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolTopUpLookupRoot = new Infragistics.Win.UltraWinToolbars.ButtonTool("TopUpLookup");
-            Infragistics.Win.Appearance appearance13 = new Infragistics.Win.Appearance();
+
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolPRWithoutGR_Root = new Infragistics.Win.UltraWinToolbars.ButtonTool("PurchaseReturnWithoutGR");
             Infragistics.Win.Appearance appearance14 = new Infragistics.Win.Appearance();
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonTool11 = new Infragistics.Win.UltraWinToolbars.ButtonTool("Master");
@@ -893,57 +870,7 @@ namespace PosBranch_Win
             ribbonGroup34,
             ribbonGroup35,
             ribbonGroup36});
-            ribbonTab7.Caption = "Branch";
-            ribbonGroup37.Caption = "General";
-            buttonToolBranchMaster.InstanceProps.IsFirstInGroup = true;
-            buttonToolBranchMaster.InstanceProps.MinimumSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
-            buttonToolBranchMaster.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
-            ribbonGroup37.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
-            buttonToolBranchMaster});
-            ribbonGroup38.Caption = "Transaction";
-            buttonToolBranchStockTransfer.InstanceProps.MinimumSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
-            buttonToolBranchStockTransfer.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
-            buttonToolBranchGoodsReceived.InstanceProps.MinimumSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
-            buttonToolBranchGoodsReceived.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
-            buttonToolBranchPO.InstanceProps.MinimumSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
-            buttonToolBranchPO.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
-            ribbonGroup38.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
-            buttonToolBranchStockTransfer,
-            buttonToolBranchGoodsReceived,
-            buttonToolBranchPO});
-            ribbonGroup39.Caption = "Ctrl+S";
-            buttonToolBranchStockLookup.InstanceProps.MinimumSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
-            buttonToolBranchStockLookup.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
-            ribbonGroup39.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
-            buttonToolBranchStockLookup});
-            ribbonGroup40.Caption = "Alt+S";
-            buttonToolBranchSalesLookup.InstanceProps.MinimumSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
-            buttonToolBranchSalesLookup.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
-            ribbonGroup40.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
-            buttonToolBranchSalesLookup});
-            ribbonGroup41.Caption = "Points Lookup";
-            buttonToolBranchPointsLookup.InstanceProps.MinimumSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
-            buttonToolBranchPointsLookup.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
-            ribbonGroup41.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
-            buttonToolBranchPointsLookup});
-            ribbonGroup42.Caption = "Alt+T";
-            buttonToolBranchTopUpLookup.InstanceProps.MinimumSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
-            buttonToolBranchTopUpLookup.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
-            ribbonGroup42.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
-            buttonToolBranchTopUpLookup});
-            ribbonGroup43.Caption = "View";
-            buttonToolBranchHistory.InstanceProps.MinimumSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
-            buttonToolBranchHistory.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
-            ribbonGroup43.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
-            buttonToolBranchHistory});
-            ribbonTab7.Groups.AddRange(new Infragistics.Win.UltraWinToolbars.RibbonGroup[] {
-            ribbonGroup37,
-            ribbonGroup38,
-            ribbonGroup39,
-            ribbonGroup40,
-            ribbonGroup41,
-            ribbonGroup42,
-            ribbonGroup43});
+
             ribbonTab8.Caption = "Utilities";
             ribbonGroup44.Caption = "Stock Utilities";
             buttonTool100.InstanceProps.MinimumSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
@@ -991,7 +918,6 @@ namespace PosBranch_Win
             ribbonTab4,
             ribbonTab5,
             ribbonTab6,
-            ribbonTab7,
             ribbonTab8,
             ribbonTab9});
             this.ultraToolbarsManager1.Ribbon.Visible = true;
@@ -1003,22 +929,7 @@ namespace PosBranch_Win
             ultraToolbar1.Text = "UltraToolbar1";
             this.ultraToolbarsManager1.Toolbars.AddRange(new Infragistics.Win.UltraWinToolbars.UltraToolbar[] {
             ultraToolbar1});
-            appearance10.Image = ((object)(resources.GetObject("appearance10.Image")));
-            buttonToolStockLookupRoot.SharedPropsInternal.AppearancesLarge.Appearance = appearance10;
-            buttonToolStockLookupRoot.SharedPropsInternal.Caption = "Stock Lookup";
-            buttonToolStockLookupRoot.SharedPropsInternal.DisplayStyle = Infragistics.Win.UltraWinToolbars.ToolDisplayStyle.ImageAndText;
-            appearance11.Image = ((object)(resources.GetObject("appearance11.Image")));
-            buttonToolSalesLookupRoot.SharedPropsInternal.AppearancesLarge.Appearance = appearance11;
-            buttonToolSalesLookupRoot.SharedPropsInternal.Caption = "Sales Lookup";
-            buttonToolSalesLookupRoot.SharedPropsInternal.DisplayStyle = Infragistics.Win.UltraWinToolbars.ToolDisplayStyle.ImageAndText;
-            appearance12.Image = ((object)(resources.GetObject("appearance12.Image")));
-            buttonToolPointsLookupRoot.SharedPropsInternal.AppearancesLarge.Appearance = appearance12;
-            buttonToolPointsLookupRoot.SharedPropsInternal.Caption = "Points Lookup";
-            buttonToolPointsLookupRoot.SharedPropsInternal.DisplayStyle = Infragistics.Win.UltraWinToolbars.ToolDisplayStyle.ImageAndText;
-            appearance13.Image = global::PosBranch_Win.Properties.Resources.payment_method1;
-            buttonToolTopUpLookupRoot.SharedPropsInternal.AppearancesLarge.Appearance = appearance13;
-            buttonToolTopUpLookupRoot.SharedPropsInternal.Caption = "TopUp Lookup";
-            buttonToolTopUpLookupRoot.SharedPropsInternal.DisplayStyle = Infragistics.Win.UltraWinToolbars.ToolDisplayStyle.ImageAndText;
+
             appearance14.Image = ((object)(resources.GetObject("appearance14.Image")));
             buttonToolPRWithoutGR_Root.SharedPropsInternal.AppearancesSmall.Appearance = appearance14;
             buttonToolPRWithoutGR_Root.SharedPropsInternal.Caption = "Purchase Return Without GR";
@@ -1405,10 +1316,7 @@ namespace PosBranch_Win
             buttonToolGovtGSTShared.SharedPropsInternal.Caption = "Govt GST Return";
             buttonToolGovtGSTShared.SharedPropsInternal.DisplayStyle = Infragistics.Win.UltraWinToolbars.ToolDisplayStyle.ImageAndText;
             this.ultraToolbarsManager1.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
-            buttonToolStockLookupRoot,
-            buttonToolSalesLookupRoot,
-            buttonToolPointsLookupRoot,
-            buttonToolTopUpLookupRoot,
+
             buttonToolPRWithoutGR_Root,
             buttonTool11,
             buttonTool12,
