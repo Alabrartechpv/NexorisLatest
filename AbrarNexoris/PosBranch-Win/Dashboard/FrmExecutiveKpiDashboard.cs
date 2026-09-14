@@ -319,11 +319,19 @@ namespace PosBranch_Win.Dashboard
                 CreateKpiCard("30. Customer Advance / Deposits", "Customer advance payments and credit deposits received", FormatCurr(_model.CustomerAdvanceBalance), "Customer Deposits / Credit", Color.FromArgb(127, 140, 141), () => DrillDown("CustomerReceiptReport"))
             };
 
-            // Display in clean 6-column grid
-            var cardsGrid = CreateCardGridPanel(allCards, containerWidth, 6, 52, 6);
+            // Display in clean full-width responsive grid:
+            // Rows 1-4: 6 cards per row, Row 5: 5 cards evenly stretched
+            int clientH = pnlScrollableContent.ClientSize.Height;
+            int gap = 5;
+            int overhead = 36;
+            int usableH = Math.Max(380, clientH - overhead);
+            int targetCardH = (int)Math.Floor(((usableH * 0.58) - (4 * gap)) / 5);
+            int cardHeight = Math.Max(50, Math.Min(74, targetCardH));
+
+            var cardsGrid = CreateCardGridPanel(allCards, containerWidth, cardHeight, gap);
             cardsGrid.Location = new Point(leftMargin, currentY);
             pnlScrollableContent.Controls.Add(cardsGrid);
-            currentY += cardsGrid.Height + 8;
+            currentY += cardsGrid.Height + 6;
 
             // ═══════════════════════════════════════════════════════════════════
             // 25. MONTHLY GROWTH & PERFORMANCE MATRIX (MoM %)
@@ -333,10 +341,11 @@ namespace PosBranch_Win.Dashboard
             pnlScrollableContent.Controls.Add(headerGrowth);
             currentY += headerGrowth.Height + 3;
 
-            var dgvGrowth = CreateGrowthMatrixGrid(containerWidth);
+            int tableHeight = Math.Max(80, clientH - currentY - 6);
+            var dgvGrowth = CreateGrowthMatrixGrid(containerWidth, tableHeight);
             dgvGrowth.Location = new Point(leftMargin, currentY);
             pnlScrollableContent.Controls.Add(dgvGrowth);
-            currentY += dgvGrowth.Height + 8;
+            currentY += dgvGrowth.Height + 6;
 
             pnlScrollableContent.ResumeLayout(true);
         }
@@ -375,10 +384,9 @@ namespace PosBranch_Win.Dashboard
             return pnl;
         }
 
-        private Panel CreateCardGridPanel(List<Control> cards, int containerWidth, int cols, int cardHeight, int gap = 6)
+        private Panel CreateCardGridPanel(List<Control> cards, int containerWidth, int cardHeight, int gap = 5)
         {
-            int cardWidth = (containerWidth - ((cols - 1) * gap)) / cols;
-            int totalRows = (int)Math.Ceiling((double)cards.Count / cols);
+            int totalRows = 5;
             int totalHeight = totalRows * cardHeight + (totalRows - 1) * gap;
 
             var pnl = new Panel
@@ -388,16 +396,34 @@ namespace PosBranch_Win.Dashboard
                 Margin = new Padding(0)
             };
 
-            for (int i = 0; i < cards.Count; i++)
+            // First 24 cards: 4 rows of 6 cards each
+            int cardWidth6 = (containerWidth - (5 * gap)) / 6;
+            for (int i = 0; i < Math.Min(24, cards.Count); i++)
             {
-                int row = i / cols;
-                int col = i % cols;
-                int x = col * (cardWidth + gap);
+                int row = i / 6;
+                int col = i % 6;
+                int x = col * (cardWidth6 + gap);
                 int y = row * (cardHeight + gap);
 
                 cards[i].Location = new Point(x, y);
-                cards[i].Size = new Size(cardWidth, cardHeight);
+                cards[i].Size = new Size(cardWidth6, cardHeight);
                 pnl.Controls.Add(cards[i]);
+            }
+
+            // Last 5 cards (cards 24 to 28): 1 row of 5 cards stretched across 100% width
+            if (cards.Count > 24)
+            {
+                int cardWidth5 = (containerWidth - (4 * gap)) / 5;
+                for (int i = 24; i < cards.Count; i++)
+                {
+                    int col = i - 24;
+                    int x = col * (cardWidth5 + gap);
+                    int y = 4 * (cardHeight + gap);
+
+                    cards[i].Location = new Point(x, y);
+                    cards[i].Size = new Size(cardWidth5, cardHeight);
+                    pnl.Controls.Add(cards[i]);
+                }
             }
 
             return pnl;
@@ -407,7 +433,7 @@ namespace PosBranch_Win.Dashboard
         {
             var card = new Panel
             {
-                Size = new Size(200, 52),
+                Size = new Size(200, 60),
                 BackColor = CardBgColor,
                 Cursor = Cursors.Hand,
                 Margin = new Padding(0)
@@ -426,9 +452,10 @@ namespace PosBranch_Win.Dashboard
                 Text = title,
                 Font = new Font("Segoe UI Semibold", 8F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(30, 48, 80),
-                Location = new Point(6, 5),
+                Location = new Point(6, 4),
                 Size = new Size(185, 14),
-                AutoEllipsis = true
+                AutoEllipsis = true,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
             card.Controls.Add(lblTitle);
 
@@ -439,7 +466,8 @@ namespace PosBranch_Win.Dashboard
                 ForeColor = accentColor,
                 Location = new Point(5, 19),
                 Size = new Size(185, 18),
-                AutoEllipsis = true
+                AutoEllipsis = true,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
             card.Controls.Add(lblValue);
 
@@ -448,11 +476,29 @@ namespace PosBranch_Win.Dashboard
                 Text = footerInfo,
                 Font = new Font("Segoe UI", 7F),
                 ForeColor = Color.FromArgb(100, 120, 145),
-                Location = new Point(6, 36),
+                Location = new Point(6, 38),
                 Size = new Size(185, 13),
-                AutoEllipsis = true
+                AutoEllipsis = true,
+                Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right
             };
             card.Controls.Add(lblFooter);
+
+            card.Resize += (s, e) =>
+            {
+                int w = card.Width;
+                int h = card.Height;
+                lblTitle.Size = new Size(Math.Max(10, w - 12), 14);
+
+                int vTop = h >= 64 ? 21 : (h >= 56 ? 19 : 17);
+                int vH = h >= 64 ? 22 : 18;
+                lblValue.Location = new Point(5, vTop);
+                lblValue.Size = new Size(Math.Max(10, w - 10), vH);
+                lblValue.Font = new Font("Segoe UI", h >= 64 ? 12F : (h >= 56 ? 11F : 10F), FontStyle.Bold);
+
+                int fTop = Math.Max(vTop + vH, h - 16);
+                lblFooter.Location = new Point(6, fTop);
+                lblFooter.Size = new Size(Math.Max(10, w - 12), 13);
+            };
 
             card.Paint += (s, e) =>
             {
@@ -491,12 +537,12 @@ namespace PosBranch_Win.Dashboard
             return card;
         }
 
-        private DataGridView CreateGrowthMatrixGrid(int width)
+        private DataGridView CreateGrowthMatrixGrid(int width, int height)
         {
             var grid = new DataGridView
             {
                 Width = width,
-                Height = 74,
+                Height = height,
                 BackgroundColor = Color.White,
                 GridColor = Color.FromArgb(225, 235, 245),
                 BorderStyle = BorderStyle.FixedSingle,
@@ -509,13 +555,13 @@ namespace PosBranch_Win.Dashboard
                 AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
                 EnableHeadersVisualStyles = false,
                 Margin = new Padding(0),
-                ScrollBars = ScrollBars.Vertical
+                ScrollBars = ScrollBars.Both
             };
 
             grid.ColumnHeadersDefaultCellStyle.BackColor = Color.FromArgb(28, 70, 130);
             grid.ColumnHeadersDefaultCellStyle.ForeColor = Color.White;
             grid.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI Semibold", 8F, FontStyle.Bold);
-            grid.ColumnHeadersHeight = 22;
+            grid.ColumnHeadersHeight = height >= 140 ? 25 : 22;
             grid.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.DisableResizing;
 
             grid.DefaultCellStyle.Font = new Font("Segoe UI", 7.5F);
@@ -523,7 +569,7 @@ namespace PosBranch_Win.Dashboard
             grid.DefaultCellStyle.SelectionBackColor = Color.FromArgb(215, 235, 255);
             grid.DefaultCellStyle.SelectionForeColor = Color.FromArgb(10, 30, 60);
             grid.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(248, 251, 255);
-            grid.RowTemplate.Height = 20;
+            grid.RowTemplate.Height = height >= 160 ? 24 : 20;
 
             grid.Columns.Add("Month", "Month Period");
             grid.Columns.Add("Sales", "Sales Turnover");
