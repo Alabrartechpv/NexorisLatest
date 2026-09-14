@@ -395,6 +395,13 @@ namespace PosBranch_Win.Transaction
             // --- Initialize Row Flash Timer ---
             rowFlashTimer.Interval = FLASH_DURATION_MS;
             rowFlashTimer.Tick += RowFlashTimer_Tick;
+
+            // Wire up hover events to refresh customer balance tooltip
+            if (txtCustomer != null)
+            {
+                txtCustomer.MouseEnter += (s, e) => UpdateCustomerBalanceDisplay();
+                txtCustomer.MouseHover += (s, e) => UpdateCustomerBalanceDisplay();
+            }
         }
 
         private void frmSalesInvoice_FormClosed(object sender, FormClosedEventArgs e)
@@ -4330,20 +4337,35 @@ namespace PosBranch_Win.Transaction
         {
             try
             {
-                int ledgerId = ParseInt(lblledger.Text, 0);
-                if (ledgerId <= 0) return;
+                if (txtCustomer == null || toolTip1 == null) return;
 
-                Repository.Accounts.LedgerRepository ledgerRepo = new Repository.Accounts.LedgerRepository();
-                var balances = ledgerRepo.GetLedgerBalances(SessionContext.CompanyId, SessionContext.BranchId, SessionContext.FinYearId, DateTime.Now);
+                int ledgerId = ParseInt(lblledger?.Text, 0);
+                string customerName = txtCustomer.Text?.Trim() ?? string.Empty;
 
-                if (balances != null && balances.TryGetValue(ledgerId, out decimal balance))
+                if (string.IsNullOrWhiteSpace(customerName) || ledgerId <= 0)
                 {
-                    string balanceText = balance >= 0 ? $"Bal: ₹{balance:N2} (Dr)" : $"Bal: ₹{Math.Abs(balance):N2} (Cr)";
-                    if (toolTip1 != null && txtCustomer != null)
+                    toolTip1.SetToolTip(txtCustomer, string.Empty);
+                    return;
+                }
+
+                decimal balance = 0;
+                try
+                {
+                    Repository.Accounts.LedgerRepository ledgerRepo = new Repository.Accounts.LedgerRepository();
+                    var balances = ledgerRepo.GetLedgerBalances(SessionContext.CompanyId, SessionContext.BranchId, SessionContext.FinYearId, DateTime.Now);
+
+                    if (balances != null && balances.TryGetValue(ledgerId, out decimal val))
                     {
-                        toolTip1.SetToolTip(txtCustomer, $"Customer: {txtCustomer.Text}\n{balanceText}");
+                        balance = val;
                     }
                 }
+                catch (Exception dbEx)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error fetching ledger balances: {dbEx.Message}");
+                }
+
+                string balanceText = balance >= 0 ? $"Bal: ₹{balance:N2} (Dr)" : $"Bal: ₹{Math.Abs(balance):N2} (Cr)";
+                toolTip1.SetToolTip(txtCustomer, $"Customer: {customerName}\n{balanceText}");
             }
             catch (Exception ex)
             {
@@ -4546,6 +4568,7 @@ namespace PosBranch_Win.Transaction
 
                 ApplySavedPaymentModeSelection(master);
                 CaptureSalesActivitySnapshot(master);
+                UpdateCustomerBalanceDisplay();
 
                 System.Diagnostics.Debug.WriteLine($"GetMyBill: Loaded bill #{master.BillNo} with VoucherID={master.VoucherID}, Status={master.Status}");
             }
@@ -4837,6 +4860,7 @@ namespace PosBranch_Win.Transaction
             txtCustomer.Text = name;
             lblledger.Text = ledgerId.ToString();
             sales.LedgerID = ledgerId;
+            UpdateCustomerBalanceDisplay();
         }
 
         // Update AddItemToGrid method for UltraGrid
