@@ -183,7 +183,7 @@ namespace PosBranch_Win.Dashboard
             this.lblDashboardSubtitle.Name = "lblDashboardSubtitle";
             this.lblDashboardSubtitle.Size = new System.Drawing.Size(306, 12);
             this.lblDashboardSubtitle.TabIndex = 1;
-            this.lblDashboardSubtitle.Text = "30 Key Business Metrics, Financial Health & Inventory Health Cockpit";
+            this.lblDashboardSubtitle.Text = "36 Key Business Metrics, Financial Health, Inventory Valuation & Growth Matrix";
             // 
             // lblDashboardTitle
             // 
