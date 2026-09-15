@@ -227,7 +227,7 @@ namespace PosBranch_Win.Dashboard
             int currentY = 8;
 
             // ═══════════════════════════════════════════════════════════════════
-            // ALL 30 METRICS IN EXACT NUMERICAL ORDER (1 to 30)
+            // ALL 36 METRICS IN EXACT NUMERICAL ORDER (1 to 36)
             // ═══════════════════════════════════════════════════════════════════
             var allCards = new List<Control>
             {
@@ -235,117 +235,146 @@ namespace PosBranch_Win.Dashboard
                 CreateKpiCard("1. Total Stock Value", "Total warehouse stock valued at purchase cost", FormatCurr(_model.TotalStockCostValue), $"Items: {_model.TotalStockItemCount:N0} | Units: {_model.TotalStockQuantity:N0}", Color.FromArgb(41, 128, 185), () => DrillDown("StockValuation")),
                 
                 // 2. Stock Profit Potential
-                CreateKpiCard("2. Stock Profit Potential", "Estimated gross profit on 100% stock liquidation", FormatCurr(_model.StockProfitPotential), $"Retail Value: {FormatCurr(_model.TotalStockRetailValue)}", Color.FromArgb(39, 174, 96), () => DrillDown("StockValuation")),
+                CreateKpiCard("2. Stock Potential Profit", "Estimated gross profit on 100% stock liquidation", FormatCurr(_model.StockProfitPotential), $"Retail: {FormatCurr(_model.TotalStockRetailValue)}", Color.FromArgb(39, 174, 96), () => DrillDown("StockValuation")),
                 
-                // 3. Total Sales Revenue
-                CreateKpiCard("3. Total Sales Revenue", "Total net billing revenue for the selected date period", FormatCurr(_model.TotalSalesRevenue), $"{_model.TotalSalesBillCount:N0} Bills | Pur: {FormatCurr(_model.TotalPurchases)}", Color.FromArgb(30, 136, 229), () => DrillDown("SalesAnalytics")),
+                // 3. Non-Moving / Dead Stock Value
+                CreateKpiCard("3. Dead Stock (>90d)", "Capital locked in stock with no sales in last 90 days", FormatCurr(_model.DeadStockValue), $"{_model.DeadStockItemCount:N0} Inactive Items", Color.FromArgb(211, 84, 0), () => DrillDown("StockAnalytics")),
+
+                // 4. Negative Stock Impact
+                CreateKpiCard("4. Negative Stock Impact", "Estimated financial distortion due to negative stock at cost", FormatCurr(_model.NegativeStockImpactValue), "Cost of Negative Items", Color.FromArgb(231, 76, 60), () => DrillDown("StockValuation")),
                 
-                // 4. Total Business Expenses
-                CreateKpiCard("4. Total Business Expenses", "Combined operational overheads, utilities, and running costs", FormatCurr(_model.TotalBusinessExpenses), $"Direct: {FormatCurr(_model.DirectExpenses)} | Indir: {FormatCurr(_model.IndirectExpenses)}", Color.FromArgb(192, 57, 43), () => DrillDown("ProfitLoss")),
+                // 5. Negative Stock Items
+                CreateKpiCard("5. Negative Stock Items", "Products currently running in negative inventory balance", $"{_model.NegativeStockItemCount} Items", $"Negative Qty: {_model.NegativeStockTotalQty:N0}", Color.FromArgb(192, 57, 43), () => DrillDown("StockAnalytics")),
                 
-                // 5. Negative Stock Impact
-                CreateKpiCard("5. Negative Stock Impact", "Estimated financial distortion due to negative stock at cost", FormatCurr(_model.NegativeStockImpactValue), "Cost Value of Negative Items", Color.FromArgb(231, 76, 60), () => DrillDown("StockValuation")),
+                // 6. Loss Stock (Damaged / Out)
+                CreateKpiCard("6. Loss Stock (Damaged)", "Total stock written off or damaged (Stock OUT adjustments)", FormatCurr(_model.LossStockValue), $"Discrepancy: {_model.LossStockQty:N2}", Color.FromArgb(192, 57, 43), () => DrillDown("StockAdjustment")),
+
+                // 7. Extra Stock (Found / In)
+                CreateKpiCard("7. Extra Stock (Found)", "Total surplus stock found and added (Stock IN adjustments)", FormatCurr(_model.ExtraStockValue), $"Surplus Qty: {_model.ExtraStockQty:N2}", Color.FromArgb(22, 160, 133), () => DrillDown("StockAdjustment")),
                 
-                // 6. Negative Stock Items
-                CreateKpiCard("6. Negative Stock Items", "Products currently running in negative inventory balance", $"{_model.NegativeStockItemCount} Items", $"Total Negative Qty: {_model.NegativeStockTotalQty:N0}", Color.FromArgb(192, 57, 43), () => DrillDown("StockAnalytics")),
+                // 8. Net Stock Adjustment
+                CreateKpiCard("8. Stock Adj. Balance", "Net variance between stock additions and write-offs", FormatCurr(_model.NetStockAdjustmentValue), _model.NetStockAdjustmentValue >= 0 ? "Surplus Net Balance" : "Shortage Variance", Color.FromArgb(142, 68, 173), () => DrillDown("StockAdjustment")),
                 
-                // 7. Cash in Hand
-                CreateKpiCard("7. Cash in Hand", "Total liquid cash in cash drawers, counter tills, and main safe", FormatCurr(_model.CashInHand), "Available Counter Cash", Color.FromArgb(46, 204, 113), () => DrillDown("CashBankBook")),
+                // 9. Excess Stock Alert
+                CreateKpiCard("9. Excess Stock Alert", "Products exceeding maximum inventory threshold", $"{_model.ExcessStockAlertCount} Items", "Over Maximum Limit", Color.FromArgb(243, 156, 18), () => DrillDown("SmartReorder")),
                 
-                // 8. Bank Balance
-                CreateKpiCard("8. Bank Balance", "Total combined active bank account balances", FormatCurr(_model.BankBalance), "Active Commercial Bank Accounts", Color.FromArgb(52, 152, 219), () => DrillDown("BankStatement")),
+                // 10. Low Stock Alert
+                CreateKpiCard("10. Low Stock Alert", "Products below minimum critical inventory threshold", $"{_model.LowStockAlertCount} Items", "Below Minimum Limit", Color.FromArgb(230, 126, 34), () => DrillDown("LowStockAlert")),
                 
-                // 9. Supplier Payables
-                CreateKpiCard("9. Supplier Payables", "Total outstanding liabilities owed to vendors and suppliers", FormatCurr(_model.SupplierPayables), $"{_model.SupplierPayablesCount} Pending Purchase Bills", Color.FromArgb(231, 76, 60), () => DrillDown("VendorOutstanding")),
+                // 11. Reorder Alert
+                CreateKpiCard("11. Reorder Alert", "Products at or below reorder level requiring purchase", $"{_model.ReorderAlertCount} Items", "Reorder Recommended", Color.FromArgb(192, 57, 43), () => DrillDown("SmartReorder")),
+
+                // 12. Total Sales Revenue
+                CreateKpiCard("12. Total Sales Turnover", "Total net billing revenue for the selected date period", FormatCurr(_model.TotalSalesRevenue), $"{_model.TotalSalesBillCount:N0} Invoices Billed", Color.FromArgb(30, 136, 229), () => DrillDown("SalesAnalytics")),
+
+                // 13. Sales Return (Customer Returns)
+                CreateKpiCard("13. Sales Return (Cust)", "Goods returned and credit notes issued to customers", FormatCurr(_model.TotalSalesReturn), $"{_model.TotalSalesReturnCount} Return Vouchers", Color.FromArgb(231, 76, 60), () => DrillDown("SalesReturnReport")),
+
+                // 14. Total Purchases (Inward Stock)
+                CreateKpiCard("14. Total Purchases", "Total inward purchases billed from vendors and suppliers", FormatCurr(_model.TotalPurchases), $"{_model.TotalPurchasesBillCount:N0} Purchase Bills", Color.FromArgb(41, 128, 185), () => DrillDown("TradingPL")),
+
+                // 15. Purchase Return (Vendor Returns)
+                CreateKpiCard("15. Purchase Return", "Goods returned back to suppliers and debit notes issued", FormatCurr(_model.TotalPurchaseReturn), $"{_model.TotalPurchaseReturnCount} Debit Vouchers", Color.FromArgb(230, 126, 34), () => DrillDown("VendorOutstanding")),
+
+                // 16. Holded Items / Bills
+                CreateKpiCard("16. Holded Items / Bills", "Suspended sales bills and hold items pending counter checkout", FormatCurr(_model.HoldBillsValue), $"{_model.HoldBillsCount} Bills | {_model.HoldItemsCount:N0} Items", Color.FromArgb(230, 126, 34), () => DrillDown("HoldBills")),
+
+                // 17. Gross Profit & Margin %
+                CreateKpiCard("17. Gross Margin %", "Gross earnings on sold goods (Sales Revenue - Cost of Sales)", FormatCurr(_model.GrossProfit), $"Gross Margin: {_model.GrossProfitMarginPercent:N1}%", Color.FromArgb(39, 174, 96), () => DrillDown("TradingPL")),
+
+                // 18. Total Business Expenses
+                CreateKpiCard("18. Business Expenses", "Combined operational overheads, utilities, and running costs", FormatCurr(_model.TotalBusinessExpenses), $"Dir: {FormatCurr(_model.DirectExpenses)} | Indir: {FormatCurr(_model.IndirectExpenses)}", Color.FromArgb(192, 57, 43), () => DrillDown("ProfitLoss")),
+
+                // 19. Actual Net Profit
+                CreateKpiCard("19. Actual Net Profit", "Bottom-line net earnings after deducting cost of sales and expenses", FormatCurr(_model.ActualNetProfit), $"Margin: {_model.OperatingProfitMarginPercent:N2}%", _model.ActualNetProfit >= 0 ? Color.FromArgb(39, 174, 96) : Color.FromArgb(192, 57, 43), () => DrillDown("ProfitLoss")),
+
+                // 20. Operating Profit Margin %
+                CreateKpiCard("20. Profit Margin %", "Ratio of net profit generated from sales turnover", $"{_model.OperatingProfitMarginPercent:N2}%", "Net Profit / Sales", Color.FromArgb(22, 160, 133), () => DrillDown("ProfitLoss")),
+
+                // 21. GST / Net Tax Liability
+                CreateKpiCard("21. GST Tax Liability", "Net government GST liability (Output GST - Input GST credit)", FormatCurr(_model.NetTaxLiability), $"Out: {FormatCurr(_model.OutputGstAmount)} | In: {FormatCurr(_model.InputGstAmount)}", Color.FromArgb(52, 73, 94), () => DrillDown("GovtGSTReturnReport")),
+
+                // 22. Cash in Hand
+                CreateKpiCard("22. Cash in Hand", "Total liquid cash in cash drawers, counter tills, and main safe", FormatCurr(_model.CashInHand), "Available Counter Cash", Color.FromArgb(46, 204, 113), () => DrillDown("CashBankBook")),
                 
-                // 10. Customer Receivables
-                CreateKpiCard("10. Customer Receivables", "Total outstanding dues to collect from customers", FormatCurr(_model.CustomerReceivables), $"{_model.CustomerReceivablesCount} Unpaid Sales Invoices", Color.FromArgb(241, 196, 15), () => DrillDown("CustomerOutstanding")),
+                // 23. Bank Balance
+                CreateKpiCard("23. Bank Balance", "Total combined active bank account balances", FormatCurr(_model.BankBalance), "Commercial Accounts", Color.FromArgb(52, 152, 219), () => DrillDown("BankStatement")),
                 
-                // 11. Actual Net Profit
-                CreateKpiCard("11. Actual Net Profit", "Bottom-line net earnings after deducting cost of sales and expenses", FormatCurr(_model.ActualNetProfit), $"Operating Margin: {_model.OperatingProfitMarginPercent:N2}%", _model.ActualNetProfit >= 0 ? Color.FromArgb(39, 174, 96) : Color.FromArgb(192, 57, 43), () => DrillDown("ProfitLoss")),
+                // 24. Vendor Outstanding
+                CreateKpiCard("24. Vendor Outstanding", "Total outstanding liabilities owed to vendors and suppliers", FormatCurr(_model.SupplierPayables), $"{_model.SupplierPayablesCount} Pending Bills", Color.FromArgb(231, 76, 60), () => DrillDown("VendorOutstanding")),
                 
-                // 12. Owner Drawings
-                CreateKpiCard("12. Owner Drawings", "Capital withdrawals and personal drawings taken by proprietors", FormatCurr(_model.OwnerDrawings), "Capital Account Withdrawals", Color.FromArgb(155, 89, 182), () => DrillDown("DayBook")),
+                // 25. Customer Outstanding
+                CreateKpiCard("25. Customer Outstanding", "Total outstanding dues to collect from customers", FormatCurr(_model.CustomerReceivables), $"{_model.CustomerReceivablesCount} Unpaid Invoices", Color.FromArgb(241, 196, 15), () => DrillDown("CustomerOutstanding")),
+
+                // 26. Delayed Customer Receivables (>30D)
+                CreateKpiCard("26. Delayed Cust (>30D)", "Overdue customer receivables past 30 days credit period", FormatCurr(_model.DelayedCustomerReceivables30Days), $"{_model.DelayedCustomerCount30Days} High-Risk Bills", Color.FromArgb(231, 76, 60), () => DrillDown("CustomerOutstanding")),
                 
-                // 13. Net Business Asset (NBA)
-                CreateKpiCard("13. Net Business Asset (NBA)", "True net worth of the business (Total Assets minus Liabilities)", FormatCurr(_model.NetBusinessAsset), $"Assets: {FormatCurr(_model.TotalAssets)} | Liab: {FormatCurr(_model.TotalLiabilities)}", Color.FromArgb(16, 85, 154), () => DrillDown("BalanceSheet")),
+                // 27. Delayed Supplier Payables (>30D)
+                CreateKpiCard("27. Delayed Supp (>30D)", "Overdue purchase invoices past 30 days credit period", FormatCurr(_model.DelayedSupplierPayables30Days), $"{_model.DelayedSupplierCount30Days} Overdue Bills", Color.FromArgb(230, 126, 34), () => DrillDown("VendorOutstanding")),
+
+                // 28. Net Business Asset (NBA)
+                CreateKpiCard("28. Net Asset (NBA)", "True net worth of the business (Total Assets minus Liabilities)", FormatCurr(_model.NetBusinessAsset), $"Assets: {FormatCurr(_model.TotalAssets)} | Liab: {FormatCurr(_model.TotalLiabilities)}", Color.FromArgb(16, 85, 154), () => DrillDown("BalanceSheet")),
+
+                // 29. Owner Drawings
+                CreateKpiCard("29. Owner Drawings", "Capital withdrawals and personal drawings taken by proprietors", FormatCurr(_model.OwnerDrawings), "Capital Withdrawals", Color.FromArgb(155, 89, 182), () => DrillDown("DayBook")),
+
+                // 30. Customer Bad Debts
+                CreateKpiCard("30. Customer Bad Debts", "Uncollectible customer credit balances written off", FormatCurr(_model.CustomerBadDebts), "Credit Loss Written Off", Color.FromArgb(149, 165, 166), () => DrillDown("CustomerOutstanding")),
                 
-                // 14. Loss Stock (Damaged / Out)
-                CreateKpiCard("14. Loss Stock (Damaged / Out)", "Total stock written off or damaged (Stock OUT adjustments)", FormatCurr(_model.LossStockValue), $"Discrepancy Qty: {_model.LossStockQty:N2}", Color.FromArgb(211, 84, 0), () => DrillDown("StockAdjustment")),
+                // 31. Supplier Write-Offs
+                CreateKpiCard("31. Supplier Write-Offs", "Vendor invoice write-offs and negotiated settlement discounts", FormatCurr(_model.SupplierWriteOffs), "Discounts Settled", Color.FromArgb(127, 140, 141), () => DrillDown("VendorOutstanding")),
+
+                // 32. Supplier Advance / Overpayment
+                CreateKpiCard("32. Supplier Advance", "Advance payments and debit balances with vendors", FormatCurr(_model.SupplierAdvanceBalance), "Advance Payments / Debit", Color.FromArgb(52, 73, 94), () => DrillDown("VendorPaymentReport")),
                 
-                // 15. Extra Stock (Found / In)
-                CreateKpiCard("15. Extra Stock (Found / In)", "Total surplus stock found and added (Stock IN adjustments)", FormatCurr(_model.ExtraStockValue), $"Surplus Qty: {_model.ExtraStockQty:N2}", Color.FromArgb(22, 160, 133), () => DrillDown("StockAdjustment")),
+                // 33. Customer Advance / Deposits
+                CreateKpiCard("33. Customer Advance", "Customer advance payments and credit deposits received", FormatCurr(_model.CustomerAdvanceBalance), "Deposits / Credit", Color.FromArgb(127, 140, 141), () => DrillDown("CustomerReceiptReport")),
+
+                // 34. Deletion & Cancellation Logs
+                CreateKpiCard("34. Deletion Logs", "Track of deleted sales bills, purchase bills, and account vouchers", $"{_model.DeletionCount} Events", "Deleted Documents", Color.FromArgb(192, 57, 43), () => DrillDown("AuditDeletions")),
                 
-                // 16. Net Stock Adjustment
-                CreateKpiCard("16. Net Stock Adjustment", "Net variance between stock additions and write-offs", FormatCurr(_model.NetStockAdjustmentValue), _model.NetStockAdjustmentValue >= 0 ? "Surplus Net Balance" : "Shortage Net Variance", Color.FromArgb(142, 68, 173), () => DrillDown("StockAdjustment")),
+                // 35. Price Change Modifications
+                CreateKpiCard("35. Price Change Logs", "Track of item selling and cost price edits in Item Master", $"{_model.PriceChangeCount} Events", "Item Master Edits", Color.FromArgb(41, 128, 185), () => DrillDown("AuditPriceChanges")),
                 
-                // 17. Delayed Customer Receivables (>30D)
-                CreateKpiCard("17. Delayed Customer Receivables (>30D)", "Overdue customer receivables past 30 days credit period", FormatCurr(_model.DelayedCustomerReceivables30Days), $"{_model.DelayedCustomerCount30Days} High-Risk Invoices", Color.FromArgb(231, 76, 60), () => DrillDown("CustomerOutstanding")),
-                
-                // 18. Delayed Supplier Payables (>30D)
-                CreateKpiCard("18. Delayed Supplier Payables (>30D)", "Overdue purchase invoices past 30 days credit period", FormatCurr(_model.DelayedSupplierPayables30Days), $"{_model.DelayedSupplierCount30Days} Overdue Vendor Bills", Color.FromArgb(230, 126, 34), () => DrillDown("VendorOutstanding")),
-                
-                // 19. Operating Profit Margin %
-                CreateKpiCard("19. Operating Profit Margin %", "Ratio of net profit generated from sales turnover", $"{_model.OperatingProfitMarginPercent:N2}%", "Net Profit / Sales Revenue", Color.FromArgb(22, 160, 133), () => DrillDown("ProfitLoss")),
-                
-                // 20. Excess Stock Alert
-                CreateKpiCard("20. Excess Stock Alert", "Products exceeding maximum inventory threshold", $"{_model.ExcessStockAlertCount} Items", "Over Maximum Limit", Color.FromArgb(243, 156, 18), () => DrillDown("SmartReorder")),
-                
-                // 21. Low Stock Alert
-                CreateKpiCard("21. Low Stock Alert", "Products below minimum critical inventory threshold", $"{_model.LowStockAlertCount} Items", "Below Minimum Limit", Color.FromArgb(230, 126, 34), () => DrillDown("LowStockAlert")),
-                
-                // 22. Reorder Alert
-                CreateKpiCard("22. Reorder Alert", "Products at or below reorder level requiring purchase", $"{_model.ReorderAlertCount} Items", "Purchase Order Recommended", Color.FromArgb(192, 57, 43), () => DrillDown("SmartReorder")),
-                
-                // 23. Customer Bad Debts
-                CreateKpiCard("23. Customer Bad Debts", "Uncollectible customer credit balances written off", FormatCurr(_model.CustomerBadDebts), "Credit Loss Write-Offs", Color.FromArgb(149, 165, 166), () => DrillDown("CustomerOutstanding")),
-                
-                // 24. Supplier Write-Offs
-                CreateKpiCard("24. Supplier Write-Offs", "Vendor invoice write-offs and negotiated settlement discounts", FormatCurr(_model.SupplierWriteOffs), "Discounts / Write-Off Settled", Color.FromArgb(127, 140, 141), () => DrillDown("VendorOutstanding")),
-                
-                // 26. Deletion & Cancellation Logs
-                CreateKpiCard("26. Deletion & Cancellation Logs", "Track of deleted sales bills, purchase bills, and account vouchers", $"{_model.DeletionCount} Events", "Cancelled / Deleted Documents", Color.FromArgb(192, 57, 43), () => DrillDown("AuditDeletions")),
-                
-                // 27. Price Change Modifications
-                CreateKpiCard("27. Price Change Modifications", "Track of item selling and cost price edits in Item Master", $"{_model.PriceChangeCount} Events", "Item Master Price Modifications", Color.FromArgb(41, 128, 185), () => DrillDown("AuditPriceChanges")),
-                
-                // 28. Physical Stock Discrepancy Logs
-                CreateKpiCard("28. Physical Stock Discrepancy Logs", "Track of physical stock count reconciliations and adjustments", $"{_model.StockAdjustmentCount} Adjustments", "Stock Adjustment Entries", Color.FromArgb(142, 68, 173), () => DrillDown("StockAdjustment")),
-                
-                // 29. Supplier Advance / Overpayment
-                CreateKpiCard("29. Supplier Advance / Overpayment", "Advance payments and debit balances with vendors", FormatCurr(_model.SupplierAdvanceBalance), "Advance Payments / Debit", Color.FromArgb(52, 73, 94), () => DrillDown("VendorPaymentReport")),
-                
-                // 30. Customer Advance / Deposits
-                CreateKpiCard("30. Customer Advance / Deposits", "Customer advance payments and credit deposits received", FormatCurr(_model.CustomerAdvanceBalance), "Customer Deposits / Credit", Color.FromArgb(127, 140, 141), () => DrillDown("CustomerReceiptReport"))
+                // 36. Physical Stock Discrepancy Logs
+                CreateKpiCard("36. Stock Discrepancies", "Track of physical stock count reconciliations and adjustments", $"{_model.StockAdjustmentCount} Adjustments", "Stock Reconciliations", Color.FromArgb(142, 68, 173), () => DrillDown("StockAdjustment"))
             };
 
             // Display in clean full-width responsive grid:
-            // Rows 1-4: 6 cards per row, Row 5: 5 cards evenly stretched
-            int clientH = pnlScrollableContent.ClientSize.Height;
-            int gap = 5;
-            int overhead = 36;
-            int usableH = Math.Max(380, clientH - overhead);
-            int targetCardH = (int)Math.Floor(((usableH * 0.58) - (4 * gap)) / 5);
-            int cardHeight = Math.Max(50, Math.Min(74, targetCardH));
+            // 9 columns (4 rows of 9 = 36 cards) on standard screens, 6 columns on smaller screens
+            int columns = containerWidth >= 1050 ? 9 : (containerWidth >= 750 ? 6 : 4);
+            int totalRows = (int)Math.Ceiling(allCards.Count / (double)columns);
 
-            var cardsGrid = CreateCardGridPanel(allCards, containerWidth, cardHeight, gap);
+            int clientH = pnlScrollableContent.ClientSize.Height;
+            int gap = 6;
+
+            // Compute compact height for Growth Performance Matrix based on number of rows
+            int matrixRows = (_model.MonthlyGrowthMatrix != null && _model.MonthlyGrowthMatrix.Count > 0) ? _model.MonthlyGrowthMatrix.Count : 1;
+            int tableHeight = 24 + (matrixRows * 22) + 2; // header (24) + each row (22) + border
+            int matrixTotalBlockHeight = 18 + 3 + tableHeight + 8; // header + spacing + table + bottom margin
+
+            // Calculate card height to fill the screen down to the bottom matrix
+            int availableForCards = clientH - currentY - matrixTotalBlockHeight - 8;
+            int targetCardH = (int)Math.Floor((availableForCards - ((totalRows - 1) * gap)) / (double)totalRows);
+            int cardHeight = Math.Max(56, Math.Min(125, targetCardH));
+
+            var cardsGrid = CreateCardGridPanel(allCards, containerWidth, cardHeight, gap, columns);
             cardsGrid.Location = new Point(leftMargin, currentY);
             pnlScrollableContent.Controls.Add(cardsGrid);
-            currentY += cardsGrid.Height + 6;
+            currentY += cardsGrid.Height + 8;
 
             // ═══════════════════════════════════════════════════════════════════
-            // 25. MONTHLY GROWTH & PERFORMANCE MATRIX (MoM %)
+            // 37. GROWTH PERFORMANCE MATRIX
             // ═══════════════════════════════════════════════════════════════════
-            var headerGrowth = CreateSectionHeader("25. Monthly Growth & Performance Matrix (MoM %)", 0, containerWidth);
+            var headerGrowth = CreateSectionHeader("37. Growth Performance Matrix", 0, containerWidth);
             headerGrowth.Location = new Point(leftMargin, currentY);
             pnlScrollableContent.Controls.Add(headerGrowth);
             currentY += headerGrowth.Height + 3;
 
-            int tableHeight = Math.Max(80, clientH - currentY - 6);
             var dgvGrowth = CreateGrowthMatrixGrid(containerWidth, tableHeight);
             dgvGrowth.Location = new Point(leftMargin, currentY);
             pnlScrollableContent.Controls.Add(dgvGrowth);
-            currentY += dgvGrowth.Height + 6;
+            currentY += dgvGrowth.Height + 8;
 
             pnlScrollableContent.ResumeLayout(true);
         }
@@ -384,9 +413,9 @@ namespace PosBranch_Win.Dashboard
             return pnl;
         }
 
-        private Panel CreateCardGridPanel(List<Control> cards, int containerWidth, int cardHeight, int gap = 5)
+        private Panel CreateCardGridPanel(List<Control> cards, int containerWidth, int cardHeight, int gap = 6, int columns = 9)
         {
-            int totalRows = 5;
+            int totalRows = (int)Math.Ceiling(cards.Count / (double)columns);
             int totalHeight = totalRows * cardHeight + (totalRows - 1) * gap;
 
             var pnl = new Panel
@@ -396,34 +425,17 @@ namespace PosBranch_Win.Dashboard
                 Margin = new Padding(0)
             };
 
-            // First 24 cards: 4 rows of 6 cards each
-            int cardWidth6 = (containerWidth - (5 * gap)) / 6;
-            for (int i = 0; i < Math.Min(24, cards.Count); i++)
+            int cardWidth = (containerWidth - ((columns - 1) * gap)) / columns;
+            for (int i = 0; i < cards.Count; i++)
             {
-                int row = i / 6;
-                int col = i % 6;
-                int x = col * (cardWidth6 + gap);
+                int row = i / columns;
+                int col = i % columns;
+                int x = col * (cardWidth + gap);
                 int y = row * (cardHeight + gap);
 
                 cards[i].Location = new Point(x, y);
-                cards[i].Size = new Size(cardWidth6, cardHeight);
+                cards[i].Size = new Size(cardWidth, cardHeight);
                 pnl.Controls.Add(cards[i]);
-            }
-
-            // Last 5 cards (cards 24 to 28): 1 row of 5 cards stretched across 100% width
-            if (cards.Count > 24)
-            {
-                int cardWidth5 = (containerWidth - (4 * gap)) / 5;
-                for (int i = 24; i < cards.Count; i++)
-                {
-                    int col = i - 24;
-                    int x = col * (cardWidth5 + gap);
-                    int y = 4 * (cardHeight + gap);
-
-                    cards[i].Location = new Point(x, y);
-                    cards[i].Size = new Size(cardWidth5, cardHeight);
-                    pnl.Controls.Add(cards[i]);
-                }
             }
 
             return pnl;
@@ -433,7 +445,7 @@ namespace PosBranch_Win.Dashboard
         {
             var card = new Panel
             {
-                Size = new Size(200, 60),
+                Size = new Size(160, 60),
                 BackColor = CardBgColor,
                 Cursor = Cursors.Hand,
                 Margin = new Padding(0)
@@ -450,54 +462,88 @@ namespace PosBranch_Win.Dashboard
             var lblTitle = new Label
             {
                 Text = title,
-                Font = new Font("Segoe UI Semibold", 8F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(30, 48, 80),
-                Location = new Point(6, 4),
-                Size = new Size(185, 14),
+                Font = new Font("Segoe UI Semibold", 7.5F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(60, 75, 95),
+                Location = new Point(5, 4),
+                Size = new Size(150, 15),
                 AutoEllipsis = true,
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+                BackColor = Color.Transparent
             };
             card.Controls.Add(lblTitle);
 
             var lblValue = new Label
             {
                 Text = mainValue,
-                Font = new Font("Segoe UI", 11F, FontStyle.Bold),
-                ForeColor = accentColor,
-                Location = new Point(5, 19),
-                Size = new Size(185, 18),
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(12, 30, 58),
+                Location = new Point(4, 20),
+                Size = new Size(152, 22),
                 AutoEllipsis = true,
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+                BackColor = Color.Transparent
             };
             card.Controls.Add(lblValue);
 
             var lblFooter = new Label
             {
                 Text = footerInfo,
-                Font = new Font("Segoe UI", 7F),
-                ForeColor = Color.FromArgb(100, 120, 145),
-                Location = new Point(6, 38),
-                Size = new Size(185, 13),
+                Font = new Font("Segoe UI", 6.8F, FontStyle.Regular),
+                ForeColor = Color.FromArgb(110, 125, 145),
+                Location = new Point(5, 42),
+                Size = new Size(150, 14),
                 AutoEllipsis = true,
-                Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right
+                BackColor = Color.Transparent
             };
             card.Controls.Add(lblFooter);
 
             card.Resize += (s, e) =>
             {
-                int w = card.Width;
-                int h = card.Height;
-                lblTitle.Size = new Size(Math.Max(10, w - 12), 14);
+                int w = card.ClientSize.Width;
+                int h = card.ClientSize.Height;
 
-                int vTop = h >= 64 ? 21 : (h >= 56 ? 19 : 17);
-                int vH = h >= 64 ? 22 : 18;
-                lblValue.Location = new Point(5, vTop);
-                lblValue.Size = new Size(Math.Max(10, w - 10), vH);
-                lblValue.Font = new Font("Segoe UI", h >= 64 ? 12F : (h >= 56 ? 11F : 10F), FontStyle.Bold);
+                lblTitle.Location = new Point(5, 4);
+                lblTitle.Font = new Font("Segoe UI Semibold", h >= 75 ? 8.2F : 7.5F, FontStyle.Bold);
+                lblTitle.Size = new Size(Math.Max(10, w - 10), h >= 75 ? 17 : 15);
 
-                int fTop = Math.Max(vTop + vH, h - 16);
-                lblFooter.Location = new Point(6, fTop);
-                lblFooter.Size = new Size(Math.Max(10, w - 12), 13);
+                if (h >= 85)
+                {
+                    lblValue.Font = new Font("Segoe UI", 12.5F, FontStyle.Bold);
+                    lblValue.Location = new Point(4, 24);
+                    lblValue.Size = new Size(Math.Max(10, w - 8), 26);
+
+                    lblFooter.Font = new Font("Segoe UI", 7.5F, FontStyle.Regular);
+                    lblFooter.Location = new Point(5, h - 20);
+                    lblFooter.Size = new Size(Math.Max(10, w - 10), 16);
+                }
+                else if (h >= 70)
+                {
+                    lblValue.Font = new Font("Segoe UI", 11.2F, FontStyle.Bold);
+                    lblValue.Location = new Point(4, 22);
+                    lblValue.Size = new Size(Math.Max(10, w - 8), 23);
+
+                    lblFooter.Font = new Font("Segoe UI", 7.0F, FontStyle.Regular);
+                    lblFooter.Location = new Point(5, h - 18);
+                    lblFooter.Size = new Size(Math.Max(10, w - 10), 15);
+                }
+                else if (h >= 58)
+                {
+                    lblValue.Font = new Font("Segoe UI", 10.2F, FontStyle.Bold);
+                    lblValue.Location = new Point(4, 19);
+                    lblValue.Size = new Size(Math.Max(10, w - 8), 21);
+
+                    lblFooter.Font = new Font("Segoe UI", 6.8F, FontStyle.Regular);
+                    lblFooter.Location = new Point(5, h - 16);
+                    lblFooter.Size = new Size(Math.Max(10, w - 10), 14);
+                }
+                else
+                {
+                    lblValue.Font = new Font("Segoe UI", 9.0F, FontStyle.Bold);
+                    lblValue.Location = new Point(4, 17);
+                    lblValue.Size = new Size(Math.Max(10, w - 8), 18);
+
+                    lblFooter.Font = new Font("Segoe UI", 6.4F, FontStyle.Regular);
+                    lblFooter.Location = new Point(5, 34);
+                    lblFooter.Size = new Size(Math.Max(10, w - 10), 13);
+                }
             };
 
             card.Paint += (s, e) =>
@@ -571,13 +617,13 @@ namespace PosBranch_Win.Dashboard
             grid.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(248, 251, 255);
             grid.RowTemplate.Height = height >= 160 ? 24 : 20;
 
-            grid.Columns.Add("Month", "Month Period");
+            grid.Columns.Add("Month", "Period");
             grid.Columns.Add("Sales", "Sales Turnover");
-            grid.Columns.Add("SalesGrowth", "Sales MoM %");
+            grid.Columns.Add("SalesGrowth", "Sales Growth %");
             grid.Columns.Add("Purchases", "Total Purchases");
             grid.Columns.Add("Expenses", "Total Expenses");
             grid.Columns.Add("NetProfit", "Actual Net Profit");
-            grid.Columns.Add("ProfitGrowth", "Profit MoM %");
+            grid.Columns.Add("ProfitGrowth", "Profit Growth %");
             grid.Columns.Add("Status", "Performance");
 
             grid.Columns["Month"].FillWeight = 110;
@@ -691,6 +737,14 @@ namespace PosBranch_Win.Dashboard
                         formToOpen = new FrmSalesAnalytics();
                         title = "Sales Analytics";
                         break;
+                    case "SalesReturnReport":
+                        formToOpen = new Reports.SalesReports.SalesReturnReport();
+                        title = "Sales Return Report";
+                        break;
+                    case "HoldBills":
+                        formToOpen = new DialogBox.FrmDialogSHold();
+                        title = "Hold Bills & Items";
+                        break;
                     case "ProfitLoss":
                         formToOpen = new Reports.FinancialReports.FrmProfitLossAccount();
                         title = "Profit & Loss Account";
@@ -698,6 +752,10 @@ namespace PosBranch_Win.Dashboard
                     case "TradingPL":
                         formToOpen = new Reports.FinancialReports.FrmTradingPLAccount();
                         title = "Trading & P/L Account";
+                        break;
+                    case "GovtGSTReturnReport":
+                        formToOpen = new Reports.FinancialReports.frmGovtGSTReturnReport();
+                        title = "Govt GST Return Report";
                         break;
                     case "DayBook":
                         formToOpen = new Reports.FinancialReports.FrmDayBook();
@@ -759,18 +817,14 @@ namespace PosBranch_Win.Dashboard
                         var res = MessageBox.Show("Executive Summary Report exported successfully!\n\nDo you want to open the exported file now?", "Export Success", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
                         if (res == DialogResult.Yes)
                         {
-                            try
-                            {
-                                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(sfd.FileName) { UseShellExecute = true });
-                            }
-                            catch { }
+                            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(sfd.FileName) { UseShellExecute = true });
                         }
                     }
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Export error: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Export failed: {ex.Message}", "Export Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
@@ -812,21 +866,21 @@ namespace PosBranch_Win.Dashboard
             string periodLabel = _model.FromDate <= new DateTime(1990, 1, 1) ? $"All Time (Up to {_model.ToDate:dd-MMM-yyyy})" : $"{_model.FromDate:dd-MMM-yyyy} to {_model.ToDate:dd-MMM-yyyy}";
 
             // ═══════════════════════════════════════════════════════════════════
-            // WORKSHEET 1: MONTHLY MATRIX
+            // WORKSHEET 1: GROWTH PERFORMANCE MATRIX
             // ═══════════════════════════════════════════════════════════════════
-            sb.AppendLine(" <Worksheet ss:Name=\"Monthly Matrix\">");
+            sb.AppendLine(" <Worksheet ss:Name=\"Growth Performance\">");
             sb.AppendLine("  <Table>");
-            sb.AppendLine("   <Column ss:Width=\"90\"/>"); // Month
-            for (int i = 0; i < 29; i++)
+            sb.AppendLine("   <Column ss:Width=\"90\"/>"); // Period
+            for (int i = 0; i < 36; i++)
             {
                 sb.AppendLine("   <Column ss:Width=\"80\"/>");
             }
-            sb.AppendLine("   <Column ss:Width=\"85\"/>"); // Sales MoM%
-            sb.AppendLine("   <Column ss:Width=\"85\"/>"); // Profit MoM%
+            sb.AppendLine("   <Column ss:Width=\"85\"/>"); // Sales Growth %
+            sb.AppendLine("   <Column ss:Width=\"85\"/>"); // Profit Growth %
 
             // Title Rows
             sb.AppendLine("   <Row ss:Height=\"24\">");
-            sb.AppendLine("    <Cell ss:StyleID=\"Title\"><Data ss:Type=\"String\">Executive Business KPI Dashboard — Monthly Performance &amp; Growth Matrix</Data></Cell>");
+            sb.AppendLine("    <Cell ss:StyleID=\"Title\"><Data ss:Type=\"String\">Executive Business KPI Dashboard — Growth Performance Matrix</Data></Cell>");
             sb.AppendLine("   </Row>");
             sb.AppendLine("   <Row ss:Height=\"18\">");
             sb.AppendLine($"    <Cell ss:StyleID=\"Meta\"><Data ss:Type=\"String\">Selected Period: {EscapeXml(periodLabel)} | Generated: {_model.GeneratedAt:dd-MMM-yyyy hh:mm tt}</Data></Cell>");
@@ -836,13 +890,14 @@ namespace PosBranch_Win.Dashboard
             // Header Row
             sb.AppendLine("   <Row ss:Height=\"26\">");
             string[] headers = new string[] {
-                "Month", "1.Stock", "2.StkProfit", "3.Sales", "4.Expenses", "5.NegStk",
-                "6.NegItems", "7.Cash", "8.Bank", "9.SupPay", "10.CustRec",
-                "11.NetProfit", "12.Drawings", "13.NBA", "14.Loss", "15.Extra",
-                "16.AdjBal", "17.DelayCust", "18.DelaySupp", "19.Profit%", "20.ExcAlert",
-                "21.LowAlert", "22.Reorder", "23.BadDebt", "24.WriteOff", "26.Deletions",
-                "27.PriceChange", "28.StockAdj", "29.SupAdvance", "30.CustAdvance",
-                "Sales MoM%", "Profit MoM%"
+                "Period", "1.Stock", "2.StkProfit", "3.DeadStock", "4.NegStk", "5.NegItems",
+                "6.Loss", "7.Extra", "8.AdjBal", "9.ExcAlert", "10.LowAlert",
+                "11.Reorder", "12.Sales", "13.SalesRet", "14.Purchases", "15.PurchRet",
+                "16.HoldBills", "17.GrossProfit", "18.Expenses", "19.NetProfit", "20.OpMargin%",
+                "21.NetGST", "22.Cash", "23.Bank", "24.VenOut", "25.CustOut",
+                "26.DelayCust", "27.DelaySupp", "28.NBA", "29.Drawings", "30.BadDebt",
+                "31.WriteOff", "32.SupAdvance", "33.CustAdvance", "34.Deletions", "35.PriceChange", "36.StockAdj",
+                "Sales Growth %", "Profit Growth %"
             };
             foreach (var h in headers)
             {
@@ -862,33 +917,40 @@ namespace PosBranch_Win.Dashboard
                     sb.AppendLine($"    <Cell ss:StyleID=\"CellTextBold\"><Data ss:Type=\"String\">{EscapeXml(m.MonthName)}</Data></Cell>");
                     sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrency\"><Data ss:Type=\"Number\">{_model.TotalStockCostValue}</Data></Cell>");
                     sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrency\"><Data ss:Type=\"Number\">{_model.StockProfitPotential}</Data></Cell>");
-                    sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrency\"><Data ss:Type=\"Number\">{m.SalesAmount}</Data></Cell>");
-                    sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrency\"><Data ss:Type=\"Number\">{m.ExpenseAmount}</Data></Cell>");
+                    sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrency\"><Data ss:Type=\"Number\">{_model.DeadStockValue}</Data></Cell>");
                     sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrency\"><Data ss:Type=\"Number\">{_model.NegativeStockImpactValue}</Data></Cell>");
                     sb.AppendLine($"    <Cell ss:StyleID=\"CellInteger\"><Data ss:Type=\"Number\">{_model.NegativeStockItemCount}</Data></Cell>");
+                    sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrency\"><Data ss:Type=\"Number\">{_model.LossStockValue}</Data></Cell>");
+                    sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrency\"><Data ss:Type=\"Number\">{_model.ExtraStockValue}</Data></Cell>");
+                    sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrency\"><Data ss:Type=\"Number\">{_model.NetStockAdjustmentValue}</Data></Cell>");
+                    sb.AppendLine($"    <Cell ss:StyleID=\"CellInteger\"><Data ss:Type=\"Number\">{_model.ExcessStockAlertCount}</Data></Cell>");
+                    sb.AppendLine($"    <Cell ss:StyleID=\"CellInteger\"><Data ss:Type=\"Number\">{_model.LowStockAlertCount}</Data></Cell>");
+                    sb.AppendLine($"    <Cell ss:StyleID=\"CellInteger\"><Data ss:Type=\"Number\">{_model.ReorderAlertCount}</Data></Cell>");
+                    sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrency\"><Data ss:Type=\"Number\">{m.SalesAmount}</Data></Cell>");
+                    sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrency\"><Data ss:Type=\"Number\">{_model.TotalSalesReturn}</Data></Cell>");
+                    sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrency\"><Data ss:Type=\"Number\">{m.PurchaseAmount}</Data></Cell>");
+                    sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrency\"><Data ss:Type=\"Number\">{_model.TotalPurchaseReturn}</Data></Cell>");
+                    sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrency\"><Data ss:Type=\"Number\">{_model.HoldBillsValue}</Data></Cell>");
+                    sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrency\"><Data ss:Type=\"Number\">{_model.GrossProfit}</Data></Cell>");
+                    sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrency\"><Data ss:Type=\"Number\">{m.ExpenseAmount}</Data></Cell>");
+                    sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrencyBold\"><Data ss:Type=\"Number\">{m.NetProfitAmount}</Data></Cell>");
+                    sb.AppendLine($"    <Cell ss:StyleID=\"CellPercent\"><Data ss:Type=\"String\">{profitMargin:N1}%</Data></Cell>");
+                    sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrency\"><Data ss:Type=\"Number\">{_model.NetTaxLiability}</Data></Cell>");
                     sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrency\"><Data ss:Type=\"Number\">{_model.CashInHand}</Data></Cell>");
                     sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrency\"><Data ss:Type=\"Number\">{_model.BankBalance}</Data></Cell>");
                     sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrency\"><Data ss:Type=\"Number\">{_model.SupplierPayables}</Data></Cell>");
                     sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrency\"><Data ss:Type=\"Number\">{_model.CustomerReceivables}</Data></Cell>");
-                    sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrencyBold\"><Data ss:Type=\"Number\">{m.NetProfitAmount}</Data></Cell>");
-                    sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrency\"><Data ss:Type=\"Number\">{_model.OwnerDrawings}</Data></Cell>");
-                    sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrency\"><Data ss:Type=\"Number\">{_model.NetBusinessAsset}</Data></Cell>");
-                    sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrency\"><Data ss:Type=\"Number\">{_model.LossStockValue}</Data></Cell>");
-                    sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrency\"><Data ss:Type=\"Number\">{_model.ExtraStockValue}</Data></Cell>");
-                    sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrency\"><Data ss:Type=\"Number\">{_model.NetStockAdjustmentValue}</Data></Cell>");
                     sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrency\"><Data ss:Type=\"Number\">{_model.DelayedCustomerReceivables30Days}</Data></Cell>");
                     sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrency\"><Data ss:Type=\"Number\">{_model.DelayedSupplierPayables30Days}</Data></Cell>");
-                    sb.AppendLine($"    <Cell ss:StyleID=\"CellPercent\"><Data ss:Type=\"String\">{profitMargin:N1}%</Data></Cell>");
-                    sb.AppendLine($"    <Cell ss:StyleID=\"CellInteger\"><Data ss:Type=\"Number\">{_model.ExcessStockAlertCount}</Data></Cell>");
-                    sb.AppendLine($"    <Cell ss:StyleID=\"CellInteger\"><Data ss:Type=\"Number\">{_model.LowStockAlertCount}</Data></Cell>");
-                    sb.AppendLine($"    <Cell ss:StyleID=\"CellInteger\"><Data ss:Type=\"Number\">{_model.ReorderAlertCount}</Data></Cell>");
+                    sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrency\"><Data ss:Type=\"Number\">{_model.NetBusinessAsset}</Data></Cell>");
+                    sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrency\"><Data ss:Type=\"Number\">{_model.OwnerDrawings}</Data></Cell>");
                     sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrency\"><Data ss:Type=\"Number\">{_model.CustomerBadDebts}</Data></Cell>");
                     sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrency\"><Data ss:Type=\"Number\">{_model.SupplierWriteOffs}</Data></Cell>");
+                    sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrency\"><Data ss:Type=\"Number\">{_model.SupplierAdvanceBalance}</Data></Cell>");
+                    sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrency\"><Data ss:Type=\"Number\">{_model.CustomerAdvanceBalance}</Data></Cell>");
                     sb.AppendLine($"    <Cell ss:StyleID=\"CellInteger\"><Data ss:Type=\"Number\">{_model.DeletionCount}</Data></Cell>");
                     sb.AppendLine($"    <Cell ss:StyleID=\"CellInteger\"><Data ss:Type=\"Number\">{_model.PriceChangeCount}</Data></Cell>");
                     sb.AppendLine($"    <Cell ss:StyleID=\"CellInteger\"><Data ss:Type=\"Number\">{_model.StockAdjustmentCount}</Data></Cell>");
-                    sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrency\"><Data ss:Type=\"Number\">{_model.SupplierAdvanceBalance}</Data></Cell>");
-                    sb.AppendLine($"    <Cell ss:StyleID=\"CellCurrency\"><Data ss:Type=\"Number\">{_model.CustomerAdvanceBalance}</Data></Cell>");
                     sb.AppendLine($"    <Cell ss:StyleID=\"{sStyle}\"><Data ss:Type=\"String\">{(m.SalesGrowthPercent >= 0 ? "+" : "")}{m.SalesGrowthPercent:N1}%</Data></Cell>");
                     sb.AppendLine($"    <Cell ss:StyleID=\"{pStyle}\"><Data ss:Type=\"String\">{(m.NetProfitGrowthPercent >= 0 ? "+" : "")}{m.NetProfitGrowthPercent:N1}%</Data></Cell>");
                     sb.AppendLine("   </Row>");
@@ -900,33 +962,40 @@ namespace PosBranch_Win.Dashboard
             sb.AppendLine("    <Cell ss:StyleID=\"CellTotalLabel\"><Data ss:Type=\"String\">Selected Period Total</Data></Cell>");
             sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.TotalStockCostValue}</Data></Cell>");
             sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.StockProfitPotential}</Data></Cell>");
-            sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.TotalSalesRevenue}</Data></Cell>");
-            sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.TotalBusinessExpenses}</Data></Cell>");
+            sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.DeadStockValue}</Data></Cell>");
             sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.NegativeStockImpactValue}</Data></Cell>");
             sb.AppendLine($"    <Cell ss:StyleID=\"CellTotalCenter\"><Data ss:Type=\"Number\">{_model.NegativeStockItemCount}</Data></Cell>");
+            sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.LossStockValue}</Data></Cell>");
+            sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.ExtraStockValue}</Data></Cell>");
+            sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.NetStockAdjustmentValue}</Data></Cell>");
+            sb.AppendLine($"    <Cell ss:StyleID=\"CellTotalCenter\"><Data ss:Type=\"Number\">{_model.ExcessStockAlertCount}</Data></Cell>");
+            sb.AppendLine($"    <Cell ss:StyleID=\"CellTotalCenter\"><Data ss:Type=\"Number\">{_model.LowStockAlertCount}</Data></Cell>");
+            sb.AppendLine($"    <Cell ss:StyleID=\"CellTotalCenter\"><Data ss:Type=\"Number\">{_model.ReorderAlertCount}</Data></Cell>");
+            sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.TotalSalesRevenue}</Data></Cell>");
+            sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.TotalSalesReturn}</Data></Cell>");
+            sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.TotalPurchases}</Data></Cell>");
+            sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.TotalPurchaseReturn}</Data></Cell>");
+            sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.HoldBillsValue}</Data></Cell>");
+            sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.GrossProfit}</Data></Cell>");
+            sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.TotalBusinessExpenses}</Data></Cell>");
+            sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.ActualNetProfit}</Data></Cell>");
+            sb.AppendLine($"    <Cell ss:StyleID=\"CellTotalCenter\"><Data ss:Type=\"String\">{_model.OperatingProfitMarginPercent:N1}%</Data></Cell>");
+            sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.NetTaxLiability}</Data></Cell>");
             sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.CashInHand}</Data></Cell>");
             sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.BankBalance}</Data></Cell>");
             sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.SupplierPayables}</Data></Cell>");
             sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.CustomerReceivables}</Data></Cell>");
-            sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.ActualNetProfit}</Data></Cell>");
-            sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.OwnerDrawings}</Data></Cell>");
-            sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.NetBusinessAsset}</Data></Cell>");
-            sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.LossStockValue}</Data></Cell>");
-            sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.ExtraStockValue}</Data></Cell>");
-            sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.NetStockAdjustmentValue}</Data></Cell>");
             sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.DelayedCustomerReceivables30Days}</Data></Cell>");
             sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.DelayedSupplierPayables30Days}</Data></Cell>");
-            sb.AppendLine($"    <Cell ss:StyleID=\"CellTotalCenter\"><Data ss:Type=\"String\">{_model.OperatingProfitMarginPercent:N1}%</Data></Cell>");
-            sb.AppendLine($"    <Cell ss:StyleID=\"CellTotalCenter\"><Data ss:Type=\"Number\">{_model.ExcessStockAlertCount}</Data></Cell>");
-            sb.AppendLine($"    <Cell ss:StyleID=\"CellTotalCenter\"><Data ss:Type=\"Number\">{_model.LowStockAlertCount}</Data></Cell>");
-            sb.AppendLine($"    <Cell ss:StyleID=\"CellTotalCenter\"><Data ss:Type=\"Number\">{_model.ReorderAlertCount}</Data></Cell>");
+            sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.NetBusinessAsset}</Data></Cell>");
+            sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.OwnerDrawings}</Data></Cell>");
             sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.CustomerBadDebts}</Data></Cell>");
             sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.SupplierWriteOffs}</Data></Cell>");
+            sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.SupplierAdvanceBalance}</Data></Cell>");
+            sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.CustomerAdvanceBalance}</Data></Cell>");
             sb.AppendLine($"    <Cell ss:StyleID=\"CellTotalCenter\"><Data ss:Type=\"Number\">{_model.DeletionCount}</Data></Cell>");
             sb.AppendLine($"    <Cell ss:StyleID=\"CellTotalCenter\"><Data ss:Type=\"Number\">{_model.PriceChangeCount}</Data></Cell>");
             sb.AppendLine($"    <Cell ss:StyleID=\"CellTotalCenter\"><Data ss:Type=\"Number\">{_model.StockAdjustmentCount}</Data></Cell>");
-            sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.SupplierAdvanceBalance}</Data></Cell>");
-            sb.AppendLine($"    <Cell ss:StyleID=\"CellTotal\"><Data ss:Type=\"Number\">{_model.CustomerAdvanceBalance}</Data></Cell>");
             sb.AppendLine("    <Cell ss:StyleID=\"CellTotalCenter\"><Data ss:Type=\"String\">-</Data></Cell>");
             sb.AppendLine("    <Cell ss:StyleID=\"CellTotalCenter\"><Data ss:Type=\"String\">-</Data></Cell>");
             sb.AppendLine("   </Row>");
@@ -934,9 +1003,9 @@ namespace PosBranch_Win.Dashboard
             sb.AppendLine(" </Worksheet>");
 
             // ═══════════════════════════════════════════════════════════════════
-            // WORKSHEET 2: COMPLETE 30 KPI SUMMARY
+            // WORKSHEET 2: COMPLETE 36 KPI SUMMARY
             // ═══════════════════════════════════════════════════════════════════
-            sb.AppendLine(" <Worksheet ss:Name=\"30 KPI Summary\">");
+            sb.AppendLine(" <Worksheet ss:Name=\"Executive Summary\">");
             sb.AppendLine("  <Table>");
             sb.AppendLine("   <Column ss:Width=\"55\"/>");  // SI No
             sb.AppendLine("   <Column ss:Width=\"240\"/>"); // Metric Name
@@ -944,7 +1013,7 @@ namespace PosBranch_Win.Dashboard
             sb.AppendLine("   <Column ss:Width=\"380\"/>"); // Business Notes
 
             sb.AppendLine("   <Row ss:Height=\"24\">");
-            sb.AppendLine("    <Cell ss:StyleID=\"Title\"><Data ss:Type=\"String\">Executive Business KPI Dashboard — Complete 30 Metrics Summary</Data></Cell>");
+            sb.AppendLine("    <Cell ss:StyleID=\"Title\"><Data ss:Type=\"String\">Executive Business KPI Dashboard — Complete 36 Metrics Summary</Data></Cell>");
             sb.AppendLine("   </Row>");
             sb.AppendLine("   <Row ss:Height=\"18\">");
             sb.AppendLine($"    <Cell ss:StyleID=\"Meta\"><Data ss:Type=\"String\">Period: {EscapeXml(periodLabel)} | Generated: {_model.GeneratedAt:dd-MMM-yyyy hh:mm tt}</Data></Cell>");
@@ -962,33 +1031,40 @@ namespace PosBranch_Win.Dashboard
             {
                 Tuple.Create(1, "Total Stock Value", FormatCurr(_model.TotalStockCostValue), $"Valued at Cost Price ({_model.TotalStockItemCount:N0} Items, {_model.TotalStockQuantity:N0} Units)"),
                 Tuple.Create(2, "Stock Profit Potential", FormatCurr(_model.StockProfitPotential), $"Retail Value: {FormatCurr(_model.TotalStockRetailValue)}"),
-                Tuple.Create(3, "Total Sales Revenue", FormatCurr(_model.TotalSalesRevenue), $"{_model.TotalSalesBillCount:N0} Bills | Purchases: {FormatCurr(_model.TotalPurchases)}"),
-                Tuple.Create(4, "Total Business Expenses", FormatCurr(_model.TotalBusinessExpenses), $"Direct: {FormatCurr(_model.DirectExpenses)} | Indirect: {FormatCurr(_model.IndirectExpenses)}"),
-                Tuple.Create(5, "Negative Stock Impact", FormatCurr(_model.NegativeStockImpactValue), "Cost value distortion from negative stock"),
-                Tuple.Create(6, "Negative Stock Items", $"{_model.NegativeStockItemCount} Items", $"Total Negative Quantity: {_model.NegativeStockTotalQty:N0}"),
-                Tuple.Create(7, "Cash in Hand", FormatCurr(_model.CashInHand), "Liquid cash available in tills and safe"),
-                Tuple.Create(8, "Bank Balance", FormatCurr(_model.BankBalance), "Active commercial bank accounts balance"),
-                Tuple.Create(9, "Supplier Payables", FormatCurr(_model.SupplierPayables), $"Owed to vendors across {_model.SupplierPayablesCount} bills"),
-                Tuple.Create(10, "Customer Receivables", FormatCurr(_model.CustomerReceivables), $"Outstanding dues from {_model.CustomerReceivablesCount} customer invoices"),
-                Tuple.Create(11, "Actual Net Profit", FormatCurr(_model.ActualNetProfit), $"Operating Margin: {_model.OperatingProfitMarginPercent:N2}%"),
-                Tuple.Create(12, "Owner Drawings", FormatCurr(_model.OwnerDrawings), "Proprietor capital withdrawals"),
-                Tuple.Create(13, "Net Business Asset (NBA)", FormatCurr(_model.NetBusinessAsset), $"Total Assets: {FormatCurr(_model.TotalAssets)} | Liabilities: {FormatCurr(_model.TotalLiabilities)}"),
-                Tuple.Create(14, "Loss Stock (Damaged / Out)", FormatCurr(_model.LossStockValue), $"Damaged & Written Off ({_model.LossStockQty:N2} Qty)"),
-                Tuple.Create(15, "Extra Stock (Found / In)", FormatCurr(_model.ExtraStockValue), $"Surplus Stock Added ({_model.ExtraStockQty:N2} Qty)"),
-                Tuple.Create(16, "Net Stock Adjustment", FormatCurr(_model.NetStockAdjustmentValue), "Net Discrepancy Balance"),
-                Tuple.Create(17, "Delayed Customer Receivables (>30 Days)", FormatCurr(_model.DelayedCustomerReceivables30Days), $"{_model.DelayedCustomerCount30Days} High-Risk Invoices overdue"),
-                Tuple.Create(18, "Delayed Supplier Payables (>30 Days)", FormatCurr(_model.DelayedSupplierPayables30Days), $"{_model.DelayedSupplierCount30Days} Vendor Invoices overdue"),
-                Tuple.Create(19, "Operating Profit Margin %", $"{_model.OperatingProfitMarginPercent:N2}%", "Net Profit / Sales Turnover"),
-                Tuple.Create(20, "Excess Stock Alert", $"{_model.ExcessStockAlertCount} Items", "Items above maximum inventory limits"),
-                Tuple.Create(21, "Low Stock Alert", $"{_model.LowStockAlertCount} Items", "Items below minimum safety stock"),
-                Tuple.Create(22, "Reorder Alert", $"{_model.ReorderAlertCount} Items", "Items at or below reorder level"),
-                Tuple.Create(23, "Customer Bad Debts", FormatCurr(_model.CustomerBadDebts), "Uncollectible receivables written off"),
-                Tuple.Create(24, "Supplier Write-Offs", FormatCurr(_model.SupplierWriteOffs), "Vendor settlement discounts / write-offs"),
-                Tuple.Create(26, "Deletion & Cancellation Logs", $"{_model.DeletionCount} Events", "Cancelled bills, deleted receipts & vouchers"),
-                Tuple.Create(27, "Price Change Modifications", $"{_model.PriceChangeCount} Events", "Item Master price updates"),
-                Tuple.Create(28, "Physical Stock Discrepancy Logs", $"{_model.StockAdjustmentCount} Adjustments", "Stock reconciliation entries"),
-                Tuple.Create(29, "Supplier Advance / Overpayment", FormatCurr(_model.SupplierAdvanceBalance), "Advance payments & vendor debit balances"),
-                Tuple.Create(30, "Customer Advance / Deposits", FormatCurr(_model.CustomerAdvanceBalance), "Advance deposits & customer credit balances")
+                Tuple.Create(3, "Non-Moving / Dead Stock Value", FormatCurr(_model.DeadStockValue), $"{_model.DeadStockItemCount:N0} Inactive items with no sales in past 90 days"),
+                Tuple.Create(4, "Negative Stock Impact", FormatCurr(_model.NegativeStockImpactValue), "Cost value distortion from negative stock"),
+                Tuple.Create(5, "Negative Stock Items", $"{_model.NegativeStockItemCount} Items", $"Total Negative Quantity: {_model.NegativeStockTotalQty:N0}"),
+                Tuple.Create(6, "Loss Stock (Damaged / Out)", FormatCurr(_model.LossStockValue), $"Damaged & Written Off ({_model.LossStockQty:N2} Qty)"),
+                Tuple.Create(7, "Extra Stock (Found / In)", FormatCurr(_model.ExtraStockValue), $"Surplus Stock Added ({_model.ExtraStockQty:N2} Qty)"),
+                Tuple.Create(8, "Net Stock Adjustment", FormatCurr(_model.NetStockAdjustmentValue), "Net Discrepancy Balance"),
+                Tuple.Create(9, "Excess Stock Alert", $"{_model.ExcessStockAlertCount} Items", "Items above maximum inventory limits"),
+                Tuple.Create(10, "Low Stock Alert", $"{_model.LowStockAlertCount} Items", "Items below minimum safety stock"),
+                Tuple.Create(11, "Reorder Alert", $"{_model.ReorderAlertCount} Items", "Items at or below reorder level"),
+                Tuple.Create(12, "Total Sales Revenue", FormatCurr(_model.TotalSalesRevenue), $"{_model.TotalSalesBillCount:N0} Bills Billed"),
+                Tuple.Create(13, "Sales Return (Customer Returns)", FormatCurr(_model.TotalSalesReturn), $"{_model.TotalSalesReturnCount} Customer Return / Credit Vouchers"),
+                Tuple.Create(14, "Total Purchases (Inward Stock)", FormatCurr(_model.TotalPurchases), $"{_model.TotalPurchasesBillCount:N0} Purchase Bills"),
+                Tuple.Create(15, "Purchase Return (Vendor Returns)", FormatCurr(_model.TotalPurchaseReturn), $"{_model.TotalPurchaseReturnCount} Vendor Return / Debit Vouchers"),
+                Tuple.Create(16, "Holded Items / Hold Bills", FormatCurr(_model.HoldBillsValue), $"{_model.HoldBillsCount} Suspended sales bills ({_model.HoldItemsCount:N0} items on hold)"),
+                Tuple.Create(17, "Gross Profit & Margin %", FormatCurr(_model.GrossProfit), $"Gross Profit Margin: {_model.GrossProfitMarginPercent:N1}%"),
+                Tuple.Create(18, "Total Business Expenses", FormatCurr(_model.TotalBusinessExpenses), $"Direct: {FormatCurr(_model.DirectExpenses)} | Indirect: {FormatCurr(_model.IndirectExpenses)}"),
+                Tuple.Create(19, "Actual Net Profit", FormatCurr(_model.ActualNetProfit), $"Operating Margin: {_model.OperatingProfitMarginPercent:N2}%"),
+                Tuple.Create(20, "Operating Profit Margin %", $"{_model.OperatingProfitMarginPercent:N2}%", "Net Profit / Sales Turnover"),
+                Tuple.Create(21, "GST / Net Tax Liability", FormatCurr(_model.NetTaxLiability), $"Output GST: {FormatCurr(_model.OutputGstAmount)} | Input GST: {FormatCurr(_model.InputGstAmount)}"),
+                Tuple.Create(22, "Cash in Hand", FormatCurr(_model.CashInHand), "Liquid cash available in tills and safe"),
+                Tuple.Create(23, "Bank Balance", FormatCurr(_model.BankBalance), "Active commercial bank accounts balance"),
+                Tuple.Create(24, "Vendor Outstanding", FormatCurr(_model.SupplierPayables), $"Owed to vendors across {_model.SupplierPayablesCount} bills"),
+                Tuple.Create(25, "Customer Outstanding", FormatCurr(_model.CustomerReceivables), $"Outstanding dues from {_model.CustomerReceivablesCount} customer invoices"),
+                Tuple.Create(26, "Delayed Customer Receivables (>30 Days)", FormatCurr(_model.DelayedCustomerReceivables30Days), $"{_model.DelayedCustomerCount30Days} High-Risk Invoices overdue"),
+                Tuple.Create(27, "Delayed Supplier Payables (>30 Days)", FormatCurr(_model.DelayedSupplierPayables30Days), $"{_model.DelayedSupplierCount30Days} Vendor Invoices overdue"),
+                Tuple.Create(28, "Net Business Asset (NBA)", FormatCurr(_model.NetBusinessAsset), $"Total Assets: {FormatCurr(_model.TotalAssets)} | Liabilities: {FormatCurr(_model.TotalLiabilities)}"),
+                Tuple.Create(29, "Owner Drawings", FormatCurr(_model.OwnerDrawings), "Proprietor capital withdrawals"),
+                Tuple.Create(30, "Customer Bad Debts", FormatCurr(_model.CustomerBadDebts), "Uncollectible receivables written off"),
+                Tuple.Create(31, "Supplier Write-Offs", FormatCurr(_model.SupplierWriteOffs), "Vendor settlement discounts / write-offs"),
+                Tuple.Create(32, "Supplier Advance / Overpayment", FormatCurr(_model.SupplierAdvanceBalance), "Advance payments & vendor debit balances"),
+                Tuple.Create(33, "Customer Advance / Deposits", FormatCurr(_model.CustomerAdvanceBalance), "Advance deposits & customer credit balances"),
+                Tuple.Create(34, "Deletion & Cancellation Logs", $"{_model.DeletionCount} Events", "Cancelled bills, deleted receipts & vouchers"),
+                Tuple.Create(35, "Price Change Modifications", $"{_model.PriceChangeCount} Events", "Item Master price updates"),
+                Tuple.Create(36, "Physical Stock Discrepancy Logs", $"{_model.StockAdjustmentCount} Adjustments", "Stock reconciliation entries")
             };
 
             foreach (var item in summaryList)
@@ -1042,13 +1118,13 @@ namespace PosBranch_Win.Dashboard
             sb.AppendLine("</style></head><body><div class='container'>");
 
             string periodLabel = _model.FromDate <= new DateTime(1990, 1, 1) ? $"All Time (Up to {_model.ToDate:dd-MMM-yyyy})" : $"{_model.FromDate:dd-MMM-yyyy} to {_model.ToDate:dd-MMM-yyyy}";
-            sb.AppendLine("<h1>Executive Business KPI Cockpit — 30 Key Metrics</h1>");
+            sb.AppendLine("<h1>Executive Business KPI Cockpit — 36 Key Metrics</h1>");
             sb.AppendLine($"<div class='meta'>Period: <b>{periodLabel}</b> | Generated: <b>{_model.GeneratedAt:dd-MMM-yyyy hh:mm tt}</b></div>");
 
-            // 1. Monthly Comparison Matrix
-            sb.AppendLine("<h2>1. Monthly Executive Performance & Growth Matrix</h2>");
+            // 1. Growth Performance Matrix
+            sb.AppendLine("<h2>1. Growth Performance Matrix</h2>");
             sb.AppendLine("<div style='overflow-x:auto;'><table><tr>");
-            sb.AppendLine("<th>Month</th><th>1.Stock</th><th>2.StkProfit</th><th>3.Sales</th><th>4.Expenses</th><th>5.NegStk</th><th>6.NegItems</th><th>7.Cash</th><th>8.Bank</th><th>9.SupPay</th><th>10.CustRec</th><th>11.NetProfit</th><th>12.Drawings</th><th>13.NBA</th><th>14.Loss</th><th>15.Extra</th><th>16.AdjBal</th><th>17.DelayCust</th><th>18.DelaySupp</th><th>19.Profit%</th><th>20.ExcAlert</th><th>21.LowAlert</th><th>22.Reorder</th><th>23.BadDebt</th><th>24.WriteOff</th><th>26.Deletions</th><th>27.PriceChange</th><th>28.StockAdj</th><th>29.SupAdvance</th><th>30.CustAdvance</th><th>Sales MoM%</th><th>Profit MoM%</th></tr>");
+            sb.AppendLine("<th>Period</th><th>1.Stock</th><th>2.StkProfit</th><th>3.DeadStock</th><th>4.NegStk</th><th>5.NegItems</th><th>6.Loss</th><th>7.Extra</th><th>8.AdjBal</th><th>9.ExcAlert</th><th>10.LowAlert</th><th>11.Reorder</th><th>12.Sales</th><th>13.SalesRet</th><th>14.Purchases</th><th>15.PurchRet</th><th>16.HoldBills</th><th>17.GrossProfit</th><th>18.Expenses</th><th>19.NetProfit</th><th>20.OpMargin%</th><th>21.NetGST</th><th>22.Cash</th><th>23.Bank</th><th>24.VenOut</th><th>25.CustOut</th><th>26.DelayCust</th><th>27.DelaySupp</th><th>28.NBA</th><th>29.Drawings</th><th>30.BadDebt</th><th>31.WriteOff</th><th>32.SupAdvance</th><th>33.CustAdvance</th><th>34.Deletions</th><th>35.PriceChange</th><th>36.StockAdj</th><th>Sales Growth %</th><th>Profit Growth %</th></tr>");
 
             if (_model.MonthlyGrowthMatrix != null && _model.MonthlyGrowthMatrix.Count > 0)
             {
@@ -1058,43 +1134,50 @@ namespace PosBranch_Win.Dashboard
                     string sColor = m.SalesGrowthPercent >= 0 ? "positive" : "negative";
                     string pColor = m.NetProfitGrowthPercent >= 0 ? "positive" : "negative";
 
-                    sb.AppendLine($"<tr><td><b>{m.MonthName}</b></td><td class='right'>{FormatCurr(_model.TotalStockCostValue)}</td><td class='right'>{FormatCurr(_model.StockProfitPotential)}</td><td class='right'>{FormatCurr(m.SalesAmount)}</td><td class='right'>{FormatCurr(m.ExpenseAmount)}</td><td class='right'>{FormatCurr(_model.NegativeStockImpactValue)}</td><td class='center'>{_model.NegativeStockItemCount}</td><td class='right'>{FormatCurr(_model.CashInHand)}</td><td class='right'>{FormatCurr(_model.BankBalance)}</td><td class='right'>{FormatCurr(_model.SupplierPayables)}</td><td class='right'>{FormatCurr(_model.CustomerReceivables)}</td><td class='right' style='font-weight:700;'>{FormatCurr(m.NetProfitAmount)}</td><td class='right'>{FormatCurr(_model.OwnerDrawings)}</td><td class='right'>{FormatCurr(_model.NetBusinessAsset)}</td><td class='right'>{FormatCurr(_model.LossStockValue)}</td><td class='right'>{FormatCurr(_model.ExtraStockValue)}</td><td class='right'>{FormatCurr(_model.NetStockAdjustmentValue)}</td><td class='right'>{FormatCurr(_model.DelayedCustomerReceivables30Days)}</td><td class='right'>{FormatCurr(_model.DelayedSupplierPayables30Days)}</td><td class='center'>{profitMargin:N1}%</td><td class='center'>{_model.ExcessStockAlertCount}</td><td class='center'>{_model.LowStockAlertCount}</td><td class='center'>{_model.ReorderAlertCount}</td><td class='right'>{FormatCurr(_model.CustomerBadDebts)}</td><td class='right'>{FormatCurr(_model.SupplierWriteOffs)}</td><td class='center'>{_model.DeletionCount}</td><td class='center'>{_model.PriceChangeCount}</td><td class='center'>{_model.StockAdjustmentCount}</td><td class='right'>{FormatCurr(_model.SupplierAdvanceBalance)}</td><td class='right'>{FormatCurr(_model.CustomerAdvanceBalance)}</td><td class='{sColor}'>{(m.SalesGrowthPercent >= 0 ? "+" : "")}{m.SalesGrowthPercent:N1}%</td><td class='{pColor}'>{(m.NetProfitGrowthPercent >= 0 ? "+" : "")}{m.NetProfitGrowthPercent:N1}%</td></tr>");
+                    sb.AppendLine($"<tr><td><b>{m.MonthName}</b></td><td class='right'>{FormatCurr(_model.TotalStockCostValue)}</td><td class='right'>{FormatCurr(_model.StockProfitPotential)}</td><td class='right'>{FormatCurr(_model.DeadStockValue)}</td><td class='right'>{FormatCurr(_model.NegativeStockImpactValue)}</td><td class='center'>{_model.NegativeStockItemCount}</td><td class='right'>{FormatCurr(_model.LossStockValue)}</td><td class='right'>{FormatCurr(_model.ExtraStockValue)}</td><td class='right'>{FormatCurr(_model.NetStockAdjustmentValue)}</td><td class='center'>{_model.ExcessStockAlertCount}</td><td class='center'>{_model.LowStockAlertCount}</td><td class='center'>{_model.ReorderAlertCount}</td><td class='right'>{FormatCurr(m.SalesAmount)}</td><td class='right'>{FormatCurr(_model.TotalSalesReturn)}</td><td class='right'>{FormatCurr(m.PurchaseAmount)}</td><td class='right'>{FormatCurr(_model.TotalPurchaseReturn)}</td><td class='right'>{FormatCurr(_model.HoldBillsValue)}</td><td class='right'>{FormatCurr(_model.GrossProfit)}</td><td class='right'>{FormatCurr(m.ExpenseAmount)}</td><td class='right' style='font-weight:700;'>{FormatCurr(m.NetProfitAmount)}</td><td class='center'>{profitMargin:N1}%</td><td class='right'>{FormatCurr(_model.NetTaxLiability)}</td><td class='right'>{FormatCurr(_model.CashInHand)}</td><td class='right'>{FormatCurr(_model.BankBalance)}</td><td class='right'>{FormatCurr(_model.SupplierPayables)}</td><td class='right'>{FormatCurr(_model.CustomerReceivables)}</td><td class='right'>{FormatCurr(_model.DelayedCustomerReceivables30Days)}</td><td class='right'>{FormatCurr(_model.DelayedSupplierPayables30Days)}</td><td class='right'>{FormatCurr(_model.NetBusinessAsset)}</td><td class='right'>{FormatCurr(_model.OwnerDrawings)}</td><td class='right'>{FormatCurr(_model.CustomerBadDebts)}</td><td class='right'>{FormatCurr(_model.SupplierWriteOffs)}</td><td class='right'>{FormatCurr(_model.SupplierAdvanceBalance)}</td><td class='right'>{FormatCurr(_model.CustomerAdvanceBalance)}</td><td class='center'>{_model.DeletionCount}</td><td class='center'>{_model.PriceChangeCount}</td><td class='center'>{_model.StockAdjustmentCount}</td><td class='{sColor}'>{(m.SalesGrowthPercent >= 0 ? "+" : "")}{m.SalesGrowthPercent:N1}%</td><td class='{pColor}'>{(m.NetProfitGrowthPercent >= 0 ? "+" : "")}{m.NetProfitGrowthPercent:N1}%</td></tr>");
                 }
             }
             sb.AppendLine("</table></div>");
 
-            // 2. Complete 30 KPI Summary Table
-            sb.AppendLine("<h2>2. Complete 30 Business KPI Summary</h2>");
+            // 2. Complete 36 KPI Summary Table
+            sb.AppendLine("<h2>2. Complete 36 Business KPI Summary</h2>");
             sb.AppendLine("<table><tr><th style='width:50px;'>#</th><th>Metric Name</th><th style='text-align:right;'>Value</th><th>Business Context & Notes</th></tr>");
             sb.AppendLine($"<tr><td>1</td><td>Total Stock Value</td><td class='value'>{FormatCurr(_model.TotalStockCostValue)}</td><td>Valued at Cost Price ({_model.TotalStockItemCount:N0} Items, {_model.TotalStockQuantity:N0} Units)</td></tr>");
             sb.AppendLine($"<tr><td>2</td><td>Stock Profit Potential</td><td class='value'>{FormatCurr(_model.StockProfitPotential)}</td><td>Retail Value: {FormatCurr(_model.TotalStockRetailValue)}</td></tr>");
-            sb.AppendLine($"<tr><td>3</td><td>Total Sales Revenue</td><td class='value'>{FormatCurr(_model.TotalSalesRevenue)}</td><td>{_model.TotalSalesBillCount:N0} Bills | Purchases: {FormatCurr(_model.TotalPurchases)}</td></tr>");
-            sb.AppendLine($"<tr><td>4</td><td>Total Business Expenses</td><td class='value'>{FormatCurr(_model.TotalBusinessExpenses)}</td><td>Direct: {FormatCurr(_model.DirectExpenses)} | Indirect: {FormatCurr(_model.IndirectExpenses)}</td></tr>");
-            sb.AppendLine($"<tr><td>5</td><td>Negative Stock Impact</td><td class='value'>{FormatCurr(_model.NegativeStockImpactValue)}</td><td>Cost value distortion from negative stock</td></tr>");
-            sb.AppendLine($"<tr><td>6</td><td>Negative Stock Items</td><td class='value'>{_model.NegativeStockItemCount} Items</td><td>Total Negative Quantity: {_model.NegativeStockTotalQty:N0}</td></tr>");
-            sb.AppendLine($"<tr><td>7</td><td>Cash in Hand</td><td class='value'>{FormatCurr(_model.CashInHand)}</td><td>Liquid cash available in tills and safe</td></tr>");
-            sb.AppendLine($"<tr><td>8</td><td>Bank Balance</td><td class='value'>{FormatCurr(_model.BankBalance)}</td><td>Active commercial bank accounts balance</td></tr>");
-            sb.AppendLine($"<tr><td>9</td><td>Supplier Payables</td><td class='value'>{FormatCurr(_model.SupplierPayables)}</td><td>Owed to vendors across {_model.SupplierPayablesCount} bills</td></tr>");
-            sb.AppendLine($"<tr><td>10</td><td>Customer Receivables</td><td class='value'>{FormatCurr(_model.CustomerReceivables)}</td><td>Outstanding dues from {_model.CustomerReceivablesCount} customer invoices</td></tr>");
-            sb.AppendLine($"<tr><td>11</td><td>Actual Net Profit</td><td class='value'>{FormatCurr(_model.ActualNetProfit)}</td><td>Operating Margin: {_model.OperatingProfitMarginPercent:N2}%</td></tr>");
-            sb.AppendLine($"<tr><td>12</td><td>Owner Drawings</td><td class='value'>{FormatCurr(_model.OwnerDrawings)}</td><td>Proprietor capital withdrawals</td></tr>");
-            sb.AppendLine($"<tr><td>13</td><td>Net Business Asset (NBA)</td><td class='value'>{FormatCurr(_model.NetBusinessAsset)}</td><td>Total Assets: {FormatCurr(_model.TotalAssets)} | Liabilities: {FormatCurr(_model.TotalLiabilities)}</td></tr>");
-            sb.AppendLine($"<tr><td>14</td><td>Loss Stock (Damaged / Out)</td><td class='value'>{FormatCurr(_model.LossStockValue)}</td><td>Damaged & Written Off ({_model.LossStockQty:N2} Qty)</td></tr>");
-            sb.AppendLine($"<tr><td>15</td><td>Extra Stock (Found / In)</td><td class='value'>{FormatCurr(_model.ExtraStockValue)}</td><td>Surplus Stock Added ({_model.ExtraStockQty:N2} Qty)</td></tr>");
-            sb.AppendLine($"<tr><td>16</td><td>Net Stock Adjustment</td><td class='value'>{FormatCurr(_model.NetStockAdjustmentValue)}</td><td>Net Discrepancy Balance</td></tr>");
-            sb.AppendLine($"<tr><td>17</td><td>Delayed Customer Receivables (>30 Days)</td><td class='value'>{FormatCurr(_model.DelayedCustomerReceivables30Days)}</td><td>{_model.DelayedCustomerCount30Days} High-Risk Invoices overdue</td></tr>");
-            sb.AppendLine($"<tr><td>18</td><td>Delayed Supplier Payables (>30 Days)</td><td class='value'>{FormatCurr(_model.DelayedSupplierPayables30Days)}</td><td>{_model.DelayedSupplierCount30Days} Vendor Invoices overdue</td></tr>");
-            sb.AppendLine($"<tr><td>19</td><td>Operating Profit Margin %</td><td class='value'>{_model.OperatingProfitMarginPercent:N2}%</td><td>Net Profit / Sales Turnover</td></tr>");
-            sb.AppendLine($"<tr><td>20</td><td>Excess Stock Alert</td><td class='value'>{_model.ExcessStockAlertCount} Items</td><td>Items above maximum inventory limits</td></tr>");
-            sb.AppendLine($"<tr><td>21</td><td>Low Stock Alert</td><td class='value'>{_model.LowStockAlertCount} Items</td><td>Items below minimum safety stock</td></tr>");
-            sb.AppendLine($"<tr><td>22</td><td>Reorder Alert</td><td class='value'>{_model.ReorderAlertCount} Items</td><td>Items at or below reorder level</td></tr>");
-            sb.AppendLine($"<tr><td>23</td><td>Customer Bad Debts</td><td class='value'>{FormatCurr(_model.CustomerBadDebts)}</td><td>Uncollectible receivables written off</td></tr>");
-            sb.AppendLine($"<tr><td>24</td><td>Supplier Write-Offs</td><td class='value'>{FormatCurr(_model.SupplierWriteOffs)}</td><td>Vendor settlement discounts / write-offs</td></tr>");
-            sb.AppendLine($"<tr><td>26</td><td>Deletion & Cancellation Logs</td><td class='value'>{_model.DeletionCount} Events</td><td>Cancelled bills, deleted receipts & vouchers</td></tr>");
-            sb.AppendLine($"<tr><td>27</td><td>Price Change Modifications</td><td class='value'>{_model.PriceChangeCount} Events</td><td>Item Master price updates</td></tr>");
-            sb.AppendLine($"<tr><td>28</td><td>Physical Stock Discrepancy Logs</td><td class='value'>{_model.StockAdjustmentCount} Adjustments</td><td>Stock reconciliation entries</td></tr>");
-            sb.AppendLine($"<tr><td>29</td><td>Supplier Advance / Overpayment</td><td class='value'>{FormatCurr(_model.SupplierAdvanceBalance)}</td><td>Advance payments & vendor debit balances</td></tr>");
-            sb.AppendLine($"<tr><td>30</td><td>Customer Advance / Deposits</td><td class='value'>{FormatCurr(_model.CustomerAdvanceBalance)}</td><td>Advance deposits & customer credit balances</td></tr>");
+            sb.AppendLine($"<tr><td>3</td><td>Non-Moving / Dead Stock Value</td><td class='value'>{FormatCurr(_model.DeadStockValue)}</td><td>{_model.DeadStockItemCount:N0} Inactive items with no sales in past 90 days</td></tr>");
+            sb.AppendLine($"<tr><td>4</td><td>Negative Stock Impact</td><td class='value'>{FormatCurr(_model.NegativeStockImpactValue)}</td><td>Cost value distortion from negative stock</td></tr>");
+            sb.AppendLine($"<tr><td>5</td><td>Negative Stock Items</td><td class='value'>{_model.NegativeStockItemCount} Items</td><td>Total Negative Quantity: {_model.NegativeStockTotalQty:N0}</td></tr>");
+            sb.AppendLine($"<tr><td>6</td><td>Loss Stock (Damaged / Out)</td><td class='value'>{FormatCurr(_model.LossStockValue)}</td><td>Damaged & Written Off ({_model.LossStockQty:N2} Qty)</td></tr>");
+            sb.AppendLine($"<tr><td>7</td><td>Extra Stock (Found / In)</td><td class='value'>{FormatCurr(_model.ExtraStockValue)}</td><td>Surplus Stock Added ({_model.ExtraStockQty:N2} Qty)</td></tr>");
+            sb.AppendLine($"<tr><td>8</td><td>Net Stock Adjustment</td><td class='value'>{FormatCurr(_model.NetStockAdjustmentValue)}</td><td>Net Discrepancy Balance</td></tr>");
+            sb.AppendLine($"<tr><td>9</td><td>Excess Stock Alert</td><td class='value'>{_model.ExcessStockAlertCount} Items</td><td>Items above maximum inventory limits</td></tr>");
+            sb.AppendLine($"<tr><td>10</td><td>Low Stock Alert</td><td class='value'>{_model.LowStockAlertCount} Items</td><td>Items below minimum safety stock</td></tr>");
+            sb.AppendLine($"<tr><td>11</td><td>Reorder Alert</td><td class='value'>{_model.ReorderAlertCount} Items</td><td>Items at or below reorder level</td></tr>");
+            sb.AppendLine($"<tr><td>12</td><td>Total Sales Revenue</td><td class='value'>{FormatCurr(_model.TotalSalesRevenue)}</td><td>{_model.TotalSalesBillCount:N0} Bills Billed</td></tr>");
+            sb.AppendLine($"<tr><td>13</td><td>Sales Return (Customer Returns)</td><td class='value'>{FormatCurr(_model.TotalSalesReturn)}</td><td>{_model.TotalSalesReturnCount} Customer Return / Credit Vouchers</td></tr>");
+            sb.AppendLine($"<tr><td>14</td><td>Total Purchases (Inward Stock)</td><td class='value'>{FormatCurr(_model.TotalPurchases)}</td><td>{_model.TotalPurchasesBillCount:N0} Purchase Bills</td></tr>");
+            sb.AppendLine($"<tr><td>15</td><td>Purchase Return (Vendor Returns)</td><td class='value'>{FormatCurr(_model.TotalPurchaseReturn)}</td><td>{_model.TotalPurchaseReturnCount} Vendor Return / Debit Vouchers</td></tr>");
+            sb.AppendLine($"<tr><td>16</td><td>Holded Items / Hold Bills</td><td class='value'>{FormatCurr(_model.HoldBillsValue)}</td><td>{_model.HoldBillsCount} Suspended sales bills ({_model.HoldItemsCount:N0} items on hold)</td></tr>");
+            sb.AppendLine($"<tr><td>17</td><td>Gross Profit & Margin %</td><td class='value'>{FormatCurr(_model.GrossProfit)}</td><td>Gross Profit Margin: {_model.GrossProfitMarginPercent:N1}%</td></tr>");
+            sb.AppendLine($"<tr><td>18</td><td>Total Business Expenses</td><td class='value'>{FormatCurr(_model.TotalBusinessExpenses)}</td><td>Direct: {FormatCurr(_model.DirectExpenses)} | Indirect: {FormatCurr(_model.IndirectExpenses)}</td></tr>");
+            sb.AppendLine($"<tr><td>19</td><td>Actual Net Profit</td><td class='value'>{FormatCurr(_model.ActualNetProfit)}</td><td>Operating Margin: {_model.OperatingProfitMarginPercent:N2}%</td></tr>");
+            sb.AppendLine($"<tr><td>20</td><td>Operating Profit Margin %</td><td class='value'>{_model.OperatingProfitMarginPercent:N2}%</td><td>Net Profit / Sales Turnover</td></tr>");
+            sb.AppendLine($"<tr><td>21</td><td>GST / Net Tax Liability</td><td class='value'>{FormatCurr(_model.NetTaxLiability)}</td><td>Output GST: {FormatCurr(_model.OutputGstAmount)} | Input GST: {FormatCurr(_model.InputGstAmount)}</td></tr>");
+            sb.AppendLine($"<tr><td>22</td><td>Cash in Hand</td><td class='value'>{FormatCurr(_model.CashInHand)}</td><td>Liquid cash available in tills and safe</td></tr>");
+            sb.AppendLine($"<tr><td>23</td><td>Bank Balance</td><td class='value'>{FormatCurr(_model.BankBalance)}</td><td>Active commercial bank accounts balance</td></tr>");
+            sb.AppendLine($"<tr><td>24</td><td>Vendor Outstanding</td><td class='value'>{FormatCurr(_model.SupplierPayables)}</td><td>Owed to vendors across {_model.SupplierPayablesCount} bills</td></tr>");
+            sb.AppendLine($"<tr><td>25</td><td>Customer Outstanding</td><td class='value'>{FormatCurr(_model.CustomerReceivables)}</td><td>Outstanding dues from {_model.CustomerReceivablesCount} customer invoices</td></tr>");
+            sb.AppendLine($"<tr><td>26</td><td>Delayed Customer Receivables (>30 Days)</td><td class='value'>{FormatCurr(_model.DelayedCustomerReceivables30Days)}</td><td>{_model.DelayedCustomerCount30Days} High-Risk Invoices overdue</td></tr>");
+            sb.AppendLine($"<tr><td>27</td><td>Delayed Supplier Payables (>30 Days)</td><td class='value'>{FormatCurr(_model.DelayedSupplierPayables30Days)}</td><td>{_model.DelayedSupplierCount30Days} Vendor Invoices overdue</td></tr>");
+            sb.AppendLine($"<tr><td>28</td><td>Net Business Asset (NBA)</td><td class='value'>{FormatCurr(_model.NetBusinessAsset)}</td><td>Total Assets: {FormatCurr(_model.TotalAssets)} | Liabilities: {FormatCurr(_model.TotalLiabilities)}</td></tr>");
+            sb.AppendLine($"<tr><td>29</td><td>Owner Drawings</td><td class='value'>{FormatCurr(_model.OwnerDrawings)}</td><td>Proprietor capital withdrawals</td></tr>");
+            sb.AppendLine($"<tr><td>30</td><td>Customer Bad Debts</td><td class='value'>{FormatCurr(_model.CustomerBadDebts)}</td><td>Uncollectible receivables written off</td></tr>");
+            sb.AppendLine($"<tr><td>31</td><td>Supplier Write-Offs</td><td class='value'>{FormatCurr(_model.SupplierWriteOffs)}</td><td>Vendor settlement discounts / write-offs</td></tr>");
+            sb.AppendLine($"<tr><td>32</td><td>Supplier Advance / Overpayment</td><td class='value'>{FormatCurr(_model.SupplierAdvanceBalance)}</td><td>Advance payments & vendor debit balances</td></tr>");
+            sb.AppendLine($"<tr><td>33</td><td>Customer Advance / Deposits</td><td class='value'>{FormatCurr(_model.CustomerAdvanceBalance)}</td><td>Advance deposits & customer credit balances</td></tr>");
+            sb.AppendLine($"<tr><td>34</td><td>Deletion & Cancellation Logs</td><td class='value'>{_model.DeletionCount} Events</td><td>Cancelled bills, deleted receipts & vouchers</td></tr>");
+            sb.AppendLine($"<tr><td>35</td><td>Price Change Modifications</td><td class='value'>{_model.PriceChangeCount} Events</td><td>Item Master price updates</td></tr>");
+            sb.AppendLine($"<tr><td>36</td><td>Physical Stock Discrepancy Logs</td><td class='value'>{_model.StockAdjustmentCount} Adjustments</td><td>Stock reconciliation entries</td></tr>");
             sb.AppendLine("</table>");
 
             sb.AppendLine("</div></body></html>");
@@ -1107,48 +1190,54 @@ namespace PosBranch_Win.Dashboard
             sb.AppendLine("SI No,Metric Name,Value,Notes");
             sb.AppendLine($"1,Total Stock Value,\"{_model.TotalStockCostValue:N2}\",At Cost Price ({_model.TotalStockItemCount} Items, {_model.TotalStockQuantity} Units)");
             sb.AppendLine($"2,Stock Profit Potential,\"{_model.StockProfitPotential:N2}\",Retail Value: {_model.TotalStockRetailValue:N2}");
-            sb.AppendLine($"3,Total Sales Revenue,\"{_model.TotalSalesRevenue:N2}\",Bills: {_model.TotalSalesBillCount}, Purchases: {_model.TotalPurchases:N2}");
-            sb.AppendLine($"4,Total Business Expenses,\"{_model.TotalBusinessExpenses:N2}\",Direct: {_model.DirectExpenses:N2}, Indir: {_model.IndirectExpenses:N2}");
-            sb.AppendLine($"5,Negative Stock Impact,\"{_model.NegativeStockImpactValue:N2}\",Cost Value Distortion");
-            sb.AppendLine($"6,Negative Stock Items,\"{_model.NegativeStockItemCount}\",Total Qty: {_model.NegativeStockTotalQty:N0}");
-            sb.AppendLine($"7,Cash in Hand,\"{_model.CashInHand:N2}\",Counter & Safe Cash");
-            sb.AppendLine($"8,Bank Balance,\"{_model.BankBalance:N2}\",Active Bank Accounts");
-            sb.AppendLine($"9,Supplier Payables,\"{_model.SupplierPayables:N2}\",Bills Count: {_model.SupplierPayablesCount}");
-            sb.AppendLine($"10,Customer Receivables,\"{_model.CustomerReceivables:N2}\",Invoices Count: {_model.CustomerReceivablesCount}");
-            sb.AppendLine($"11,Actual Net Profit,\"{_model.ActualNetProfit:N2}\",Margin: {_model.OperatingProfitMarginPercent:N2}%");
-            sb.AppendLine($"12,Owner Drawings,\"{_model.OwnerDrawings:N2}\",Capital Withdrawals");
-            sb.AppendLine($"13,Net Business Asset (NBA),\"{_model.NetBusinessAsset:N2}\",Assets: {_model.TotalAssets:N2} | Liab: {_model.TotalLiabilities:N2}");
-            sb.AppendLine($"14,Loss Stock (Damaged / Out),\"{_model.LossStockValue:N2}\",Discrepancy Qty: {_model.LossStockQty:N2}");
-            sb.AppendLine($"15,Extra Stock (Found / In),\"{_model.ExtraStockValue:N2}\",Surplus Qty: {_model.ExtraStockQty:N2}");
-            sb.AppendLine($"16,Net Stock Adjustment,\"{_model.NetStockAdjustmentValue:N2}\",Net Variance");
-            sb.AppendLine($"17,Delayed Customer Receivables (>30 Days),\"{_model.DelayedCustomerReceivables30Days:N2}\",Count: {_model.DelayedCustomerCount30Days}");
-            sb.AppendLine($"18,Delayed Supplier Payables (>30 Days),\"{_model.DelayedSupplierPayables30Days:N2}\",Count: {_model.DelayedSupplierCount30Days}");
-            sb.AppendLine($"19,Operating Profit Margin %,\"{_model.OperatingProfitMarginPercent:N2}%\",Net Margin");
-            sb.AppendLine($"20,Excess Stock Alert,\"{_model.ExcessStockAlertCount}\",Over Max Limit");
-            sb.AppendLine($"21,Low Stock Alert,\"{_model.LowStockAlertCount}\",Below Min Limit");
-            sb.AppendLine($"22,Reorder Alert,\"{_model.ReorderAlertCount}\",Reorder Needed");
-            sb.AppendLine($"23,Customer Bad Debts,\"{_model.CustomerBadDebts:N2}\",Written Off");
-            sb.AppendLine($"24,Supplier Write-Offs,\"{_model.SupplierWriteOffs:N2}\",Discounts Settled");
-            sb.AppendLine($"26,Deletion & Cancellation Logs,\"{_model.DeletionCount}\",Deleted Bills/Vouchers");
-            sb.AppendLine($"27,Price Change Modifications,\"{_model.PriceChangeCount}\",Item Master Edits");
-            sb.AppendLine($"28,Physical Stock Discrepancy Logs,\"{_model.StockAdjustmentCount}\",Stock Adjustments");
-            sb.AppendLine($"29,Supplier Advance / Overpayment,\"{_model.SupplierAdvanceBalance:N2}\",Debit Balances");
-            sb.AppendLine($"30,Customer Advance / Deposits,\"{_model.CustomerAdvanceBalance:N2}\",Credit Balances");
+            sb.AppendLine($"3,Non-Moving / Dead Stock Value,\"{_model.DeadStockValue:N2}\",Inactive Items: {_model.DeadStockItemCount}");
+            sb.AppendLine($"4,Negative Stock Impact,\"{_model.NegativeStockImpactValue:N2}\",Cost Value Distortion");
+            sb.AppendLine($"5,Negative Stock Items,\"{_model.NegativeStockItemCount}\",Total Qty: {_model.NegativeStockTotalQty:N0}");
+            sb.AppendLine($"6,Loss Stock (Damaged / Out),\"{_model.LossStockValue:N2}\",Discrepancy Qty: {_model.LossStockQty:N2}");
+            sb.AppendLine($"7,Extra Stock (Found / In),\"{_model.ExtraStockValue:N2}\",Surplus Qty: {_model.ExtraStockQty:N2}");
+            sb.AppendLine($"8,Net Stock Adjustment,\"{_model.NetStockAdjustmentValue:N2}\",Net Variance");
+            sb.AppendLine($"9,Excess Stock Alert,\"{_model.ExcessStockAlertCount}\",Over Max Limit");
+            sb.AppendLine($"10,Low Stock Alert,\"{_model.LowStockAlertCount}\",Below Min Limit");
+            sb.AppendLine($"11,Reorder Alert,\"{_model.ReorderAlertCount}\",Reorder Needed");
+            sb.AppendLine($"12,Total Sales Revenue,\"{_model.TotalSalesRevenue:N2}\",Bills: {_model.TotalSalesBillCount}");
+            sb.AppendLine($"13,Sales Return (Customer Returns),\"{_model.TotalSalesReturn:N2}\",Return Count: {_model.TotalSalesReturnCount}");
+            sb.AppendLine($"14,Total Purchases (Inward Stock),\"{_model.TotalPurchases:N2}\",Purchase Bills: {_model.TotalPurchasesBillCount}");
+            sb.AppendLine($"15,Purchase Return (Vendor Returns),\"{_model.TotalPurchaseReturn:N2}\",Return Count: {_model.TotalPurchaseReturnCount}");
+            sb.AppendLine($"16,Holded Items / Hold Bills,\"{_model.HoldBillsValue:N2}\",Bills: {_model.HoldBillsCount} | Items: {_model.HoldItemsCount:N0}");
+            sb.AppendLine($"17,Gross Profit & Margin %,\"{_model.GrossProfit:N2}\",Gross Margin: {_model.GrossProfitMarginPercent:N1}%");
+            sb.AppendLine($"18,Total Business Expenses,\"{_model.TotalBusinessExpenses:N2}\",Direct: {_model.DirectExpenses:N2}, Indir: {_model.IndirectExpenses:N2}");
+            sb.AppendLine($"19,Actual Net Profit,\"{_model.ActualNetProfit:N2}\",Margin: {_model.OperatingProfitMarginPercent:N2}%");
+            sb.AppendLine($"20,Operating Profit Margin %,\"{_model.OperatingProfitMarginPercent:N2}%\",Net Margin");
+            sb.AppendLine($"21,GST / Net Tax Liability,\"{_model.NetTaxLiability:N2}\",Out: {_model.OutputGstAmount:N2}, In: {_model.InputGstAmount:N2}");
+            sb.AppendLine($"22,Cash in Hand,\"{_model.CashInHand:N2}\",Counter & Safe Cash");
+            sb.AppendLine($"23,Bank Balance,\"{_model.BankBalance:N2}\",Active Bank Accounts");
+            sb.AppendLine($"24,Vendor Outstanding,\"{_model.SupplierPayables:N2}\",Bills Count: {_model.SupplierPayablesCount}");
+            sb.AppendLine($"25,Customer Outstanding,\"{_model.CustomerReceivables:N2}\",Invoices Count: {_model.CustomerReceivablesCount}");
+            sb.AppendLine($"26,Delayed Customer Receivables (>30 Days),\"{_model.DelayedCustomerReceivables30Days:N2}\",Count: {_model.DelayedCustomerCount30Days}");
+            sb.AppendLine($"27,Delayed Supplier Payables (>30 Days),\"{_model.DelayedSupplierPayables30Days:N2}\",Count: {_model.DelayedSupplierCount30Days}");
+            sb.AppendLine($"28,Net Business Asset (NBA),\"{_model.NetBusinessAsset:N2}\",Assets: {_model.TotalAssets:N2} | Liab: {_model.TotalLiabilities:N2}");
+            sb.AppendLine($"29,Owner Drawings,\"{_model.OwnerDrawings:N2}\",Capital Withdrawals");
+            sb.AppendLine($"30,Customer Bad Debts,\"{_model.CustomerBadDebts:N2}\",Written Off");
+            sb.AppendLine($"31,Supplier Write-Offs,\"{_model.SupplierWriteOffs:N2}\",Discounts Settled");
+            sb.AppendLine($"32,Supplier Advance / Overpayment,\"{_model.SupplierAdvanceBalance:N2}\",Debit Balances");
+            sb.AppendLine($"33,Customer Advance / Deposits,\"{_model.CustomerAdvanceBalance:N2}\",Credit Balances");
+            sb.AppendLine($"34,Deletion & Cancellation Logs,\"{_model.DeletionCount}\",Deleted Bills/Vouchers");
+            sb.AppendLine($"35,Price Change Modifications,\"{_model.PriceChangeCount}\",Item Master Edits");
+            sb.AppendLine($"36,Physical Stock Discrepancy Logs,\"{_model.StockAdjustmentCount}\",Stock Adjustments");
 
-            // Monthly Matrix in CSV
+            // Growth Matrix in CSV
             sb.AppendLine();
-            sb.AppendLine("Monthly Performance & Growth Matrix");
-            sb.AppendLine("Month,1.Stock,2.StkProfit,3.Sales,4.Expenses,5.NegStk,6.NegItems,7.Cash,8.Bank,9.SupPay,10.CustRec,11.NetProfit,12.Drawings,13.NBA,14.Loss,15.Extra,16.AdjBal,17.DelayCust,18.DelaySupp,19.Profit%,20.ExcAlert,21.LowAlert,22.Reorder,23.BadDebt,24.WriteOff,26.Deletions,27.PriceChange,28.StockAdj,29.SupAdvance,30.CustAdvance,Sales Growth %,Profit Growth %");
+            sb.AppendLine("37. Growth Performance Matrix");
+            sb.AppendLine("Period,1.Stock,2.StkProfit,3.DeadStock,4.NegStk,5.NegItems,6.Loss,7.Extra,8.AdjBal,9.ExcAlert,10.LowAlert,11.Reorder,12.Sales,13.SalesRet,14.Purchases,15.PurchRet,16.HoldBills,17.GrossProfit,18.Expenses,19.NetProfit,20.OpMargin%,21.NetGST,22.Cash,23.Bank,24.VenOut,25.CustOut,26.DelayCust,27.DelaySupp,28.NBA,29.Drawings,30.BadDebt,31.WriteOff,32.SupAdvance,33.CustAdvance,34.Deletions,35.PriceChange,36.StockAdj,Sales Growth %,Profit Growth %");
 
             if (_model.MonthlyGrowthMatrix != null && _model.MonthlyGrowthMatrix.Count > 0)
             {
                 foreach (var m in _model.MonthlyGrowthMatrix)
                 {
                     decimal profitMargin = m.SalesAmount > 0 ? (m.NetProfitAmount / m.SalesAmount) * 100m : 0m;
-                    sb.AppendLine($"\"{m.MonthName}\",\"{_model.TotalStockCostValue:N2}\",\"{_model.StockProfitPotential:N2}\",\"{m.SalesAmount:N2}\",\"{m.ExpenseAmount:N2}\",\"{_model.NegativeStockImpactValue:N2}\",{_model.NegativeStockItemCount},\"{_model.CashInHand:N2}\",\"{_model.BankBalance:N2}\",\"{_model.SupplierPayables:N2}\",\"{_model.CustomerReceivables:N2}\",\"{m.NetProfitAmount:N2}\",\"{_model.OwnerDrawings:N2}\",\"{_model.NetBusinessAsset:N2}\",\"{_model.LossStockValue:N2}\",\"{_model.ExtraStockValue:N2}\",\"{_model.NetStockAdjustmentValue:N2}\",\"{_model.DelayedCustomerReceivables30Days:N2}\",\"{_model.DelayedSupplierPayables30Days:N2}\",\"{profitMargin:N1}%\",{_model.ExcessStockAlertCount},{_model.LowStockAlertCount},{_model.ReorderAlertCount},\"{_model.CustomerBadDebts:N2}\",\"{_model.SupplierWriteOffs:N2}\",{_model.DeletionCount},{_model.PriceChangeCount},{_model.StockAdjustmentCount},\"{_model.SupplierAdvanceBalance:N2}\",\"{_model.CustomerAdvanceBalance:N2}\",\"{m.SalesGrowthPercent:N1}%\",\"{m.NetProfitGrowthPercent:N1}%\"");
+                    sb.AppendLine($"\"{m.MonthName}\",\"{_model.TotalStockCostValue:N2}\",\"{_model.StockProfitPotential:N2}\",\"{_model.DeadStockValue:N2}\",\"{_model.NegativeStockImpactValue:N2}\",{_model.NegativeStockItemCount},\"{_model.LossStockValue:N2}\",\"{_model.ExtraStockValue:N2}\",\"{_model.NetStockAdjustmentValue:N2}\",{_model.ExcessStockAlertCount},{_model.LowStockAlertCount},{_model.ReorderAlertCount},\"{m.SalesAmount:N2}\",\"{_model.TotalSalesReturn:N2}\",\"{m.PurchaseAmount:N2}\",\"{_model.TotalPurchaseReturn:N2}\",\"{_model.HoldBillsValue:N2}\",\"{_model.GrossProfit:N2}\",\"{m.ExpenseAmount:N2}\",\"{m.NetProfitAmount:N2}\",\"{profitMargin:N1}%\",\"{_model.NetTaxLiability:N2}\",\"{_model.CashInHand:N2}\",\"{_model.BankBalance:N2}\",\"{_model.SupplierPayables:N2}\",\"{_model.CustomerReceivables:N2}\",\"{_model.DelayedCustomerReceivables30Days:N2}\",\"{_model.DelayedSupplierPayables30Days:N2}\",\"{_model.NetBusinessAsset:N2}\",\"{_model.OwnerDrawings:N2}\",\"{_model.CustomerBadDebts:N2}\",\"{_model.SupplierWriteOffs:N2}\",\"{_model.SupplierAdvanceBalance:N2}\",\"{_model.CustomerAdvanceBalance:N2}\",{_model.DeletionCount},{_model.PriceChangeCount},{_model.StockAdjustmentCount},\"{m.SalesGrowthPercent:N1}%\",\"{m.NetProfitGrowthPercent:N1}%\"");
                 }
             }
-
             File.WriteAllText(filePath, sb.ToString(), Encoding.UTF8);
         }
 
