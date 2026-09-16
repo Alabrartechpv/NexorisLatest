@@ -717,6 +717,18 @@ namespace PosBranch_Win.Reports.InventoryReport
                     toBarcodeFilter);
 
                 _allRows = data.ToList();
+
+                // Exclude inactive items from Smart Reorder Dashboard
+                if (_allRows.Count > 0)
+                {
+                    Dropdowns statusDropdown = new Dropdowns();
+                    Dictionary<int, ItemStatusRuleInfo> statusMap = statusDropdown.GetItemStatuses(_allRows.Select(x => (int)x.ItemId));
+                    _allRows.RemoveAll(x =>
+                        string.Equals((x.Alert ?? string.Empty).Trim(), "INACTIVE ITEM", StringComparison.OrdinalIgnoreCase) ||
+                        (statusMap.TryGetValue((int)x.ItemId, out ItemStatusRuleInfo statusInfo) &&
+                         string.Equals(statusInfo.StatusName, "Inactive", StringComparison.OrdinalIgnoreCase)));
+                }
+
                 ApplyClientFilters();
             }
             catch (Exception ex)
@@ -727,7 +739,8 @@ namespace PosBranch_Win.Reports.InventoryReport
 
         private void ApplyClientFilters()
         {
-            IEnumerable<SmartReorderItemModel> filtered = _allRows;
+            IEnumerable<SmartReorderItemModel> filtered = _allRows.Where(x =>
+                !string.Equals((x.Alert ?? string.Empty).Trim(), "INACTIVE ITEM", StringComparison.OrdinalIgnoreCase));
 
             string alertFilter = GetSelectedValue(cmbAlert);
             if (!string.IsNullOrWhiteSpace(alertFilter) && !string.Equals(alertFilter, "ALL", StringComparison.OrdinalIgnoreCase))

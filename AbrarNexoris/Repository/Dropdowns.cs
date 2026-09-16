@@ -51,7 +51,6 @@ namespace Repository
         {
             switch (NormalizeItemStatusName(statusName))
             {
-                case ItemStatusInactive:
                 case ItemStatusBlockedForSale:
                 case ItemStatusDiscontinued:
                     return true;
@@ -61,6 +60,18 @@ namespace Repository
         }
 
         public static bool DoesStatusBlockPurchase(string statusName)
+        {
+            switch (NormalizeItemStatusName(statusName))
+            {
+                case ItemStatusBlockedForPurchase:
+                case ItemStatusDiscontinued:
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        public static bool DoesStatusBlockPurchaseOrder(string statusName)
         {
             switch (NormalizeItemStatusName(statusName))
             {

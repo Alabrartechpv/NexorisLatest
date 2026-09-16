@@ -1261,6 +1261,12 @@
     <Compile Include="Reports\InventoryReport\frmStockAdjustmentReport.Designer.cs">
       <DependentUpon>frmStockAdjustmentReport.cs</DependentUpon>
     </Compile>
+    <Compile Include="Reports\InventoryReport\frmInactiveItemsReport.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Reports\InventoryReport\frmInactiveItemsReport.Designer.cs">
+      <DependentUpon>frmInactiveItemsReport.cs</DependentUpon>
+    </Compile>
     <Compile Include="Reports\SalesReports\frmCustomerwiseSalesSummaryReport.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -1854,6 +1860,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Reports\InventoryReport\frmStockAdjustmentReport.resx">
       <DependentUpon>frmStockAdjustmentReport.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Reports\InventoryReport\frmInactiveItemsReport.resx">
+      <DependentUpon>frmInactiveItemsReport.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Reports\InventoryReport\frmStockReportAdvanced.resx">
       <DependentUpon>frmStockReportAdvanced.cs</DependentUpon>

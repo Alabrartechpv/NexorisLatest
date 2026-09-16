@@ -2014,7 +2014,16 @@ namespace PosBranch_Win.DialogBox
 
         private bool IsPurchaseDialog()
         {
-            return string.Equals(FormName, "FromPurchase", StringComparison.OrdinalIgnoreCase);
+            return string.Equals(FormName, "FromPurchase", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(FormName, "FrmPurchase", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private bool IsPurchaseOrderDialog()
+        {
+            return string.Equals(FormName, "frmPurchaseOrder", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(FormName, "FrmPurchaseOrder", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(FormName, "SmartReorder", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(FormName, "FrmSmartReorderDashboard", StringComparison.OrdinalIgnoreCase);
         }
 
         private bool IsStatusBlockedForCurrentDialog(DataRow row)
@@ -2030,8 +2039,24 @@ namespace PosBranch_Win.DialogBox
             bool blockPurchase = row.Table.Columns.Contains("BlockPurchase") &&
                                  row["BlockPurchase"] != DBNull.Value &&
                                  Convert.ToBoolean(row["BlockPurchase"]);
+            string itemStatus = row.Table.Columns.Contains("ItemStatus")
+                ? Dropdowns.NormalizeItemStatusName(row["ItemStatus"]?.ToString())
+                : "Active";
 
-            return (IsSalesInvoiceDialog() && blockSale) || (IsPurchaseDialog() && blockPurchase);
+            if (IsSalesInvoiceDialog())
+            {
+                return blockSale;
+            }
+            if (IsPurchaseDialog())
+            {
+                return blockPurchase;
+            }
+            if (IsPurchaseOrderDialog())
+            {
+                return string.Equals(itemStatus, "Inactive", StringComparison.OrdinalIgnoreCase) || blockPurchase;
+            }
+
+            return false;
         }
 
         private void ApplyItemStatusContextFilter(DataTable dataTable)
@@ -2046,7 +2071,7 @@ namespace PosBranch_Win.DialogBox
                 Dropdowns statusDropdown = new Dropdowns();
                 statusDropdown.ApplyItemStatuses(dataTable);
 
-                if (!IsSalesInvoiceDialog() && !IsPurchaseDialog())
+                if (!IsSalesInvoiceDialog() && !IsPurchaseDialog() && !IsPurchaseOrderDialog())
                 {
                     return;
                 }
@@ -2086,19 +2111,21 @@ namespace PosBranch_Win.DialogBox
                                  row.Cells["BlockPurchase"].Value != null &&
                                  row.Cells["BlockPurchase"].Value != DBNull.Value &&
                                  Convert.ToBoolean(row.Cells["BlockPurchase"].Value);
+            string statusName = row.Cells.Exists("ItemStatus")
+                ? Dropdowns.NormalizeItemStatusName(row.Cells["ItemStatus"].Value?.ToString())
+                : "Active";
 
-            bool isBlocked = (IsSalesInvoiceDialog() && blockSale) || (IsPurchaseDialog() && blockPurchase);
+            bool isBlocked = (IsSalesInvoiceDialog() && blockSale) ||
+                             (IsPurchaseDialog() && blockPurchase) ||
+                             (IsPurchaseOrderDialog() && (string.Equals(statusName, "Inactive", StringComparison.OrdinalIgnoreCase) || blockPurchase));
             if (!isBlocked)
             {
                 return true;
             }
 
             string itemName = row.Cells.Exists("Description") ? row.Cells["Description"].Value?.ToString() ?? "Item" : "Item";
-            string statusName = row.Cells.Exists("ItemStatus")
-                ? Dropdowns.NormalizeItemStatusName(row.Cells["ItemStatus"].Value?.ToString())
-                : "Active";
             string reason = row.Cells.Exists("StatusReason") ? row.Cells["StatusReason"].Value?.ToString() ?? string.Empty : string.Empty;
-            string actionName = IsSalesInvoiceDialog() ? "sale" : "purchase";
+            string actionName = IsSalesInvoiceDialog() ? "sale" : (IsPurchaseOrderDialog() ? "reorder/purchase order" : "purchase");
             string message = $"{itemName} is marked as '{statusName}' and is blocked for {actionName}.";
 
             if (!string.IsNullOrWhiteSpace(reason))

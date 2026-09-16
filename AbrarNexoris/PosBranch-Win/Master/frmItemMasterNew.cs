@@ -1296,7 +1296,6 @@ namespace PosBranch_Win.Master
         {
             switch (NormalizeItemStatusName(statusName))
             {
-                case ItemStatusInactive:
                 case ItemStatusBlockedForSale:
                 case ItemStatusDiscontinued:
                     return true;
@@ -1309,7 +1308,6 @@ namespace PosBranch_Win.Master
         {
             switch (NormalizeItemStatusName(statusName))
             {
-                case ItemStatusInactive:
                 case ItemStatusBlockedForPurchase:
                 case ItemStatusDiscontinued:
                     return true;
