@@ -391,7 +391,8 @@ namespace Repository.TransactionRepository
 
                             List<PurchaseStockUpdateOnPricesettings> UpdatePriceSettingsWithStock = DataConnection.Query<PurchaseStockUpdateOnPricesettings>(STOREDPROCEDURE.POS_PurchaseInvoice_PriceSettings, objPricesettingsStock, trans, commandType: CommandType.StoredProcedure).ToList<PurchaseStockUpdateOnPricesettings>();
 
-                            UpdateItemMasterCostDirectly(objPricesettingsStock.ItemID, objPricesettingsStock.UnitId, calculatedAvgCost, packingValue, trans);
+                            // NOTE: Do not overwrite item's master Unit Cost (PriceSettings.Cost) on purchase per user requirements
+                            // UpdateItemMasterCostDirectly(objPricesettingsStock.ItemID, objPricesettingsStock.UnitId, calculatedAvgCost, packingValue, trans);
                         }
                         catch (Exception ex)
                         {
@@ -816,7 +817,8 @@ namespace Repository.TransactionRepository
                             objPricesettingsStock._Operation = "CREATE";
                             List<PurchaseStockUpdateOnPricesettings> UpdatePriceSettingsWithStock = DataConnection.Query<PurchaseStockUpdateOnPricesettings>(STOREDPROCEDURE.POS_PurchaseInvoice_PriceSettings, objPricesettingsStock, trans, commandType: CommandType.StoredProcedure).ToList<PurchaseStockUpdateOnPricesettings>();
 
-                            UpdateItemMasterCostDirectly(objPricesettingsStock.ItemID, objPricesettingsStock.UnitId, calculatedAvgCost, packingValue, trans);
+                            // NOTE: Do not overwrite item's master Unit Cost (PriceSettings.Cost) on purchase update per user requirements
+                            // UpdateItemMasterCostDirectly(objPricesettingsStock.ItemID, objPricesettingsStock.UnitId, calculatedAvgCost, packingValue, trans);
                         }
                         catch (Exception ex)
                         {

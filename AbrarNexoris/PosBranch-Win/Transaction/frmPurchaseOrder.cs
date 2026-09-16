@@ -1467,7 +1467,7 @@ namespace PosBranch_Win.Transaction
 
         private void OpenItemDialog()
         {
-            using (frmdialForItemMaster itemDialog = new frmdialForItemMaster("FrmBarcode"))
+            using (frmdialForItemMaster itemDialog = new frmdialForItemMaster("frmPurchaseOrder"))
             {
                 if (itemDialog.ShowDialog(this) != DialogResult.OK)
                     return;
@@ -1495,8 +1495,26 @@ namespace PosBranch_Win.Transaction
 
             string itemNo = GetString(itemData, "BarCode", "Barcode", "ItemNo", "ItemId");
             string description = GetString(itemData, "Description", "ItemName", "ProductName");
-            string uom = GetString(itemData, "Unit", "UOM");
             int itemId = GetInt(itemData, "ItemId", "ID", "ItemID");
+
+            string itemStatus = GetString(itemData, "ItemStatus", "Status");
+            if (itemId > 0)
+            {
+                Dropdowns dropdowns = new Dropdowns();
+                ItemStatusRuleInfo statusInfo = dropdowns.GetItemStatus(itemId);
+                if (statusInfo != null && !string.IsNullOrWhiteSpace(statusInfo.StatusName))
+                {
+                    itemStatus = statusInfo.StatusName;
+                }
+            }
+
+            if (Dropdowns.NormalizeItemStatusName(itemStatus) == "Inactive" || Dropdowns.DoesStatusBlockPurchaseOrder(itemStatus))
+            {
+                MessageBox.Show($"Item '{description}' is marked as '{itemStatus}' and cannot be ordered in Purchase Order.", "Blocked Item", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            string uom = GetString(itemData, "Unit", "UOM");
             int unitId = GetInt(itemData, "UnitId", "UID");
             decimal qty = 1m;
             decimal itemMasterUnitCost = GetItemMasterUnitCost(itemId, unitId, uom, GetDecimal(itemData, "Cost", "PurchasePrice", "RetailPrice", "UnitPrice"));
