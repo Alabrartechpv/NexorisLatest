@@ -1294,6 +1294,12 @@
     <Compile Include="Reports\SalesReports\frmSalesProfit.Designer.cs">
       <DependentUpon>frmSalesProfit.cs</DependentUpon>
     </Compile>
+    <Compile Include="Reports\SalesReports\FrmSalesHoldReport.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Reports\SalesReports\FrmSalesHoldReport.Designer.cs">
+      <DependentUpon>FrmSalesHoldReport.cs</DependentUpon>
+    </Compile>
     <Compile Include="Reports\FinancialReports\FrmTradingPLAccount.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -1869,6 +1875,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Reports\SalesReports\frmSalesProfit.resx">
       <DependentUpon>frmSalesProfit.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Reports\SalesReports\FrmSalesHoldReport.resx">
+      <DependentUpon>FrmSalesHoldReport.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Reports\FinancialReports\frmCustomerLedgerReport.resx">
       <DependentUpon>frmCustomerLedgerReport.cs</DependentUpon>
