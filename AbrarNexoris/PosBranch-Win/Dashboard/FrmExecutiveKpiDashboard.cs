@@ -241,10 +241,10 @@ namespace PosBranch_Win.Dashboard
                 CreateKpiCard("3. Dead Stock (>90d)", "Capital locked in stock with no sales in last 90 days", FormatCurr(_model.DeadStockValue), $"{_model.DeadStockItemCount:N0} Inactive Items", Color.FromArgb(211, 84, 0), () => DrillDown("StockAnalytics")),
 
                 // 4. Negative Stock Impact
-                CreateKpiCard("4. Neg. Stock Impact", "Estimated financial distortion due to negative stock at cost", FormatCurr(_model.NegativeStockImpactValue), "Cost of Negative Items", Color.FromArgb(231, 76, 60), () => DrillDown("StockValuation")),
+                CreateKpiCard("4. Neg. Stock Impact", "Estimated financial distortion due to negative stock at cost", FormatCurr(_model.NegativeStockImpactValue), "Cost of Negative Items", Color.FromArgb(231, 76, 60), () => DrillDown("StockValuationNegative")),
                 
                 // 5. Negative Stock Items
-                CreateKpiCard("5. Neg. Stock Items", "Products currently running in negative inventory balance", $"{_model.NegativeStockItemCount} Items", $"Negative Qty: {_model.NegativeStockTotalQty:N0}", Color.FromArgb(192, 57, 43), () => DrillDown("StockAnalytics")),
+                CreateKpiCard("5. Neg. Stock Items", "Products currently running in negative inventory balance", $"{_model.NegativeStockItemCount} Items", $"Negative Qty: {_model.NegativeStockTotalQty:N0}", Color.FromArgb(192, 57, 43), () => DrillDown("StockValuationNegative")),
                 
                 // 6. Loss Stock (Stock OUT Adjustments)
                 CreateKpiCard("6. Loss Stock (Out)", "Total stock written off or reduced (Stock OUT adjustments)", FormatCurr(_model.LossStockValue), $"Items: {_model.LossStockItemCount:N0} | Qty: {_model.LossStockQty:N2}", Color.FromArgb(192, 57, 43), () => DrillDown("StockAdjustment")),
@@ -719,8 +719,16 @@ namespace PosBranch_Win.Dashboard
                 switch (target)
                 {
                     case "StockValuation":
-                        formToOpen = new Reports.InventoryReport.frmStockValuationReport();
+                        formToOpen = new Reports.InventoryReport.frmStockValuationReport("All Items");
                         title = "Stock Valuation Report";
+                        break;
+                    case "StockValuationPositive":
+                        formToOpen = new Reports.InventoryReport.frmStockValuationReport("Positive Stock");
+                        title = "Stock Valuation Report (Positive Stock)";
+                        break;
+                    case "StockValuationNegative":
+                        formToOpen = new Reports.InventoryReport.frmStockValuationReport("Negative Stock");
+                        title = "Stock Valuation Report (Negative Stock)";
                         break;
                     case "StockAnalytics":
                         formToOpen = new FrmStockAnalytics();

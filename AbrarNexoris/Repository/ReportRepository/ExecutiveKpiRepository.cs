@@ -196,6 +196,86 @@ namespace Repository.ReportRepository
                         }
                     }
                 }
+
+                // ═══════════════════════════════════════════════════════════════════
+                // RECONCILE: Override stock metrics using the same SP as the
+                // Stock Valuation Report (_Test16 / _POS_StockReportAdvanced)
+                // so that the dashboard and the report always match exactly.
+                // ═══════════════════════════════════════════════════════════════════
+                try
+                {
+                    if (DataConnection.State != ConnectionState.Open)
+                        DataConnection.Open();
+
+                    using (SqlCommand cmdStock = new SqlCommand(STOREDPROCEDURE._POS_StockReportAdvanced, (SqlConnection)DataConnection))
+                    {
+                        cmdStock.CommandType = CommandType.StoredProcedure;
+                        cmdStock.CommandTimeout = 180;
+                        cmdStock.Parameters.AddWithValue("@FromDate", new DateTime(1753, 1, 1));
+                        cmdStock.Parameters.AddWithValue("@ToDate", DateTime.Today.AddDays(1).AddTicks(-1));
+                        cmdStock.Parameters.AddWithValue("@CompanyId", effectiveCompany);
+                        cmdStock.Parameters.AddWithValue("@BranchId", effectiveBranch);
+                        cmdStock.Parameters.AddWithValue("@FinYearId", effectiveFinYear);
+                        cmdStock.Parameters.AddWithValue("@BarcodeContains", DBNull.Value);
+                        cmdStock.Parameters.AddWithValue("@GroupId", DBNull.Value);
+                        cmdStock.Parameters.AddWithValue("@CategoryId", DBNull.Value);
+                        cmdStock.Parameters.AddWithValue("@SubCategoryId", DBNull.Value);
+                        cmdStock.Parameters.AddWithValue("@LedgerId", DBNull.Value);
+
+                        using (SqlDataAdapter adaptStock = new SqlDataAdapter(cmdStock))
+                        {
+                            DataTable dtStock = new DataTable();
+                            adaptStock.Fill(dtStock);
+
+                            if (dtStock != null && dtStock.Rows.Count > 0)
+                            {
+                                decimal totalCostValueAll = 0;
+                                decimal totalRetailValueAll = 0;
+                                decimal totalQtyAll = 0;
+                                int itemCountAll = 0;
+
+                                decimal negImpactValue = 0;
+                                decimal negTotalQty = 0;
+                                int negItemCount = 0;
+
+                                foreach (DataRow sr in dtStock.Rows)
+                                {
+                                    decimal closingStock = sr["ClosingStock"] != DBNull.Value ? Convert.ToDecimal(sr["ClosingStock"]) : 0;
+                                    decimal cost = sr["Cost"] != DBNull.Value ? Convert.ToDecimal(sr["Cost"]) : 0;
+                                    decimal retail = sr["RetailPrice"] != DBNull.Value ? Convert.ToDecimal(sr["RetailPrice"]) : 0;
+
+                                    totalCostValueAll += closingStock * cost;
+                                    totalRetailValueAll += closingStock * retail;
+                                    totalQtyAll += closingStock;
+                                    itemCountAll++;
+
+                                    if (closingStock < 0)
+                                    {
+                                        negImpactValue += Math.Abs(closingStock) * cost;
+                                        negTotalQty += closingStock; // negative
+                                        negItemCount++;
+                                    }
+                                }
+
+                                // Override with accurate net values matching the Stock Report
+                                model.TotalStockCostValue = totalCostValueAll;
+                                model.TotalStockRetailValue = totalRetailValueAll;
+                                model.StockProfitPotential = totalRetailValueAll - totalCostValueAll;
+                                model.TotalStockItemCount = itemCountAll;
+                                model.TotalStockQuantity = totalQtyAll;
+
+                                model.NegativeStockImpactValue = negImpactValue;
+                                model.NegativeStockItemCount = negItemCount;
+                                model.NegativeStockTotalQty = negTotalQty;
+                            }
+                        }
+                    }
+                }
+                catch (Exception exStock)
+                {
+                    // If the reconciliation query fails, keep the original dashboard values
+                    System.Diagnostics.Debug.WriteLine($"Stock reconciliation fallback: {exStock.Message}");
+                }
             }
             catch (Exception ex)
             {
