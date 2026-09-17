@@ -86,8 +86,10 @@ namespace Repository.ReportRepository
 
                             model.LossStockValue = GetDecimal(r, "LossStockValue");
                             model.LossStockQty = GetDecimal(r, "LossStockQty");
+                            model.LossStockItemCount = GetInt(r, "LossStockItemCount");
                             model.ExtraStockValue = GetDecimal(r, "ExtraStockValue");
                             model.ExtraStockQty = GetDecimal(r, "ExtraStockQty");
+                            model.ExtraStockItemCount = GetInt(r, "ExtraStockItemCount");
                             model.NetStockAdjustmentValue = GetDecimal(r, "NetStockAdjustmentValue");
 
                             // 2. Sales, Purchases, Returns & Discounts

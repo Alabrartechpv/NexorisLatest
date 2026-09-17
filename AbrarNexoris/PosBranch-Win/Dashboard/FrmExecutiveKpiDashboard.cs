@@ -246,14 +246,14 @@ namespace PosBranch_Win.Dashboard
                 // 5. Negative Stock Items
                 CreateKpiCard("5. Neg. Stock Items", "Products currently running in negative inventory balance", $"{_model.NegativeStockItemCount} Items", $"Negative Qty: {_model.NegativeStockTotalQty:N0}", Color.FromArgb(192, 57, 43), () => DrillDown("StockAnalytics")),
                 
-                // 6. Loss Stock (Damaged / Out)
-                CreateKpiCard("6. Loss Stock (Damaged)", "Total stock written off or damaged (Stock OUT adjustments)", FormatCurr(_model.LossStockValue), $"Discrepancy: {_model.LossStockQty:N2}", Color.FromArgb(192, 57, 43), () => DrillDown("StockAdjustment")),
+                // 6. Loss Stock (Stock OUT Adjustments)
+                CreateKpiCard("6. Loss Stock (Out)", "Total stock written off or reduced (Stock OUT adjustments)", FormatCurr(_model.LossStockValue), $"Items: {_model.LossStockItemCount:N0} | Qty: {_model.LossStockQty:N2}", Color.FromArgb(192, 57, 43), () => DrillDown("StockAdjustment")),
 
-                // 7. Extra Stock (Found / In)
-                CreateKpiCard("7. Extra Stock (Found)", "Total surplus stock found and added (Stock IN adjustments)", FormatCurr(_model.ExtraStockValue), $"Surplus Qty: {_model.ExtraStockQty:N2}", Color.FromArgb(22, 160, 133), () => DrillDown("StockAdjustment")),
+                // 7. Extra Stock (Stock IN Adjustments)
+                CreateKpiCard("7. Extra Stock (In)", "Total surplus stock found and added (Stock IN adjustments)", FormatCurr(_model.ExtraStockValue), $"Items: {_model.ExtraStockItemCount:N0} | Qty: {_model.ExtraStockQty:N2}", Color.FromArgb(22, 160, 133), () => DrillDown("StockAdjustment")),
                 
                 // 8. Net Stock Adjustment
-                CreateKpiCard("8. Stock Adj. Balance", "Net variance between stock additions and write-offs", FormatCurr(_model.NetStockAdjustmentValue), _model.NetStockAdjustmentValue >= 0 ? "Surplus Net Balance" : "Shortage Variance", Color.FromArgb(142, 68, 173), () => DrillDown("StockAdjustment")),
+                CreateKpiCard("8. Stock Adj. Balance", "Net variance between stock additions and write-offs", FormatCurr(_model.NetStockAdjustmentValue), _model.NetStockAdjustmentValue >= 0 ? "Surplus Net Balance" : "Shortage Variance", _model.NetStockAdjustmentValue >= 0 ? Color.FromArgb(22, 160, 133) : Color.FromArgb(192, 57, 43), () => DrillDown("StockAdjustment")),
                 
                 // 9. Excess Stock Alert
                 CreateKpiCard("9. Excess Stock Alert", "Products exceeding maximum inventory threshold", $"{_model.ExcessStockAlertCount} Items", "Over Maximum Limit", Color.FromArgb(243, 156, 18), () => DrillDown("SmartReorder")),
@@ -289,7 +289,7 @@ namespace PosBranch_Win.Dashboard
                 CreateKpiCard("19. Actual Net Profit", "Bottom-line net earnings after deducting cost of sales and expenses", FormatCurr(_model.ActualNetProfit), $"Margin: {_model.OperatingProfitMarginPercent:N2}%", _model.ActualNetProfit >= 0 ? Color.FromArgb(39, 174, 96) : Color.FromArgb(192, 57, 43), () => DrillDown("ProfitLoss")),
 
                 // 20. Operating Profit Margin %
-                CreateKpiCard("20. Profit Margin %", "Ratio of net profit generated from sales turnover", $"{_model.OperatingProfitMarginPercent:N2}%", "Net Profit / Sales", Color.FromArgb(22, 160, 133), () => DrillDown("ProfitLoss")),
+                CreateKpiCard("20. Profit Margin %", "Ratio of net profit generated from sales turnover", $"{_model.OperatingProfitMarginPercent:N2}%", "Net Profit / Sales", _model.OperatingProfitMarginPercent >= 0 ? Color.FromArgb(22, 160, 133) : Color.FromArgb(192, 57, 43), () => DrillDown("ProfitLoss")),
 
                 // 21. GST / Net Tax Liability
                 CreateKpiCard("21. GST Tax Liability", "Net government GST liability (Output GST - Input GST credit)", FormatCurr(_model.NetTaxLiability), $"Out: {FormatCurr(_model.OutputGstAmount)} | In: {FormatCurr(_model.InputGstAmount)}", Color.FromArgb(52, 73, 94), () => DrillDown("GovtGSTReturnReport")),
@@ -472,11 +472,19 @@ namespace PosBranch_Win.Dashboard
             };
             card.Controls.Add(lblTitle);
 
+            bool isValNegative = mainValue.Trim().StartsWith("-") 
+                              || mainValue.Contains("-₹") 
+                              || (mainValue.EndsWith("%") && mainValue.StartsWith("-"));
+
+            Color valueColor = isValNegative ? Color.FromArgb(192, 57, 43) : Color.FromArgb(12, 30, 58);
+            Color barColor = isValNegative ? Color.FromArgb(192, 57, 43) : accentColor;
+            topBar.BackColor = barColor;
+
             var lblValue = new Label
             {
                 Text = mainValue,
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(12, 30, 58),
+                ForeColor = valueColor,
                 Location = new Point(4, 20),
                 Size = new Size(152, 22),
                 AutoEllipsis = true,
@@ -485,11 +493,14 @@ namespace PosBranch_Win.Dashboard
             };
             card.Controls.Add(lblValue);
 
+            bool isFooterNegative = !string.IsNullOrEmpty(footerInfo) && (footerInfo.Contains("Negative Qty: -") || footerInfo.Contains("Shortage") || footerInfo.Contains("-"));
+            Color footerColor = isFooterNegative ? Color.FromArgb(192, 57, 43) : Color.FromArgb(110, 125, 145);
+
             var lblFooter = new Label
             {
                 Text = footerInfo,
-                Font = new Font("Segoe UI", 6.8F, FontStyle.Regular),
-                ForeColor = Color.FromArgb(110, 125, 145),
+                Font = new Font("Segoe UI", 6.8F, isFooterNegative ? FontStyle.Bold : FontStyle.Regular),
+                ForeColor = footerColor,
                 Location = new Point(4, 42),
                 Size = new Size(152, 14),
                 AutoEllipsis = true,
@@ -1056,8 +1067,8 @@ namespace PosBranch_Win.Dashboard
                 Tuple.Create(3, "Non-Moving / Dead Stock Value", FormatCurr(_model.DeadStockValue), $"{_model.DeadStockItemCount:N0} Inactive items with no sales in past 90 days"),
                 Tuple.Create(4, "Negative Stock Impact", FormatCurr(_model.NegativeStockImpactValue), "Cost value distortion from negative stock"),
                 Tuple.Create(5, "Negative Stock Items", $"{_model.NegativeStockItemCount} Items", $"Total Negative Quantity: {_model.NegativeStockTotalQty:N0}"),
-                Tuple.Create(6, "Loss Stock (Damaged / Out)", FormatCurr(_model.LossStockValue), $"Damaged & Written Off ({_model.LossStockQty:N2} Qty)"),
-                Tuple.Create(7, "Extra Stock (Found / In)", FormatCurr(_model.ExtraStockValue), $"Surplus Stock Added ({_model.ExtraStockQty:N2} Qty)"),
+                Tuple.Create(6, "Loss Stock (Out)", FormatCurr(_model.LossStockValue), _model.LossStockItemCount > 0 ? $"Stock Out ({_model.LossStockItemCount:N0} Items, {_model.LossStockQty:N2} Qty)" : $"Stock Out ({_model.LossStockQty:N2} Qty)"),
+                Tuple.Create(7, "Extra Stock (In)", FormatCurr(_model.ExtraStockValue), _model.ExtraStockItemCount > 0 ? $"Stock In ({_model.ExtraStockItemCount:N0} Items, {_model.ExtraStockQty:N2} Qty)" : $"Stock In ({_model.ExtraStockQty:N2} Qty)"),
                 Tuple.Create(8, "Net Stock Adjustment", FormatCurr(_model.NetStockAdjustmentValue), "Net Discrepancy Balance"),
                 Tuple.Create(9, "Excess Stock Alert", $"{_model.ExcessStockAlertCount} Items", "Items above maximum inventory limits"),
                 Tuple.Create(10, "Low Stock Alert", $"{_model.LowStockAlertCount} Items", "Items below minimum safety stock"),
@@ -1169,8 +1180,8 @@ namespace PosBranch_Win.Dashboard
             sb.AppendLine($"<tr><td>3</td><td>Non-Moving / Dead Stock Value</td><td class='value'>{FormatCurr(_model.DeadStockValue)}</td><td>{_model.DeadStockItemCount:N0} Inactive items with no sales in past 90 days</td></tr>");
             sb.AppendLine($"<tr><td>4</td><td>Negative Stock Impact</td><td class='value'>{FormatCurr(_model.NegativeStockImpactValue)}</td><td>Cost value distortion from negative stock</td></tr>");
             sb.AppendLine($"<tr><td>5</td><td>Negative Stock Items</td><td class='value'>{_model.NegativeStockItemCount} Items</td><td>Total Negative Quantity: {_model.NegativeStockTotalQty:N0}</td></tr>");
-            sb.AppendLine($"<tr><td>6</td><td>Loss Stock (Damaged / Out)</td><td class='value'>{FormatCurr(_model.LossStockValue)}</td><td>Damaged & Written Off ({_model.LossStockQty:N2} Qty)</td></tr>");
-            sb.AppendLine($"<tr><td>7</td><td>Extra Stock (Found / In)</td><td class='value'>{FormatCurr(_model.ExtraStockValue)}</td><td>Surplus Stock Added ({_model.ExtraStockQty:N2} Qty)</td></tr>");
+            sb.AppendLine($"<tr><td>6</td><td>Loss Stock (Out)</td><td class='value'>{FormatCurr(_model.LossStockValue)}</td><td>{(_model.LossStockItemCount > 0 ? $"Stock Out ({_model.LossStockItemCount:N0} Items, {_model.LossStockQty:N2} Qty)" : $"Stock Out ({_model.LossStockQty:N2} Qty)")}</td></tr>");
+            sb.AppendLine($"<tr><td>7</td><td>Extra Stock (In)</td><td class='value'>{FormatCurr(_model.ExtraStockValue)}</td><td>{(_model.ExtraStockItemCount > 0 ? $"Stock In ({_model.ExtraStockItemCount:N0} Items, {_model.ExtraStockQty:N2} Qty)" : $"Stock In ({_model.ExtraStockQty:N2} Qty)")}</td></tr>");
             sb.AppendLine($"<tr><td>8</td><td>Net Stock Adjustment</td><td class='value'>{FormatCurr(_model.NetStockAdjustmentValue)}</td><td>Net Discrepancy Balance</td></tr>");
             sb.AppendLine($"<tr><td>9</td><td>Excess Stock Alert</td><td class='value'>{_model.ExcessStockAlertCount} Items</td><td>Items above maximum inventory limits</td></tr>");
             sb.AppendLine($"<tr><td>10</td><td>Low Stock Alert</td><td class='value'>{_model.LowStockAlertCount} Items</td><td>Items below minimum safety stock</td></tr>");
@@ -1215,8 +1226,8 @@ namespace PosBranch_Win.Dashboard
             sb.AppendLine($"3,Non-Moving / Dead Stock Value,\"{_model.DeadStockValue:N2}\",Inactive Items: {_model.DeadStockItemCount}");
             sb.AppendLine($"4,Negative Stock Impact,\"{_model.NegativeStockImpactValue:N2}\",Cost Value Distortion");
             sb.AppendLine($"5,Negative Stock Items,\"{_model.NegativeStockItemCount}\",Total Qty: {_model.NegativeStockTotalQty:N0}");
-            sb.AppendLine($"6,Loss Stock (Damaged / Out),\"{_model.LossStockValue:N2}\",Discrepancy Qty: {_model.LossStockQty:N2}");
-            sb.AppendLine($"7,Extra Stock (Found / In),\"{_model.ExtraStockValue:N2}\",Surplus Qty: {_model.ExtraStockQty:N2}");
+            sb.AppendLine($"6,Loss Stock (Out),\"{_model.LossStockValue:N2}\",{(_model.LossStockItemCount > 0 ? $"Stock Out ({_model.LossStockItemCount:N0} Items | {_model.LossStockQty:N2} Qty)" : $"Out Qty: {_model.LossStockQty:N2}")}");
+            sb.AppendLine($"7,Extra Stock (In),\"{_model.ExtraStockValue:N2}\",{(_model.ExtraStockItemCount > 0 ? $"Stock In ({_model.ExtraStockItemCount:N0} Items | {_model.ExtraStockQty:N2} Qty)" : $"In Qty: {_model.ExtraStockQty:N2}")}");
             sb.AppendLine($"8,Net Stock Adjustment,\"{_model.NetStockAdjustmentValue:N2}\",Net Variance");
             sb.AppendLine($"9,Excess Stock Alert,\"{_model.ExcessStockAlertCount}\",Over Max Limit");
             sb.AppendLine($"10,Low Stock Alert,\"{_model.LowStockAlertCount}\",Below Min Limit");
@@ -1265,6 +1276,8 @@ namespace PosBranch_Win.Dashboard
 
         private string FormatCurr(decimal val)
         {
+            if (val < 0)
+                return "-₹ " + Math.Abs(val).ToString("N2", _culture);
             return "₹ " + val.ToString("N2", _culture);
         }
     }
