@@ -3,6 +3,7 @@ using Infragistics.Win.UltraWinGrid;
 using ModelClass;
 using Repository;
 using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
 using System.Drawing;
@@ -98,54 +99,108 @@ namespace PosBranch_Win.DialogBox
             try
             {
                 fullDataTable = GetAllItems();
-                ApplyStatusFilter(fullDataTable);
-                textBox3.Text = fullDataTable.Rows.Count.ToString();
+                SortInactiveItems(fullDataTable);
+                if (textBox3 != null)
+                {
+                    textBox3.Text = fullDataTable.Rows.Count.ToString();
+                }
                 ultraGrid1.DataSource = fullDataTable;
                 ApplyFilter();
                 this.Text = "Inactive Items";
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Error loading inactive items: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                System.Diagnostics.Debug.WriteLine("Error loading inactive items: " + ex.Message);
                 fullDataTable = new DataTable();
+                StandardizeColumns(fullDataTable);
                 ultraGrid1.DataSource = fullDataTable;
-                textBox3.Text = "0";
+                if (textBox3 != null)
+                {
+                    textBox3.Text = "0";
+                }
             }
         }
 
         private DataTable GetAllItems()
         {
-            using (BaseRepostitory repo = new BaseRepostitory())
+            DataTable table = new DataTable();
+            table.Columns.Add("ItemId", typeof(int));
+            table.Columns.Add("ItemNo", typeof(string));
+            table.Columns.Add("BarCode", typeof(string));
+            table.Columns.Add("Description", typeof(string));
+            table.Columns.Add("Unit", typeof(string));
+            table.Columns.Add("Stock", typeof(decimal));
+            table.Columns.Add("ItemStatus", typeof(string));
+            table.Columns.Add("StatusReason", typeof(string));
+            table.Columns.Add("StatusDate", typeof(DateTime));
+
+            try
             {
-                SqlConnection connection = repo.DataConnection as SqlConnection;
-                if (connection == null)
-                {
-                    return new DataTable();
-                }
+                Repository.ReportRepository.InactiveItemsReportRepository repo = new Repository.ReportRepository.InactiveItemsReportRepository();
+                var reportData = repo.GetInactiveItemsReport(new ModelClass.Report.InactiveItemsReportFilter());
 
-                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_ItemDetalisDDL, connection))
+                if (reportData != null)
                 {
-                    cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@BranchId", DataBase.BranchId);
-                    cmd.Parameters.AddWithValue("@CompanyId", DataBase.CompanyId);
-                    cmd.Parameters.AddWithValue("@Barcode", "");
-                    cmd.Parameters.AddWithValue("@ItemName", "");
-                    cmd.Parameters.AddWithValue("@Operation", "GETALL");
-
-                    DataTable table = new DataTable();
-                    using (SqlDataAdapter adapter = new SqlDataAdapter(cmd))
+                    foreach (var item in reportData)
                     {
-                        adapter.Fill(table);
+                        table.Rows.Add(
+                            item.ItemId,
+                            item.ItemNo ?? "",
+                            item.Barcode ?? "",
+                            item.ItemName ?? "",
+                            item.Unit ?? "",
+                            item.Stock,
+                            string.IsNullOrWhiteSpace(item.ItemStatus) ? "Inactive" : item.ItemStatus,
+                            item.StatusReason ?? "",
+                            item.StatusDate ?? item.CreatedOn ?? DateTime.Now
+                        );
                     }
-
-                    return table;
                 }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"GetAllItems error: {ex.Message}");
+            }
+
+            StandardizeColumns(table);
+            return table;
+        }
+
+        private static void StandardizeColumns(DataTable table)
+        {
+            if (table == null) return;
+
+            MapColumn(table, "Barcode", "BarCode");
+            MapColumn(table, "ItemName", "Description");
+            MapColumn(table, "Item Name", "Description");
+            MapColumn(table, "ItemDescription", "Description");
+            MapColumn(table, "BaseUnitName", "Unit");
+            MapColumn(table, "UnitName", "Unit");
+            MapColumn(table, "ClosingStock", "Stock");
+            MapColumn(table, "AvailableStock", "Stock");
+            MapColumn(table, "Status", "ItemStatus");
+            MapColumn(table, "StatusName", "ItemStatus");
+
+            if (!table.Columns.Contains("BarCode")) table.Columns.Add("BarCode", typeof(string));
+            if (!table.Columns.Contains("Description")) table.Columns.Add("Description", typeof(string));
+            if (!table.Columns.Contains("Unit")) table.Columns.Add("Unit", typeof(string));
+            if (!table.Columns.Contains("Stock")) table.Columns.Add("Stock", typeof(decimal));
+            if (!table.Columns.Contains("ItemStatus")) table.Columns.Add("ItemStatus", typeof(string));
+            if (!table.Columns.Contains("StatusReason")) table.Columns.Add("StatusReason", typeof(string));
+            if (!table.Columns.Contains("StatusDate")) table.Columns.Add("StatusDate", typeof(DateTime));
+        }
+
+        private static void MapColumn(DataTable table, string oldName, string newName)
+        {
+            if (table.Columns.Contains(oldName) && !table.Columns.Contains(newName))
+            {
+                table.Columns[oldName].ColumnName = newName;
             }
         }
 
         private void ApplyStatusFilter(DataTable table)
         {
-            if (table == null)
+            if (table == null || table.Rows.Count == 0)
             {
                 return;
             }
@@ -218,37 +273,52 @@ namespace PosBranch_Win.DialogBox
                 switch (filterOption)
                 {
                     case "Barcode":
-                        view.RowFilter = ColumnLikeFilter("BarCode", escaped);
+                        view.RowFilter = ColumnLikeFilter(view.Table, "BarCode", escaped);
                         break;
                     case "Item Name":
-                        view.RowFilter = ColumnLikeFilter("Description", escaped);
+                        view.RowFilter = ColumnLikeFilter(view.Table, "Description", escaped);
                         break;
                     case "Status":
-                        view.RowFilter = ColumnLikeFilter("ItemStatus", escaped);
+                        view.RowFilter = ColumnLikeFilter(view.Table, "ItemStatus", escaped);
                         break;
                     default:
                         view.RowFilter = string.Join(" OR ", new[]
                         {
-                            ColumnLikeFilter("BarCode", escaped),
-                            ColumnLikeFilter("Description", escaped),
-                            ColumnLikeFilter("ItemStatus", escaped)
+                            ColumnLikeFilter(view.Table, "BarCode", escaped),
+                            ColumnLikeFilter(view.Table, "Description", escaped),
+                            ColumnLikeFilter(view.Table, "ItemStatus", escaped)
                         }.Where(filter => !string.IsNullOrWhiteSpace(filter)));
                         break;
                 }
             }
 
             ultraGrid1.DataSource = view;
-            textBox3.Text = view.Count.ToString();
+            if (textBox3 != null)
+            {
+                textBox3.Text = view.Count.ToString();
+            }
         }
 
-        private string ColumnLikeFilter(string columnName, string escapedSearchText)
+        private string ColumnLikeFilter(DataTable table, string columnName, string escapedSearchText)
         {
-            if (fullDataTable == null || !fullDataTable.Columns.Contains(columnName))
-            {
-                return string.Empty;
-            }
+            if (table == null) return string.Empty;
+            string actualCol = FindTableColumnName(table, columnName);
+            if (string.IsNullOrEmpty(actualCol)) return string.Empty;
 
-            return $"CONVERT([{columnName}], 'System.String') LIKE '%{escapedSearchText}%'";
+            return $"CONVERT([{actualCol}], 'System.String') LIKE '%{escapedSearchText}%'";
+        }
+
+        private string FindTableColumnName(DataTable table, string name)
+        {
+            if (table == null) return null;
+            foreach (DataColumn col in table.Columns)
+            {
+                if (string.Equals(col.ColumnName, name, StringComparison.OrdinalIgnoreCase))
+                {
+                    return col.ColumnName;
+                }
+            }
+            return null;
         }
 
         private void textBoxsearch_TextChanged(object sender, EventArgs e)
@@ -261,10 +331,11 @@ namespace PosBranch_Win.DialogBox
             e.Layout.Override.BorderStyleRow = Infragistics.Win.UIElementBorderStyle.Solid;
             e.Layout.Override.BorderStyleCell = Infragistics.Win.UIElementBorderStyle.Solid;
             e.Layout.Override.HeaderClickAction = HeaderClickAction.SortMulti;
-            e.Layout.Override.RowSelectorWidth = 20;
+            e.Layout.Override.RowSelectorWidth = 25;
+            e.Layout.Override.RowSelectorNumberStyle = RowSelectorNumberStyle.RowIndex;
             e.Layout.Override.CellClickAction = CellClickAction.RowSelect;
             e.Layout.Override.AllowUpdate = DefaultableBoolean.False;
-            e.Layout.Override.DefaultRowHeight = 30;
+            e.Layout.Override.DefaultRowHeight = 28;
             e.Layout.Override.CellAppearance.TextVAlign = VAlign.Middle;
             e.Layout.ViewStyleBand = ViewStyleBand.OutlookGroupBy;
             e.Layout.GroupByBox.Hidden = true;
@@ -276,7 +347,7 @@ namespace PosBranch_Win.DialogBox
             e.Layout.Override.HeaderAppearance.ForeColor = Color.White;
             e.Layout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.True;
 
-            if (e.Layout.Bands.Count == 0)
+            if (e.Layout.Bands.Count == 0 || e.Layout.Bands[0].Columns.Count == 0)
             {
                 return;
             }
@@ -297,12 +368,12 @@ namespace PosBranch_Win.DialogBox
 
         private void ShowColumn(UltraGridBand band, string key, string caption, int position, int width, string format = null, HAlign alignment = HAlign.Left)
         {
-            if (!band.Columns.Exists(key))
+            UltraGridColumn column = FindColumn(band, key);
+            if (column == null)
             {
                 return;
             }
 
-            UltraGridColumn column = band.Columns[key];
             column.Hidden = false;
             column.Header.Caption = caption;
             column.Header.VisiblePosition = position;
@@ -314,5 +385,18 @@ namespace PosBranch_Win.DialogBox
                 column.Format = format;
             }
         }
+
+        private UltraGridColumn FindColumn(UltraGridBand band, string key)
+        {
+            if (band == null || string.IsNullOrWhiteSpace(key)) return null;
+            foreach (UltraGridColumn col in band.Columns)
+            {
+                if (string.Equals(col.Key, key, StringComparison.OrdinalIgnoreCase))
+                {
+                    return col;
+                }
+            }
+            return null;
+        }
     }
-}
+}

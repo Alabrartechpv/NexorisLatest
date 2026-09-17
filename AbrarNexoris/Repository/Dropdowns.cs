@@ -167,18 +167,122 @@ namespace Repository
                     openedHere = true;
                 }
 
-                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_ItemMasterStatusRules, connection))
+                using (SqlCommand cmd = new SqlCommand(@"
+IF OBJECT_ID(N'dbo.POS_ItemMasterStatusRules', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.POS_ItemMasterStatusRules
+    (
+        RuleId INT IDENTITY(1,1) PRIMARY KEY,
+        ItemId INT NOT NULL UNIQUE,
+        CompanyId INT NULL DEFAULT 0,
+        BranchId INT NULL DEFAULT 0,
+        StatusName NVARCHAR(100) NOT NULL DEFAULT N'Active',
+        StatusReason NVARCHAR(500) NULL,
+        StatusDate DATETIME NULL DEFAULT GETDATE(),
+        BlockSale BIT NOT NULL DEFAULT 0,
+        BlockPurchase BIT NOT NULL DEFAULT 0,
+        CreatedOn DATETIME NULL DEFAULT GETDATE(),
+        UpdatedOn DATETIME NULL DEFAULT GETDATE()
+    );
+END
+
+IF OBJECT_ID(N'dbo._POS_ItemMasterStatusRules', N'P') IS NULL
+    EXEC(N'CREATE PROCEDURE dbo._POS_ItemMasterStatusRules AS BEGIN SET NOCOUNT ON; END');", connection))
                 {
-                    cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@_Operation", "INITIALIZE");
+                    cmd.ExecuteNonQuery();
+                }
+
+                using (SqlCommand cmd = new SqlCommand(@"
+ALTER PROCEDURE dbo._POS_ItemMasterStatusRules
+    @_Operation NVARCHAR(50) = N'GETALL',
+    @ItemId INT = 0,
+    @CompanyId INT = 0,
+    @BranchId INT = 0,
+    @StatusName NVARCHAR(100) = N'Active',
+    @StatusReason NVARCHAR(500) = NULL,
+    @StatusDate DATETIME = NULL,
+    @BlockSale BIT = 0,
+    @BlockPurchase BIT = 0
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF @_Operation = N'INITIALIZE' OR @_Operation = N'ENSURESTATUSSTORAGE'
+    BEGIN
+        SELECT 1 AS Result;
+        RETURN;
+    END
+
+    IF @_Operation = N'SAVE' OR @_Operation = N'SAVESTATUS'
+    BEGIN
+        IF EXISTS (SELECT 1 FROM dbo.POS_ItemMasterStatusRules WHERE ItemId = @ItemId)
+        BEGIN
+            UPDATE dbo.POS_ItemMasterStatusRules
+            SET StatusName = @StatusName,
+                StatusReason = @StatusReason,
+                StatusDate = ISNULL(@StatusDate, GETDATE()),
+                BlockSale = @BlockSale,
+                BlockPurchase = @BlockPurchase,
+                UpdatedOn = GETDATE(),
+                CompanyId = ISNULL(NULLIF(@CompanyId, 0), CompanyId),
+                BranchId = ISNULL(NULLIF(@BranchId, 0), BranchId)
+            WHERE ItemId = @ItemId;
+        END
+        ELSE
+        BEGIN
+            INSERT INTO dbo.POS_ItemMasterStatusRules (ItemId, CompanyId, BranchId, StatusName, StatusReason, StatusDate, BlockSale, BlockPurchase)
+            VALUES (@ItemId, @CompanyId, @BranchId, @StatusName, @StatusReason, ISNULL(@StatusDate, GETDATE()), @BlockSale, @BlockPurchase);
+        END
+
+        IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.ItemMaster') AND name = N'Status')
+        BEGIN
+            EXEC(N'UPDATE dbo.ItemMaster SET Status = ''' + @StatusName + ''' WHERE ItemId = ' + @ItemId);
+        END
+
+        IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.ItemMaster') AND name = N'IsActive')
+        BEGIN
+            IF UPPER(LTRIM(RTRIM(@StatusName))) = N'INACTIVE'
+                EXEC(N'UPDATE dbo.ItemMaster SET IsActive = 0 WHERE ItemId = ' + @ItemId);
+            ELSE
+                EXEC(N'UPDATE dbo.ItemMaster SET IsActive = 1 WHERE ItemId = ' + @ItemId);
+        END
+
+        SELECT 1 AS Result;
+        RETURN;
+    END
+
+    IF @_Operation = N'GET' OR @_Operation = N'GETSTATUS' OR @_Operation = N'GETITEM'
+    BEGIN
+        SELECT TOP 1 ItemId, StatusName, StatusReason, StatusDate, BlockSale, BlockPurchase
+        FROM dbo.POS_ItemMasterStatusRules
+        WHERE ItemId = @ItemId;
+        RETURN;
+    END
+
+    IF @_Operation = N'GETALL'
+    BEGIN
+        SELECT 
+            COALESCE(sr.ItemId, im.ItemId) AS ItemId,
+            ISNULL(sr.StatusName, CASE WHEN UPPER(LTRIM(RTRIM(ISNULL(im.Status, '')))) = 'INACTIVE' OR CAST(ISNULL(im.IsActive, 1) AS VARCHAR(10)) IN ('0', 'N', 'false', 'False') THEN 'Inactive' ELSE 'Active' END) AS StatusName,
+            ISNULL(sr.StatusReason, '') AS StatusReason,
+            ISNULL(sr.StatusDate, GETDATE()) AS StatusDate,
+            ISNULL(sr.BlockSale, CASE WHEN UPPER(LTRIM(RTRIM(ISNULL(im.Status, '')))) = 'INACTIVE' OR CAST(ISNULL(im.IsActive, 1) AS VARCHAR(10)) IN ('0', 'N', 'false', 'False') THEN 1 ELSE 0 END) AS BlockSale,
+            ISNULL(sr.BlockPurchase, CASE WHEN UPPER(LTRIM(RTRIM(ISNULL(im.Status, '')))) = 'INACTIVE' OR CAST(ISNULL(im.IsActive, 1) AS VARCHAR(10)) IN ('0', 'N', 'false', 'False') THEN 1 ELSE 0 END) AS BlockPurchase
+        FROM dbo.POS_ItemMasterStatusRules sr WITH (NOLOCK)
+        FULL OUTER JOIN dbo.ItemMaster im WITH (NOLOCK) ON sr.ItemId = im.ItemId;
+        RETURN;
+    END
+END", connection))
+                {
                     cmd.ExecuteNonQuery();
                 }
 
                 itemStatusStorageEnsured = true;
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Debug.WriteLine($"Error ensuring item status storage: {ex.Message}");
                 itemStatusStorageEnsured = true;
                 return true;
             }
@@ -333,11 +437,26 @@ namespace Repository
                     status = CreateDefaultItemStatus(itemId);
                 }
 
-                row["ItemStatus"] = NormalizeItemStatusName(status.StatusName);
+                string existingStatus = row.Table.Columns.Contains("ItemStatus") && row["ItemStatus"] != DBNull.Value ? row["ItemStatus"].ToString() : string.Empty;
+                string existingIsActive = row.Table.Columns.Contains("IsActive") && row["IsActive"] != DBNull.Value ? row["IsActive"].ToString() : string.Empty;
+
+                string finalStatus = NormalizeItemStatusName(status.StatusName);
+                if (string.Equals(finalStatus, "Active", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (string.Equals(existingStatus?.Trim(), "Inactive", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(existingIsActive?.Trim(), "0", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(existingIsActive?.Trim(), "N", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(existingIsActive?.Trim(), "false", StringComparison.OrdinalIgnoreCase))
+                    {
+                        finalStatus = "Inactive";
+                    }
+                }
+
+                row["ItemStatus"] = finalStatus;
                 row["StatusReason"] = status.StatusReason ?? string.Empty;
                 row["StatusDate"] = status.StatusDate.HasValue ? (object)status.StatusDate.Value.Date : DBNull.Value;
-                row["BlockSale"] = status.BlockSale;
-                row["BlockPurchase"] = status.BlockPurchase;
+                row["BlockSale"] = status.BlockSale || string.Equals(finalStatus, "Inactive", StringComparison.OrdinalIgnoreCase);
+                row["BlockPurchase"] = status.BlockPurchase || string.Equals(finalStatus, "Inactive", StringComparison.OrdinalIgnoreCase);
             }
         }
 

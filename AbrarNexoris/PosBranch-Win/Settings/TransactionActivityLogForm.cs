@@ -37,8 +37,10 @@ namespace PosBranch_Win.Settings
         private Label lblTitle;
         private Label lblSubtitle;
         private Label lblTotal;
+        private Label lblTotalQty;
+        private Label lblTotalCost;
+        private Label lblTotalNet;
         private Label lblToday;
-        private Label lblWeek;
         private Label lblMonth;
         private Label lblShowing;
 
@@ -184,13 +186,16 @@ namespace PosBranch_Win.Settings
                 Dock = DockStyle.Fill,
                 BackColor = Color.White,
                 WrapContents = false,
-                FlowDirection = FlowDirection.LeftToRight
+                FlowDirection = FlowDirection.LeftToRight,
+                AutoScroll = true
             };
 
-            lblTotal = CreateCard(cards, "Selected Range");
-            lblToday = CreateCard(cards, "Today");
-            lblWeek = CreateCard(cards, "This Week");
-            lblMonth = CreateCard(cards, "This Month");
+            lblTotal = CreateCard(cards, "Total Logs", 100);
+            lblTotalQty = CreateCard(cards, "Total Qty", 120);
+            lblTotalCost = CreateCard(cards, "Total Cost (Cost×Qty)", 160);
+            lblTotalNet = CreateCard(cards, "Total Net Amount", 145);
+            lblToday = CreateCard(cards, "Today", 95);
+            lblMonth = CreateCard(cards, "This Month", 105);
 
             gridFrame = new RoundedPanel
             {
@@ -210,8 +215,8 @@ namespace PosBranch_Win.Settings
                 RowCount = 1,
                 BackColor = Color.Transparent
             };
-            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
-            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50F));
+            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 85F));
+            footer.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 15F));
             footer.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 130F));
             lblShowing = new Label
             {
@@ -295,12 +300,12 @@ namespace PosBranch_Win.Settings
             panel.Controls.Add(new Panel { Height = 8, Dock = DockStyle.Top });
         }
 
-        private Label CreateCard(FlowLayoutPanel host, string caption)
+        private Label CreateCard(FlowLayoutPanel host, string caption, int width = 140)
         {
             var panel = new RoundedPanel
             {
-                Size = new Size(132, 50),
-                Margin = new Padding(0, 0, 10, 6),
+                Size = new Size(width, 50),
+                Margin = new Padding(0, 0, 8, 6),
                 BackColor = Color.FromArgb(250, 253, 255),
                 BorderColor = Color.FromArgb(190, 226, 250),
                 BorderRadius = 8
@@ -310,17 +315,20 @@ namespace PosBranch_Win.Settings
                 Text = caption,
                 Dock = DockStyle.Top,
                 Height = 21,
-                Padding = new Padding(9, 4, 0, 0),
-                ForeColor = Color.FromArgb(54, 78, 120)
+                Padding = new Padding(7, 4, 0, 0),
+                Font = new Font("Segoe UI", 8.25F),
+                ForeColor = Color.FromArgb(54, 78, 120),
+                AutoEllipsis = true
             };
             var labelValue = new Label
             {
                 Text = "0",
                 Dock = DockStyle.Fill,
-                Font = new Font("Segoe UI Semibold", 14F, FontStyle.Bold),
+                Font = new Font("Segoe UI Semibold", 11F, FontStyle.Bold),
                 ForeColor = navy,
-                Padding = new Padding(9, 0, 0, 0),
-                TextAlign = ContentAlignment.MiddleLeft
+                Padding = new Padding(7, 0, 0, 0),
+                TextAlign = ContentAlignment.MiddleLeft,
+                AutoEllipsis = true
             };
             panel.Controls.Add(labelValue);
             panel.Controls.Add(labelCaption);
@@ -430,27 +438,84 @@ namespace PosBranch_Win.Settings
 
         private void UpdateSummaryCards()
         {
-            lblTotal.Text = currentData == null ? "0" : currentData.Rows.Count.ToString();
+            int rowCount = currentData == null ? 0 : currentData.Rows.Count;
+            lblTotal.Text = rowCount.ToString("N0");
+
+            decimal totalQty = 0m;
+            decimal totalCost = 0m;
+            decimal totalNet = 0m;
+
+            if (currentData != null && currentData.Rows.Count > 0)
+            {
+                foreach (DataRow row in currentData.Rows)
+                {
+                    if (row.RowState == DataRowState.Deleted) continue;
+
+                    decimal qty = GetRowDecimal(row, "Qty");
+                    decimal cost = GetRowDecimal(row, "Cost");
+                    decimal baseAmount = GetRowDecimal(row, "BaseAmount");
+                    decimal netAmt = GetRowDecimal(row, "NetAmount");
+
+                    decimal lineCost = 0m;
+                    if (baseAmount > 0m)
+                    {
+                        lineCost = baseAmount;
+                    }
+                    else if (cost > 0m && qty > 0m)
+                    {
+                        lineCost = cost * qty;
+                    }
+                    else
+                    {
+                        lineCost = cost;
+                    }
+
+                    totalQty += qty;
+                    totalCost += lineCost;
+                    totalNet += netAmt;
+                }
+            }
+
+            if (lblTotalQty != null) lblTotalQty.Text = totalQty.ToString("N2");
+            if (lblTotalCost != null) lblTotalCost.Text = totalCost.ToString("N2");
+            if (lblTotalNet != null) lblTotalNet.Text = totalNet.ToString("N2");
 
             try
             {
                 DateTime today = DateTime.Today;
-                DateTime weekStart = today.AddDays(-(int)today.DayOfWeek);
                 DateTime monthStart = new DateTime(today.Year, today.Month, 1);
 
                 using (var repo = new TransactionActivityLogRepository())
                 {
-                    lblToday.Text = repo.CountActivity(logType, today, today).ToString();
-                    lblWeek.Text = repo.CountActivity(logType, weekStart, today).ToString();
-                    lblMonth.Text = repo.CountActivity(logType, monthStart, today).ToString();
+                    if (lblToday != null) lblToday.Text = repo.CountActivity(logType, today, today).ToString("N0");
+                    if (lblMonth != null) lblMonth.Text = repo.CountActivity(logType, monthStart, today).ToString("N0");
                 }
             }
             catch
             {
-                lblToday.Text = "0";
-                lblWeek.Text = "0";
-                lblMonth.Text = "0";
+                if (lblToday != null) lblToday.Text = "0";
+                if (lblMonth != null) lblMonth.Text = "0";
             }
+
+            if (lblShowing != null)
+            {
+                lblShowing.Text = $"Showing {rowCount} record(s)  |  Total Qty: {totalQty:N2}  |  Total Cost (Cost×Qty): {totalCost:N2}  |  Total Net: {totalNet:N2}";
+            }
+        }
+
+        private static decimal GetRowDecimal(DataRow row, string colName)
+        {
+            if (row == null || !row.Table.Columns.Contains(colName) || row[colName] == DBNull.Value)
+            {
+                return 0m;
+            }
+
+            if (decimal.TryParse(Convert.ToString(row[colName]), out decimal val))
+            {
+                return val;
+            }
+
+            return 0m;
         }
 
         private void ConfigureGridColumns()
