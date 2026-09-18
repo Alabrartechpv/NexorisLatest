@@ -2286,6 +2286,10 @@ namespace PosBranch_Win.Transaction
             ItemStatusRuleInfo status = CreatePurchaseItemStatus(item);
             if (!status.BlockPurchase)
             {
+                if (string.Equals(Dropdowns.NormalizeItemStatusName(status?.StatusName), "Inactive", StringComparison.OrdinalIgnoreCase))
+                {
+                    MessageBox.Show("This item has been inactivated.", "Item Inactive", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
                 return true;
             }
 
@@ -2298,6 +2302,10 @@ namespace PosBranch_Win.Transaction
             status = GetPurchaseItemStatus(itemId);
             if (!status.BlockPurchase)
             {
+                if (string.Equals(Dropdowns.NormalizeItemStatusName(status?.StatusName), "Inactive", StringComparison.OrdinalIgnoreCase))
+                {
+                    MessageBox.Show("This item has been inactivated.", "Item Inactive", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
                 return true;
             }
 

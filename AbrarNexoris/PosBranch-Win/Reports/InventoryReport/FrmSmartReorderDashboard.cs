@@ -64,6 +64,7 @@ namespace PosBranch_Win.Reports.InventoryReport
         private readonly List<ComboItem> _groupOptions;
         private readonly List<ComboItem> _categoryOptions;
         private List<SmartReorderItemModel> _allRows;
+        private InactiveItemLookupInfo _inactiveLookup;
         private Form _columnChooserForm;
         private CheckedListBox _columnChooserListBox;
         private ContextMenuStrip _gridMenu;
@@ -718,15 +719,15 @@ namespace PosBranch_Win.Reports.InventoryReport
 
                 _allRows = data.ToList();
 
-                // Exclude inactive items from Smart Reorder Dashboard
-                if (_allRows.Count > 0)
+                // Exclude inactive items from Smart Reorder Dashboard completely
+                // Uses GetInactiveItemLookup() which checks BOTH POS_ItemMasterStatusRules
+                // AND ItemMaster.Status/IsActive columns by ItemId, Barcode, ItemName, Alert, and Reason
+                Dropdowns statusDropdown = new Dropdowns();
+                _inactiveLookup = statusDropdown.GetInactiveItemLookup();
+
+                if (_allRows.Count > 0 && _inactiveLookup != null)
                 {
-                    Dropdowns statusDropdown = new Dropdowns();
-                    Dictionary<int, ItemStatusRuleInfo> statusMap = statusDropdown.GetItemStatuses(_allRows.Select(x => (int)x.ItemId));
-                    _allRows.RemoveAll(x =>
-                        string.Equals((x.Alert ?? string.Empty).Trim(), "INACTIVE ITEM", StringComparison.OrdinalIgnoreCase) ||
-                        (statusMap.TryGetValue((int)x.ItemId, out ItemStatusRuleInfo statusInfo) &&
-                         string.Equals(statusInfo.StatusName, "Inactive", StringComparison.OrdinalIgnoreCase)));
+                    _allRows.RemoveAll(x => _inactiveLookup.IsInactive(x.ItemId, x.Barcode, x.ItemName, x.Alert, x.Reason));
                 }
 
                 ApplyClientFilters();
@@ -751,8 +752,21 @@ namespace PosBranch_Win.Reports.InventoryReport
 
         private void ApplyClientFilters()
         {
+            if (_inactiveLookup == null)
+            {
+                try
+                {
+                    Dropdowns statusDropdown = new Dropdowns();
+                    _inactiveLookup = statusDropdown.GetInactiveItemLookup();
+                }
+                catch
+                {
+                    _inactiveLookup = new InactiveItemLookupInfo();
+                }
+            }
+
             IEnumerable<SmartReorderItemModel> filtered = _allRows.Where(x =>
-                !string.Equals((x.Alert ?? string.Empty).Trim(), "INACTIVE ITEM", StringComparison.OrdinalIgnoreCase));
+                !_inactiveLookup.IsInactive(x.ItemId, x.Barcode, x.ItemName, x.Alert, x.Reason));
 
             string alertFilter = GetSelectedValue(cmbAlert);
             if (!string.IsNullOrWhiteSpace(alertFilter) && !string.Equals(alertFilter, "ALL", StringComparison.OrdinalIgnoreCase))
