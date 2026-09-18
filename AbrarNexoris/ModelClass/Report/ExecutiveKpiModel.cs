@@ -43,10 +43,12 @@ namespace ModelClass.Report
         /// <summary>Metric 14: Loss Stock Value (Damaged, Expired, Stock OUT adjustments) (നഷ്ടപ്പെട്ടതോ കേടായതോ ആയ സ്റ്റോക്ക്)</summary>
         public decimal LossStockValue { get; set; }
         public decimal LossStockQty { get; set; }
+        public int LossStockItemCount { get; set; }
 
         /// <summary>Metric 15: Extra Stock Value (Found in audit / Stock IN adjustments) (അധികമായി കണ്ടെത്തിയ സ്റ്റോക്ക്)</summary>
         public decimal ExtraStockValue { get; set; }
         public decimal ExtraStockQty { get; set; }
+        public int ExtraStockItemCount { get; set; }
 
         /// <summary>Metric 16: Net Stock Adjustment Balance (Extra Stock - Loss Stock) (സ്റ്റോക്ക് അഡ്ജസ്റ്റ്മെന്റ് ബാലൻസ്)</summary>
         public decimal NetStockAdjustmentValue { get; set; }

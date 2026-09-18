@@ -241,19 +241,19 @@ namespace PosBranch_Win.Dashboard
                 CreateKpiCard("3. Dead Stock (>90d)", "Capital locked in stock with no sales in last 90 days", FormatCurr(_model.DeadStockValue), $"{_model.DeadStockItemCount:N0} Inactive Items", Color.FromArgb(211, 84, 0), () => DrillDown("StockAnalytics")),
 
                 // 4. Negative Stock Impact
-                CreateKpiCard("4. Negative Stock Impact", "Estimated financial distortion due to negative stock at cost", FormatCurr(_model.NegativeStockImpactValue), "Cost of Negative Items", Color.FromArgb(231, 76, 60), () => DrillDown("StockValuation")),
+                CreateKpiCard("4. Neg. Stock Impact", "Estimated financial distortion due to negative stock at cost", FormatCurr(_model.NegativeStockImpactValue), "Cost of Negative Items", Color.FromArgb(231, 76, 60), () => DrillDown("StockValuationNegative")),
                 
                 // 5. Negative Stock Items
-                CreateKpiCard("5. Negative Stock Items", "Products currently running in negative inventory balance", $"{_model.NegativeStockItemCount} Items", $"Negative Qty: {_model.NegativeStockTotalQty:N0}", Color.FromArgb(192, 57, 43), () => DrillDown("StockAnalytics")),
+                CreateKpiCard("5. Neg. Stock Items", "Products currently running in negative inventory balance", $"{_model.NegativeStockItemCount} Items", $"Negative Qty: {_model.NegativeStockTotalQty:N0}", Color.FromArgb(192, 57, 43), () => DrillDown("StockValuationNegative")),
                 
-                // 6. Loss Stock (Damaged / Out)
-                CreateKpiCard("6. Loss Stock (Damaged)", "Total stock written off or damaged (Stock OUT adjustments)", FormatCurr(_model.LossStockValue), $"Discrepancy: {_model.LossStockQty:N2}", Color.FromArgb(192, 57, 43), () => DrillDown("StockAdjustment")),
+                // 6. Loss Stock (Stock OUT Adjustments)
+                CreateKpiCard("6. Loss Stock (Out)", "Total stock written off or reduced (Stock OUT adjustments)", FormatCurr(_model.LossStockValue), $"Items: {_model.LossStockItemCount:N0} | Qty: {_model.LossStockQty:N2}", Color.FromArgb(192, 57, 43), () => DrillDown("StockAdjustment")),
 
-                // 7. Extra Stock (Found / In)
-                CreateKpiCard("7. Extra Stock (Found)", "Total surplus stock found and added (Stock IN adjustments)", FormatCurr(_model.ExtraStockValue), $"Surplus Qty: {_model.ExtraStockQty:N2}", Color.FromArgb(22, 160, 133), () => DrillDown("StockAdjustment")),
+                // 7. Extra Stock (Stock IN Adjustments)
+                CreateKpiCard("7. Extra Stock (In)", "Total surplus stock found and added (Stock IN adjustments)", FormatCurr(_model.ExtraStockValue), $"Items: {_model.ExtraStockItemCount:N0} | Qty: {_model.ExtraStockQty:N2}", Color.FromArgb(22, 160, 133), () => DrillDown("StockAdjustment")),
                 
                 // 8. Net Stock Adjustment
-                CreateKpiCard("8. Stock Adj. Balance", "Net variance between stock additions and write-offs", FormatCurr(_model.NetStockAdjustmentValue), _model.NetStockAdjustmentValue >= 0 ? "Surplus Net Balance" : "Shortage Variance", Color.FromArgb(142, 68, 173), () => DrillDown("StockAdjustment")),
+                CreateKpiCard("8. Stock Adj. Balance", "Net variance between stock additions and write-offs", FormatCurr(_model.NetStockAdjustmentValue), _model.NetStockAdjustmentValue >= 0 ? "Surplus Net Balance" : "Shortage Variance", _model.NetStockAdjustmentValue >= 0 ? Color.FromArgb(22, 160, 133) : Color.FromArgb(192, 57, 43), () => DrillDown("StockAdjustment")),
                 
                 // 9. Excess Stock Alert
                 CreateKpiCard("9. Excess Stock Alert", "Products exceeding maximum inventory threshold", $"{_model.ExcessStockAlertCount} Items", "Over Maximum Limit", Color.FromArgb(243, 156, 18), () => DrillDown("SmartReorder")),
@@ -265,7 +265,7 @@ namespace PosBranch_Win.Dashboard
                 CreateKpiCard("11. Reorder Alert", "Products at or below reorder level requiring purchase", $"{_model.ReorderAlertCount} Items", "Reorder Recommended", Color.FromArgb(192, 57, 43), () => DrillDown("SmartReorder")),
 
                 // 12. Total Sales Revenue
-                CreateKpiCard("12. Total Sales Turnover", "Total net billing revenue for the selected date period", FormatCurr(_model.TotalSalesRevenue), $"{_model.TotalSalesBillCount:N0} Invoices Billed", Color.FromArgb(30, 136, 229), () => DrillDown("SalesAnalytics")),
+                CreateKpiCard("12. Sales Turnover", "Total net billing revenue for the selected date period", FormatCurr(_model.TotalSalesRevenue), $"{_model.TotalSalesBillCount:N0} Invoices Billed", Color.FromArgb(30, 136, 229), () => DrillDown("SalesAnalytics")),
 
                 // 13. Sales Return (Customer Returns)
                 CreateKpiCard("13. Sales Return (Cust)", "Goods returned and credit notes issued to customers", FormatCurr(_model.TotalSalesReturn), $"{_model.TotalSalesReturnCount} Return Vouchers", Color.FromArgb(231, 76, 60), () => DrillDown("SalesReturnReport")),
@@ -277,7 +277,7 @@ namespace PosBranch_Win.Dashboard
                 CreateKpiCard("15. Purchase Return", "Goods returned back to suppliers and debit notes issued", FormatCurr(_model.TotalPurchaseReturn), $"{_model.TotalPurchaseReturnCount} Debit Vouchers", Color.FromArgb(230, 126, 34), () => DrillDown("VendorOutstanding")),
 
                 // 16. Holded Items / Bills
-                CreateKpiCard("16. Holded Items / Bills", "Suspended sales bills and hold items pending counter checkout", FormatCurr(_model.HoldBillsValue), $"{_model.HoldBillsCount} Bills | {_model.HoldItemsCount:N0} Items", Color.FromArgb(230, 126, 34), () => DrillDown("HoldBills")),
+                CreateKpiCard("16. Hold Items / Bills", "Suspended sales bills and hold items pending counter checkout", FormatCurr(_model.HoldBillsValue), $"{_model.HoldBillsCount} Bills | {_model.HoldItemsCount:N0} Items", Color.FromArgb(230, 126, 34), () => DrillDown("HoldBills")),
 
                 // 17. Gross Profit & Margin %
                 CreateKpiCard("17. Gross Margin %", "Gross earnings on sold goods (Sales Revenue - Cost of Sales)", FormatCurr(_model.GrossProfit), $"Gross Margin: {_model.GrossProfitMarginPercent:N1}%", Color.FromArgb(39, 174, 96), () => DrillDown("TradingPL")),
@@ -289,7 +289,7 @@ namespace PosBranch_Win.Dashboard
                 CreateKpiCard("19. Actual Net Profit", "Bottom-line net earnings after deducting cost of sales and expenses", FormatCurr(_model.ActualNetProfit), $"Margin: {_model.OperatingProfitMarginPercent:N2}%", _model.ActualNetProfit >= 0 ? Color.FromArgb(39, 174, 96) : Color.FromArgb(192, 57, 43), () => DrillDown("ProfitLoss")),
 
                 // 20. Operating Profit Margin %
-                CreateKpiCard("20. Profit Margin %", "Ratio of net profit generated from sales turnover", $"{_model.OperatingProfitMarginPercent:N2}%", "Net Profit / Sales", Color.FromArgb(22, 160, 133), () => DrillDown("ProfitLoss")),
+                CreateKpiCard("20. Profit Margin %", "Ratio of net profit generated from sales turnover", $"{_model.OperatingProfitMarginPercent:N2}%", "Net Profit / Sales", _model.OperatingProfitMarginPercent >= 0 ? Color.FromArgb(22, 160, 133) : Color.FromArgb(192, 57, 43), () => DrillDown("ProfitLoss")),
 
                 // 21. GST / Net Tax Liability
                 CreateKpiCard("21. GST Tax Liability", "Net government GST liability (Output GST - Input GST credit)", FormatCurr(_model.NetTaxLiability), $"Out: {FormatCurr(_model.OutputGstAmount)} | In: {FormatCurr(_model.InputGstAmount)}", Color.FromArgb(52, 73, 94), () => DrillDown("GovtGSTReturnReport")),
@@ -304,13 +304,13 @@ namespace PosBranch_Win.Dashboard
                 CreateKpiCard("24. Vendor Outstanding", "Total outstanding liabilities owed to vendors and suppliers", FormatCurr(_model.SupplierPayables), $"{_model.SupplierPayablesCount} Pending Bills", Color.FromArgb(231, 76, 60), () => DrillDown("VendorOutstanding")),
                 
                 // 25. Customer Outstanding
-                CreateKpiCard("25. Customer Outstanding", "Total outstanding dues to collect from customers", FormatCurr(_model.CustomerReceivables), $"{_model.CustomerReceivablesCount} Unpaid Invoices", Color.FromArgb(241, 196, 15), () => DrillDown("CustomerOutstanding")),
+                CreateKpiCard("25. Cust. Outstanding", "Total outstanding dues to collect from customers", FormatCurr(_model.CustomerReceivables), $"{_model.CustomerReceivablesCount} Unpaid Invoices", Color.FromArgb(241, 196, 15), () => DrillDown("CustomerOutstanding")),
 
                 // 26. Delayed Customer Receivables (>30D)
-                CreateKpiCard("26. Delayed Cust (>30D)", "Overdue customer receivables past 30 days credit period", FormatCurr(_model.DelayedCustomerReceivables30Days), $"{_model.DelayedCustomerCount30Days} High-Risk Bills", Color.FromArgb(231, 76, 60), () => DrillDown("CustomerOutstanding")),
+                CreateKpiCard("26. Delayed Cust >30d", "Overdue customer receivables past 30 days credit period", FormatCurr(_model.DelayedCustomerReceivables30Days), $"{_model.DelayedCustomerCount30Days} High-Risk Bills", Color.FromArgb(231, 76, 60), () => DrillDown("CustomerOutstanding")),
                 
                 // 27. Delayed Supplier Payables (>30D)
-                CreateKpiCard("27. Delayed Supp (>30D)", "Overdue purchase invoices past 30 days credit period", FormatCurr(_model.DelayedSupplierPayables30Days), $"{_model.DelayedSupplierCount30Days} Overdue Bills", Color.FromArgb(230, 126, 34), () => DrillDown("VendorOutstanding")),
+                CreateKpiCard("27. Delayed Supp >30d", "Overdue purchase invoices past 30 days credit period", FormatCurr(_model.DelayedSupplierPayables30Days), $"{_model.DelayedSupplierCount30Days} Overdue Bills", Color.FromArgb(230, 126, 34), () => DrillDown("VendorOutstanding")),
 
                 // 28. Net Business Asset (NBA)
                 CreateKpiCard("28. Net Asset (NBA)", "True net worth of the business (Total Assets minus Liabilities)", FormatCurr(_model.NetBusinessAsset), $"Assets: {FormatCurr(_model.TotalAssets)} | Liab: {FormatCurr(_model.TotalLiabilities)}", Color.FromArgb(16, 85, 154), () => DrillDown("BalanceSheet")),
@@ -319,16 +319,16 @@ namespace PosBranch_Win.Dashboard
                 CreateKpiCard("29. Owner Drawings", "Capital withdrawals and personal drawings taken by proprietors", FormatCurr(_model.OwnerDrawings), "Capital Withdrawals", Color.FromArgb(155, 89, 182), () => DrillDown("DayBook")),
 
                 // 30. Customer Bad Debts
-                CreateKpiCard("30. Customer Bad Debts", "Uncollectible customer credit balances written off", FormatCurr(_model.CustomerBadDebts), "Credit Loss Written Off", Color.FromArgb(149, 165, 166), () => DrillDown("CustomerOutstanding")),
+                CreateKpiCard("30. Cust. Bad Debts", "Uncollectible customer credit balances written off", FormatCurr(_model.CustomerBadDebts), "Credit Loss Written Off", Color.FromArgb(149, 165, 166), () => DrillDown("CustomerOutstanding")),
                 
                 // 31. Supplier Write-Offs
-                CreateKpiCard("31. Supplier Write-Offs", "Vendor invoice write-offs and negotiated settlement discounts", FormatCurr(_model.SupplierWriteOffs), "Discounts Settled", Color.FromArgb(127, 140, 141), () => DrillDown("VendorOutstanding")),
+                CreateKpiCard("31. Supp. Write-Offs", "Vendor invoice write-offs and negotiated settlement discounts", FormatCurr(_model.SupplierWriteOffs), "Discounts Settled", Color.FromArgb(127, 140, 141), () => DrillDown("VendorOutstanding")),
 
                 // 32. Supplier Advance / Overpayment
-                CreateKpiCard("32. Supplier Advance", "Advance payments and debit balances with vendors", FormatCurr(_model.SupplierAdvanceBalance), "Advance Payments / Debit", Color.FromArgb(52, 73, 94), () => DrillDown("VendorPaymentReport")),
+                CreateKpiCard("32. Supp. Advance", "Advance payments and debit balances with vendors", FormatCurr(_model.SupplierAdvanceBalance), "Advance Payments / Debit", Color.FromArgb(52, 73, 94), () => DrillDown("VendorPaymentReport")),
                 
                 // 33. Customer Advance / Deposits
-                CreateKpiCard("33. Customer Advance", "Customer advance payments and credit deposits received", FormatCurr(_model.CustomerAdvanceBalance), "Deposits / Credit", Color.FromArgb(127, 140, 141), () => DrillDown("CustomerReceiptReport")),
+                CreateKpiCard("33. Cust. Advance", "Customer advance payments and credit deposits received", FormatCurr(_model.CustomerAdvanceBalance), "Deposits / Credit", Color.FromArgb(127, 140, 141), () => DrillDown("CustomerReceiptReport")),
 
                 // 34. Deletion & Cancellation Logs
                 CreateKpiCard("34. Deletion Logs", "Track of deleted sales bills, purchase bills, and account vouchers", $"{_model.DeletionCount} Events", "Deleted Documents", Color.FromArgb(192, 57, 43), () => DrillDown("AuditDeletions")),
@@ -337,7 +337,7 @@ namespace PosBranch_Win.Dashboard
                 CreateKpiCard("35. Price Change Logs", "Track of item selling and cost price edits in Item Master", $"{_model.PriceChangeCount} Events", "Item Master Edits", Color.FromArgb(41, 128, 185), () => DrillDown("AuditPriceChanges")),
                 
                 // 36. Physical Stock Discrepancy Logs
-                CreateKpiCard("36. Stock Discrepancies", "Track of physical stock count reconciliations and adjustments", $"{_model.StockAdjustmentCount} Adjustments", "Stock Reconciliations", Color.FromArgb(142, 68, 173), () => DrillDown("StockAdjustment"))
+                CreateKpiCard("36. Stock Variance", "Track of physical stock count reconciliations and adjustments", $"{_model.StockAdjustmentCount} Adjustments", "Stock Reconciliations", Color.FromArgb(142, 68, 173), () => DrillDown("StockAdjustment"))
             };
 
             // Display in clean full-width responsive grid:
@@ -462,89 +462,122 @@ namespace PosBranch_Win.Dashboard
             var lblTitle = new Label
             {
                 Text = title,
-                Font = new Font("Segoe UI Semibold", 7.5F, FontStyle.Bold),
+                Font = new Font("Segoe UI Semibold", 7.2F, FontStyle.Bold),
                 ForeColor = Color.FromArgb(60, 75, 95),
-                Location = new Point(5, 4),
-                Size = new Size(150, 15),
+                Location = new Point(4, 4),
+                Size = new Size(152, 15),
                 AutoEllipsis = true,
-                BackColor = Color.Transparent
+                BackColor = Color.Transparent,
+                UseCompatibleTextRendering = true
             };
             card.Controls.Add(lblTitle);
+
+            bool isValNegative = mainValue.Trim().StartsWith("-") 
+                              || mainValue.Contains("-₹") 
+                              || (mainValue.EndsWith("%") && mainValue.StartsWith("-"));
+
+            Color valueColor = isValNegative ? Color.FromArgb(192, 57, 43) : Color.FromArgb(12, 30, 58);
+            Color barColor = isValNegative ? Color.FromArgb(192, 57, 43) : accentColor;
+            topBar.BackColor = barColor;
 
             var lblValue = new Label
             {
                 Text = mainValue,
                 Font = new Font("Segoe UI", 10F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(12, 30, 58),
+                ForeColor = valueColor,
                 Location = new Point(4, 20),
                 Size = new Size(152, 22),
                 AutoEllipsis = true,
-                BackColor = Color.Transparent
+                BackColor = Color.Transparent,
+                UseCompatibleTextRendering = true
             };
             card.Controls.Add(lblValue);
+
+            bool isFooterNegative = !string.IsNullOrEmpty(footerInfo) && (footerInfo.Contains("Negative Qty: -") || footerInfo.Contains("Shortage") || footerInfo.Contains("-"));
+            Color footerColor = isFooterNegative ? Color.FromArgb(192, 57, 43) : Color.FromArgb(110, 125, 145);
 
             var lblFooter = new Label
             {
                 Text = footerInfo,
-                Font = new Font("Segoe UI", 6.8F, FontStyle.Regular),
-                ForeColor = Color.FromArgb(110, 125, 145),
-                Location = new Point(5, 42),
-                Size = new Size(150, 14),
+                Font = new Font("Segoe UI", 6.8F, isFooterNegative ? FontStyle.Bold : FontStyle.Regular),
+                ForeColor = footerColor,
+                Location = new Point(4, 42),
+                Size = new Size(152, 14),
                 AutoEllipsis = true,
-                BackColor = Color.Transparent
+                BackColor = Color.Transparent,
+                UseCompatibleTextRendering = true
             };
             card.Controls.Add(lblFooter);
 
-            card.Resize += (s, e) =>
+            Action adjustCardLayout = () =>
             {
                 int w = card.ClientSize.Width;
                 int h = card.ClientSize.Height;
+                int availW = Math.Max(10, w - 8);
 
-                lblTitle.Location = new Point(5, 4);
-                lblTitle.Font = new Font("Segoe UI Semibold", h >= 75 ? 8.2F : 7.5F, FontStyle.Bold);
-                lblTitle.Size = new Size(Math.Max(10, w - 10), h >= 75 ? 17 : 15);
+                // Auto-scale title font size so full text always fits without ellipsis
+                float titleFontSize = (h >= 75 && w >= 135) ? 8.0F : (w >= 120 ? 7.4F : 6.9F);
+                while (titleFontSize > 5.5F)
+                {
+                    using (var testFont = new Font("Segoe UI Semibold", titleFontSize, FontStyle.Bold))
+                    {
+                        var sz = TextRenderer.MeasureText(title, testFont, new Size(int.MaxValue, int.MaxValue), TextFormatFlags.SingleLine | TextFormatFlags.NoPadding);
+                        if (sz.Width <= availW)
+                        {
+                            break;
+                        }
+                    }
+                    titleFontSize -= 0.25F;
+                }
+
+                lblTitle.Location = new Point(4, 4);
+                lblTitle.Font = new Font("Segoe UI Semibold", Math.Max(5.5F, titleFontSize), FontStyle.Bold);
+                lblTitle.Size = new Size(availW, h >= 75 ? 17 : 15);
 
                 if (h >= 85)
                 {
-                    lblValue.Font = new Font("Segoe UI", 12.5F, FontStyle.Bold);
+                    lblValue.Font = new Font("Segoe UI", 12.0F, FontStyle.Bold);
                     lblValue.Location = new Point(4, 24);
-                    lblValue.Size = new Size(Math.Max(10, w - 8), 26);
+                    lblValue.Size = new Size(availW, 26);
 
-                    lblFooter.Font = new Font("Segoe UI", 7.5F, FontStyle.Regular);
-                    lblFooter.Location = new Point(5, h - 20);
-                    lblFooter.Size = new Size(Math.Max(10, w - 10), 16);
+                    lblFooter.Font = new Font("Segoe UI", 7.2F, FontStyle.Regular);
+                    lblFooter.Location = new Point(4, h - 20);
+                    lblFooter.Size = new Size(availW, 16);
                 }
                 else if (h >= 70)
                 {
-                    lblValue.Font = new Font("Segoe UI", 11.2F, FontStyle.Bold);
+                    lblValue.Font = new Font("Segoe UI", 11.0F, FontStyle.Bold);
                     lblValue.Location = new Point(4, 22);
-                    lblValue.Size = new Size(Math.Max(10, w - 8), 23);
+                    lblValue.Size = new Size(availW, 23);
 
-                    lblFooter.Font = new Font("Segoe UI", 7.0F, FontStyle.Regular);
-                    lblFooter.Location = new Point(5, h - 18);
-                    lblFooter.Size = new Size(Math.Max(10, w - 10), 15);
+                    lblFooter.Font = new Font("Segoe UI", 6.8F, FontStyle.Regular);
+                    lblFooter.Location = new Point(4, h - 18);
+                    lblFooter.Size = new Size(availW, 15);
                 }
                 else if (h >= 58)
                 {
-                    lblValue.Font = new Font("Segoe UI", 10.2F, FontStyle.Bold);
+                    lblValue.Font = new Font("Segoe UI", 10.0F, FontStyle.Bold);
                     lblValue.Location = new Point(4, 19);
-                    lblValue.Size = new Size(Math.Max(10, w - 8), 21);
+                    lblValue.Size = new Size(availW, 21);
 
-                    lblFooter.Font = new Font("Segoe UI", 6.8F, FontStyle.Regular);
-                    lblFooter.Location = new Point(5, h - 16);
-                    lblFooter.Size = new Size(Math.Max(10, w - 10), 14);
+                    lblFooter.Font = new Font("Segoe UI", 6.5F, FontStyle.Regular);
+                    lblFooter.Location = new Point(4, h - 16);
+                    lblFooter.Size = new Size(availW, 14);
                 }
                 else
                 {
-                    lblValue.Font = new Font("Segoe UI", 9.0F, FontStyle.Bold);
+                    lblValue.Font = new Font("Segoe UI", 8.8F, FontStyle.Bold);
                     lblValue.Location = new Point(4, 17);
-                    lblValue.Size = new Size(Math.Max(10, w - 8), 18);
+                    lblValue.Size = new Size(availW, 18);
 
-                    lblFooter.Font = new Font("Segoe UI", 6.4F, FontStyle.Regular);
-                    lblFooter.Location = new Point(5, 34);
-                    lblFooter.Size = new Size(Math.Max(10, w - 10), 13);
+                    lblFooter.Font = new Font("Segoe UI", 6.2F, FontStyle.Regular);
+                    lblFooter.Location = new Point(4, 34);
+                    lblFooter.Size = new Size(availW, 13);
                 }
             };
+
+            card.Resize += (s, e) => adjustCardLayout();
+            adjustCardLayout();
 
             card.Paint += (s, e) =>
             {
@@ -686,8 +719,16 @@ namespace PosBranch_Win.Dashboard
                 switch (target)
                 {
                     case "StockValuation":
-                        formToOpen = new Reports.InventoryReport.frmStockValuationReport();
+                        formToOpen = new Reports.InventoryReport.frmStockValuationReport("All Items");
                         title = "Stock Valuation Report";
+                        break;
+                    case "StockValuationPositive":
+                        formToOpen = new Reports.InventoryReport.frmStockValuationReport("Positive Stock");
+                        title = "Stock Valuation Report (Positive Stock)";
+                        break;
+                    case "StockValuationNegative":
+                        formToOpen = new Reports.InventoryReport.frmStockValuationReport("Negative Stock");
+                        title = "Stock Valuation Report (Negative Stock)";
                         break;
                     case "StockAnalytics":
                         formToOpen = new FrmStockAnalytics();
@@ -742,8 +783,8 @@ namespace PosBranch_Win.Dashboard
                         title = "Sales Return Report";
                         break;
                     case "HoldBills":
-                        formToOpen = new DialogBox.FrmDialogSHold();
-                        title = "Hold Bills & Items";
+                        formToOpen = new Reports.SalesReports.FrmSalesHoldReport();
+                        title = "Sales Hold Report";
                         break;
                     case "ProfitLoss":
                         formToOpen = new Reports.FinancialReports.FrmProfitLossAccount();
@@ -1034,8 +1075,8 @@ namespace PosBranch_Win.Dashboard
                 Tuple.Create(3, "Non-Moving / Dead Stock Value", FormatCurr(_model.DeadStockValue), $"{_model.DeadStockItemCount:N0} Inactive items with no sales in past 90 days"),
                 Tuple.Create(4, "Negative Stock Impact", FormatCurr(_model.NegativeStockImpactValue), "Cost value distortion from negative stock"),
                 Tuple.Create(5, "Negative Stock Items", $"{_model.NegativeStockItemCount} Items", $"Total Negative Quantity: {_model.NegativeStockTotalQty:N0}"),
-                Tuple.Create(6, "Loss Stock (Damaged / Out)", FormatCurr(_model.LossStockValue), $"Damaged & Written Off ({_model.LossStockQty:N2} Qty)"),
-                Tuple.Create(7, "Extra Stock (Found / In)", FormatCurr(_model.ExtraStockValue), $"Surplus Stock Added ({_model.ExtraStockQty:N2} Qty)"),
+                Tuple.Create(6, "Loss Stock (Out)", FormatCurr(_model.LossStockValue), _model.LossStockItemCount > 0 ? $"Stock Out ({_model.LossStockItemCount:N0} Items, {_model.LossStockQty:N2} Qty)" : $"Stock Out ({_model.LossStockQty:N2} Qty)"),
+                Tuple.Create(7, "Extra Stock (In)", FormatCurr(_model.ExtraStockValue), _model.ExtraStockItemCount > 0 ? $"Stock In ({_model.ExtraStockItemCount:N0} Items, {_model.ExtraStockQty:N2} Qty)" : $"Stock In ({_model.ExtraStockQty:N2} Qty)"),
                 Tuple.Create(8, "Net Stock Adjustment", FormatCurr(_model.NetStockAdjustmentValue), "Net Discrepancy Balance"),
                 Tuple.Create(9, "Excess Stock Alert", $"{_model.ExcessStockAlertCount} Items", "Items above maximum inventory limits"),
                 Tuple.Create(10, "Low Stock Alert", $"{_model.LowStockAlertCount} Items", "Items below minimum safety stock"),
@@ -1147,8 +1188,8 @@ namespace PosBranch_Win.Dashboard
             sb.AppendLine($"<tr><td>3</td><td>Non-Moving / Dead Stock Value</td><td class='value'>{FormatCurr(_model.DeadStockValue)}</td><td>{_model.DeadStockItemCount:N0} Inactive items with no sales in past 90 days</td></tr>");
             sb.AppendLine($"<tr><td>4</td><td>Negative Stock Impact</td><td class='value'>{FormatCurr(_model.NegativeStockImpactValue)}</td><td>Cost value distortion from negative stock</td></tr>");
             sb.AppendLine($"<tr><td>5</td><td>Negative Stock Items</td><td class='value'>{_model.NegativeStockItemCount} Items</td><td>Total Negative Quantity: {_model.NegativeStockTotalQty:N0}</td></tr>");
-            sb.AppendLine($"<tr><td>6</td><td>Loss Stock (Damaged / Out)</td><td class='value'>{FormatCurr(_model.LossStockValue)}</td><td>Damaged & Written Off ({_model.LossStockQty:N2} Qty)</td></tr>");
-            sb.AppendLine($"<tr><td>7</td><td>Extra Stock (Found / In)</td><td class='value'>{FormatCurr(_model.ExtraStockValue)}</td><td>Surplus Stock Added ({_model.ExtraStockQty:N2} Qty)</td></tr>");
+            sb.AppendLine($"<tr><td>6</td><td>Loss Stock (Out)</td><td class='value'>{FormatCurr(_model.LossStockValue)}</td><td>{(_model.LossStockItemCount > 0 ? $"Stock Out ({_model.LossStockItemCount:N0} Items, {_model.LossStockQty:N2} Qty)" : $"Stock Out ({_model.LossStockQty:N2} Qty)")}</td></tr>");
+            sb.AppendLine($"<tr><td>7</td><td>Extra Stock (In)</td><td class='value'>{FormatCurr(_model.ExtraStockValue)}</td><td>{(_model.ExtraStockItemCount > 0 ? $"Stock In ({_model.ExtraStockItemCount:N0} Items, {_model.ExtraStockQty:N2} Qty)" : $"Stock In ({_model.ExtraStockQty:N2} Qty)")}</td></tr>");
             sb.AppendLine($"<tr><td>8</td><td>Net Stock Adjustment</td><td class='value'>{FormatCurr(_model.NetStockAdjustmentValue)}</td><td>Net Discrepancy Balance</td></tr>");
             sb.AppendLine($"<tr><td>9</td><td>Excess Stock Alert</td><td class='value'>{_model.ExcessStockAlertCount} Items</td><td>Items above maximum inventory limits</td></tr>");
             sb.AppendLine($"<tr><td>10</td><td>Low Stock Alert</td><td class='value'>{_model.LowStockAlertCount} Items</td><td>Items below minimum safety stock</td></tr>");
@@ -1193,8 +1234,8 @@ namespace PosBranch_Win.Dashboard
             sb.AppendLine($"3,Non-Moving / Dead Stock Value,\"{_model.DeadStockValue:N2}\",Inactive Items: {_model.DeadStockItemCount}");
             sb.AppendLine($"4,Negative Stock Impact,\"{_model.NegativeStockImpactValue:N2}\",Cost Value Distortion");
             sb.AppendLine($"5,Negative Stock Items,\"{_model.NegativeStockItemCount}\",Total Qty: {_model.NegativeStockTotalQty:N0}");
-            sb.AppendLine($"6,Loss Stock (Damaged / Out),\"{_model.LossStockValue:N2}\",Discrepancy Qty: {_model.LossStockQty:N2}");
-            sb.AppendLine($"7,Extra Stock (Found / In),\"{_model.ExtraStockValue:N2}\",Surplus Qty: {_model.ExtraStockQty:N2}");
+            sb.AppendLine($"6,Loss Stock (Out),\"{_model.LossStockValue:N2}\",{(_model.LossStockItemCount > 0 ? $"Stock Out ({_model.LossStockItemCount:N0} Items | {_model.LossStockQty:N2} Qty)" : $"Out Qty: {_model.LossStockQty:N2}")}");
+            sb.AppendLine($"7,Extra Stock (In),\"{_model.ExtraStockValue:N2}\",{(_model.ExtraStockItemCount > 0 ? $"Stock In ({_model.ExtraStockItemCount:N0} Items | {_model.ExtraStockQty:N2} Qty)" : $"In Qty: {_model.ExtraStockQty:N2}")}");
             sb.AppendLine($"8,Net Stock Adjustment,\"{_model.NetStockAdjustmentValue:N2}\",Net Variance");
             sb.AppendLine($"9,Excess Stock Alert,\"{_model.ExcessStockAlertCount}\",Over Max Limit");
             sb.AppendLine($"10,Low Stock Alert,\"{_model.LowStockAlertCount}\",Below Min Limit");
@@ -1243,6 +1284,8 @@ namespace PosBranch_Win.Dashboard
 
         private string FormatCurr(decimal val)
         {
+            if (val < 0)
+                return "-₹ " + Math.Abs(val).ToString("N2", _culture);
             return "₹ " + val.ToString("N2", _culture);
         }
     }

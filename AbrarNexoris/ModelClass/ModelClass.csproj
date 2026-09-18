@@ -112,6 +112,7 @@
     <Compile Include="Report\StockAdjustmentReportModel.cs" />
     <Compile Include="Report\InactiveItemsReportModel.cs" />
     <Compile Include="Report\ExecutiveKpiModel.cs" />
+    <Compile Include="Report\SalesHoldReportModel.cs" />
     <Compile Include="SessionContext.cs" />
     <Compile Include="Settings\POSSetting.cs" />
     <Compile Include="Settings\FinancialYearModel.cs" />

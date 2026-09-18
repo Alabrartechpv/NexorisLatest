@@ -1,4 +1,4 @@
-﻿using ModelClass;
+using ModelClass;
 using ModelClass.Report;
 using System;
 using System.Collections.Generic;
@@ -12,6 +12,30 @@ namespace Repository.ReportRepository
 {
     public class PurchaseReportRepository : BaseRepostitory
     {
+        private static int SafeInt(object value)
+        {
+            if (value == null || value == DBNull.Value) return 0;
+            return int.TryParse(value.ToString(), out int result) ? result : 0;
+        }
+
+        private static double SafeDouble(object value)
+        {
+            if (value == null || value == DBNull.Value) return 0.0;
+            return double.TryParse(value.ToString(), out double result) ? result : 0.0;
+        }
+
+        private static DateTime SafeDateTime(object value)
+        {
+            if (value == null || value == DBNull.Value) return DateTime.Today;
+            return DateTime.TryParse(value.ToString(), out DateTime result) ? result : DateTime.Today;
+        }
+
+        private static string SafeString(object value)
+        {
+            if (value == null || value == DBNull.Value) return string.Empty;
+            return value.ToString();
+        }
+
         /// <summary>
         /// Get Purchase Report Details for a specific Purchase Number using the stored procedure
         /// </summary>
@@ -40,16 +64,16 @@ namespace Repository.ReportRepository
                             var masterRow = ds.Tables[0].Rows[0];
                             reportData.Master = new PurchaseReportMaster
                             {
-                                PurchaseNo = Convert.ToInt32(masterRow["PurchaseNo"]),
-                                PurchaseDate = Convert.ToDateTime(masterRow["PurchaseDate"]),
-                                InvoiceNo = masterRow["InvoiceNo"]?.ToString(),
-                                InvoiceDate = Convert.ToDateTime(masterRow["InvoiceDate"]),
-                                VendorName = masterRow["VendorName"]?.ToString(),
-                                Paymode = masterRow["Paymode"]?.ToString(),
-                                SubTotal = Convert.ToDouble(masterRow["SubTotal"]),
-                                GrandTotal = Convert.ToDouble(masterRow["GrandTotal"]),
-                                PayedAmount = Convert.ToDouble(masterRow["PayedAmount"]),
-                                BilledBy = masterRow["BilledBy"]?.ToString()
+                                PurchaseNo = SafeInt(masterRow["PurchaseNo"]),
+                                PurchaseDate = SafeDateTime(masterRow["PurchaseDate"]),
+                                InvoiceNo = SafeString(masterRow["InvoiceNo"]),
+                                InvoiceDate = SafeDateTime(masterRow["InvoiceDate"]),
+                                VendorName = SafeString(masterRow["VendorName"]),
+                                Paymode = SafeString(masterRow["Paymode"]),
+                                SubTotal = SafeDouble(masterRow["SubTotal"]),
+                                GrandTotal = SafeDouble(masterRow["GrandTotal"]),
+                                PayedAmount = SafeDouble(masterRow["PayedAmount"]),
+                                BilledBy = SafeString(masterRow["BilledBy"])
                             };
                         }
 
@@ -63,15 +87,15 @@ namespace Repository.ReportRepository
                                 var detail = new PurchaseReportDetail
                                 {
                                     PurchaseNo = purchaseNo,
-                                    SlNo = Convert.ToInt32(detailRow["SlNo"]),
-                                    ItemName = detailRow["ItemName"]?.ToString(),
-                                    BarCode = detailRow["BarCode"]?.ToString(),
-                                    Unit = detailRow["Unit"]?.ToString(),
-                                    Packing = detailRow["Packing"]?.ToString(),
-                                    Qty = Convert.ToDouble(detailRow["qty"]),
-                                    Cost = Convert.ToDouble(detailRow["Cost"]),
-                                    Amount = Convert.ToDouble(detailRow["Amount"]),
-                                    Free = Convert.ToDouble(detailRow["Free"])
+                                    SlNo = SafeInt(detailRow["SlNo"]),
+                                    ItemName = SafeString(detailRow["ItemName"]),
+                                    BarCode = SafeString(detailRow["BarCode"]),
+                                    Unit = SafeString(detailRow["Unit"]),
+                                    Packing = SafeString(detailRow["Packing"]),
+                                    Qty = SafeDouble(detailRow["qty"]),
+                                    Cost = SafeDouble(detailRow["Cost"]),
+                                    Amount = SafeDouble(detailRow["Amount"]),
+                                    Free = SafeDouble(detailRow["Free"])
                                 };
                                 reportData.Details.Add(detail);
                             }
@@ -130,16 +154,16 @@ namespace Repository.ReportRepository
                             {
                                 bills.Add(new PurchaseReportMaster
                                 {
-                                    PurchaseNo = Convert.ToInt32(row["PurchaseNo"]),
-                                    PurchaseDate = Convert.ToDateTime(row["PurchaseDate"]),
-                                    InvoiceNo = row["InvoiceNo"]?.ToString() ?? "",
-                                    InvoiceDate = Convert.ToDateTime(row["InvoiceDate"]),
-                                    VendorName = row["VendorName"]?.ToString() ?? "",
-                                    Paymode = row["Paymode"]?.ToString() ?? "",
-                                    SubTotal = Convert.ToDouble(row["SubTotal"]),
-                                    GrandTotal = Convert.ToDouble(row["GrandTotal"]),
-                                    PayedAmount = Convert.ToDouble(row["PayedAmount"]),
-                                    BilledBy = row["BilledBy"]?.ToString() ?? ""
+                                    PurchaseNo = SafeInt(row["PurchaseNo"]),
+                                    PurchaseDate = SafeDateTime(row["PurchaseDate"]),
+                                    InvoiceNo = SafeString(row["InvoiceNo"]),
+                                    InvoiceDate = SafeDateTime(row["InvoiceDate"]),
+                                    VendorName = SafeString(row["VendorName"]),
+                                    Paymode = SafeString(row["Paymode"]),
+                                    SubTotal = SafeDouble(row["SubTotal"]),
+                                    GrandTotal = SafeDouble(row["GrandTotal"]),
+                                    PayedAmount = SafeDouble(row["PayedAmount"]),
+                                    BilledBy = SafeString(row["BilledBy"])
                                 });
                             }
                         }

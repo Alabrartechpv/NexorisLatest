@@ -77,6 +77,7 @@ namespace PosBranch_Win
             new ReportNavigatorDefinition("Sales", "Sales Return Report", "SalesReturn"),
             new ReportNavigatorDefinition("Sales", "Sales Profit", "SalesProfit"),
             new ReportNavigatorDefinition("Sales", "Salesman Incentive Report", "SalesmanIncentiveReport"),
+            new ReportNavigatorDefinition("Sales", "Sales Hold Report", "SalesHoldReport"),
             new ReportNavigatorDefinition("Sales", "Daily Sales", "DSales"),
             new ReportNavigatorDefinition("Sales", "Counter Report", "CounterReport"),
             new ReportNavigatorDefinition("Purchase", "Purchase Details", "Purchase Details"),
@@ -141,9 +142,8 @@ namespace PosBranch_Win
             closingAlertTimer.Interval = 60000;
             closingAlertTimer.Tick += ClosingAlertTimer_Tick;
 
-            // Wire up context menu events
-            closeTabToolStripMenuItem.Click += closeTabToolStripMenuItem_Click;
-            closeAllTabsToolStripMenuItem.Click += closeAllTabsToolStripMenuItem_Click;
+            // Disable tab context menu (Close Tab / Close All Tabs)
+            tabControlMain.ContextMenuStrip = null;
 
             // Track tab changes for POS-only ribbon actions
             tabControlMain.SelectedTabChanged += TabControlMain_SelectedTabChanged;
@@ -2614,6 +2614,11 @@ namespace PosBranch_Win
                 Reports.SalesReports.frmSalesmanIncentiveReport frmSalesmanIncentiveReport = new Reports.SalesReports.frmSalesmanIncentiveReport();
                 OpenFormInTab(frmSalesmanIncentiveReport, "Salesman Incentive Report");
             }
+            if (e.Tool.Key == "SalesHoldReport" || e.Tool.Key == "Tool_SalesHoldReport")
+            {
+                Reports.SalesReports.FrmSalesHoldReport frmSalesHold = new Reports.SalesReports.FrmSalesHoldReport();
+                OpenFormInTab(frmSalesHold, "Sales Hold Report");
+            }
             if (e.Tool.Key == "Purchase Details")
             {
 
@@ -2826,6 +2831,26 @@ namespace PosBranch_Win
                     {
                         targetCategory = "Item";
                     }
+                    else if (tabCaption.Equals("Sales", StringComparison.OrdinalIgnoreCase))
+                    {
+                        targetCategory = "Sales";
+                    }
+                    else if (tabCaption.Equals("Purchase", StringComparison.OrdinalIgnoreCase))
+                    {
+                        targetCategory = "Purchase";
+                    }
+                    else if (tabKey == "ribbon3" || tabCaption.Equals("Accounts", StringComparison.OrdinalIgnoreCase))
+                    {
+                        targetCategory = "Analysis";
+                    }
+                    else if (tabCaption.IndexOf("GST", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        targetCategory = "GST Reports";
+                    }
+                    else if (tabCaption.Equals("Manual Balance", StringComparison.OrdinalIgnoreCase))
+                    {
+                        targetCategory = "Others";
+                    }
                 }
 
                 if (_isReportNavigatorVisible)
@@ -2836,15 +2861,6 @@ namespace PosBranch_Win
                         if (targetGrp != null && !targetGrp.Expanded)
                         {
                             ShowReportNavigator(targetCategory);
-                            return;
-                        }
-                    }
-                    else if (string.IsNullOrEmpty(targetCategory) && ultraExplorerBarReportNavigator != null)
-                    {
-                        bool anyCollapsed = ultraExplorerBarReportNavigator.Groups.Cast<Infragistics.Win.UltraWinExplorerBar.UltraExplorerBarGroup>().Any(g => !g.Expanded);
-                        if (anyCollapsed)
-                        {
-                            ShowReportNavigator(null);
                             return;
                         }
                     }
@@ -4029,6 +4045,7 @@ namespace PosBranch_Win
                             else if (formTypeName == "FrmBankStatementReport" || tabTextClean == "Bank Statement") matchedToolKey = "BankStatementReport";
                             else if (formTypeName == "FrmDebitNote" || tabTextClean == "DebitNote") matchedToolKey = "DebitNote";
                             else if (formTypeName == "FrmCreditNote" || tabTextClean == "CreditNote") matchedToolKey = "CreditNote";
+                            else if (formTypeName == "FrmSalesHoldReport" || tabTextClean == "Sales Hold Report") matchedToolKey = "SalesHoldReport";
                         }
 
                         if (string.IsNullOrEmpty(matchedToolKey))
@@ -4963,15 +4980,19 @@ namespace PosBranch_Win
 
             if (ultraExplorerBarReportNavigator != null && ultraExplorerBarReportNavigator.Groups.Count > 0)
             {
-                if (!string.IsNullOrEmpty(targetGroupKey))
+                string effectiveTarget = !string.IsNullOrWhiteSpace(targetGroupKey) ? targetGroupKey : null;
+                bool foundTarget = false;
+
+                if (!string.IsNullOrEmpty(effectiveTarget))
                 {
                     foreach (Infragistics.Win.UltraWinExplorerBar.UltraExplorerBarGroup group in ultraExplorerBarReportNavigator.Groups)
                     {
-                        if (group.Key.Equals(targetGroupKey, StringComparison.OrdinalIgnoreCase) ||
-                            group.Key.Equals($"Grp_{targetGroupKey}", StringComparison.OrdinalIgnoreCase) ||
-                            group.Text.Equals(targetGroupKey, StringComparison.OrdinalIgnoreCase))
+                        if (group.Key.Equals(effectiveTarget, StringComparison.OrdinalIgnoreCase) ||
+                            group.Key.Equals($"Grp_{effectiveTarget}", StringComparison.OrdinalIgnoreCase) ||
+                            group.Text.Equals(effectiveTarget, StringComparison.OrdinalIgnoreCase))
                         {
                             group.Expanded = true;
+                            foundTarget = true;
                             try
                             {
                                 ultraExplorerBarReportNavigator.ActiveGroup = group;
@@ -4984,21 +5005,14 @@ namespace PosBranch_Win
                         }
                     }
                 }
-                else
+
+                if (!foundTarget)
                 {
-                    // Opened from Home tab or general shortcut -> Expand all report categories
+                    // Opened from Home tab or general shortcut -> keep all groups collapsed so nothing is opened by default
                     foreach (Infragistics.Win.UltraWinExplorerBar.UltraExplorerBarGroup group in ultraExplorerBarReportNavigator.Groups)
                     {
-                        group.Expanded = true;
+                        group.Expanded = false;
                     }
-                    try
-                    {
-                        if (ultraExplorerBarReportNavigator.Groups.Count > 0)
-                        {
-                            ultraExplorerBarReportNavigator.ActiveGroup = ultraExplorerBarReportNavigator.Groups[0];
-                        }
-                    }
-                    catch { }
                 }
             }
         }
@@ -5068,6 +5082,7 @@ namespace PosBranch_Win
                     keyToExecute == "SalesmanwiseSalesSummaryReport" ||
                     keyToExecute == "ItemwiseSalesSummaryReport" ||
                     keyToExecute == "SalesmanIncentiveReport" ||
+                    keyToExecute == "SalesHoldReport" ||
                     keyToExecute == "CounterReport" ||
                     keyToExecute == "ShiftReconciliationReport" ||
                     keyToExecute == "TradingAccount" ||

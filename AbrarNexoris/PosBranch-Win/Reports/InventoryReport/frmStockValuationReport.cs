@@ -61,12 +61,20 @@ namespace PosBranch_Win.Reports.InventoryReport
         // ════════════════════════════════════════════════════════════
         //  Constructor
         // ════════════════════════════════════════════════════════════
-        public frmStockValuationReport()
+        private string _initialStockFilter = "All Items";
+
+        public frmStockValuationReport() : this("All Items")
         {
+        }
+
+        public frmStockValuationReport(string initialStockFilter)
+        {
+            _initialStockFilter = string.IsNullOrWhiteSpace(initialStockFilter) ? "All Items" : initialStockFilter;
             InitializeComponent();
             this.Font = new Font("Segoe UI", 9F);
             InitializeBackgroundWorker();
             InitializeForm();
+            this.Load += (s, e) => RunSearch();
         }
 
         // ════════════════════════════════════════════════════════════
@@ -100,6 +108,10 @@ namespace PosBranch_Win.Reports.InventoryReport
 
                 InitializePeriodCombo();
                 InitializeStockFilterCombo();
+                if (!string.IsNullOrEmpty(_initialStockFilter))
+                {
+                    comboStockFilter.Text = _initialStockFilter;
+                }
                 LoadGroups();
                 LoadCategories();
                 StyleGrid();
@@ -117,6 +129,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                 btnPrint.Click   += BtnPrint_Click;
                 btnClose.Click   += BtnClose_Click;
                 comboPeriod.ValueChanged  += ComboPeriod_ValueChanged;
+                comboStockFilter.ValueChanged += (s, e) => { if (_allRows.Count > 0) ApplyFilters(); };
                 txtSearch.TextChanged     += TxtSearch_TextChanged;
                 dtFrom.ValueChanged += DtDate_ValueChanged;
                 dtTo.ValueChanged   += DtDate_ValueChanged;

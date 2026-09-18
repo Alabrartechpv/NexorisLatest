@@ -1474,7 +1474,6 @@ namespace PosBranch_Win
             // tabControlMain
             // 
             this.tabControlMain.BackColorInternal = System.Drawing.Color.FromArgb(((int)(((byte)(240)))), ((int)(((byte)(248)))), ((int)(((byte)(255)))));
-            this.tabControlMain.ContextMenuStrip = this.tabContextMenuStrip;
             this.tabControlMain.Controls.Add(this.ultraTabSharedControlsPage1);
             this.tabControlMain.Dock = System.Windows.Forms.DockStyle.Fill;
             this.tabControlMain.Location = new System.Drawing.Point(0, 0);

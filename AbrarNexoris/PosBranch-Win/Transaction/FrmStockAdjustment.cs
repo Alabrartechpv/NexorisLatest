@@ -731,53 +731,127 @@ namespace PosBranch_Win.Transaction
             }
         }
 
+        private void NavigateGridRow(bool moveDown)
+        {
+            if (ultraGrid1 == null || ultraGrid1.Rows.Count == 0) return;
+
+            int currentRow = ultraGrid1.ActiveRow != null ? ultraGrid1.ActiveRow.Index : -1;
+            int targetRow = currentRow;
+
+            if (moveDown)
+            {
+                if (currentRow < 0)
+                    targetRow = 0;
+                else if (currentRow < ultraGrid1.Rows.Count - 1)
+                    targetRow = currentRow + 1;
+            }
+            else
+            {
+                if (currentRow < 0)
+                    targetRow = 0;
+                else if (currentRow > 0)
+                    targetRow = currentRow - 1;
+            }
+
+            if (targetRow >= 0 && targetRow < ultraGrid1.Rows.Count)
+            {
+                ultraGrid1.ActiveRow = ultraGrid1.Rows[targetRow];
+                ultraGrid1.Selected.Rows.Clear();
+                ultraGrid1.Rows[targetRow].Selected = true;
+                ultraGrid1.ActiveRowScrollRegion?.ScrollRowIntoView(ultraGrid1.Rows[targetRow]);
+            }
+
+            // Maintain focus in barcode textbox so user can seamlessly type e.g. *10
+            if (txtb_barcode != null && !txtb_barcode.IsDisposed)
+            {
+                if (this.ActiveControl != txtb_barcode)
+                {
+                    txtb_barcode.Focus();
+                }
+                txtb_barcode.SelectionStart = txtb_barcode.Text.Length;
+                txtb_barcode.SelectionLength = 0;
+            }
+        }
+
         private void txtb_barcode_KeyDown(object sender, KeyEventArgs e)
         {
+            // Up and Down arrow navigation while keeping focus in barcode textbox
+            if (e.KeyCode == Keys.Down || e.KeyCode == Keys.Up)
+            {
+                NavigateGridRow(e.KeyCode == Keys.Down);
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+                return;
+            }
+
             if (e.KeyCode == Keys.Enter)
             {
                 string input = txtb_barcode.Text.Trim();
                 if (string.IsNullOrEmpty(input)) return;
 
-                // Special handling for quantity change (*5, *-5)
+                // Special handling for quantity change (*5, *-5, 10*, *10)
+                int quantity = 0;
+                bool isQtyInput = false;
+
                 if (input.StartsWith("*") && input.Length > 1)
                 {
-                    string quantityText = input.Substring(1);
-                    if (int.TryParse(quantityText, out int quantity))
+                    string quantityText = input.Substring(1).Trim();
+                    isQtyInput = int.TryParse(quantityText, out quantity);
+                }
+                else if (input.EndsWith("*") && input.Length > 1)
+                {
+                    string quantityText = input.Substring(0, input.Length - 1).Trim();
+                    isQtyInput = int.TryParse(quantityText, out quantity);
+                }
+
+                if (isQtyInput)
+                {
+                    // If no row is active yet, default to the currently selected row or the last row
+                    if (ultraGrid1.ActiveRow == null && ultraGrid1.Rows.Count > 0)
                     {
-                        // If we have an active row, update its Adjustment Qty
-                        if (ultraGrid1.ActiveRow != null)
+                        if (ultraGrid1.Selected.Rows.Count > 0)
                         {
-                            ultraGrid1.ActiveRow.Cells["Adjustment Qty"].Value = quantity;
-
-                            // Update calculations directly without creating a new event
-                            int rowIndex = ultraGrid1.ActiveRow.Index;
-                            var row = ultraGrid1.Rows[rowIndex];
-
-                            // Get cell values with validation
-                            var adjQtyCell = row.Cells["Adjustment Qty"];
-                            var qtyOnHandCell = row.Cells["Qty On Hand"];
-                            var qtyDifferenceCell = row.Cells["Qty Difference"];
-                            var newBalanceCell = row.Cells["New Balance"];
-
-                            if (adjQtyCell?.Value != null && qtyOnHandCell?.Value != null)
-                            {
-                                int adjQty       = Convert.ToInt32(adjQtyCell.Value);
-                                int currentStock = Convert.ToInt32(qtyOnHandCell.Value);
-
-                                var (newBalance, difference) = CalculateBalance(currentStock, adjQty);
-                                newBalanceCell.Value    = newBalance;
-                                qtyDifferenceCell.Value = difference;
-                                ApplyColorFormatting(row, difference);
-                            }
+                            ultraGrid1.ActiveRow = ultraGrid1.Selected.Rows[0];
                         }
                         else
                         {
-                            MessageBox.Show("Please select a row first before changing quantity.",
-                                "No Row Selected", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            ultraGrid1.ActiveRow = ultraGrid1.Rows[ultraGrid1.Rows.Count - 1];
                         }
-                        barcodeFocus();
-                        return;
                     }
+
+                    // If we have an active row, update its Adjustment Qty
+                    if (ultraGrid1.ActiveRow != null)
+                    {
+                        ultraGrid1.ActiveRow.Cells["Adjustment Qty"].Value = quantity;
+
+                        // Update calculations directly without creating a new event
+                        int rowIndex = ultraGrid1.ActiveRow.Index;
+                        var row = ultraGrid1.Rows[rowIndex];
+
+                        // Get cell values with validation
+                        var adjQtyCell = row.Cells["Adjustment Qty"];
+                        var qtyOnHandCell = row.Cells["Qty On Hand"];
+                        var qtyDifferenceCell = row.Cells["Qty Difference"];
+                        var newBalanceCell = row.Cells["New Balance"];
+
+                        if (adjQtyCell?.Value != null && qtyOnHandCell?.Value != null)
+                        {
+                            int adjQty       = Convert.ToInt32(adjQtyCell.Value);
+                            int currentStock = Convert.ToInt32(qtyOnHandCell.Value);
+
+                            var (newBalance, difference) = CalculateBalance(currentStock, adjQty);
+                            newBalanceCell.Value    = newBalance;
+                            qtyDifferenceCell.Value = difference;
+                            ApplyColorFormatting(row, difference);
+                        }
+                    }
+                    else
+                    {
+                        MessageBox.Show("Please select a row first before changing quantity.",
+                            "No Row Selected", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    barcodeFocus();
+                    return;
                 }
 
                 // Special handling for unit dialog ('u')
@@ -1368,6 +1442,16 @@ namespace PosBranch_Win.Transaction
         {
             try
             {
+                // Handle Up/Down arrow navigation while in barcode textbox
+                if ((keyData == Keys.Up || keyData == Keys.Down) && ultraGrid1 != null && ultraGrid1.Rows.Count > 0)
+                {
+                    if (this.ActiveControl == txtb_barcode || (txtb_barcode != null && txtb_barcode.Focused))
+                    {
+                        NavigateGridRow(keyData == Keys.Down);
+                        return true;
+                    }
+                }
+
                 // F1 to clear the form (previously F5)
                 if (keyData == Keys.F1)
                 {
