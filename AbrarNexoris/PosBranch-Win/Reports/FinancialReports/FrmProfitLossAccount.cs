@@ -14,6 +14,23 @@ namespace PosBranch_Win.Reports.FinancialReports
 {
     public partial class FrmProfitLossAccount : Form
     {
+        #region Styling Constants
+        private static readonly Color FormBackColor = Color.FromArgb(232, 246, 255);
+        private static readonly Color FilterPanelBackColor = Color.FromArgb(232, 246, 255);
+        private static readonly Color ActionPanelBackColor = Color.FromArgb(206, 223, 238);
+        private static readonly Color BorderBlue = Color.FromArgb(118, 154, 198);
+        private static readonly Color ControlTextColor = Color.FromArgb(18, 49, 102);
+        private static readonly Color GridHeaderBlue = Color.FromArgb(93, 151, 214);
+        private static readonly Color GridHeaderBlueDark = Color.FromArgb(67, 118, 184);
+        private static readonly Color GridSelectedBlue = Color.FromArgb(126, 126, 245);
+        private static readonly Color GridRowLine = Color.FromArgb(197, 217, 241);
+        private static readonly Color GridAltRow = Color.FromArgb(246, 250, 255);
+        private static readonly Color ButtonBlueTop = Color.FromArgb(232, 241, 252);
+        private static readonly Color ButtonBlueBottom = Color.FromArgb(145, 181, 224);
+        private static readonly Color ButtonLightOutline = Color.FromArgb(166, 183, 202);
+        private static readonly Color ButtonTextBlue = Color.FromArgb(14, 47, 108);
+        #endregion
+
         #region Private Fields
         private TradingPLRepository reportRepository;
         private TradingPLReport currentReport;
@@ -29,10 +46,8 @@ namespace PosBranch_Win.Reports.FinancialReports
 
         public void RibbonClear()
         {
-            int currentYear = DateTime.Now.Year;
-            int fyStartYear = DateTime.Now.Month >= 4 ? currentYear : currentYear - 1;
-            ultraDateTimeFrom.Value = new DateTime(fyStartYear, 4, 1);
-            ultraDateTimeTo.Value = DateTime.Now;
+            ultraComboPresetDates.Value = "CURRENT_FY";
+            ApplyDatePreset("CURRENT_FY");
             currentReport = null;
             ultraGridProfitLoss.DataSource = null;
             ClearSummary();
@@ -52,13 +67,8 @@ namespace PosBranch_Win.Reports.FinancialReports
                 this.WindowState = FormWindowState.Maximized;
                 this.StartPosition = FormStartPosition.CenterScreen;
 
-                // Set default date range: current financial year (April 1 to today)
-                int currentYear = DateTime.Now.Year;
-                int fyStartYear = DateTime.Now.Month >= 4 ? currentYear : currentYear - 1;
-                ultraDateTimeFrom.Value = new DateTime(fyStartYear, 4, 1);
-                ultraDateTimeFrom.FormatString = "dd-MM-yyyy";
-                ultraDateTimeTo.Value = DateTime.Now;
-                ultraDateTimeTo.FormatString = "dd-MM-yyyy";
+                // Setup Date Presets
+                InitializeDateControls();
 
                 // Keyboard shortcuts
                 this.KeyPreview = true;
@@ -80,70 +90,180 @@ namespace PosBranch_Win.Reports.FinancialReports
             }
         }
 
+        private void InitializeDateControls()
+        {
+            ultraDateTimeFrom.FormatString = "dd-MM-yyyy";
+            ultraDateTimeTo.FormatString = "dd-MM-yyyy";
+
+            ultraComboPresetDates.Items.Clear();
+            ultraComboPresetDates.Items.Add("CURRENT_FY", "Current FY");
+            ultraComboPresetDates.Items.Add("TODAY", "Today");
+            ultraComboPresetDates.Items.Add("THIS_MONTH", "This Month");
+            ultraComboPresetDates.Items.Add("DATE_RANGE", "Date by Range");
+            ultraComboPresetDates.Items.Add("ALL", "ALL");
+
+            ultraComboPresetDates.Value = "CURRENT_FY";
+            ApplyDatePreset("CURRENT_FY");
+        }
+
+        private void ApplyDatePreset(string presetKey)
+        {
+            int currentYear = DateTime.Now.Year;
+            switch (presetKey)
+            {
+                case "CURRENT_FY":
+                    int fyStartYear = DateTime.Now.Month >= 4 ? currentYear : currentYear - 1;
+                    ultraDateTimeFrom.Value = new DateTime(fyStartYear, 4, 1);
+                    ultraDateTimeTo.Value = DateTime.Today;
+                    ultraDateTimeFrom.Enabled = false;
+                    ultraDateTimeTo.Enabled = false;
+                    break;
+
+                case "TODAY":
+                    ultraDateTimeFrom.Value = DateTime.Today;
+                    ultraDateTimeTo.Value = DateTime.Today;
+                    ultraDateTimeFrom.Enabled = false;
+                    ultraDateTimeTo.Enabled = false;
+                    break;
+
+                case "THIS_MONTH":
+                    ultraDateTimeFrom.Value = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
+                    ultraDateTimeTo.Value = DateTime.Today;
+                    ultraDateTimeFrom.Enabled = false;
+                    ultraDateTimeTo.Enabled = false;
+                    break;
+
+                case "ALL":
+                    ultraDateTimeFrom.Value = new DateTime(1990, 1, 1);
+                    ultraDateTimeTo.Value = DateTime.Today;
+                    ultraDateTimeFrom.Enabled = false;
+                    ultraDateTimeTo.Enabled = false;
+                    break;
+
+                case "DATE_RANGE":
+                default:
+                    ultraDateTimeFrom.Enabled = true;
+                    ultraDateTimeTo.Enabled = true;
+                    break;
+            }
+        }
+
+        private void UltraComboPresetDates_ValueChanged(object sender, EventArgs e)
+        {
+            string selected = Convert.ToString(ultraComboPresetDates.Value ?? ultraComboPresetDates.Text);
+            ApplyDatePreset(selected);
+        }
+
         private void InitializePanels()
         {
-            // Set panel colors
-            ultraGroupBoxPL.Appearance.BackColor = Color.FromArgb(74, 20, 140);
-            ultraGroupBoxPL.Appearance.ForeColor = Color.White;
-            ultraGroupBoxPL.Appearance.FontData.Bold = DefaultableBoolean.True;
-            ultraGroupBoxPL.Appearance.FontData.SizeInPoints = 11;
+            this.BackColor = FormBackColor;
 
-            ultraPanelSummary.Appearance.BackColor = Color.FromArgb(38, 50, 56);
-            
-            // Net Profit Panel
-            panelNetProfit.Appearance.BackColor = Color.FromArgb(232, 245, 233);
-            lblNetProfitCaption.Appearance.ForeColor = Color.FromArgb(27, 94, 32);
-            lblNetProfitCaption.Appearance.FontData.Bold = DefaultableBoolean.True;
-            lblNetProfitCaption.Appearance.FontData.SizeInPoints = 12;
-            lblNetProfitValue.Appearance.ForeColor = Color.FromArgb(27, 94, 32);
-            lblNetProfitValue.Appearance.FontData.Bold = DefaultableBoolean.True;
-            lblNetProfitValue.Appearance.FontData.SizeInPoints = 16;
+            // Filter Panel
+            ultraPanelControls.Appearance.BackColor = FilterPanelBackColor;
+            ultraPanelControls.Appearance.BorderColor = BorderBlue;
+            ultraPanelControls.BorderStyle = UIElementBorderStyle.Solid;
+            ultraPanelControls.Dock = DockStyle.Top;
+            ultraPanelControls.Height = 58;
 
-            // Summary Bottom Panel
-            StyleSummaryLabel(lblGrossProfitBfCaption, Color.FromArgb(176, 190, 197), false);
-            StyleSummaryValueLabel(lblGrossProfitBfValue, Color.FromArgb(102, 187, 106), 12);
-            
-            StyleSummaryLabel(lblIndirectIncomesCaption, Color.FromArgb(176, 190, 197), false);
-            StyleSummaryValueLabel(lblIndirectIncomesValue, Color.FromArgb(102, 187, 106), 12);
+            // Label Styling
+            lblPreset.Appearance.ForeColor = ControlTextColor;
+            lblPreset.Appearance.FontData.Bold = DefaultableBoolean.False;
+            lblFromDate.Appearance.ForeColor = ControlTextColor;
+            lblToDate.Appearance.ForeColor = ControlTextColor;
 
-            StyleSummaryLabel(lblIndirectExpensesCaption, Color.FromArgb(176, 190, 197), false);
-            StyleSummaryValueLabel(lblIndirectExpensesValue, Color.FromArgb(239, 83, 80), 12);
-        }
+            // Action Panel
+            ultraPanelAction.Appearance.BackColor = ActionPanelBackColor;
+            ultraPanelAction.Appearance.BorderColor = BorderBlue;
+            ultraPanelAction.BorderStyle = UIElementBorderStyle.Solid;
+            ultraPanelAction.Dock = DockStyle.Top;
+            ultraPanelAction.Height = 45;
 
-        private void StyleSummaryLabel(Infragistics.Win.Misc.UltraLabel label, Color foreColor, bool isBold)
-        {
-            label.Appearance.ForeColor = foreColor;
-            label.Appearance.FontData.Bold = isBold ? DefaultableBoolean.True : DefaultableBoolean.False;
-            label.Appearance.FontData.SizeInPoints = 9;
-        }
+            // Master Panel
+            ultraPanelMaster.Appearance.BackColor = FormBackColor;
+            ultraPanelMaster.Appearance.BorderColor = BorderBlue;
+            ultraPanelMaster.BorderStyle = UIElementBorderStyle.Solid;
+            ultraPanelMaster.Dock = DockStyle.Fill;
 
-        private void StyleSummaryValueLabel(Infragistics.Win.Misc.UltraLabel label, Color foreColor, int fontSize)
-        {
-            label.Appearance.ForeColor = foreColor;
-            label.Appearance.FontData.Bold = DefaultableBoolean.True;
-            label.Appearance.FontData.SizeInPoints = fontSize;
+            // Footer Panel
+            ultraPanelGridFooter.Appearance.BackColor = GridHeaderBlue;
+            ultraPanelGridFooter.Appearance.BackColor2 = GridHeaderBlueDark;
+            ultraPanelGridFooter.Appearance.BackGradientStyle = GradientStyle.Vertical;
+            ultraPanelGridFooter.Appearance.BorderColor = BorderBlue;
+            ultraPanelGridFooter.BorderStyle = UIElementBorderStyle.Solid;
+            ultraPanelGridFooter.Dock = DockStyle.Bottom;
+            ultraPanelGridFooter.Height = 34;
+
+            // Footer Labels Styling
+            lblGrossProfitBf.Appearance.ForeColor = Color.White;
+            lblGrossProfitBf.Appearance.FontData.Bold = DefaultableBoolean.True;
+            lblGrossProfitBf.Appearance.FontData.SizeInPoints = 9.5f;
+
+            lblIndirectExpenses.Appearance.ForeColor = Color.FromArgb(255, 230, 230);
+            lblIndirectExpenses.Appearance.FontData.Bold = DefaultableBoolean.True;
+            lblIndirectExpenses.Appearance.FontData.SizeInPoints = 9.5f;
+
+            lblIndirectIncomes.Appearance.ForeColor = Color.FromArgb(230, 255, 230);
+            lblIndirectIncomes.Appearance.FontData.Bold = DefaultableBoolean.True;
+            lblIndirectIncomes.Appearance.FontData.SizeInPoints = 9.5f;
+
+            lblNetProfit.Appearance.ForeColor = Color.FromArgb(255, 255, 180);
+            lblNetProfit.Appearance.FontData.Bold = DefaultableBoolean.True;
+            lblNetProfit.Appearance.FontData.SizeInPoints = 10.5f;
+            lblNetProfit.Appearance.TextHAlign = HAlign.Right;
+
+            // Dock & Z-Order
+            ultraPanelControls.SendToBack();
+            ultraPanelAction.BringToFront();
+            ultraPanelMaster.BringToFront();
+            ultraPanelGridFooter.SendToBack();
+            ultraGridProfitLoss.BringToFront();
+
+            UpdateSelectionToggleButtonText();
         }
 
         private void StyleButtons()
         {
-            StyleButton(btnGenerate, Color.FromArgb(25, 118, 210), Color.White);
-            StyleButton(btnExport, Color.FromArgb(0, 121, 107), Color.White);
-            StyleButton(btnPrint, Color.FromArgb(81, 45, 168), Color.White);
-            StyleButton(btnClose, Color.FromArgb(198, 40, 40), Color.White);
+            btnGenerate.Text = "View Grid";
+            btnPreviewGrid.Text = "Preview Grid";
+            btnPrint.Text = "Preview Report";
+            btnExport.Text = "Export Grid";
+            btnClearFilters.Text = "Reset Filters";
+            btnToggleSelection.Text = "Hide Selection";
+
+            StyleClassicButton(btnGenerate);
+            StyleClassicButton(btnPreviewGrid);
+            StyleClassicButton(btnPrint);
+            StyleClassicButton(btnExport);
+            StyleClassicButton(btnClearFilters);
+            StyleClassicButton(btnToggleSelection);
         }
 
-        private void StyleButton(Infragistics.Win.Misc.UltraButton btn, Color backColor, Color foreColor)
+        private static void StyleClassicButton(Infragistics.Win.Misc.UltraButton button)
         {
-            btn.UseOsThemes = DefaultableBoolean.False;
-            btn.Appearance.BackColor = backColor;
-            btn.Appearance.ForeColor = foreColor;
-            btn.Appearance.FontData.Bold = DefaultableBoolean.True;
-            btn.Appearance.BorderColor = backColor;
-            btn.ButtonStyle = Infragistics.Win.UIElementButtonStyle.Flat;
-            
-            btn.HotTrackAppearance.BackColor = Color.FromArgb(66, 165, 245);
-            btn.HotTrackAppearance.ForeColor = Color.White;
-            btn.HotTrackAppearance.BorderColor = backColor;
+            button.UseAppStyling = false;
+            button.UseOsThemes = DefaultableBoolean.False;
+            button.ButtonStyle = UIElementButtonStyle.Flat;
+            button.UseFlatMode = DefaultableBoolean.False;
+            button.Appearance.BackColor = ButtonBlueTop;
+            button.Appearance.BackColor2 = ButtonBlueBottom;
+            button.Appearance.BackGradientStyle = GradientStyle.Vertical;
+            button.Appearance.ForeColor = ButtonTextBlue;
+            button.Appearance.BorderColor = ButtonLightOutline;
+            button.Appearance.TextHAlign = HAlign.Center;
+            button.Appearance.TextVAlign = VAlign.Middle;
+            button.Appearance.FontData.Bold = DefaultableBoolean.False;
+            button.Appearance.FontData.SizeInPoints = 9;
+            button.Font = new Font("Tahoma", 9F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            button.HotTrackAppearance.BackColor = Color.FromArgb(241, 247, 254);
+            button.HotTrackAppearance.BackColor2 = Color.FromArgb(166, 195, 231);
+            button.HotTrackAppearance.BackGradientStyle = GradientStyle.Vertical;
+            button.HotTrackAppearance.BorderColor = ButtonLightOutline;
+            button.HotTrackAppearance.ForeColor = ButtonTextBlue;
+            button.PressedAppearance.BackColor = Color.FromArgb(118, 161, 214);
+            button.PressedAppearance.BackColor2 = Color.FromArgb(217, 231, 247);
+            button.PressedAppearance.BackGradientStyle = GradientStyle.Vertical;
+            button.PressedAppearance.BorderColor = Color.FromArgb(148, 163, 182);
+            button.PressedAppearance.ForeColor = ButtonTextBlue;
         }
 
         private void SetupProfitLossGrid()
@@ -155,12 +275,19 @@ namespace PosBranch_Win.Reports.FinancialReports
             ApplyGridBaseSettings(ultraGridProfitLoss);
             
             // Header colors
-            ultraGridProfitLoss.DisplayLayout.Override.HeaderAppearance.BackColor = Color.FromArgb(74, 20, 140);
-            ultraGridProfitLoss.DisplayLayout.Override.HeaderAppearance.BackColor2 = Color.FromArgb(106, 27, 154);
-            
+            ultraGridProfitLoss.DisplayLayout.Override.HeaderAppearance.BackColor = GridHeaderBlue;
+            ultraGridProfitLoss.DisplayLayout.Override.HeaderAppearance.BackColor2 = GridHeaderBlueDark;
+            ultraGridProfitLoss.DisplayLayout.Override.HeaderAppearance.BackGradientStyle = GradientStyle.Vertical;
+            ultraGridProfitLoss.DisplayLayout.Override.HeaderAppearance.ForeColor = Color.White;
+            ultraGridProfitLoss.DisplayLayout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.True;
+            ultraGridProfitLoss.DisplayLayout.Override.HeaderAppearance.FontData.SizeInPoints = 9f;
+            ultraGridProfitLoss.DisplayLayout.Override.HeaderAppearance.TextHAlign = HAlign.Center;
+
             // Highlight cells
-            ultraGridProfitLoss.DisplayLayout.Override.SelectedRowAppearance.BackColor = Color.FromArgb(243, 229, 245);
-            
+            ultraGridProfitLoss.DisplayLayout.Override.SelectedRowAppearance.BackColor = GridSelectedBlue;
+            ultraGridProfitLoss.DisplayLayout.Override.SelectedRowAppearance.ForeColor = Color.White;
+            ultraGridProfitLoss.DisplayLayout.Override.SelectedRowAppearance.FontData.Bold = DefaultableBoolean.True;
+
             ultraGridProfitLoss.InitializeLayout += UltraGridProfitLoss_InitializeLayout;
             ultraGridProfitLoss.InitializeRow += UltraGridProfitLoss_InitializeRow;
         }
@@ -173,22 +300,25 @@ namespace PosBranch_Win.Reports.FinancialReports
             if (category == "Gross Profit b/f" || category == "Gross Loss b/f" || category == "Net Profit" || category == "Net Loss")
             {
                 e.Row.Appearance.FontData.Bold = DefaultableBoolean.True;
-                e.Row.Appearance.BackColor = Color.FromArgb(245, 245, 245);
-                
+
                 if (category == "Gross Profit b/f" || category == "Net Profit")
                 {
+                    e.Row.Appearance.BackColor = Color.FromArgb(232, 245, 233); // Soft Green
                     e.Row.Cells["LedgerName"].Appearance.ForeColor = Color.FromArgb(27, 94, 32); // Dark Green
+                    e.Row.Cells["EffectiveAmount"].Appearance.ForeColor = Color.FromArgb(27, 94, 32);
                 }
                 else
                 {
+                    e.Row.Appearance.BackColor = Color.FromArgb(255, 235, 238); // Soft Red
                     e.Row.Cells["LedgerName"].Appearance.ForeColor = Color.FromArgb(198, 40, 40); // Dark Red
+                    e.Row.Cells["EffectiveAmount"].Appearance.ForeColor = Color.FromArgb(198, 40, 40);
                 }
             }
         }
 
         private void ApplyGridBaseSettings(UltraGrid grid)
         {
-            grid.UseOsThemes = DefaultableBoolean.False; // Bypass OS theming to allow custom header appearance
+            grid.UseOsThemes = DefaultableBoolean.False;
             grid.DisplayLayout.Override.AllowAddNew = AllowAddNew.No;
             grid.DisplayLayout.Override.AllowDelete = DefaultableBoolean.False;
             grid.DisplayLayout.Override.AllowUpdate = DefaultableBoolean.False;
@@ -202,23 +332,20 @@ namespace PosBranch_Win.Reports.FinancialReports
             grid.DisplayLayout.CaptionVisible = DefaultableBoolean.False;
             grid.DisplayLayout.GroupByBox.Hidden = true;
             
-            grid.DisplayLayout.Override.MinRowHeight = 28;
-            grid.DisplayLayout.Override.DefaultRowHeight = 28;
+            grid.DisplayLayout.Override.MinRowHeight = 26;
+            grid.DisplayLayout.Override.DefaultRowHeight = 26;
             
             grid.DisplayLayout.Override.RowAppearance.BackColor = Color.White;
-            grid.DisplayLayout.Override.RowAlternateAppearance.BackColor = Color.FromArgb(250, 250, 252);
-            
-            grid.DisplayLayout.Override.HeaderAppearance.BackGradientStyle = GradientStyle.Vertical;
-            grid.DisplayLayout.Override.HeaderAppearance.ForeColor = Color.White;
-            grid.DisplayLayout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.True;
-            grid.DisplayLayout.Override.HeaderAppearance.FontData.SizeInPoints = 9.5f;
-            grid.DisplayLayout.Override.HeaderAppearance.TextHAlign = HAlign.Center;
+            grid.DisplayLayout.Override.RowAlternateAppearance.BackColor = GridAltRow;
+            grid.DisplayLayout.Override.CellAppearance.BorderColor = GridRowLine;
+            grid.DisplayLayout.Override.BorderStyleCell = UIElementBorderStyle.Solid;
+            grid.DisplayLayout.Override.BorderStyleRow = UIElementBorderStyle.Solid;
         }
 
         private void UltraGridProfitLoss_InitializeLayout(object sender, InitializeLayoutEventArgs e)
         {
             var band = e.Layout.Bands[0];
-            band.ColHeadersVisible = true; // Force column headers to be visible
+            band.ColHeadersVisible = true;
             
             foreach (var col in band.Columns)
             {
@@ -226,34 +353,34 @@ namespace PosBranch_Win.Reports.FinancialReports
             }
 
             // Show and configure required columns
-            ConfigureColumn(band, "LedgerName", "Particulars", 300, HAlign.Left);
+            ConfigureColumn(band, "LedgerName", "Particulars", 320, HAlign.Left);
             band.Columns["LedgerName"].Header.VisiblePosition = 0;
 
-            ConfigureColumn(band, "GroupName", "Account Group", 200, HAlign.Left);
+            ConfigureColumn(band, "GroupName", "Account Group", 220, HAlign.Left);
             band.Columns["GroupName"].Header.VisiblePosition = 1;
 
-            ConfigureColumn(band, "Category", "Category", 160, HAlign.Left);
+            ConfigureColumn(band, "Category", "Category", 180, HAlign.Left);
             band.Columns["Category"].Header.VisiblePosition = 2;
             band.Columns["Category"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
-            band.Columns["Category"].CellAppearance.ForeColor = Color.FromArgb(74, 20, 140);
+            band.Columns["Category"].CellAppearance.ForeColor = ButtonTextBlue;
             
-            ConfigureColumn(band, "TotalDebit", "Debit (₹)", 130, HAlign.Right);
+            ConfigureColumn(band, "TotalDebit", "Debit (₹)", 140, HAlign.Right);
             band.Columns["TotalDebit"].Header.VisiblePosition = 3;
             band.Columns["TotalDebit"].Format = "N2";
             band.Columns["TotalDebit"].CellAppearance.ForeColor = Color.FromArgb(198, 40, 40);
 
-            ConfigureColumn(band, "TotalCredit", "Credit (₹)", 130, HAlign.Right);
+            ConfigureColumn(band, "TotalCredit", "Credit (₹)", 140, HAlign.Right);
             band.Columns["TotalCredit"].Header.VisiblePosition = 4;
             band.Columns["TotalCredit"].Format = "N2";
             band.Columns["TotalCredit"].CellAppearance.ForeColor = Color.FromArgb(27, 94, 32);
 
-            ConfigureColumn(band, "EffectiveAmount", "Amount (₹)", 140, HAlign.Right);
+            ConfigureColumn(band, "EffectiveAmount", "Amount (₹)", 150, HAlign.Right);
             band.Columns["EffectiveAmount"].Header.VisiblePosition = 5;
             band.Columns["EffectiveAmount"].Format = "N2";
             band.Columns["EffectiveAmount"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
             
             band.Override.AllowColSizing = AllowColSizing.Free;
-            e.Layout.AutoFitStyle = AutoFitStyle.ExtendLastColumn;
+            e.Layout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
         }
 
         private void ConfigureColumn(UltraGridBand band, string key, string headerText, int width, HAlign align)
@@ -386,39 +513,33 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             var s = currentReport.Summary;
 
-            // Summary bar
-            lblGrossProfitBfValue.Text = $"₹ {Math.Abs(s.GrossProfit):N2}";
-            lblGrossProfitBfCaption.Text = s.GrossProfit >= 0
-                ? "Gross Profit (B/F):"
-                : "Gross Loss (B/F):";
-            lblGrossProfitBfValue.Appearance.ForeColor = s.GrossProfit >= 0
-                ? Color.FromArgb(102, 187, 106)
-                : Color.FromArgb(239, 83, 80);
-            lblIndirectIncomesValue.Text = $"₹ {s.TotalIndirectIncomes:N2}";
-            lblIndirectExpensesValue.Text = $"₹ {s.TotalIndirectExpenses:N2}";
+            // Summary bar labels
+            lblGrossProfitBf.Text = s.GrossProfit >= 0
+                ? $"Gross Profit (B/F): ₹ {Math.Abs(s.GrossProfit):N2}"
+                : $"Gross Loss (B/F): ₹ {Math.Abs(s.GrossProfit):N2}";
+
+            lblIndirectExpenses.Text = $"Indirect Expenses: ₹ {s.TotalIndirectExpenses:N2}";
+            lblIndirectIncomes.Text = $"Indirect Incomes: ₹ {s.TotalIndirectIncomes:N2}";
 
             // Net Profit
-            lblNetProfitValue.Text = $"₹ {Math.Abs(s.NetProfit):N2}";
             if (s.NetProfit >= 0)
             {
-                lblNetProfitValue.Appearance.ForeColor = Color.FromArgb(27, 94, 32);
-                lblNetProfitCaption.Text = "★ NET PROFIT:";
-                panelNetProfit.Appearance.BackColor = Color.FromArgb(232, 245, 233);
+                lblNetProfit.Text = $"★ NET PROFIT: ₹ {s.NetProfit:N2}";
+                lblNetProfit.Appearance.ForeColor = Color.FromArgb(255, 255, 180); // Gold/Yellow highlight
             }
             else
             {
-                lblNetProfitValue.Appearance.ForeColor = Color.FromArgb(183, 28, 28);
-                lblNetProfitCaption.Text = "★ NET LOSS:";
-                panelNetProfit.Appearance.BackColor = Color.FromArgb(255, 235, 238);
+                lblNetProfit.Text = $"★ NET LOSS: ₹ {Math.Abs(s.NetProfit):N2}";
+                lblNetProfit.Appearance.ForeColor = Color.FromArgb(255, 200, 200); // Light Red highlight
             }
         }
 
         private void ClearSummary()
         {
-            lblGrossProfitBfValue.Text = "₹ 0.00";
-            lblIndirectIncomesValue.Text = "₹ 0.00";
-            lblIndirectExpensesValue.Text = "₹ 0.00";
-            lblNetProfitValue.Text = "₹ 0.00";
+            lblGrossProfitBf.Text = "Gross Profit (B/F): ₹ 0.00";
+            lblIndirectExpenses.Text = "Indirect Expenses: ₹ 0.00";
+            lblIndirectIncomes.Text = "Indirect Incomes: ₹ 0.00";
+            lblNetProfit.Text = "★ NET PROFIT: ₹ 0.00";
         }
         #endregion
 
@@ -431,6 +552,24 @@ namespace PosBranch_Win.Reports.FinancialReports
         private void btnGenerate_Click(object sender, EventArgs e)
         {
             LoadReport();
+        }
+
+        private void btnPreviewGrid_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (ultraGridProfitLoss.Rows.Count == 0)
+                {
+                    MessageBox.Show("No data to preview.", "Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                ultraGridProfitLoss.PrintPreview();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error during print preview: {ex.Message}", "Preview Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void btnExportCsv_Click(object sender, EventArgs e)
@@ -500,6 +639,25 @@ namespace PosBranch_Win.Reports.FinancialReports
             }
         }
 
+        private void btnClearFilters_Click(object sender, EventArgs e)
+        {
+            RibbonClear();
+        }
+
+        private void btnToggleSelection_Click(object sender, EventArgs e)
+        {
+            ultraPanelControls.Visible = !ultraPanelControls.Visible;
+            UpdateSelectionToggleButtonText();
+        }
+
+        private void UpdateSelectionToggleButtonText()
+        {
+            if (btnToggleSelection != null)
+            {
+                btnToggleSelection.Text = ultraPanelControls.Visible ? "Hide Selection" : "View Selection";
+            }
+        }
+
         private void btnClose_Click(object sender, EventArgs e)
         {
             this.Close();
@@ -513,7 +671,15 @@ namespace PosBranch_Win.Reports.FinancialReports
             {
                 if (e.KeyCode == Keys.F5)
                 {
-                    btnGenerate_Click(sender, e);
+                    if (e.Control)
+                        btnPreviewGrid_Click(sender, e);
+                    else
+                        btnGenerate_Click(sender, e);
+                    e.Handled = true;
+                }
+                else if (e.KeyCode == Keys.F6)
+                {
+                    btnClearFilters_Click(sender, e);
                     e.Handled = true;
                 }
                 else if (e.KeyCode == Keys.Escape)
