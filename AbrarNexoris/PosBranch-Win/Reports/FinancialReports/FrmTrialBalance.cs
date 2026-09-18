@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Drawing;
 using System.IO;
 using System.Linq;
@@ -14,23 +15,45 @@ namespace PosBranch_Win.Reports.FinancialReports
 {
     public partial class FrmTrialBalance : Form
     {
+        #region Styling Constants
+        private static readonly Color FormBackColor = Color.FromArgb(232, 246, 255);
+        private static readonly Color FilterPanelBackColor = Color.FromArgb(232, 246, 255);
+        private static readonly Color ActionPanelBackColor = Color.FromArgb(206, 223, 238);
+        private static readonly Color BorderBlue = Color.FromArgb(118, 154, 198);
+        private static readonly Color ControlTextColor = Color.FromArgb(18, 49, 102);
+        private static readonly Color GridHeaderBlue = Color.FromArgb(93, 151, 214);
+        private static readonly Color GridHeaderBlueDark = Color.FromArgb(67, 118, 184);
+        private static readonly Color GridSelectedBlue = Color.FromArgb(126, 126, 245);
+        private static readonly Color GridRowLine = Color.FromArgb(197, 217, 241);
+        private static readonly Color GridAltRow = Color.FromArgb(246, 250, 255);
+        private static readonly Color ButtonBlueTop = Color.FromArgb(232, 241, 252);
+        private static readonly Color ButtonBlueBottom = Color.FromArgb(145, 181, 224);
+        private static readonly Color ButtonLightOutline = Color.FromArgb(166, 183, 202);
+        private static readonly Color ButtonTextBlue = Color.FromArgb(14, 47, 108);
+
+        // Muted gray for zero values
+        private static readonly Color ZeroValueGray = Color.FromArgb(165, 175, 185);
+        private static readonly Color ActiveAmountColor = Color.FromArgb(18, 49, 102);
+        #endregion
+
+        #region Private Fields
         private TrialBalanceRepository reportRepository;
         private TrialBalanceReport currentReport;
         private List<TrialBalanceLineItem> displayedLineItems;
+        #endregion
 
+        #region Constructor
         public FrmTrialBalance()
         {
             InitializeComponent();
             InitializeForm();
-            ultraGridTrialBalance.DisplayLayout.Override.HeaderAppearance.ThemedElementAlpha = Alpha.Transparent;
         }
+        #endregion
 
         public void RibbonClear()
         {
-            int currentYear = DateTime.Now.Year;
-            int fyStartYear = DateTime.Now.Month >= 4 ? currentYear : currentYear - 1;
-            ultraDateTimeFrom.Value = new DateTime(fyStartYear, 4, 1);
-            ultraDateTimeTo.Value = DateTime.Now;
+            ultraComboPresetDates.Value = "ALL";
+            ApplyDatePreset("ALL");
             txtSearch.Text = string.Empty;
             currentReport = null;
             displayedLineItems = null;
@@ -40,31 +63,34 @@ namespace PosBranch_Win.Reports.FinancialReports
 
         public void Clear() => RibbonClear();
 
+        #region Form Initialization
         private void InitializeForm()
         {
             try
             {
                 reportRepository = new TrialBalanceRepository();
 
-                Text = "Trial Balance";
-                WindowState = FormWindowState.Maximized;
-                StartPosition = FormStartPosition.CenterScreen;
+                // Form Properties
+                this.Text = "Trial Balance";
+                this.WindowState = FormWindowState.Maximized;
+                this.StartPosition = FormStartPosition.CenterScreen;
 
-                int currentYear = DateTime.Now.Year;
-                int fyStartYear = DateTime.Now.Month >= 4 ? currentYear : currentYear - 1;
-                ultraDateTimeFrom.Value = new DateTime(fyStartYear, 4, 1);
-                ultraDateTimeFrom.FormatString = "dd-MM-yyyy";
-                ultraDateTimeTo.Value = DateTime.Now;
-                ultraDateTimeTo.FormatString = "dd-MM-yyyy";
+                // Setup Date Controls (Default: ALL records as requested)
+                InitializeDateControls();
 
-                KeyPreview = true;
-                KeyDown += Form_KeyDown;
+                // Keyboard shortcuts & Search Events
+                this.KeyPreview = true;
+                this.KeyDown += Form_KeyDown;
                 txtSearch.TextChanged += txtSearch_TextChanged;
 
+                // Setup Panels
                 InitializePanels();
+
+                // Setup Grid
                 SetupTrialBalanceGrid();
+
+                // Button Styling
                 StyleButtons();
-                StyleSearch();
             }
             catch (Exception ex)
             {
@@ -73,147 +99,350 @@ namespace PosBranch_Win.Reports.FinancialReports
             }
         }
 
+        private void InitializeDateControls()
+        {
+            ultraDateTimeFrom.FormatString = "dd-MM-yyyy";
+            ultraDateTimeTo.FormatString = "dd-MM-yyyy";
+
+            ultraComboPresetDates.Items.Clear();
+            ultraComboPresetDates.Items.Add("ALL", "ALL");
+            ultraComboPresetDates.Items.Add("CURRENT_FY", "Current FY");
+            ultraComboPresetDates.Items.Add("TODAY", "Today");
+            ultraComboPresetDates.Items.Add("THIS_MONTH", "This Month");
+            ultraComboPresetDates.Items.Add("DATE_RANGE", "Date by Range");
+
+            // Default: ALL (Everything as before)
+            ultraComboPresetDates.Value = "ALL";
+            ApplyDatePreset("ALL");
+        }
+
+        private void ApplyDatePreset(string presetKey)
+        {
+            int currentYear = DateTime.Now.Year;
+            switch (presetKey)
+            {
+                case "ALL":
+                    ultraDateTimeFrom.Value = new DateTime(1990, 1, 1);
+                    ultraDateTimeTo.Value = DateTime.Today;
+                    ultraDateTimeFrom.Enabled = false;
+                    ultraDateTimeTo.Enabled = false;
+                    break;
+
+                case "CURRENT_FY":
+                    int fyStartYear = DateTime.Now.Month >= 4 ? currentYear : currentYear - 1;
+                    ultraDateTimeFrom.Value = new DateTime(fyStartYear, 4, 1);
+                    ultraDateTimeTo.Value = DateTime.Today;
+                    ultraDateTimeFrom.Enabled = false;
+                    ultraDateTimeTo.Enabled = false;
+                    break;
+
+                case "TODAY":
+                    ultraDateTimeFrom.Value = DateTime.Today;
+                    ultraDateTimeTo.Value = DateTime.Today;
+                    ultraDateTimeFrom.Enabled = false;
+                    ultraDateTimeTo.Enabled = false;
+                    break;
+
+                case "THIS_MONTH":
+                    ultraDateTimeFrom.Value = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
+                    ultraDateTimeTo.Value = DateTime.Today;
+                    ultraDateTimeFrom.Enabled = false;
+                    ultraDateTimeTo.Enabled = false;
+                    break;
+
+                case "DATE_RANGE":
+                default:
+                    ultraDateTimeFrom.Enabled = true;
+                    ultraDateTimeTo.Enabled = true;
+                    break;
+            }
+        }
+
+        private void UltraComboPresetDates_ValueChanged(object sender, EventArgs e)
+        {
+            string selected = Convert.ToString(ultraComboPresetDates.Value ?? ultraComboPresetDates.Text);
+            ApplyDatePreset(selected);
+        }
+
         private void InitializePanels()
         {
-            ultraPanelSummary.Appearance.BackColor = Color.FromArgb(38, 50, 56);
+            this.BackColor = FormBackColor;
 
-            StyleSummaryLabel(lblTotalOpeningDrCaption, Color.FromArgb(176, 190, 197), false);
-            StyleSummaryValueLabel(lblTotalOpeningDrValue, Color.FromArgb(255, 235, 59), 10);
-            StyleSummaryLabel(lblTotalOpeningCrCaption, Color.FromArgb(176, 190, 197), false);
-            StyleSummaryValueLabel(lblTotalOpeningCrValue, Color.FromArgb(255, 235, 59), 10);
-            StyleSummaryLabel(lblTotalTransactionDrCaption, Color.FromArgb(176, 190, 197), false);
-            StyleSummaryValueLabel(lblTotalTransactionDrValue, Color.FromArgb(64, 196, 255), 10);
-            StyleSummaryLabel(lblTotalTransactionCrCaption, Color.FromArgb(176, 190, 197), false);
-            StyleSummaryValueLabel(lblTotalTransactionCrValue, Color.FromArgb(64, 196, 255), 10);
-            StyleSummaryLabel(lblTotalClosingDrCaption, Color.FromArgb(176, 190, 197), false);
-            StyleSummaryValueLabel(lblTotalClosingDrValue, Color.FromArgb(105, 240, 174), 11);
-            StyleSummaryLabel(lblTotalClosingCrCaption, Color.FromArgb(176, 190, 197), false);
-            StyleSummaryValueLabel(lblTotalClosingCrValue, Color.FromArgb(105, 240, 174), 11);
+            // Filter Panel
+            ultraPanelControls.Appearance.BackColor = FilterPanelBackColor;
+            ultraPanelControls.Appearance.BorderColor = BorderBlue;
+            ultraPanelControls.BorderStyle = UIElementBorderStyle.Solid;
+            ultraPanelControls.Dock = DockStyle.Top;
+            ultraPanelControls.Height = 78;
 
-            panelDifference.Appearance.BackColor = Color.FromArgb(250, 250, 250);
-            lblDifferenceCaption.Appearance.ForeColor = Color.FromArgb(66, 66, 66);
-            lblDifferenceCaption.Appearance.FontData.Bold = DefaultableBoolean.True;
-            lblDifferenceCaption.Appearance.FontData.SizeInPoints = 9;
-            lblDifferenceValue.Appearance.ForeColor = Color.FromArgb(66, 66, 66);
-            lblDifferenceValue.Appearance.FontData.Bold = DefaultableBoolean.True;
-            lblDifferenceValue.Appearance.FontData.SizeInPoints = 11;
+            // Label Styling
+            lblSearch.Appearance.ForeColor = ControlTextColor;
+            lblPreset.Appearance.ForeColor = ControlTextColor;
+            lblFromDate.Appearance.ForeColor = ControlTextColor;
+            lblToDate.Appearance.ForeColor = ControlTextColor;
+            lblSearchStatus.Appearance.ForeColor = ControlTextColor;
+            lblSearchStatus.Appearance.FontData.SizeInPoints = 8.5f;
+
+            // Action Panel
+            ultraPanelAction.Appearance.BackColor = ActionPanelBackColor;
+            ultraPanelAction.Appearance.BorderColor = BorderBlue;
+            ultraPanelAction.BorderStyle = UIElementBorderStyle.Solid;
+            ultraPanelAction.Dock = DockStyle.Top;
+            ultraPanelAction.Height = 45;
+
+            // Master Panel
+            ultraPanelMaster.Appearance.BackColor = FormBackColor;
+            ultraPanelMaster.Appearance.BorderColor = BorderBlue;
+            ultraPanelMaster.BorderStyle = UIElementBorderStyle.Solid;
+            ultraPanelMaster.Dock = DockStyle.Fill;
+
+            // Footer Panel
+            ultraPanelGridFooter.Appearance.BackColor = GridHeaderBlue;
+            ultraPanelGridFooter.Appearance.BackColor2 = GridHeaderBlueDark;
+            ultraPanelGridFooter.Appearance.BackGradientStyle = GradientStyle.Vertical;
+            ultraPanelGridFooter.Appearance.BorderColor = BorderBlue;
+            ultraPanelGridFooter.BorderStyle = UIElementBorderStyle.Solid;
+            ultraPanelGridFooter.Dock = DockStyle.Bottom;
+            ultraPanelGridFooter.Height = 34;
+
+            // Footer Labels Styling
+            lblOpeningSummary.Appearance.ForeColor = Color.FromArgb(255, 255, 200);
+            lblOpeningSummary.Appearance.FontData.Bold = DefaultableBoolean.True;
+            lblOpeningSummary.Appearance.FontData.SizeInPoints = 8.5f;
+
+            lblTransactionSummary.Appearance.ForeColor = Color.FromArgb(220, 240, 255);
+            lblTransactionSummary.Appearance.FontData.Bold = DefaultableBoolean.True;
+            lblTransactionSummary.Appearance.FontData.SizeInPoints = 8.5f;
+
+            lblClosingSummary.Appearance.ForeColor = Color.FromArgb(220, 255, 220);
+            lblClosingSummary.Appearance.FontData.Bold = DefaultableBoolean.True;
+            lblClosingSummary.Appearance.FontData.SizeInPoints = 8.5f;
+
+            // Initial Badge State (Balanced Default)
+            SetBadgeState(isMismatch: false, difference: 0);
+
+            // Dock & Z-Order
+            ultraPanelControls.SendToBack();
+            ultraPanelAction.BringToFront();
+            ultraPanelMaster.BringToFront();
+            ultraPanelGridFooter.SendToBack();
+            ultraGridTrialBalance.BringToFront();
+
+            UpdateSelectionToggleButtonText();
         }
 
-        private void StyleSummaryLabel(Infragistics.Win.Misc.UltraLabel label, Color foreColor, bool isBold)
+        private void SetBadgeState(bool isMismatch, decimal difference)
         {
-            label.Appearance.ForeColor = foreColor;
-            label.Appearance.FontData.Bold = isBold ? DefaultableBoolean.True : DefaultableBoolean.False;
-            label.Appearance.FontData.SizeInPoints = 8.5f;
-        }
-
-        private void StyleSummaryValueLabel(Infragistics.Win.Misc.UltraLabel label, Color foreColor, int fontSize)
-        {
-            label.Appearance.ForeColor = foreColor;
-            label.Appearance.FontData.Bold = DefaultableBoolean.True;
-            label.Appearance.FontData.SizeInPoints = fontSize;
+            if (isMismatch)
+            {
+                // High-contrast Warning Red Pill
+                lblDifferenceBadge.Appearance.BackColor = Color.FromArgb(255, 235, 238);
+                lblDifferenceBadge.Appearance.BackColor2 = Color.FromArgb(255, 205, 210);
+                lblDifferenceBadge.Appearance.BackGradientStyle = GradientStyle.Vertical;
+                lblDifferenceBadge.Appearance.BorderColor = Color.FromArgb(198, 40, 40);
+                lblDifferenceBadge.Appearance.ForeColor = Color.FromArgb(183, 28, 28);
+                lblDifferenceBadge.Appearance.FontData.Bold = DefaultableBoolean.True;
+                lblDifferenceBadge.Appearance.FontData.SizeInPoints = 9.5f;
+                lblDifferenceBadge.Text = $"MISMATCH: ₹ {Math.Abs(difference):N2}";
+            }
+            else
+            {
+                // Clean Success Emerald Pill
+                lblDifferenceBadge.Appearance.BackColor = Color.FromArgb(232, 245, 233);
+                lblDifferenceBadge.Appearance.BackColor2 = Color.FromArgb(200, 230, 201);
+                lblDifferenceBadge.Appearance.BackGradientStyle = GradientStyle.Vertical;
+                lblDifferenceBadge.Appearance.BorderColor = Color.FromArgb(46, 125, 50);
+                lblDifferenceBadge.Appearance.ForeColor = Color.FromArgb(27, 94, 32);
+                lblDifferenceBadge.Appearance.FontData.Bold = DefaultableBoolean.True;
+                lblDifferenceBadge.Appearance.FontData.SizeInPoints = 9.5f;
+                lblDifferenceBadge.Text = "BALANCED: ₹ 0.00";
+            }
         }
 
         private void StyleButtons()
         {
-            StyleButton(btnGenerate, Color.FromArgb(25, 118, 210), Color.White);
-            StyleButton(btnExport, Color.FromArgb(0, 121, 107), Color.White);
-            StyleButton(btnPrint, Color.FromArgb(81, 45, 168), Color.White);
-            StyleButton(btnClose, Color.FromArgb(198, 40, 40), Color.White);
+            btnGenerate.Text = "View Grid";
+            btnPreviewGrid.Text = "Preview Grid";
+            btnPrint.Text = "Preview Report";
+            btnExport.Text = "Export Grid";
+            btnClearFilters.Text = "Reset Filters";
+            btnToggleSelection.Text = "Hide Selection";
+
+            StyleClassicButton(btnGenerate);
+            StyleClassicButton(btnPreviewGrid);
+            StyleClassicButton(btnPrint);
+            StyleClassicButton(btnExport);
+            StyleClassicButton(btnClearFilters);
+            StyleClassicButton(btnToggleSelection);
         }
 
-        private void StyleSearch()
+        private static void StyleClassicButton(Infragistics.Win.Misc.UltraButton button)
         {
-            lblSearch.Appearance.ForeColor = Color.FromArgb(55, 71, 79);
-            lblSearch.Appearance.FontData.Bold = DefaultableBoolean.True;
-            lblSearch.Appearance.FontData.SizeInPoints = 8.5f;
-            txtSearch.Appearance.BackColor = Color.White;
-            txtSearch.Appearance.ForeColor = Color.FromArgb(33, 33, 33);
-            txtSearch.Appearance.FontData.SizeInPoints = 9.5f;
-            txtSearch.BorderStyle = UIElementBorderStyle.Solid;
-            lblSearchStatus.Appearance.ForeColor = Color.FromArgb(84, 110, 122);
-            lblSearchStatus.Appearance.FontData.SizeInPoints = 8.5f;
-        }
-
-        private void StyleButton(Infragistics.Win.Misc.UltraButton btn, Color backColor, Color foreColor)
-        {
-            btn.UseOsThemes = DefaultableBoolean.False;
-            btn.Appearance.BackColor = backColor;
-            btn.Appearance.ForeColor = foreColor;
-            btn.Appearance.FontData.Bold = DefaultableBoolean.True;
-            btn.Appearance.BorderColor = backColor;
-            btn.ButtonStyle = Infragistics.Win.UIElementButtonStyle.Flat;
-            btn.HotTrackAppearance.BackColor = Color.FromArgb(66, 165, 245);
-            btn.HotTrackAppearance.ForeColor = Color.White;
-            btn.HotTrackAppearance.BorderColor = backColor;
+            button.UseAppStyling = false;
+            button.UseOsThemes = DefaultableBoolean.False;
+            button.ButtonStyle = UIElementButtonStyle.Flat;
+            button.UseFlatMode = DefaultableBoolean.False;
+            button.Appearance.BackColor = ButtonBlueTop;
+            button.Appearance.BackColor2 = ButtonBlueBottom;
+            button.Appearance.BackGradientStyle = GradientStyle.Vertical;
+            button.Appearance.ForeColor = ButtonTextBlue;
+            button.Appearance.BorderColor = ButtonLightOutline;
+            button.Appearance.TextHAlign = HAlign.Center;
+            button.Appearance.TextVAlign = VAlign.Middle;
+            button.Appearance.FontData.Bold = DefaultableBoolean.False;
+            button.Appearance.FontData.SizeInPoints = 9;
+            button.Font = new Font("Tahoma", 9F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            button.HotTrackAppearance.BackColor = Color.FromArgb(241, 247, 254);
+            button.HotTrackAppearance.BackColor2 = Color.FromArgb(166, 195, 231);
+            button.HotTrackAppearance.BackGradientStyle = GradientStyle.Vertical;
+            button.HotTrackAppearance.BorderColor = ButtonLightOutline;
+            button.HotTrackAppearance.ForeColor = ButtonTextBlue;
+            button.PressedAppearance.BackColor = Color.FromArgb(118, 161, 214);
+            button.PressedAppearance.BackColor2 = Color.FromArgb(217, 231, 247);
+            button.PressedAppearance.BackGradientStyle = GradientStyle.Vertical;
+            button.PressedAppearance.BorderColor = Color.FromArgb(148, 163, 182);
+            button.PressedAppearance.ForeColor = ButtonTextBlue;
         }
 
         private void SetupTrialBalanceGrid()
         {
             ultraGridTrialBalance.DisplayLayout.Reset();
             ApplyGridBaseSettings(ultraGridTrialBalance);
-            ultraGridTrialBalance.DisplayLayout.Override.HeaderAppearance.BackColor = Color.FromArgb(26, 35, 126);
-            ultraGridTrialBalance.DisplayLayout.Override.HeaderAppearance.BackColor2 = Color.FromArgb(40, 53, 147);
-            ultraGridTrialBalance.DisplayLayout.Override.SelectedRowAppearance.BackColor = Color.FromArgb(232, 234, 246);
+            
+            // Header colors
+            ultraGridTrialBalance.DisplayLayout.Override.HeaderAppearance.BackColor = GridHeaderBlue;
+            ultraGridTrialBalance.DisplayLayout.Override.HeaderAppearance.BackColor2 = GridHeaderBlueDark;
+            ultraGridTrialBalance.DisplayLayout.Override.HeaderAppearance.BackGradientStyle = GradientStyle.Vertical;
+            ultraGridTrialBalance.DisplayLayout.Override.HeaderAppearance.ForeColor = Color.White;
+            ultraGridTrialBalance.DisplayLayout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.True;
+            ultraGridTrialBalance.DisplayLayout.Override.HeaderAppearance.FontData.SizeInPoints = 9f;
+            ultraGridTrialBalance.DisplayLayout.Override.HeaderAppearance.TextHAlign = HAlign.Center;
+
+            // Highlight cells
+            ultraGridTrialBalance.DisplayLayout.Override.SelectedRowAppearance.BackColor = GridSelectedBlue;
+            ultraGridTrialBalance.DisplayLayout.Override.SelectedRowAppearance.ForeColor = Color.White;
+            ultraGridTrialBalance.DisplayLayout.Override.SelectedRowAppearance.FontData.Bold = DefaultableBoolean.True;
+
             ultraGridTrialBalance.InitializeLayout += UltraGridTrialBalance_InitializeLayout;
+            ultraGridTrialBalance.InitializeRow += UltraGridTrialBalance_InitializeRow;
+        }
+
+        private void UltraGridTrialBalance_InitializeRow(object sender, InitializeRowEventArgs e)
+        {
+            if (!e.Row.IsDataRow) return;
+
+            // Format Amount Columns (Mute zero values, style active amounts clearly)
+            FormatAmountCell(e.Row.Cells["OpeningDebit"]);
+            FormatAmountCell(e.Row.Cells["OpeningCredit"]);
+            FormatAmountCell(e.Row.Cells["TransactionDebit"]);
+            FormatAmountCell(e.Row.Cells["TransactionCredit"]);
+            FormatClosingAmountCell(e.Row.Cells["ClosingDebit"]);
+            FormatClosingAmountCell(e.Row.Cells["ClosingCredit"]);
+        }
+
+        private void FormatAmountCell(UltraGridCell cell)
+        {
+            if (cell == null || cell.Value == null) return;
+
+            if (decimal.TryParse(cell.Value.ToString(), out decimal val))
+            {
+                if (val == 0)
+                {
+                    cell.Appearance.ForeColor = ZeroValueGray;
+                    cell.Appearance.FontData.Bold = DefaultableBoolean.False;
+                }
+                else
+                {
+                    cell.Appearance.ForeColor = ActiveAmountColor;
+                    cell.Appearance.FontData.Bold = DefaultableBoolean.False;
+                }
+            }
+        }
+
+        private void FormatClosingAmountCell(UltraGridCell cell)
+        {
+            if (cell == null || cell.Value == null) return;
+
+            if (decimal.TryParse(cell.Value.ToString(), out decimal val))
+            {
+                if (val == 0)
+                {
+                    cell.Appearance.ForeColor = ZeroValueGray;
+                    cell.Appearance.FontData.Bold = DefaultableBoolean.False;
+                }
+                else
+                {
+                    cell.Appearance.ForeColor = ActiveAmountColor;
+                    cell.Appearance.FontData.Bold = DefaultableBoolean.True;
+                }
+            }
         }
 
         private void ApplyGridBaseSettings(UltraGrid grid)
         {
+            grid.UseOsThemes = DefaultableBoolean.False;
             grid.DisplayLayout.Override.AllowAddNew = AllowAddNew.No;
             grid.DisplayLayout.Override.AllowDelete = DefaultableBoolean.False;
             grid.DisplayLayout.Override.AllowUpdate = DefaultableBoolean.False;
+            
             grid.DisplayLayout.Override.RowSelectors = DefaultableBoolean.True;
             grid.DisplayLayout.Override.RowSelectorNumberStyle = RowSelectorNumberStyle.RowIndex;
             grid.DisplayLayout.Override.RowSelectorWidth = 40;
             grid.DisplayLayout.Override.SelectTypeRow = SelectType.Single;
             grid.DisplayLayout.Override.CellClickAction = CellClickAction.RowSelect;
+            
             grid.DisplayLayout.CaptionVisible = DefaultableBoolean.False;
             grid.DisplayLayout.GroupByBox.Hidden = true;
-            grid.DisplayLayout.Override.MinRowHeight = 28;
-            grid.DisplayLayout.Override.DefaultRowHeight = 28;
+            
+            grid.DisplayLayout.Override.MinRowHeight = 26;
+            grid.DisplayLayout.Override.DefaultRowHeight = 26;
+            
             grid.DisplayLayout.Override.RowAppearance.BackColor = Color.White;
-            grid.DisplayLayout.Override.RowAlternateAppearance.BackColor = Color.FromArgb(250, 250, 252);
-            grid.DisplayLayout.Override.HeaderAppearance.BackGradientStyle = GradientStyle.Vertical;
-            grid.DisplayLayout.Override.HeaderAppearance.ForeColor = Color.White;
-            grid.DisplayLayout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.True;
-            grid.DisplayLayout.Override.HeaderAppearance.FontData.SizeInPoints = 9.5f;
-            grid.DisplayLayout.Override.HeaderAppearance.TextHAlign = HAlign.Center;
+            grid.DisplayLayout.Override.RowAlternateAppearance.BackColor = GridAltRow;
+            grid.DisplayLayout.Override.CellAppearance.BorderColor = GridRowLine;
+            grid.DisplayLayout.Override.BorderStyleCell = UIElementBorderStyle.Solid;
+            grid.DisplayLayout.Override.BorderStyleRow = UIElementBorderStyle.Solid;
         }
 
         private void UltraGridTrialBalance_InitializeLayout(object sender, InitializeLayoutEventArgs e)
         {
             var band = e.Layout.Bands[0];
+            band.ColHeadersVisible = true;
 
             foreach (var col in band.Columns)
             {
                 col.Hidden = true;
             }
 
-            ConfigureColumn(band, "GroupType", "Category", 130, HAlign.Left);
-            band.Columns["GroupType"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
-            ConfigureColumn(band, "GroupName", "Account Group", 150, HAlign.Left);
             ConfigureColumn(band, "LedgerName", "Particulars / Ledger", 220, HAlign.Left);
-            ConfigureAmountColumn(band, "OpeningDebit", "Opening Dr");
-            ConfigureAmountColumn(band, "OpeningCredit", "Opening Cr");
-            ConfigureAmountColumn(band, "TransactionDebit", "Transactions Dr");
-            ConfigureAmountColumn(band, "TransactionCredit", "Transactions Cr");
-            ConfigureAmountColumn(band, "ClosingDebit", "Closing Dr");
-            ConfigureAmountColumn(band, "ClosingCredit", "Closing Cr");
+            band.Columns["LedgerName"].Header.VisiblePosition = 0;
+
+            ConfigureColumn(band, "GroupName", "Account Group", 150, HAlign.Left);
+            band.Columns["GroupName"].Header.VisiblePosition = 1;
+
+            ConfigureColumn(band, "GroupType", "Category", 110, HAlign.Left);
+            band.Columns["GroupType"].Header.VisiblePosition = 2;
+            band.Columns["GroupType"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
+            band.Columns["GroupType"].CellAppearance.ForeColor = ButtonTextBlue;
+
+            ConfigureAmountColumn(band, "OpeningDebit", "Opening Dr", 3);
+            ConfigureAmountColumn(band, "OpeningCredit", "Opening Cr", 4);
+            ConfigureAmountColumn(band, "TransactionDebit", "Transactions Dr", 5);
+            ConfigureAmountColumn(band, "TransactionCredit", "Transactions Cr", 6);
+            ConfigureAmountColumn(band, "ClosingDebit", "Closing Dr", 7);
+            ConfigureAmountColumn(band, "ClosingCredit", "Closing Cr", 8);
 
             band.Override.AllowColSizing = AllowColSizing.Free;
-            e.Layout.AutoFitStyle = AutoFitStyle.ExtendLastColumn;
+            e.Layout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
         }
 
-        private void ConfigureAmountColumn(UltraGridBand band, string key, string headerText)
+        private void ConfigureAmountColumn(UltraGridBand band, string key, string headerText, int visiblePosition)
         {
-            ConfigureColumn(band, key, headerText, 120, HAlign.Right);
+            ConfigureColumn(band, key, headerText, 105, HAlign.Right);
             if (band.Columns.Exists(key))
             {
+                band.Columns[key].Header.VisiblePosition = visiblePosition;
                 band.Columns[key].Format = "N2";
-                if (key.StartsWith("Closing", StringComparison.Ordinal))
-                {
-                    band.Columns[key].CellAppearance.FontData.Bold = DefaultableBoolean.True;
-                }
             }
         }
 
@@ -230,20 +459,22 @@ namespace PosBranch_Win.Reports.FinancialReports
             col.Width = width;
             col.CellAppearance.TextHAlign = align;
         }
+        #endregion
 
+        #region Data Loading & Searching
         private void LoadReport()
         {
             try
             {
-                Cursor = Cursors.WaitCursor;
+                this.Cursor = Cursors.WaitCursor;
 
                 DateTime fromDate = ultraDateTimeFrom.DateTime.Date;
-                DateTime toDate = ultraDateTimeTo.DateTime.Date.AddDays(1).AddSeconds(-1);
+                DateTime toDate = ultraDateTimeTo.DateTime.Date.AddHours(23).AddMinutes(59).AddSeconds(59);
 
                 currentReport = reportRepository.GetTrialBalanceReport(fromDate, toDate);
                 ApplySearchFilter();
 
-                if (currentReport.LineItems.Count == 0)
+                if (currentReport == null || currentReport.LineItems.Count == 0)
                 {
                     MessageBox.Show("No trial balance rows found for the selected period.", "Information",
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -259,7 +490,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             }
             finally
             {
-                Cursor = Cursors.Default;
+                this.Cursor = Cursors.Default;
             }
         }
 
@@ -308,7 +539,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             }
 
             lblSearchStatus.Text = visibleRows == totalRows
-                ? $"{totalRows:N0} rows"
+                ? $"Total: {totalRows:N0} rows"
                 : $"Showing {visibleRows:N0} of {totalRows:N0} rows";
         }
 
@@ -324,26 +555,12 @@ namespace PosBranch_Win.Reports.FinancialReports
                 ? currentReport.Summary
                 : CalculateSummary(lineItems);
 
-            lblTotalOpeningDrValue.Text = FormatAmount(s.TotalOpeningDebit);
-            lblTotalOpeningCrValue.Text = FormatAmount(s.TotalOpeningCredit);
-            lblTotalTransactionDrValue.Text = FormatAmount(s.TotalTransactionDebit);
-            lblTotalTransactionCrValue.Text = FormatAmount(s.TotalTransactionCredit);
-            lblTotalClosingDrValue.Text = FormatAmount(s.TotalClosingDebit);
-            lblTotalClosingCrValue.Text = FormatAmount(s.TotalClosingCredit);
-            lblDifferenceValue.Text = FormatAmount(s.Difference);
+            lblOpeningSummary.Text = $"Opening: Dr ₹ {s.TotalOpeningDebit:N2} | Cr ₹ {s.TotalOpeningCredit:N2}";
+            lblTransactionSummary.Text = $"Period: Dr ₹ {s.TotalTransactionDebit:N2} | Cr ₹ {s.TotalTransactionCredit:N2}";
+            lblClosingSummary.Text = $"Closing: Dr ₹ {s.TotalClosingDebit:N2} | Cr ₹ {s.TotalClosingCredit:N2}";
 
-            if (s.Difference == 0)
-            {
-                lblDifferenceCaption.Text = "DIFFERENCE:";
-                lblDifferenceValue.Appearance.ForeColor = Color.FromArgb(46, 125, 50);
-                panelDifference.Appearance.BackColor = Color.FromArgb(232, 245, 233);
-            }
-            else
-            {
-                lblDifferenceCaption.Text = "DIFFERENCE:";
-                lblDifferenceValue.Appearance.ForeColor = Color.FromArgb(198, 40, 40);
-                panelDifference.Appearance.BackColor = Color.FromArgb(255, 235, 238);
-            }
+            bool isMismatch = Math.Abs(s.Difference) > 0.001m;
+            SetBadgeState(isMismatch, s.Difference);
         }
 
         private TrialBalanceSummary CalculateSummary(IEnumerable<TrialBalanceLineItem> lineItems)
@@ -363,21 +580,15 @@ namespace PosBranch_Win.Reports.FinancialReports
 
         private void ClearSummary()
         {
-            lblTotalOpeningDrValue.Text = FormatAmount(0);
-            lblTotalOpeningCrValue.Text = FormatAmount(0);
-            lblTotalTransactionDrValue.Text = FormatAmount(0);
-            lblTotalTransactionCrValue.Text = FormatAmount(0);
-            lblTotalClosingDrValue.Text = FormatAmount(0);
-            lblTotalClosingCrValue.Text = FormatAmount(0);
-            lblDifferenceValue.Text = FormatAmount(0);
+            lblOpeningSummary.Text = "Opening: Dr ₹ 0.00 | Cr ₹ 0.00";
+            lblTransactionSummary.Text = "Period: Dr ₹ 0.00 | Cr ₹ 0.00";
+            lblClosingSummary.Text = "Closing: Dr ₹ 0.00 | Cr ₹ 0.00";
+            SetBadgeState(isMismatch: false, difference: 0);
             lblSearchStatus.Text = string.Empty;
         }
+        #endregion
 
-        private string FormatAmount(decimal amount)
-        {
-            return amount.ToString("N2");
-        }
-
+        #region Button Events
         private void FrmTrialBalance_Load(object sender, EventArgs e)
         {
             LoadReport();
@@ -386,6 +597,24 @@ namespace PosBranch_Win.Reports.FinancialReports
         private void btnGenerate_Click(object sender, EventArgs e)
         {
             LoadReport();
+        }
+
+        private void btnPreviewGrid_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (ultraGridTrialBalance.Rows.Count == 0)
+                {
+                    MessageBox.Show("No data to preview.", "Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                ultraGridTrialBalance.PrintPreview();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error during print preview: {ex.Message}", "Preview Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void btnExportCsv_Click(object sender, EventArgs e)
@@ -410,17 +639,17 @@ namespace PosBranch_Win.Reports.FinancialReports
                         sb.AppendLine("Trial Balance");
                         sb.AppendLine($"Period: {ultraDateTimeFrom.DateTime:dd/MM/yyyy} to {ultraDateTimeTo.DateTime:dd/MM/yyyy}");
                         sb.AppendLine();
-                        sb.AppendLine("Category,Account Group,Ledger,Opening Dr,Opening Cr,Transaction Dr,Transaction Cr,Closing Dr,Closing Cr");
+                        sb.AppendLine("Particulars / Ledger,Account Group,Category,Opening Dr,Opening Cr,Transaction Dr,Transaction Cr,Closing Dr,Closing Cr");
 
                         foreach (var item in exportItems)
                         {
-                            sb.AppendLine($"\"{item.GroupType}\",\"{item.GroupName}\",\"{item.LedgerName}\",{item.OpeningDebit:N2},{item.OpeningCredit:N2},{item.TransactionDebit:N2},{item.TransactionCredit:N2},{item.ClosingDebit:N2},{item.ClosingCredit:N2}");
+                            sb.AppendLine($"\"{item.LedgerName}\",\"{item.GroupName}\",\"{item.GroupType}\",{item.OpeningDebit:N2},{item.OpeningCredit:N2},{item.TransactionDebit:N2},{item.TransactionCredit:N2},{item.ClosingDebit:N2},{item.ClosingCredit:N2}");
                         }
 
                         TrialBalanceSummary exportSummary = CalculateSummary(exportItems);
                         sb.AppendLine();
-                        sb.AppendLine($",,TOTAL,{exportSummary.TotalOpeningDebit:N2},{exportSummary.TotalOpeningCredit:N2},{exportSummary.TotalTransactionDebit:N2},{exportSummary.TotalTransactionCredit:N2},{exportSummary.TotalClosingDebit:N2},{exportSummary.TotalClosingCredit:N2}");
-                        sb.AppendLine($",,Difference,,,,,,{exportSummary.Difference:N2}");
+                        sb.AppendLine($"TOTAL,,,{exportSummary.TotalOpeningDebit:N2},{exportSummary.TotalOpeningCredit:N2},{exportSummary.TotalTransactionDebit:N2},{exportSummary.TotalTransactionCredit:N2},{exportSummary.TotalClosingDebit:N2},{exportSummary.TotalClosingCredit:N2}");
+                        sb.AppendLine($"Difference,,,,,,,,{exportSummary.Difference:N2}");
                         File.WriteAllText(sfd.FileName, sb.ToString());
                         MessageBox.Show("Report exported successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
@@ -449,6 +678,25 @@ namespace PosBranch_Win.Reports.FinancialReports
             }
         }
 
+        private void btnClearFilters_Click(object sender, EventArgs e)
+        {
+            RibbonClear();
+        }
+
+        private void btnToggleSelection_Click(object sender, EventArgs e)
+        {
+            ultraPanelControls.Visible = !ultraPanelControls.Visible;
+            UpdateSelectionToggleButtonText();
+        }
+
+        private void UpdateSelectionToggleButtonText()
+        {
+            if (btnToggleSelection != null)
+            {
+                btnToggleSelection.Text = ultraPanelControls.Visible ? "Hide Selection" : "View Selection";
+            }
+        }
+
         private void btnClose_Click(object sender, EventArgs e)
         {
             Close();
@@ -463,7 +711,9 @@ namespace PosBranch_Win.Reports.FinancialReports
         {
             ApplySearchFilter();
         }
+        #endregion
 
+        #region Keyboard Shortcuts
         private void Form_KeyDown(object sender, KeyEventArgs e)
         {
             try
@@ -476,7 +726,15 @@ namespace PosBranch_Win.Reports.FinancialReports
                 }
                 else if (e.KeyCode == Keys.F5)
                 {
-                    btnGenerate_Click(sender, e);
+                    if (e.Control)
+                        btnPreviewGrid_Click(sender, e);
+                    else
+                        btnGenerate_Click(sender, e);
+                    e.Handled = true;
+                }
+                else if (e.KeyCode == Keys.F6)
+                {
+                    btnClearFilters_Click(sender, e);
                     e.Handled = true;
                 }
                 else if (e.KeyCode == Keys.Escape && txtSearch.Focused && !string.IsNullOrWhiteSpace(txtSearch.Text))
@@ -489,10 +747,21 @@ namespace PosBranch_Win.Reports.FinancialReports
                     btnClose_Click(sender, e);
                     e.Handled = true;
                 }
+                else if (e.Control && e.KeyCode == Keys.E)
+                {
+                    btnExportCsv_Click(sender, e);
+                    e.Handled = true;
+                }
+                else if (e.Control && e.KeyCode == Keys.P)
+                {
+                    btnPrint_Click(sender, e);
+                    e.Handled = true;
+                }
             }
             catch
             {
             }
         }
+        #endregion
     }
 }

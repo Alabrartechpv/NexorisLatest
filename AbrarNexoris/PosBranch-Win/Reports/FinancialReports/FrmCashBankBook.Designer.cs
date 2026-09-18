@@ -17,316 +17,368 @@ namespace PosBranch_Win.Reports.FinancialReports
 
         private void InitializeComponent()
         {
-            this.panelMain = new Infragistics.Win.Misc.UltraPanel();
-            this.panelHeader = new Infragistics.Win.Misc.UltraPanel();
-            this.ultraGroupBox1 = new Infragistics.Win.Misc.UltraGroupBox();
-            this.ultraLabel4 = new Infragistics.Win.Misc.UltraLabel();
+            Infragistics.Win.Appearance appearanceHeader = new Infragistics.Win.Appearance();
+            Infragistics.Win.Appearance appearanceAction = new Infragistics.Win.Appearance();
+            Infragistics.Win.Appearance appearanceMaster = new Infragistics.Win.Appearance();
+            Infragistics.Win.Appearance appearanceFooter = new Infragistics.Win.Appearance();
+            Infragistics.Win.Appearance appearanceGrid = new Infragistics.Win.Appearance();
+            Infragistics.Win.Appearance appearanceClosingBadge = new Infragistics.Win.Appearance();
+
+            this.ultraPanelControls = new Infragistics.Win.Misc.UltraPanel();
+            this.lblLedger = new Infragistics.Win.Misc.UltraLabel();
             this.ultraComboLedger = new Infragistics.Win.UltraWinGrid.UltraCombo();
-            this.ultraLabel3 = new Infragistics.Win.Misc.UltraLabel();
+            this.lblPreset = new Infragistics.Win.Misc.UltraLabel();
             this.cmbDateQuickSelect = new Infragistics.Win.UltraWinEditors.UltraComboEditor();
-            this.btnClose = new Infragistics.Win.Misc.UltraButton();
+            this.lblFromDate = new Infragistics.Win.Misc.UltraLabel();
+            this.dtFromDate = new Infragistics.Win.UltraWinEditors.UltraDateTimeEditor();
+            this.lblToDate = new Infragistics.Win.Misc.UltraLabel();
+            this.dtToDate = new Infragistics.Win.UltraWinEditors.UltraDateTimeEditor();
+            this.lblSearch = new Infragistics.Win.Misc.UltraLabel();
+            this.txtSearch = new Infragistics.Win.UltraWinEditors.UltraTextEditor();
+            this.lblRowCount = new Infragistics.Win.Misc.UltraLabel();
+
+            this.ultraPanelAction = new Infragistics.Win.Misc.UltraPanel();
+            this.btnGenerate = new Infragistics.Win.Misc.UltraButton();
+            this.btnPreviewGrid = new Infragistics.Win.Misc.UltraButton();
             this.btnPrint = new Infragistics.Win.Misc.UltraButton();
             this.btnExportCsv = new Infragistics.Win.Misc.UltraButton();
-            this.btnGenerate = new Infragistics.Win.Misc.UltraButton();
-            this.ultraLabel2 = new Infragistics.Win.Misc.UltraLabel();
-            this.ultraLabel1 = new Infragistics.Win.Misc.UltraLabel();
-            this.dtToDate = new Infragistics.Win.UltraWinEditors.UltraDateTimeEditor();
-            this.dtFromDate = new Infragistics.Win.UltraWinEditors.UltraDateTimeEditor();
-            this.panelSummary = new Infragistics.Win.Misc.UltraPanel();
-            this.panelClosing = new Infragistics.Win.Misc.UltraPanel();
-            this.lblClosingBalanceValue = new Infragistics.Win.Misc.UltraLabel();
-            this.lblClosingBalanceTitle = new Infragistics.Win.Misc.UltraLabel();
-            this.panelPayments = new Infragistics.Win.Misc.UltraPanel();
-            this.lblTotalPaymentsValue = new Infragistics.Win.Misc.UltraLabel();
-            this.lblTotalPaymentsTitle = new Infragistics.Win.Misc.UltraLabel();
-            this.panelReceipts = new Infragistics.Win.Misc.UltraPanel();
-            this.lblTotalReceiptsValue = new Infragistics.Win.Misc.UltraLabel();
-            this.lblTotalReceiptsTitle = new Infragistics.Win.Misc.UltraLabel();
-            this.panelOpening = new Infragistics.Win.Misc.UltraPanel();
-            this.lblOpeningBalanceValue = new Infragistics.Win.Misc.UltraLabel();
-            this.lblOpeningBalanceTitle = new Infragistics.Win.Misc.UltraLabel();
-            this.panelGrid = new Infragistics.Win.Misc.UltraPanel();
-            this.ultraGridTransactions = new Infragistics.Win.UltraWinGrid.UltraGrid();
+            this.btnClearFilters = new Infragistics.Win.Misc.UltraButton();
+            this.btnToggleSelection = new Infragistics.Win.Misc.UltraButton();
 
-            // Suspend layout
-            this.panelMain.SuspendLayout();
-            this.panelHeader.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.ultraGroupBox1)).BeginInit();
-            this.ultraGroupBox1.SuspendLayout();
+            this.ultraPanelMaster = new Infragistics.Win.Misc.UltraPanel();
+            this.ultraGridTransactions = new Infragistics.Win.UltraWinGrid.UltraGrid();
+            this.ultraPanelGridFooter = new Infragistics.Win.Misc.UltraPanel();
+            this.lblOpeningSummary = new Infragistics.Win.Misc.UltraLabel();
+            this.lblReceiptsSummary = new Infragistics.Win.Misc.UltraLabel();
+            this.lblPaymentsSummary = new Infragistics.Win.Misc.UltraLabel();
+            this.lblClosingBadge = new Infragistics.Win.Misc.UltraLabel();
+
+            this.ultraPanelControls.ClientArea.SuspendLayout();
+            this.ultraPanelControls.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.ultraComboLedger)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.cmbDateQuickSelect)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.dtToDate)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.dtFromDate)).BeginInit();
-            this.panelSummary.SuspendLayout();
-            this.panelGrid.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.dtToDate)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.txtSearch)).BeginInit();
+
+            this.ultraPanelAction.ClientArea.SuspendLayout();
+            this.ultraPanelAction.SuspendLayout();
+
+            this.ultraPanelMaster.ClientArea.SuspendLayout();
+            this.ultraPanelMaster.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.ultraGridTransactions)).BeginInit();
+            this.ultraPanelGridFooter.ClientArea.SuspendLayout();
+            this.ultraPanelGridFooter.SuspendLayout();
+
             this.SuspendLayout();
 
-            // ==========================================
-            // panelMain — Dock.Fill, wraps everything
-            // ==========================================
-            this.panelMain.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.panelMain.Location = new System.Drawing.Point(0, 0);
-            this.panelMain.Name = "panelMain";
-            this.panelMain.Size = new System.Drawing.Size(1280, 700);
-            this.panelMain.TabIndex = 0;
-            this.panelMain.ClientArea.Controls.Add(this.panelGrid);      // Fill (added first = fills remaining)
-            this.panelMain.ClientArea.Controls.Add(this.panelSummary);   // Top
-            this.panelMain.ClientArea.Controls.Add(this.panelHeader);    // Top (added last = topmost)
+            // =========================================================================
+            // ultraPanelControls (Top Filter Panel, Height: 78)
+            // =========================================================================
+            this.ultraPanelControls.Appearance = appearanceHeader;
+            this.ultraPanelControls.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
+            this.ultraPanelControls.ClientArea.Controls.Add(this.lblLedger);
+            this.ultraPanelControls.ClientArea.Controls.Add(this.ultraComboLedger);
+            this.ultraPanelControls.ClientArea.Controls.Add(this.lblPreset);
+            this.ultraPanelControls.ClientArea.Controls.Add(this.cmbDateQuickSelect);
+            this.ultraPanelControls.ClientArea.Controls.Add(this.lblFromDate);
+            this.ultraPanelControls.ClientArea.Controls.Add(this.dtFromDate);
+            this.ultraPanelControls.ClientArea.Controls.Add(this.lblToDate);
+            this.ultraPanelControls.ClientArea.Controls.Add(this.dtToDate);
+            this.ultraPanelControls.ClientArea.Controls.Add(this.lblSearch);
+            this.ultraPanelControls.ClientArea.Controls.Add(this.txtSearch);
+            this.ultraPanelControls.ClientArea.Controls.Add(this.lblRowCount);
+            this.ultraPanelControls.Dock = System.Windows.Forms.DockStyle.Top;
+            this.ultraPanelControls.Location = new System.Drawing.Point(0, 0);
+            this.ultraPanelControls.Name = "ultraPanelControls";
+            this.ultraPanelControls.Size = new System.Drawing.Size(1280, 78);
+            this.ultraPanelControls.TabIndex = 0;
 
-            // ==========================================
-            // panelHeader — Dock.Top, height 70
-            // ==========================================
-            this.panelHeader.Dock = System.Windows.Forms.DockStyle.Top;
-            this.panelHeader.Location = new System.Drawing.Point(0, 0);
-            this.panelHeader.Name = "panelHeader";
-            this.panelHeader.Size = new System.Drawing.Size(1280, 70);
-            this.panelHeader.TabIndex = 0;
-            this.panelHeader.ClientArea.Controls.Add(this.ultraGroupBox1);
+            // Row 1: Search & Status
+            this.lblSearch.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
+            this.lblSearch.Location = new System.Drawing.Point(12, 12);
+            this.lblSearch.Name = "lblSearch";
+            this.lblSearch.Size = new System.Drawing.Size(55, 23);
+            this.lblSearch.TabIndex = 0;
+            this.lblSearch.Text = "Search";
 
-            // ultraGroupBox1 — Dock.Fill inside header
-            this.ultraGroupBox1.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.ultraGroupBox1.Name = "ultraGroupBox1";
-            this.ultraGroupBox1.Text = "Filter Parameters";
-            this.ultraGroupBox1.Controls.Add(this.ultraLabel4);
-            this.ultraGroupBox1.Controls.Add(this.ultraComboLedger);
-            this.ultraGroupBox1.Controls.Add(this.ultraLabel3);
-            this.ultraGroupBox1.Controls.Add(this.cmbDateQuickSelect);
-            this.ultraGroupBox1.Controls.Add(this.btnClose);
-            this.ultraGroupBox1.Controls.Add(this.btnPrint);
-            this.ultraGroupBox1.Controls.Add(this.btnExportCsv);
-            this.ultraGroupBox1.Controls.Add(this.btnGenerate);
-            this.ultraGroupBox1.Controls.Add(this.ultraLabel2);
-            this.ultraGroupBox1.Controls.Add(this.ultraLabel1);
-            this.ultraGroupBox1.Controls.Add(this.dtToDate);
-            this.ultraGroupBox1.Controls.Add(this.dtFromDate);
+            this.txtSearch.Font = new System.Drawing.Font("Segoe UI", 9F);
+            this.txtSearch.Location = new System.Drawing.Point(72, 9);
+            this.txtSearch.Name = "txtSearch";
+            this.txtSearch.NullText = "Search particulars, narration, voucher type...";
+            this.txtSearch.Size = new System.Drawing.Size(280, 24);
+            this.txtSearch.TabIndex = 1;
 
-            // Ledger Label & Combo
-            this.ultraLabel4.Location = new System.Drawing.Point(15, 28);
-            this.ultraLabel4.Name = "ultraLabel4";
-            this.ultraLabel4.Size = new System.Drawing.Size(55, 23);
-            this.ultraLabel4.Text = "Ledger:";
+            this.lblRowCount.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular);
+            this.lblRowCount.Location = new System.Drawing.Point(365, 12);
+            this.lblRowCount.Name = "lblRowCount";
+            this.lblRowCount.Size = new System.Drawing.Size(200, 20);
+            this.lblRowCount.TabIndex = 2;
+            this.lblRowCount.Text = "Total: 0 rows";
 
-            this.ultraComboLedger.Location = new System.Drawing.Point(70, 24);
+            // Row 2: Ledger & Period & Dates
+            this.lblLedger.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
+            this.lblLedger.Location = new System.Drawing.Point(12, 44);
+            this.lblLedger.Name = "lblLedger";
+            this.lblLedger.Size = new System.Drawing.Size(55, 23);
+            this.lblLedger.TabIndex = 3;
+            this.lblLedger.Text = "Ledger";
+
+            this.ultraComboLedger.Font = new System.Drawing.Font("Segoe UI", 9F);
+            this.ultraComboLedger.Location = new System.Drawing.Point(72, 42);
             this.ultraComboLedger.Name = "ultraComboLedger";
-            this.ultraComboLedger.Size = new System.Drawing.Size(200, 24);
-            this.ultraComboLedger.TabIndex = 0;
+            this.ultraComboLedger.Size = new System.Drawing.Size(280, 24);
+            this.ultraComboLedger.TabIndex = 4;
 
-            // Quick Date
-            this.ultraLabel3.Location = new System.Drawing.Point(285, 28);
-            this.ultraLabel3.Name = "ultraLabel3";
-            this.ultraLabel3.Size = new System.Drawing.Size(45, 23);
-            this.ultraLabel3.Text = "Quick:";
+            this.lblPreset.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
+            this.lblPreset.Location = new System.Drawing.Point(365, 44);
+            this.lblPreset.Name = "lblPreset";
+            this.lblPreset.Size = new System.Drawing.Size(50, 23);
+            this.lblPreset.TabIndex = 5;
+            this.lblPreset.Text = "Period";
 
-            this.cmbDateQuickSelect.Location = new System.Drawing.Point(330, 24);
-            this.cmbDateQuickSelect.Name = "cmbDateQuickSelect";
-            this.cmbDateQuickSelect.Size = new System.Drawing.Size(120, 24);
             this.cmbDateQuickSelect.DropDownStyle = Infragistics.Win.DropDownStyle.DropDownList;
-            this.cmbDateQuickSelect.Items.Add("Today");
-            this.cmbDateQuickSelect.Items.Add("This Month");
-            this.cmbDateQuickSelect.Items.Add("Last Month");
-            this.cmbDateQuickSelect.Items.Add("This Financial Year");
+            this.cmbDateQuickSelect.Font = new System.Drawing.Font("Segoe UI", 9F);
+            this.cmbDateQuickSelect.Location = new System.Drawing.Point(420, 42);
+            this.cmbDateQuickSelect.Name = "cmbDateQuickSelect";
+            this.cmbDateQuickSelect.Size = new System.Drawing.Size(145, 24);
+            this.cmbDateQuickSelect.TabIndex = 6;
 
-            // From / To Dates
-            this.ultraLabel1.Location = new System.Drawing.Point(465, 28);
-            this.ultraLabel1.Name = "ultraLabel1";
-            this.ultraLabel1.Size = new System.Drawing.Size(40, 23);
-            this.ultraLabel1.Text = "From:";
-            this.dtFromDate.Location = new System.Drawing.Point(505, 24);
+            this.lblFromDate.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
+            this.lblFromDate.Location = new System.Drawing.Point(580, 44);
+            this.lblFromDate.Name = "lblFromDate";
+            this.lblFromDate.Size = new System.Drawing.Size(42, 23);
+            this.lblFromDate.TabIndex = 7;
+            this.lblFromDate.Text = "From";
+
+            this.dtFromDate.Font = new System.Drawing.Font("Segoe UI", 9F);
+            this.dtFromDate.FormatString = "dd-MM-yyyy";
+            this.dtFromDate.Location = new System.Drawing.Point(628, 42);
             this.dtFromDate.Name = "dtFromDate";
-            this.dtFromDate.Size = new System.Drawing.Size(110, 24);
+            this.dtFromDate.Size = new System.Drawing.Size(115, 24);
+            this.dtFromDate.TabIndex = 8;
 
-            this.ultraLabel2.Location = new System.Drawing.Point(625, 28);
-            this.ultraLabel2.Name = "ultraLabel2";
-            this.ultraLabel2.Size = new System.Drawing.Size(25, 23);
-            this.ultraLabel2.Text = "To:";
-            this.dtToDate.Location = new System.Drawing.Point(650, 24);
+            this.lblToDate.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
+            this.lblToDate.Location = new System.Drawing.Point(755, 44);
+            this.lblToDate.Name = "lblToDate";
+            this.lblToDate.Size = new System.Drawing.Size(30, 23);
+            this.lblToDate.TabIndex = 9;
+            this.lblToDate.Text = "To";
+
+            this.dtToDate.Font = new System.Drawing.Font("Segoe UI", 9F);
+            this.dtToDate.FormatString = "dd-MM-yyyy";
+            this.dtToDate.Location = new System.Drawing.Point(790, 42);
             this.dtToDate.Name = "dtToDate";
-            this.dtToDate.Size = new System.Drawing.Size(110, 24);
+            this.dtToDate.Size = new System.Drawing.Size(115, 24);
+            this.dtToDate.TabIndex = 10;
 
-            // 1. Search Box
-            var lblSearch = new Infragistics.Win.Misc.UltraLabel();
-            lblSearch.Text = "Search:";
-            lblSearch.Size = new System.Drawing.Size(50, 23);
-            lblSearch.Location = new System.Drawing.Point(15, 60);
+            // =========================================================================
+            // ultraPanelAction (Action Bar, Height: 45)
+            // =========================================================================
+            this.ultraPanelAction.Appearance = appearanceAction;
+            this.ultraPanelAction.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
+            this.ultraPanelAction.ClientArea.Controls.Add(this.btnGenerate);
+            this.ultraPanelAction.ClientArea.Controls.Add(this.btnPreviewGrid);
+            this.ultraPanelAction.ClientArea.Controls.Add(this.btnPrint);
+            this.ultraPanelAction.ClientArea.Controls.Add(this.btnExportCsv);
+            this.ultraPanelAction.ClientArea.Controls.Add(this.btnClearFilters);
+            this.ultraPanelAction.ClientArea.Controls.Add(this.btnToggleSelection);
+            this.ultraPanelAction.Dock = System.Windows.Forms.DockStyle.Top;
+            this.ultraPanelAction.Location = new System.Drawing.Point(0, 78);
+            this.ultraPanelAction.Name = "ultraPanelAction";
+            this.ultraPanelAction.Size = new System.Drawing.Size(1280, 45);
+            this.ultraPanelAction.TabIndex = 1;
 
-            this.txtSearch = new Infragistics.Win.UltraWinEditors.UltraTextEditor();
-            this.txtSearch.Size = new System.Drawing.Size(200, 24);
-            this.txtSearch.Location = new System.Drawing.Point(70, 56);
-            this.txtSearch.NullText = "Search particulars...";
-            this.txtSearch.ValueChanged += TxtSearch_ValueChanged;
-
-            this.ultraGroupBox1.Controls.Add(lblSearch);
-            this.ultraGroupBox1.Controls.Add(txtSearch);
-
-            // Expand header for search
-            this.panelHeader.Size = new System.Drawing.Size(1280, 95);
-
-            // Buttons — anchored to the right
-            this.btnGenerate.Location = new System.Drawing.Point(780, 20);
+            this.btnGenerate.Location = new System.Drawing.Point(12, 7);
             this.btnGenerate.Name = "btnGenerate";
-            this.btnGenerate.Size = new System.Drawing.Size(85, 33);
-            this.btnGenerate.Text = "Generate";
-            this.btnGenerate.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right;
+            this.btnGenerate.Size = new System.Drawing.Size(95, 30);
+            this.btnGenerate.TabIndex = 0;
+            this.btnGenerate.Text = "View Grid";
 
-            this.btnExportCsv.Location = new System.Drawing.Point(870, 20);
-            this.btnExportCsv.Name = "btnExportCsv";
-            this.btnExportCsv.Size = new System.Drawing.Size(70, 33);
-            this.btnExportCsv.Text = "CSV";
-            this.btnExportCsv.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right;
+            this.btnPreviewGrid.Location = new System.Drawing.Point(114, 7);
+            this.btnPreviewGrid.Name = "btnPreviewGrid";
+            this.btnPreviewGrid.Size = new System.Drawing.Size(95, 30);
+            this.btnPreviewGrid.TabIndex = 1;
+            this.btnPreviewGrid.Text = "Preview Grid";
 
-            this.btnPrint.Location = new System.Drawing.Point(945, 20);
+            this.btnPrint.Location = new System.Drawing.Point(216, 7);
             this.btnPrint.Name = "btnPrint";
-            this.btnPrint.Size = new System.Drawing.Size(70, 33);
-            this.btnPrint.Text = "Print";
-            this.btnPrint.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right;
+            this.btnPrint.Size = new System.Drawing.Size(100, 30);
+            this.btnPrint.TabIndex = 2;
+            this.btnPrint.Text = "Preview Report";
 
-            this.btnClose.Location = new System.Drawing.Point(1020, 20);
-            this.btnClose.Name = "btnClose";
-            this.btnClose.Size = new System.Drawing.Size(70, 33);
-            this.btnClose.Text = "Close";
-            this.btnClose.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right;
+            this.btnExportCsv.Location = new System.Drawing.Point(323, 7);
+            this.btnExportCsv.Name = "btnExportCsv";
+            this.btnExportCsv.Size = new System.Drawing.Size(95, 30);
+            this.btnExportCsv.TabIndex = 3;
+            this.btnExportCsv.Text = "Export Grid";
 
-            // ==========================================
-            // panelSummary — Dock.Top, height 65
-            // ==========================================
-            this.panelSummary.Dock = System.Windows.Forms.DockStyle.Top;
-            this.panelSummary.Location = new System.Drawing.Point(0, 70);
-            this.panelSummary.Name = "panelSummary";
-            this.panelSummary.Size = new System.Drawing.Size(1280, 65);
-            this.panelSummary.TabIndex = 1;
+            this.btnClearFilters.Location = new System.Drawing.Point(425, 7);
+            this.btnClearFilters.Name = "btnClearFilters";
+            this.btnClearFilters.Size = new System.Drawing.Size(95, 30);
+            this.btnClearFilters.TabIndex = 4;
+            this.btnClearFilters.Text = "Reset Filters";
 
-            // Use TableLayoutPanel inside summary for equal distribution
-            var tlp = new System.Windows.Forms.TableLayoutPanel();
-            tlp.Dock = System.Windows.Forms.DockStyle.Fill;
-            tlp.ColumnCount = 4;
-            tlp.RowCount = 1;
-            tlp.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 25F));
-            tlp.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 25F));
-            tlp.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 25F));
-            tlp.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(System.Windows.Forms.SizeType.Percent, 25F));
-            tlp.RowStyles.Add(new System.Windows.Forms.RowStyle(System.Windows.Forms.SizeType.Percent, 100F));
-            tlp.Padding = new System.Windows.Forms.Padding(5);
+            this.btnToggleSelection.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.btnToggleSelection.Location = new System.Drawing.Point(1160, 7);
+            this.btnToggleSelection.Name = "btnToggleSelection";
+            this.btnToggleSelection.Size = new System.Drawing.Size(110, 30);
+            this.btnToggleSelection.TabIndex = 5;
+            this.btnToggleSelection.Text = "Hide Selection";
 
-            // Opening Balance panel
-            SetupSummaryPanel(this.panelOpening, this.lblOpeningBalanceTitle, this.lblOpeningBalanceValue, "Opening Balance:");
-            tlp.Controls.Add(this.panelOpening, 0, 0);
+            // =========================================================================
+            // ultraPanelMaster (Dock: Fill)
+            // =========================================================================
+            appearanceMaster.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(232)))), ((int)(((byte)(246)))), ((int)(((byte)(255)))));
+            appearanceMaster.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(118)))), ((int)(((byte)(154)))), ((int)(((byte)(198)))));
+            this.ultraPanelMaster.Appearance = appearanceMaster;
+            this.ultraPanelMaster.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
+            // 
+            // ultraPanelMaster.ClientArea
+            // 
+            this.ultraPanelMaster.ClientArea.Controls.Add(this.ultraGridTransactions);
+            this.ultraPanelMaster.ClientArea.Controls.Add(this.ultraPanelGridFooter);
+            this.ultraPanelMaster.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.ultraPanelMaster.Location = new System.Drawing.Point(0, 123);
+            this.ultraPanelMaster.Name = "ultraPanelMaster";
+            this.ultraPanelMaster.Size = new System.Drawing.Size(1280, 577);
+            this.ultraPanelMaster.TabIndex = 2;
 
-            // Total Receipts panel
-            SetupSummaryPanel(this.panelReceipts, this.lblTotalReceiptsTitle, this.lblTotalReceiptsValue, "Total Receipts:");
-            tlp.Controls.Add(this.panelReceipts, 1, 0);
-
-            // Total Payments panel
-            SetupSummaryPanel(this.panelPayments, this.lblTotalPaymentsTitle, this.lblTotalPaymentsValue, "Total Payments:");
-            tlp.Controls.Add(this.panelPayments, 2, 0);
-
-            // Closing Balance panel
-            SetupSummaryPanel(this.panelClosing, this.lblClosingBalanceTitle, this.lblClosingBalanceValue, "Closing Balance:");
-            tlp.Controls.Add(this.panelClosing, 3, 0);
-
-            this.panelSummary.ClientArea.Controls.Add(tlp);
-
-            // ==========================================
-            // panelGrid — Dock.Fill (takes remaining space)
-            // ==========================================
-            this.panelGrid.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.panelGrid.Name = "panelGrid";
-            this.panelGrid.Padding = new System.Windows.Forms.Padding(5);
-            this.panelGrid.TabIndex = 2;
-
+            // 
+            // ultraGridTransactions
+            // 
+            appearanceGrid.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(232)))), ((int)(((byte)(246)))), ((int)(((byte)(255)))));
+            this.ultraGridTransactions.DisplayLayout.Appearance = appearanceGrid;
+            this.ultraGridTransactions.DisplayLayout.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
             this.ultraGridTransactions.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.ultraGridTransactions.Location = new System.Drawing.Point(0, 0);
             this.ultraGridTransactions.Name = "ultraGridTransactions";
+            this.ultraGridTransactions.Size = new System.Drawing.Size(1280, 543);
             this.ultraGridTransactions.TabIndex = 0;
-            this.panelGrid.ClientArea.Controls.Add(this.ultraGridTransactions);
+            this.ultraGridTransactions.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
 
-            // ==========================================
-            // Form
-            // ==========================================
+            // 
+            // ultraPanelGridFooter
+            // 
+            appearanceFooter.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(93)))), ((int)(((byte)(151)))), ((int)(((byte)(214)))));
+            appearanceFooter.BackColor2 = System.Drawing.Color.FromArgb(((int)(((byte)(67)))), ((int)(((byte)(118)))), ((int)(((byte)(184)))));
+            appearanceFooter.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
+            appearanceFooter.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(118)))), ((int)(((byte)(154)))), ((int)(((byte)(198)))));
+            this.ultraPanelGridFooter.Appearance = appearanceFooter;
+            this.ultraPanelGridFooter.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
+            // 
+            // ultraPanelGridFooter.ClientArea
+            // 
+            this.ultraPanelGridFooter.ClientArea.Controls.Add(this.lblOpeningSummary);
+            this.ultraPanelGridFooter.ClientArea.Controls.Add(this.lblReceiptsSummary);
+            this.ultraPanelGridFooter.ClientArea.Controls.Add(this.lblPaymentsSummary);
+            this.ultraPanelGridFooter.ClientArea.Controls.Add(this.lblClosingBadge);
+            this.ultraPanelGridFooter.Dock = System.Windows.Forms.DockStyle.Bottom;
+            this.ultraPanelGridFooter.Location = new System.Drawing.Point(0, 543);
+            this.ultraPanelGridFooter.Name = "ultraPanelGridFooter";
+            this.ultraPanelGridFooter.Size = new System.Drawing.Size(1280, 34);
+            this.ultraPanelGridFooter.TabIndex = 1;
+
+            // Footer Labels
+            this.lblOpeningSummary.Font = new System.Drawing.Font("Segoe UI", 8.5F, System.Drawing.FontStyle.Bold);
+            this.lblOpeningSummary.Location = new System.Drawing.Point(12, 6);
+            this.lblOpeningSummary.Name = "lblOpeningSummary";
+            this.lblOpeningSummary.Size = new System.Drawing.Size(260, 22);
+            this.lblOpeningSummary.TabIndex = 0;
+            this.lblOpeningSummary.Text = "Opening: ₹ 0.00 Dr";
+
+            this.lblReceiptsSummary.Font = new System.Drawing.Font("Segoe UI", 8.5F, System.Drawing.FontStyle.Bold);
+            this.lblReceiptsSummary.Location = new System.Drawing.Point(280, 6);
+            this.lblReceiptsSummary.Name = "lblReceiptsSummary";
+            this.lblReceiptsSummary.Size = new System.Drawing.Size(260, 22);
+            this.lblReceiptsSummary.TabIndex = 1;
+            this.lblReceiptsSummary.Text = "Receipts (Dr): ₹ 0.00";
+
+            this.lblPaymentsSummary.Font = new System.Drawing.Font("Segoe UI", 8.5F, System.Drawing.FontStyle.Bold);
+            this.lblPaymentsSummary.Location = new System.Drawing.Point(550, 6);
+            this.lblPaymentsSummary.Name = "lblPaymentsSummary";
+            this.lblPaymentsSummary.Size = new System.Drawing.Size(260, 22);
+            this.lblPaymentsSummary.TabIndex = 2;
+            this.lblPaymentsSummary.Text = "Payments (Cr): ₹ 0.00";
+
+            this.lblClosingBadge.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            appearanceClosingBadge.TextHAlign = Infragistics.Win.HAlign.Center;
+            appearanceClosingBadge.TextVAlign = Infragistics.Win.VAlign.Middle;
+            this.lblClosingBadge.Appearance = appearanceClosingBadge;
+            this.lblClosingBadge.BorderStyleInner = Infragistics.Win.UIElementBorderStyle.Solid;
+            this.lblClosingBadge.Font = new System.Drawing.Font("Segoe UI", 9.5F, System.Drawing.FontStyle.Bold);
+            this.lblClosingBadge.Location = new System.Drawing.Point(980, 4);
+            this.lblClosingBadge.Name = "lblClosingBadge";
+            this.lblClosingBadge.Size = new System.Drawing.Size(290, 26);
+            this.lblClosingBadge.TabIndex = 3;
+            this.lblClosingBadge.Text = "CLOSING: ₹ 0.00 Dr";
+
+            // =========================================================================
+            // FrmCashBankBook Form
+            // =========================================================================
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(232)))), ((int)(((byte)(246)))), ((int)(((byte)(255)))));
             this.ClientSize = new System.Drawing.Size(1280, 700);
-            this.Controls.Add(this.panelMain);
-            this.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.Controls.Add(this.ultraPanelMaster);
+            this.Controls.Add(this.ultraPanelAction);
+            this.Controls.Add(this.ultraPanelControls);
+            this.Font = new System.Drawing.Font("Segoe UI", 9F);
             this.Name = "FrmCashBankBook";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "Cash & Bank Book";
+            this.WindowState = System.Windows.Forms.FormWindowState.Maximized;
 
-            // Resume layout
-            ((System.ComponentModel.ISupportInitialize)(this.ultraGridTransactions)).EndInit();
-            this.panelGrid.ResumeLayout(false);
-            this.panelSummary.ResumeLayout(false);
+            this.ultraPanelControls.ClientArea.ResumeLayout(false);
+            this.ultraPanelControls.ClientArea.PerformLayout();
+            this.ultraPanelControls.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)(this.ultraComboLedger)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.cmbDateQuickSelect)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.dtFromDate)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.dtToDate)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.cmbDateQuickSelect)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.ultraComboLedger)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.ultraGroupBox1)).EndInit();
-            this.ultraGroupBox1.ResumeLayout(false);
-            this.panelHeader.ResumeLayout(false);
-            this.panelMain.ClientArea.ResumeLayout(false);
-            this.panelMain.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)(this.txtSearch)).EndInit();
+
+            this.ultraPanelAction.ClientArea.ResumeLayout(false);
+            this.ultraPanelAction.ResumeLayout(false);
+
+            this.ultraPanelMaster.ClientArea.ResumeLayout(false);
+            this.ultraPanelMaster.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)(this.ultraGridTransactions)).EndInit();
+            this.ultraPanelGridFooter.ClientArea.ResumeLayout(false);
+            this.ultraPanelGridFooter.ResumeLayout(false);
+
             this.ResumeLayout(false);
-        }
-
-        private void SetupSummaryPanel(Infragistics.Win.Misc.UltraPanel panel, Infragistics.Win.Misc.UltraLabel lblTitle, Infragistics.Win.Misc.UltraLabel lblVal, string title)
-        {
-            panel.Dock = System.Windows.Forms.DockStyle.Fill;
-            panel.Margin = new System.Windows.Forms.Padding(3);
-            panel.Name = "pnl" + title.Replace(" ", "").Replace(":", "");
-
-            lblTitle.Dock = System.Windows.Forms.DockStyle.Left;
-            lblTitle.Size = new System.Drawing.Size(140, 50);
-            lblTitle.Text = title;
-            lblTitle.Font = new System.Drawing.Font("Segoe UI Semibold", 10F);
-            lblTitle.Appearance.TextVAlign = Infragistics.Win.VAlign.Middle;
-            lblTitle.Appearance.BackColor = System.Drawing.Color.Transparent;
-
-            lblVal.Dock = System.Windows.Forms.DockStyle.Fill;
-            lblVal.Text = "0.00";
-            lblVal.Font = new System.Drawing.Font("Segoe UI", 13F, System.Drawing.FontStyle.Bold);
-            lblVal.Appearance.TextHAlign = Infragistics.Win.HAlign.Right;
-            lblVal.Appearance.TextVAlign = Infragistics.Win.VAlign.Middle;
-            lblVal.Appearance.BackColor = System.Drawing.Color.Transparent;
-
-            panel.ClientArea.Controls.Add(lblVal);
-            panel.ClientArea.Controls.Add(lblTitle);
         }
 
         #endregion
 
-        private Infragistics.Win.Misc.UltraPanel panelMain;
-        private Infragistics.Win.Misc.UltraPanel panelHeader;
-        private Infragistics.Win.Misc.UltraGroupBox ultraGroupBox1;
+        private Infragistics.Win.Misc.UltraPanel ultraPanelControls;
+        private Infragistics.Win.Misc.UltraLabel lblSearch;
+        private Infragistics.Win.UltraWinEditors.UltraTextEditor txtSearch;
+        private Infragistics.Win.Misc.UltraLabel lblRowCount;
+        private Infragistics.Win.Misc.UltraLabel lblLedger;
         private Infragistics.Win.UltraWinGrid.UltraCombo ultraComboLedger;
-        private Infragistics.Win.Misc.UltraLabel ultraLabel4;
-        private Infragistics.Win.Misc.UltraLabel ultraLabel3;
+        private Infragistics.Win.Misc.UltraLabel lblPreset;
         private Infragistics.Win.UltraWinEditors.UltraComboEditor cmbDateQuickSelect;
-        private Infragistics.Win.Misc.UltraLabel ultraLabel1;
+        private Infragistics.Win.Misc.UltraLabel lblFromDate;
         private Infragistics.Win.UltraWinEditors.UltraDateTimeEditor dtFromDate;
-        private Infragistics.Win.Misc.UltraLabel ultraLabel2;
+        private Infragistics.Win.Misc.UltraLabel lblToDate;
         private Infragistics.Win.UltraWinEditors.UltraDateTimeEditor dtToDate;
+
+        private Infragistics.Win.Misc.UltraPanel ultraPanelAction;
         private Infragistics.Win.Misc.UltraButton btnGenerate;
-        private Infragistics.Win.Misc.UltraButton btnExportCsv;
+        private Infragistics.Win.Misc.UltraButton btnPreviewGrid;
         private Infragistics.Win.Misc.UltraButton btnPrint;
-        private Infragistics.Win.Misc.UltraButton btnClose;
+        private Infragistics.Win.Misc.UltraButton btnExportCsv;
+        private Infragistics.Win.Misc.UltraButton btnClearFilters;
+        private Infragistics.Win.Misc.UltraButton btnToggleSelection;
 
-        private Infragistics.Win.Misc.UltraPanel panelSummary;
-        private Infragistics.Win.Misc.UltraPanel panelOpening;
-        private Infragistics.Win.Misc.UltraLabel lblOpeningBalanceTitle;
-        private Infragistics.Win.Misc.UltraLabel lblOpeningBalanceValue;
-
-        private Infragistics.Win.Misc.UltraPanel panelReceipts;
-        private Infragistics.Win.Misc.UltraLabel lblTotalReceiptsTitle;
-        private Infragistics.Win.Misc.UltraLabel lblTotalReceiptsValue;
-
-        private Infragistics.Win.Misc.UltraPanel panelPayments;
-        private Infragistics.Win.Misc.UltraLabel lblTotalPaymentsTitle;
-        private Infragistics.Win.Misc.UltraLabel lblTotalPaymentsValue;
-
-        private Infragistics.Win.Misc.UltraPanel panelClosing;
-        private Infragistics.Win.Misc.UltraLabel lblClosingBalanceTitle;
-        private Infragistics.Win.Misc.UltraLabel lblClosingBalanceValue;
-
-        private Infragistics.Win.Misc.UltraPanel panelGrid;
+        private Infragistics.Win.Misc.UltraPanel ultraPanelMaster;
         private Infragistics.Win.UltraWinGrid.UltraGrid ultraGridTransactions;
+        private Infragistics.Win.Misc.UltraPanel ultraPanelGridFooter;
+        private Infragistics.Win.Misc.UltraLabel lblOpeningSummary;
+        private Infragistics.Win.Misc.UltraLabel lblReceiptsSummary;
+        private Infragistics.Win.Misc.UltraLabel lblPaymentsSummary;
+        private Infragistics.Win.Misc.UltraLabel lblClosingBadge;
     }
 }
