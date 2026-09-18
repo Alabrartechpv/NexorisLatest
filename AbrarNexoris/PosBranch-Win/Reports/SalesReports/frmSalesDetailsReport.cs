@@ -22,6 +22,15 @@ namespace PosBranch_Win.Reports.SalesReports
     public partial class frmSalesReportMasterDetail : Form
     {
         #region Private Fields
+        private static readonly Color FilterPanelBackColor = Color.FromArgb(232, 246, 255);
+        private static readonly Color ActionPanelBackColor = Color.FromArgb(206, 223, 238);
+        private static readonly Color BorderBlue = Color.FromArgb(118, 154, 198);
+        private static readonly Color ButtonBlueTop = Color.FromArgb(232, 241, 252);
+        private static readonly Color ButtonBlueBottom = Color.FromArgb(145, 181, 224);
+        private static readonly Color ButtonLightOutline = Color.FromArgb(166, 183, 202);
+        private static readonly Color ButtonTextBlue = Color.FromArgb(14, 47, 108);
+
+        private Label lblCount;
         private SalesReportRepository _reportRepository;
         private Dropdowns _dropdowns;
         private readonly List<ComboItem> _customerOptions;
@@ -131,31 +140,45 @@ namespace PosBranch_Win.Reports.SalesReports
         #region UI Setup & Styling
         private void InitializeRuntimeAppearance()
         {
-            ConfigureButton(btnViewGrid, Color.FromArgb(72, 122, 214), Color.FromArgb(95, 145, 230));
-            ConfigureButton(btnPreviewGrid, Color.FromArgb(94, 116, 202), Color.FromArgb(121, 141, 222));
-            ConfigureButton(btnPreviewReport, Color.FromArgb(108, 92, 231), Color.FromArgb(135, 120, 245));
-            ConfigureButton(btnExportExcel, Color.FromArgb(46, 125, 50), Color.FromArgb(76, 175, 80));
-            ConfigureButton(btnColumnChooser, Color.FromArgb(90, 110, 160), Color.FromArgb(115, 135, 185));
-            ConfigureButton(btnHideSelection, Color.FromArgb(84, 120, 190), Color.FromArgb(112, 148, 214));
+            StyleClassicButton(btnViewGrid);
+            StyleClassicButton(btnPreviewGrid);
+            StyleClassicButton(btnPreviewReport);
+            StyleClassicButton(btnExportExcel);
+            StyleClassicButton(btnClearFilters);
+            StyleClassicButton(btnHideSelection);
 
             ConfigureGridAppearance(ultraGridMaster);
             InitializeSummaryFooterPanel();
             InitializeGridContextMenuAndDragDrop();
-            ReflowSummaryCards();
         }
 
-        private void ConfigureButton(Infragistics.Win.Misc.UltraButton button, Color startColor, Color endColor)
+        private static void StyleClassicButton(Infragistics.Win.Misc.UltraButton button)
         {
+            if (button == null) return;
             button.UseAppStyling = false;
             button.UseOsThemes = DefaultableBoolean.False;
-            button.Appearance.BackColor = startColor;
-            button.Appearance.BackColor2 = endColor;
+            button.ButtonStyle = UIElementButtonStyle.Flat;
+            button.UseFlatMode = DefaultableBoolean.False;
+            button.Appearance.BackColor = ButtonBlueTop;
+            button.Appearance.BackColor2 = ButtonBlueBottom;
             button.Appearance.BackGradientStyle = GradientStyle.Vertical;
-            button.Appearance.ForeColor = Color.White;
-            button.Appearance.FontData.Bold = DefaultableBoolean.True;
-            button.Appearance.BorderColor = startColor;
-            button.HotTrackAppearance.BackColor = endColor;
-            button.HotTrackAppearance.ForeColor = Color.White;
+            button.Appearance.ForeColor = ButtonTextBlue;
+            button.Appearance.BorderColor = ButtonLightOutline;
+            button.Appearance.TextHAlign = HAlign.Center;
+            button.Appearance.TextVAlign = VAlign.Middle;
+            button.Appearance.FontData.Bold = DefaultableBoolean.False;
+            button.Appearance.FontData.SizeInPoints = 9;
+            button.Font = new Font("Tahoma", 9F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            button.HotTrackAppearance.BackColor = Color.FromArgb(241, 247, 254);
+            button.HotTrackAppearance.BackColor2 = Color.FromArgb(166, 195, 231);
+            button.HotTrackAppearance.BackGradientStyle = GradientStyle.Vertical;
+            button.HotTrackAppearance.BorderColor = ButtonLightOutline;
+            button.HotTrackAppearance.ForeColor = ButtonTextBlue;
+            button.PressedAppearance.BackColor = Color.FromArgb(118, 161, 214);
+            button.PressedAppearance.BackColor2 = Color.FromArgb(217, 231, 247);
+            button.PressedAppearance.BackGradientStyle = GradientStyle.Vertical;
+            button.PressedAppearance.BorderColor = Color.FromArgb(148, 163, 182);
+            button.PressedAppearance.ForeColor = ButtonTextBlue;
         }
 
         private void ConfigureGridAppearance(UltraGrid targetGrid)
@@ -225,21 +248,29 @@ namespace PosBranch_Win.Reports.SalesReports
                 return;
             }
 
-            // Style gridFooterPanel to match SalesInvoice
-            gridFooterPanel.Appearance.BackColor = Color.FromArgb(0, 122, 204);
-            gridFooterPanel.Appearance.BackColor2 = Color.FromArgb(0, 102, 184);
+            // Style gridFooterPanel
+            gridFooterPanel.Appearance.BackColor = Color.FromArgb(93, 151, 214);
+            gridFooterPanel.Appearance.BackColor2 = Color.FromArgb(67, 118, 184);
             gridFooterPanel.Appearance.BackGradientStyle = GradientStyle.Vertical;
-            gridFooterPanel.Appearance.BorderColor = Color.FromArgb(0, 100, 182);
+            gridFooterPanel.Appearance.BorderColor = BorderBlue;
             gridFooterPanel.BorderStyle = UIElementBorderStyle.Solid;
             gridFooterPanel.Visible = true;
 
-            if (lblCount != null)
+            if (lblCount == null)
             {
-                lblCount.Appearance.ForeColor = Color.White;
-                lblCount.Appearance.FontData.Bold = DefaultableBoolean.True;
-                lblCount.Appearance.BackColor = Color.Transparent;
-                lblCount.Location = new Point(8, 4);
-                lblCount.Size = new Size(180, 22);
+                lblCount = new Label
+                {
+                    Name = "lblCount",
+                    AutoSize = false,
+                    TextAlign = ContentAlignment.MiddleLeft,
+                    ForeColor = Color.White,
+                    BackColor = Color.Transparent,
+                    Font = new Font("Tahoma", 8.5F, FontStyle.Bold),
+                    Location = new Point(8, 2),
+                    Size = new Size(200, 22),
+                    Text = "Total Bills: 0"
+                };
+                gridFooterPanel.ClientArea.Controls.Add(lblCount);
             }
 
             // Set default aggregations for Master Band numeric columns
@@ -366,6 +397,9 @@ namespace PosBranch_Win.Reports.SalesReports
             }
         }
 
+        public void RibbonClear() => ResetFilters(true);
+        public void Clear() => ResetFilters(true);
+
         private void ResetFilters(bool reload = true)
         {
             ultraComboDateMode.Value = "RANGE";
@@ -414,6 +448,11 @@ namespace PosBranch_Win.Reports.SalesReports
         private void BtnExportExcel_Click(object sender, EventArgs e)
         {
             ExportToExcel();
+        }
+
+        private void BtnClearFilters_Click(object sender, EventArgs e)
+        {
+            ResetFilters(true);
         }
 
         private void BtnColumnChooser_Click(object sender, EventArgs e)
@@ -589,15 +628,10 @@ namespace PosBranch_Win.Reports.SalesReports
 
                 LoadGridLayout();
 
-                // Update Bottom Summary Cards
-                lblCardBillsValue.Text = $"{finalBills.Count:N0}";
-                lblCardQtyValue.Text = $"{totalQty:N2}";
-                lblCardSubTotalValue.Text = $"₹ {totalSubTotal:N2}";
-                lblCardTaxValue.Text = $"₹ {totalTax:N2}";
-                lblCardNetValue.Text = $"₹ {totalNet:N2}";
-                lblCardProfitValue.Text = $"₹ {totalProfit:N2}";
-
-                lblCount.Text = $"Total Bills: {finalBills.Count:N0}";
+                if (lblCount != null)
+                {
+                    lblCount.Text = $"Total Bills: {finalBills.Count:N0}";
+                }
                 UpdateSummaryFooter();
                 RefreshColumnChooserList();
             }
@@ -1296,51 +1330,6 @@ namespace PosBranch_Win.Reports.SalesReports
         {
             UpdateFooterValues();
             AlignSummaryLabels();
-        }
-        #endregion
-
-        #region Summary Cards Reflow
-        private void SummaryCards_Resize(object sender, EventArgs e)
-        {
-            ReflowSummaryCards();
-        }
-
-        private void ReflowSummaryCards()
-        {
-            if (ultraPanelSummaryCards == null) return;
-
-            int panelWidth = ultraPanelSummaryCards.ClientArea.Width;
-            if (panelWidth < 100) return;
-
-            Infragistics.Win.Misc.UltraPanel[] cards = new Infragistics.Win.Misc.UltraPanel[]
-            {
-                pnlCardBills, pnlCardQty, pnlCardSubTotal, pnlCardTax, pnlCardNet, pnlCardProfit
-            };
-
-            int cardCount = cards.Length;
-            int margin = 10;
-            int edgePadding = 12;
-            int totalMargins = edgePadding * 2 + margin * (cardCount - 1);
-            int cardWidth = Math.Max(100, (panelWidth - totalMargins) / cardCount);
-            int cardHeight = 60;
-            int yPos = (ultraPanelSummaryCards.ClientArea.Height - cardHeight) / 2;
-            if (yPos < 4) yPos = 4;
-
-            for (int i = 0; i < cards.Length; i++)
-            {
-                if (cards[i] == null) continue;
-                int xPos = edgePadding + i * (cardWidth + margin);
-                cards[i].Location = new Point(xPos, yPos);
-                cards[i].Size = new Size(cardWidth, cardHeight);
-
-                foreach (Control ctrl in cards[i].ClientArea.Controls)
-                {
-                    if (ctrl is Infragistics.Win.Misc.UltraLabel lbl)
-                    {
-                        lbl.Size = new Size(cardWidth - 16, lbl.Height);
-                    }
-                }
-            }
         }
         #endregion
 

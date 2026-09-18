@@ -202,6 +202,9 @@ namespace PosBranch_Win.Reports.FinancialReports
             }
         }
         
+        public void RibbonClear() => BtnClearFilters_Click(this, EventArgs.Empty);
+        public void Clear() => BtnClearFilters_Click(this, EventArgs.Empty);
+
         private void BtnClearFilters_Click(object sender, EventArgs e)
         {
             dtFrom.Value = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);

@@ -2100,7 +2100,15 @@ namespace PosBranch_Win
 
                     string[] candidateMethods = new string[0];
                     if (toolKey == "Clear")
-                        candidateMethods = new[] { "RibbonClear", "ClearFields", "ClearRecord", "Clear", "Reset", "ClearForm", "ResetForm", "btnClear_Click", "BtnClear_Click", "brnClear_Click", "btnReset_Click", "BtnNew_Click", "btnNew_Click", "button7_Click", "ultraPictureBox1_Click", "button2_Click", "button4_Click", "btnClear_Click_1", "ultraBtnClear_Click", "btn_clear_Click" };
+                        candidateMethods = new[] { 
+                            "RibbonClear", "ClearFields", "ClearRecord", "Clear", "Reset", "ClearForm", "ResetForm", 
+                            "ResetFilters", "ClearFilters", "ResetReportView", "ResetFormState", "btnClearFilters_Click", 
+                            "BtnClearFilters_Click", "btnClearFilters", "BtnClearFilters", "btnClear_Click", "BtnClear_Click", 
+                            "brnClear_Click", "btnReset_Click", "BtnReset_Click", "btnResetFilters_Click", "BtnResetFilters_Click", 
+                            "BtnNew_Click", "btnNew_Click", "button7_Click", "ultraPictureBox1_Click", "button2_Click", "button4_Click", 
+                            "btnClear_Click_1", "ultraBtnClear_Click", "btn_clear_Click", "btn_Reset_Click", "BtnClearSalesman_Click", 
+                            "BtnClearCustomer_Click" 
+                        };
                     else if (toolKey == "Delet")
                         candidateMethods = new[] { "RibbonDeleteInvoice", "Delete", "DeleteRecord", "DeleteItem", "DeletePurchase", "DeletePurchaseReturn", "DeleteReturn", "btnDelete_Click", "BtnDelete_Click", "btn_delete_Click", "ultraPictureBox2_Click", "ultraBtnDelete_Click" };
                     else if (toolKey == "Update")
@@ -2114,7 +2122,9 @@ namespace PosBranch_Win
 
                     foreach (var methodName in candidateMethods)
                     {
-                        var method = activeForm.GetType().GetMethod(methodName, System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                        var method = activeForm.GetType().GetMethod(methodName, 
+                            System.Reflection.BindingFlags.IgnoreCase | System.Reflection.BindingFlags.NonPublic | 
+                            System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
                         if (method != null)
                         {
                             var parameters = method.GetParameters();
@@ -2124,11 +2134,55 @@ namespace PosBranch_Win
                                 handled = true;
                                 break;
                             }
+                            else if (parameters.Length == 1 && parameters[0].HasDefaultValue)
+                            {
+                                method.Invoke(activeForm, new object[] { parameters[0].DefaultValue });
+                                handled = true;
+                                break;
+                            }
+                            else if (parameters.Length == 1 && parameters[0].ParameterType == typeof(bool))
+                            {
+                                method.Invoke(activeForm, new object[] { true });
+                                handled = true;
+                                break;
+                            }
                             else if (parameters.Length == 2)
                             {
                                 method.Invoke(activeForm, new object[] { this, EventArgs.Empty });
                                 handled = true;
                                 break;
+                            }
+                        }
+                    }
+
+                    // Fallback: search for clear or reset buttons inside active form
+                    if (!handled && toolKey == "Clear")
+                    {
+                        var clearBtnNames = new[] { "btnClearFilters", "btnResetFilters", "btnClear", "btnReset", "btn_clear", "btn_reset", "_btnClear", "_btnReset", "ultraBtnClear", "ultraBtnReset", "buttonClear", "buttonReset" };
+                        foreach (var btnName in clearBtnNames)
+                        {
+                            var foundControls = activeForm.Controls.Find(btnName, true);
+                            if (foundControls != null && foundControls.Length > 0)
+                            {
+                                foreach (var c in foundControls)
+                                {
+                                    if (c.Visible && c.Enabled)
+                                    {
+                                        if (c is Button winBtn)
+                                        {
+                                            winBtn.PerformClick();
+                                            handled = true;
+                                            break;
+                                        }
+                                        else if (c is Infragistics.Win.Misc.UltraButton ultraBtn)
+                                        {
+                                            ultraBtn.PerformClick();
+                                            handled = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                                if (handled) break;
                             }
                         }
                     }

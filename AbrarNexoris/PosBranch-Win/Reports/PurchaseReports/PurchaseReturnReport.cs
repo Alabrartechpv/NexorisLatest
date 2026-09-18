@@ -2,6 +2,7 @@ using Infragistics.Win;
 using Infragistics.Win.UltraWinGrid;
 using ModelClass;
 using ModelClass.Report;
+using PosBranch_Win.DialogBox;
 using Repository.ReportRepository;
 using System;
 using System.Collections.Generic;
@@ -9,6 +10,7 @@ using System.ComponentModel;
 using System.Data;
 using System.Data.SqlClient;
 using System.Drawing;
+using System.Drawing.Drawing2D;
 using System.Drawing.Printing;
 using System.Linq;
 using System.Text;
@@ -22,10 +24,61 @@ namespace PosBranch_Win.Reports.PurchaseReports
     /// </summary>
     public partial class PurchaseReturnReport : Form
     {
+        #region Helper Classes
+        private sealed class ColumnItem
+        {
+            public ColumnItem(string columnKey, string displayText, int bandIndex = 0)
+            {
+                ColumnKey = columnKey;
+                DisplayText = displayText;
+                BandIndex = bandIndex;
+            }
+
+            public string ColumnKey { get; }
+            public string DisplayText { get; }
+            public int BandIndex { get; }
+
+            public override string ToString()
+            {
+                return DisplayText;
+            }
+        }
+        #endregion
+
         #region Private Fields
+        private static readonly Color FormBackColor = Color.FromArgb(232, 246, 255);
+        private static readonly Color FilterPanelBackColor = Color.FromArgb(232, 246, 255);
+        private static readonly Color ActionPanelBackColor = Color.FromArgb(206, 223, 238);
+        private static readonly Color BorderBlue = Color.FromArgb(118, 154, 198);
+        private static readonly Color ControlBackColor = Color.White;
+        private static readonly Color ControlTextColor = Color.FromArgb(18, 49, 102);
+        private static readonly Color GridHeaderBlue = Color.FromArgb(93, 151, 214);
+        private static readonly Color GridHeaderBlueDark = Color.FromArgb(67, 118, 184);
+        private static readonly Color GridSelectedBlue = Color.FromArgb(126, 126, 245);
+        private static readonly Color GridRowLine = Color.FromArgb(197, 217, 241);
+        private static readonly Color GridAltRow = Color.FromArgb(246, 250, 255);
+        private static readonly Color ButtonBlueTop = Color.FromArgb(232, 241, 252);
+        private static readonly Color ButtonBlueBottom = Color.FromArgb(145, 181, 224);
+        private static readonly Color ButtonBlueBorder = Color.FromArgb(62, 104, 166);
+        private static readonly Color ButtonLightOutline = Color.FromArgb(166, 183, 202);
+        private static readonly Color SkyBlueOutline = Color.FromArgb(160, 210, 255);
+        private static readonly Color ButtonTextBlue = Color.FromArgb(14, 47, 108);
+
         private PurchaseReturnReportRepository reportRepository;
         private DataSet dsHierarchical;
         private bool isLoading = false;
+
+        // Grid calculation footer fields
+        private readonly Dictionary<string, Label> footerLabels = new Dictionary<string, Label>();
+        private readonly Dictionary<string, string> columnAggregations = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        // Column chooser & drag-drop fields
+        private Form columnChooserForm;
+        private System.Windows.Forms.ToolTip gridToolTip = new System.Windows.Forms.ToolTip();
+        private Point headerDragStartPoint;
+        private UltraGridColumn columnToHideByDrag;
+        private bool isDraggingHeaderColumn;
+        private readonly Dictionary<string, int> savedColumnWidths = new Dictionary<string, int>();
         #endregion
 
         #region Constructor
@@ -44,9 +97,18 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 reportRepository = new PurchaseReturnReportRepository();
 
                 // Set form properties
-                this.Text = "Purchase Return Report - Master Detail View";
-                this.WindowState = FormWindowState.Maximized;
-                this.StartPosition = FormStartPosition.CenterScreen;
+                this.Text = "Purchase Return Report";
+                if (this.TopLevel)
+                {
+                    this.WindowState = FormWindowState.Maximized;
+                    this.StartPosition = FormStartPosition.CenterScreen;
+                }
+                else
+                {
+                    this.WindowState = FormWindowState.Normal;
+                    this.Dock = DockStyle.Fill;
+                }
+                this.MinimumSize = new Size(0, 0);
 
                 // Initialize date controls
                 InitializeDateControls();
@@ -63,6 +125,15 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 // Initialize panels
                 InitializePanels();
 
+                // Initialize control positions and IRS POS layout
+                InitializeControlLayout();
+
+                // Initialize Grid Footer & Calculation Bar
+                InitializeGridFooter();
+
+                // Initialize Grid Context Menu and Drag-Drop
+                InitializeGridContextMenuAndDragDrop();
+
                 // Don't load data here - will load in Form_Load event after form is shown
             }
             catch (Exception ex)
@@ -74,9 +145,9 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
         private void InitializeDateControls()
         {
-            // Set default date range (last 30 days)
-            ultraDateTimeEditorFrom.Value = DateTime.Now.AddDays(-30);
-            ultraDateTimeEditorTo.Value = DateTime.Now;
+            // Set default date range (ALL records)
+            ultraDateTimeEditorFrom.Value = new DateTime(1990, 1, 1);
+            ultraDateTimeEditorTo.Value = DateTime.Today;
 
             // Set date format
             ultraDateTimeEditorFrom.FormatString = "dd/MM/yyyy";
@@ -85,26 +156,15 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
         private void InitializeSearchControls()
         {
-            // Initialize preset date options
+            // Initialize Date Mode options: ALL and Date by Range (matching IRS POS style)
             ultraComboPresetDates.Items.Clear();
-            ultraComboPresetDates.Items.Add("Today", "Today");
-            ultraComboPresetDates.Items.Add("Yesterday", "Yesterday");
-            ultraComboPresetDates.Items.Add("This Week", "ThisWeek");
-            ultraComboPresetDates.Items.Add("Last Week", "LastWeek");
-            ultraComboPresetDates.Items.Add("This Month", "ThisMonth");
-            ultraComboPresetDates.Items.Add("Last Month", "LastMonth");
-            ultraComboPresetDates.Items.Add("This Quarter", "ThisQuarter");
-            ultraComboPresetDates.Items.Add("Last Quarter", "LastQuarter");
-            ultraComboPresetDates.Items.Add("This Year", "ThisYear");
-            ultraComboPresetDates.Items.Add("Last Year", "LastYear");
-            ultraComboPresetDates.Items.Add("Custom Range", "Custom");
+            ultraComboPresetDates.Items.Add("ALL", "ALL");
+            ultraComboPresetDates.Items.Add("DATE_RANGE", "Date by Range");
 
-            // Set default to "This Month"
-            ultraComboPresetDates.Value = "ThisMonth";
+            // Set default to "ALL"
+            ultraComboPresetDates.Value = "ALL";
 
             // Initialize numeric editors
-            ultraNumericEditorAmountFrom.FormatString = "N2";
-            ultraNumericEditorAmountTo.FormatString = "N2";
             ultraNumericEditorReturnNo.FormatString = "0";
 
             // Set placeholder text
@@ -120,6 +180,158 @@ namespace PosBranch_Win.Reports.PurchaseReports
             SetupKeyboardShortcuts();
         }
 
+        private void InitializeControlLayout()
+        {
+            // Remove / Hide Amount filters completely
+            ultraLabelAmountFrom.Visible = false;
+            ultraNumericEditorAmountFrom.Visible = false;
+            ultraLabelAmountTo.Visible = false;
+            ultraNumericEditorAmountTo.Visible = false;
+
+            // Vendor & Return No (Row 1)
+            ultraLabelVendorSearch.Text = "Vendor";
+            ultraLabelVendorSearch.Location = new Point(20, 15);
+            ultraLabelVendorSearch.Size = new Size(55, 20);
+            ultraLabelVendorSearch.Appearance.ForeColor = ControlTextColor;
+            ultraLabelVendorSearch.Font = new Font("Tahoma", 9F, FontStyle.Regular);
+
+            ultraTextEditorVendor.Location = new Point(80, 12);
+            ultraTextEditorVendor.Size = new Size(236, 24);
+            ultraTextEditorVendor.KeyDown += UltraTextEditorVendor_KeyDown;
+
+            // Picture Box for Vendor Search (Opens Vendor Dialog)
+            pbVendorSearch.Location = new Point(320, 12);
+            pbVendorSearch.Size = new Size(26, 24);
+            pbVendorSearch.Cursor = Cursors.Hand;
+            pbVendorSearch.BackColor = Color.FromArgb(232, 241, 252);
+            pbVendorSearch.Paint += PbVendorSearch_Paint;
+            pbVendorSearch.MouseEnter += (s, e) => { pbVendorSearch.BackColor = Color.FromArgb(215, 235, 255); };
+            pbVendorSearch.MouseLeave += (s, e) => { pbVendorSearch.BackColor = Color.FromArgb(232, 241, 252); };
+            pbVendorSearch.Click += PbVendorSearch_Click;
+
+            ultraLabelReturnNoSearch.Text = "Doc No";
+            ultraLabelReturnNoSearch.Location = new Point(360, 15);
+            ultraLabelReturnNoSearch.Size = new Size(60, 20);
+            ultraLabelReturnNoSearch.Appearance.ForeColor = ControlTextColor;
+            ultraLabelReturnNoSearch.Font = new Font("Tahoma", 9F, FontStyle.Regular);
+
+            ultraNumericEditorReturnNo.Location = new Point(425, 12);
+            ultraNumericEditorReturnNo.Size = new Size(110, 24);
+
+            // Date Preset & Pickers (Row 2)
+            ultraLabelPreset.Text = "Date";
+            ultraLabelPreset.Location = new Point(20, 46);
+            ultraLabelPreset.Size = new Size(55, 20);
+            ultraLabelPreset.Appearance.ForeColor = ControlTextColor;
+            ultraLabelPreset.Font = new Font("Tahoma", 9F, FontStyle.Regular);
+
+            ultraComboPresetDates.Location = new Point(80, 44);
+            ultraComboPresetDates.Size = new Size(180, 24);
+
+            ultraLabelFromDate.Text = "From";
+            ultraLabelFromDate.Location = new Point(280, 46);
+            ultraLabelFromDate.Size = new Size(40, 20);
+            ultraLabelFromDate.Appearance.ForeColor = ControlTextColor;
+            ultraLabelFromDate.Font = new Font("Tahoma", 9F, FontStyle.Regular);
+
+            ultraDateTimeEditorFrom.Location = new Point(325, 44);
+            ultraDateTimeEditorFrom.Size = new Size(115, 24);
+
+            ultraLabelToDate.Text = "To";
+            ultraLabelToDate.Location = new Point(455, 46);
+            ultraLabelToDate.Size = new Size(25, 20);
+            ultraLabelToDate.Appearance.ForeColor = ControlTextColor;
+            ultraLabelToDate.Font = new Font("Tahoma", 9F, FontStyle.Regular);
+
+            ultraDateTimeEditorTo.Location = new Point(485, 44);
+            ultraDateTimeEditorTo.Size = new Size(115, 24);
+
+            ultraPanelControls.Height = 78;
+
+            UpdateDateControlVisibility();
+            UpdateSelectionToggleButtonText();
+        }
+
+        private void PbVendorSearch_Paint(object sender, PaintEventArgs e)
+        {
+            Graphics g = e.Graphics;
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
+            // Draw subtle border
+            using (Pen borderPen = new Pen(ButtonLightOutline))
+            {
+                g.DrawRectangle(borderPen, 0, 0, pbVendorSearch.Width - 1, pbVendorSearch.Height - 1);
+            }
+
+            // Draw magnifying glass icon
+            using (Pen iconPen = new Pen(ButtonTextBlue, 2f))
+            {
+                g.DrawEllipse(iconPen, 5, 4, 10, 10);
+                g.DrawLine(iconPen, 13, 12, 19, 18);
+            }
+        }
+
+        private void PbVendorSearch_Click(object sender, EventArgs e)
+        {
+            OpenVendorDialog();
+        }
+
+        private void UltraTextEditorVendor_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.F11 || e.KeyCode == Keys.Enter)
+            {
+                OpenVendorDialog();
+                e.Handled = true;
+            }
+        }
+
+        private void OpenVendorDialog()
+        {
+            try
+            {
+                using (frmVendorDig vendorDialog = new frmVendorDig())
+                {
+                    if (vendorDialog.ShowDialog(this) == DialogResult.OK)
+                    {
+                        if (vendorDialog.SelectedVendorId > 0 || !string.IsNullOrWhiteSpace(vendorDialog.SelectedVendorName))
+                        {
+                            ultraTextEditorVendor.Text = vendorDialog.SelectedVendorName ?? string.Empty;
+                            ultraTextEditorVendor.Value = vendorDialog.SelectedVendorName ?? string.Empty;
+                            LoadPurchaseReturnDataWithFilters();
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error opening vendor lookup: {ex.Message}", "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void UpdateDateControlVisibility()
+        {
+            bool isAll = string.Equals(Convert.ToString(ultraComboPresetDates.Value ?? ultraComboPresetDates.Text), "ALL", StringComparison.OrdinalIgnoreCase);
+            ultraLabelFromDate.Visible = !isAll;
+            ultraDateTimeEditorFrom.Visible = !isAll;
+            ultraLabelToDate.Visible = !isAll;
+            ultraDateTimeEditorTo.Visible = !isAll;
+        }
+
+        private void btnToggleSelection_Click(object sender, EventArgs e)
+        {
+            ultraPanelControls.Visible = !ultraPanelControls.Visible;
+            UpdateSelectionToggleButtonText();
+        }
+
+        private void UpdateSelectionToggleButtonText()
+        {
+            if (btnToggleSelection != null)
+            {
+                btnToggleSelection.Text = ultraPanelControls.Visible ? "Hide Selection" : "View Selection";
+            }
+        }
+
         /// <summary>
         /// Initialize tooltips for better user experience
         /// </summary>
@@ -132,14 +344,14 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 toolTip.SetToolTip(ultraDateTimeEditorTo, "Select end date for the report");
                 toolTip.SetToolTip(ultraComboPresetDates, "Quick date range selection");
                 toolTip.SetToolTip(ultraNumericEditorReturnNo, "Enter specific return number to search");
-                toolTip.SetToolTip(ultraTextEditorVendor, "Enter vendor name (partial match supported)");
-                toolTip.SetToolTip(ultraNumericEditorAmountFrom, "Minimum amount filter");
-                toolTip.SetToolTip(ultraNumericEditorAmountTo, "Maximum amount filter");
-                toolTip.SetToolTip(btnSearch, "Search with current filters (F5)");
-                toolTip.SetToolTip(btnClearFilters, "Clear all search filters (F6)");
-                toolTip.SetToolTip(btnRefresh, "Refresh data (F5)");
-                toolTip.SetToolTip(btnExport, "Export to Excel (Ctrl+E)");
-                toolTip.SetToolTip(btnPrint, "Print report (Ctrl+P)");
+                toolTip.SetToolTip(ultraTextEditorVendor, "Enter vendor name (partial match supported) or press F11 / click search icon");
+                toolTip.SetToolTip(pbVendorSearch, "Click to search and select a vendor (F11)");
+                toolTip.SetToolTip(btnSearch, "View Grid (F5)");
+                toolTip.SetToolTip(btnClearFilters, "Reset all search filters (F6)");
+                toolTip.SetToolTip(btnRefresh, "Preview Grid");
+                toolTip.SetToolTip(btnExport, "Export Grid to Excel (Ctrl+E)");
+                toolTip.SetToolTip(btnPrint, "Preview Report / Print (Ctrl+P)");
+                toolTip.SetToolTip(btnToggleSelection, "Hide / View Filter Selection Panel");
             }
             catch (Exception ex)
             {
@@ -148,71 +360,25 @@ namespace PosBranch_Win.Reports.PurchaseReports
         }
 
         /// <summary>
-        /// Style buttons for better appearance - Modern Material Design inspired
+        /// Style buttons like Vendor Outstanding / IRS POS action toolbar
         /// </summary>
         private void StyleButtons()
         {
             try
             {
-                // Modern Material Design color palette with enhanced styling
+                btnSearch.Text = "View Grid";
+                btnRefresh.Text = "Preview Grid";
+                btnPrint.Text = "Preview Report";
+                btnExport.Text = "Export Grid";
+                btnClearFilters.Text = "Reset Filters";
+                btnToggleSelection.Text = "Hide Selection";
 
-                // Style search button - Primary Blue
-                btnSearch.UseAppStyling = false;
-                btnSearch.UseOsThemes = DefaultableBoolean.False;
-                btnSearch.Appearance.BackColor = Color.FromArgb(25, 118, 210);
-                btnSearch.Appearance.BackColor2 = Color.FromArgb(33, 150, 243);
-                btnSearch.Appearance.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
-                btnSearch.Appearance.ForeColor = Color.White;
-                btnSearch.Appearance.FontData.Bold = DefaultableBoolean.True;
-                btnSearch.Appearance.FontData.SizeInPoints = 10;
-                btnSearch.Appearance.BorderColor = Color.FromArgb(21, 101, 192);
-
-                // Style clear filters button - Orange Accent
-                btnClearFilters.UseAppStyling = false;
-                btnClearFilters.UseOsThemes = DefaultableBoolean.False;
-                btnClearFilters.Appearance.BackColor = Color.FromArgb(245, 124, 0);
-                btnClearFilters.Appearance.BackColor2 = Color.FromArgb(255, 152, 0);
-                btnClearFilters.Appearance.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
-                btnClearFilters.Appearance.ForeColor = Color.White;
-                btnClearFilters.Appearance.FontData.Bold = DefaultableBoolean.True;
-                btnClearFilters.Appearance.FontData.SizeInPoints = 10;
-                btnClearFilters.Appearance.BorderColor = Color.FromArgb(230, 81, 0);
-
-                // Style refresh button - Green
-                btnRefresh.UseAppStyling = false;
-                btnRefresh.UseOsThemes = DefaultableBoolean.False;
-                btnRefresh.Appearance.BackColor = Color.FromArgb(56, 142, 60);
-                btnRefresh.Appearance.BackColor2 = Color.FromArgb(76, 175, 80);
-                btnRefresh.Appearance.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
-                btnRefresh.Appearance.ForeColor = Color.White;
-                btnRefresh.Appearance.FontData.Bold = DefaultableBoolean.True;
-                btnRefresh.Appearance.FontData.SizeInPoints = 10;
-                btnRefresh.Appearance.BorderColor = Color.FromArgb(46, 125, 50);
-
-                // Style export button - Teal
-                btnExport.UseAppStyling = false;
-                btnExport.UseOsThemes = DefaultableBoolean.False;
-                btnExport.Appearance.BackColor = Color.FromArgb(0, 121, 107);
-                btnExport.Appearance.BackColor2 = Color.FromArgb(0, 150, 136);
-                btnExport.Appearance.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
-                btnExport.Appearance.ForeColor = Color.White;
-                btnExport.Appearance.FontData.Bold = DefaultableBoolean.True;
-                btnExport.Appearance.FontData.SizeInPoints = 10;
-                btnExport.Appearance.BorderColor = Color.FromArgb(0, 105, 92);
-
-                // Style print button - Deep Purple
-                btnPrint.UseAppStyling = false;
-                btnPrint.UseOsThemes = DefaultableBoolean.False;
-                btnPrint.Appearance.BackColor = Color.FromArgb(81, 45, 168);
-                btnPrint.Appearance.BackColor2 = Color.FromArgb(103, 58, 183);
-                btnPrint.Appearance.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
-                btnPrint.Appearance.ForeColor = Color.White;
-                btnPrint.Appearance.FontData.Bold = DefaultableBoolean.True;
-                btnPrint.Appearance.FontData.SizeInPoints = 10;
-                btnPrint.Appearance.BorderColor = Color.FromArgb(69, 39, 160);
-
-                // Add hover effects for all buttons
-                SetButtonHoverEffects();
+                StyleClassicButton(btnSearch);
+                StyleClassicButton(btnRefresh);
+                StyleClassicButton(btnPrint);
+                StyleClassicButton(btnExport);
+                StyleClassicButton(btnClearFilters);
+                StyleClassicButton(btnToggleSelection);
             }
             catch (Exception ex)
             {
@@ -220,37 +386,32 @@ namespace PosBranch_Win.Reports.PurchaseReports
             }
         }
 
-        /// <summary>
-        /// Set hover effects for buttons
-        /// </summary>
-        private void SetButtonHoverEffects()
+        private static void StyleClassicButton(Infragistics.Win.Misc.UltraButton button)
         {
-            try
-            {
-                // Search button hover
-                btnSearch.HotTrackAppearance.BackColor = Color.FromArgb(66, 165, 245);
-                btnSearch.HotTrackAppearance.ForeColor = Color.White;
-
-                // Clear filters button hover
-                btnClearFilters.HotTrackAppearance.BackColor = Color.FromArgb(255, 167, 38);
-                btnClearFilters.HotTrackAppearance.ForeColor = Color.White;
-
-                // Refresh button hover
-                btnRefresh.HotTrackAppearance.BackColor = Color.FromArgb(102, 187, 106);
-                btnRefresh.HotTrackAppearance.ForeColor = Color.White;
-
-                // Export button hover
-                btnExport.HotTrackAppearance.BackColor = Color.FromArgb(38, 166, 154);
-                btnExport.HotTrackAppearance.ForeColor = Color.White;
-
-                // Print button hover
-                btnPrint.HotTrackAppearance.BackColor = Color.FromArgb(126, 87, 194);
-                btnPrint.HotTrackAppearance.ForeColor = Color.White;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error setting hover effects: {ex.Message}");
-            }
+            button.UseAppStyling = false;
+            button.UseOsThemes = DefaultableBoolean.False;
+            button.ButtonStyle = UIElementButtonStyle.Flat;
+            button.UseFlatMode = DefaultableBoolean.False;
+            button.Appearance.BackColor = ButtonBlueTop;
+            button.Appearance.BackColor2 = ButtonBlueBottom;
+            button.Appearance.BackGradientStyle = GradientStyle.Vertical;
+            button.Appearance.ForeColor = ButtonTextBlue;
+            button.Appearance.BorderColor = ButtonLightOutline;
+            button.Appearance.TextHAlign = HAlign.Center;
+            button.Appearance.TextVAlign = VAlign.Middle;
+            button.Appearance.FontData.Bold = DefaultableBoolean.False;
+            button.Appearance.FontData.SizeInPoints = 9;
+            button.Font = new Font("Tahoma", 9F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            button.HotTrackAppearance.BackColor = Color.FromArgb(241, 247, 254);
+            button.HotTrackAppearance.BackColor2 = Color.FromArgb(166, 195, 231);
+            button.HotTrackAppearance.BackGradientStyle = GradientStyle.Vertical;
+            button.HotTrackAppearance.BorderColor = ButtonLightOutline;
+            button.HotTrackAppearance.ForeColor = ButtonTextBlue;
+            button.PressedAppearance.BackColor = Color.FromArgb(118, 161, 214);
+            button.PressedAppearance.BackColor2 = Color.FromArgb(217, 231, 247);
+            button.PressedAppearance.BackGradientStyle = GradientStyle.Vertical;
+            button.PressedAppearance.BorderColor = Color.FromArgb(148, 163, 182);
+            button.PressedAppearance.ForeColor = ButtonTextBlue;
         }
 
         /// <summary>
@@ -416,37 +577,41 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 ultraGridMaster.DisplayLayout.Override.MinRowHeight = 25;
                 ultraGridMaster.DisplayLayout.Override.DefaultRowHeight = 25;
 
-                // Modern selection colors - Material Design Blue
-                ultraGridMaster.DisplayLayout.Override.SelectedRowAppearance.BackColor = Color.FromArgb(66, 165, 245);
+                // Modern selection colors matching Vendor Outstanding theme
+                ultraGridMaster.DisplayLayout.Override.SelectedRowAppearance.BackColor = GridSelectedBlue;
                 ultraGridMaster.DisplayLayout.Override.SelectedRowAppearance.ForeColor = Color.White;
                 ultraGridMaster.DisplayLayout.Override.SelectedRowAppearance.FontData.Bold = DefaultableBoolean.True;
 
-                // Modern header styling - Deep Blue-Grey gradient effect
-                ultraGridMaster.DisplayLayout.Override.HeaderAppearance.BackColor = Color.FromArgb(55, 71, 79);
-                ultraGridMaster.DisplayLayout.Override.HeaderAppearance.BackColor2 = Color.FromArgb(69, 90, 100);
+                // Modern header styling - Blue gradient matching Vendor Outstanding
+                ultraGridMaster.DisplayLayout.Override.HeaderAppearance.BackColor = GridHeaderBlue;
+                ultraGridMaster.DisplayLayout.Override.HeaderAppearance.BackColor2 = GridHeaderBlueDark;
                 ultraGridMaster.DisplayLayout.Override.HeaderAppearance.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
                 ultraGridMaster.DisplayLayout.Override.HeaderAppearance.ForeColor = Color.White;
                 ultraGridMaster.DisplayLayout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.True;
-                ultraGridMaster.DisplayLayout.Override.HeaderAppearance.FontData.SizeInPoints = 9;
+                ultraGridMaster.DisplayLayout.Override.HeaderAppearance.FontData.SizeInPoints = 8.5F;
 
-                // Modern alternating row colors - Soft gradient
+                // Modern alternating row colors
                 ultraGridMaster.DisplayLayout.Override.RowAppearance.BackColor = Color.White;
-                ultraGridMaster.DisplayLayout.Override.RowAlternateAppearance.BackColor = Color.FromArgb(250, 250, 252);
-
-                // Modern hover effects - Light blue
-                ultraGridMaster.DisplayLayout.Override.ActiveRowAppearance.BackColor = Color.FromArgb(227, 242, 253);
-                ultraGridMaster.DisplayLayout.Override.ActiveRowAppearance.ForeColor = Color.FromArgb(33, 33, 33);
-                ultraGridMaster.DisplayLayout.Override.ActiveRowAppearance.BorderColor = Color.FromArgb(66, 165, 245);
-
-                // Add grid lines
+                ultraGridMaster.DisplayLayout.Override.RowAlternateAppearance.BackColor = GridAltRow;
+                ultraGridMaster.DisplayLayout.Override.CellAppearance.BorderColor = GridRowLine;
                 ultraGridMaster.DisplayLayout.Override.BorderStyleCell = UIElementBorderStyle.Solid;
                 ultraGridMaster.DisplayLayout.Override.BorderStyleRow = UIElementBorderStyle.Solid;
+
+                // Modern hover effects - Light blue
+                ultraGridMaster.DisplayLayout.Override.ActiveRowAppearance.BackColor = Color.FromArgb(215, 235, 255);
+                ultraGridMaster.DisplayLayout.Override.ActiveRowAppearance.ForeColor = ControlTextColor;
+                ultraGridMaster.DisplayLayout.Override.ActiveRowAppearance.BorderColor = BorderBlue;
 
                 // Event handlers
                 ultraGridMaster.InitializeLayout += UltraGridMaster_InitializeLayout;
                 ultraGridMaster.AfterRowExpanded += UltraGridMaster_AfterRowExpanded;
                 ultraGridMaster.BeforeRowExpanded += UltraGridMaster_BeforeRowExpanded;
                 ultraGridMaster.InitializeRow += UltraGridMaster_InitializeRow;
+                ultraGridMaster.AfterColPosChanged += UltraGridMaster_AfterColPosChanged;
+                ultraGridMaster.AfterColRegionScroll += (s, e) => UpdateFooterCellPositions();
+                ultraGridMaster.AfterRowFilterChanged += UltraGridMaster_AfterRowFilterChanged;
+                ultraGridMaster.AfterSortChange += UltraGridMaster_AfterSortChange;
+                ultraGridMaster.Resize += UltraGridMaster_Resize;
 
                 System.Diagnostics.Debug.WriteLine("Hierarchical grid setup completed");
             }
@@ -459,44 +624,53 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
         private void InitializePanels()
         {
-            // Setup master panel (contains hierarchical grid) - Modern clean white
-            ultraPanelMaster.BackColor = Color.FromArgb(250, 251, 252);
+            this.BackColor = FormBackColor;
+
+            // Setup control panel (Vendor & Date Filters - Topmost)
+            ultraPanelControls.Appearance.BackColor = FilterPanelBackColor;
+            ultraPanelControls.Appearance.BorderColor = BorderBlue;
+            ultraPanelControls.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
+            ultraPanelControls.Dock = DockStyle.Top;
+            ultraPanelControls.Height = 78;
+
+            // Setup action toolbar panel (IRS POS Style - Docks directly below ultraPanelControls)
+            ultraPanelAction.Appearance.BackColor = ActionPanelBackColor;
+            ultraPanelAction.Appearance.BorderColor = BorderBlue;
+            ultraPanelAction.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
+            ultraPanelAction.Dock = DockStyle.Top;
+            ultraPanelAction.Height = 45;
+
+            // Setup master panel (contains hierarchical grid and calculation footer)
+            ultraPanelMaster.Appearance.BackColor = FormBackColor;
+            ultraPanelMaster.Appearance.BorderColor = BorderBlue;
             ultraPanelMaster.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
+            ultraPanelMaster.Dock = DockStyle.Fill;
 
-            // Setup control panel - Modern gradient-like appearance
-            ultraPanelControls.BackColor = Color.FromArgb(236, 240, 245);
+            // Setup grid calculation footer panel
+            if (ultraPanelGridFooter != null)
+            {
+                ultraPanelGridFooter.Appearance.BackColor = GridHeaderBlue;
+                ultraPanelGridFooter.Appearance.BackColor2 = GridHeaderBlue;
+                ultraPanelGridFooter.Appearance.BackGradientStyle = GradientStyle.None;
+                ultraPanelGridFooter.Appearance.BorderColor = BorderBlue;
+                ultraPanelGridFooter.BorderStyle = UIElementBorderStyle.Solid;
+                ultraPanelGridFooter.Dock = DockStyle.Bottom;
+                ultraPanelGridFooter.Height = 26;
+            }
 
-            // Style summary caption labels - Modern bold headers
-            StyleSummaryLabel(ultraLabelTotalReturnsCaption, Color.FromArgb(25, 118, 210), true);
-            StyleSummaryLabel(ultraLabelSubTotalCaption, Color.FromArgb(56, 142, 60), true);
-            StyleSummaryLabel(ultraLabelGrandTotalCaption, Color.FromArgb(123, 31, 162), true);
+            ultraGridMaster.Dock = DockStyle.Fill;
 
-            // Style summary value labels - Large, bold, colorful
-            StyleSummaryValueLabel(ultraLabelTotalReturnsValue, Color.FromArgb(13, 71, 161), 14);
-            StyleSummaryValueLabel(ultraLabelSubTotalValue, Color.FromArgb(27, 94, 32), 14);
-            StyleSummaryValueLabel(ultraLabelGrandTotalValue, Color.FromArgb(74, 20, 140), 16);
-        }
+            // Enforce proper z-order for docking calculations:
+            // Controls (Topmost Y=0) -> Action toolbar (Below Controls Y=78) -> Master (Fill remaining space)
+            ultraPanelControls.SendToBack();
+            ultraPanelAction.BringToFront();
+            ultraPanelMaster.BringToFront();
 
-        /// <summary>
-        /// Style summary caption labels
-        /// </summary>
-        private void StyleSummaryLabel(Infragistics.Win.Misc.UltraLabel label, Color foreColor, bool isBold)
-        {
-            label.Appearance.ForeColor = foreColor;
-            label.Appearance.FontData.Bold = isBold ? DefaultableBoolean.True : DefaultableBoolean.False;
-            label.Appearance.FontData.SizeInPoints = 10;
-            label.Appearance.TextHAlign = Infragistics.Win.HAlign.Left;
-        }
-
-        /// <summary>
-        /// Style summary value labels with larger font
-        /// </summary>
-        private void StyleSummaryValueLabel(Infragistics.Win.Misc.UltraLabel label, Color foreColor, float fontSize)
-        {
-            label.Appearance.ForeColor = foreColor;
-            label.Appearance.FontData.Bold = DefaultableBoolean.True;
-            label.Appearance.FontData.SizeInPoints = fontSize;
-            label.Appearance.TextHAlign = Infragistics.Win.HAlign.Left;
+            if (ultraPanelGridFooter != null)
+            {
+                ultraPanelGridFooter.SendToBack();
+            }
+            ultraGridMaster.BringToFront();
         }
         #endregion
 
@@ -585,7 +759,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
             // Format currency columns with modern styling
             if (masterBand.Columns["SubTotal"] != null)
             {
-                masterBand.Columns["SubTotal"].Format = "? #,##0.00";
+                masterBand.Columns["SubTotal"].Format = "₹ #,##0.00";
                 masterBand.Columns["SubTotal"].Header.Caption = "Sub Total";
                 masterBand.Columns["SubTotal"].Width = 110;
                 masterBand.Columns["SubTotal"].CellAppearance.TextHAlign = Infragistics.Win.HAlign.Right;
@@ -593,7 +767,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
             if (masterBand.Columns["GrandTotal"] != null)
             {
-                masterBand.Columns["GrandTotal"].Format = "? #,##0.00";
+                masterBand.Columns["GrandTotal"].Format = "₹ #,##0.00";
                 masterBand.Columns["GrandTotal"].Header.Caption = "Grand Total";
                 masterBand.Columns["GrandTotal"].Width = 120;
                 masterBand.Columns["GrandTotal"].CellAppearance.TextHAlign = Infragistics.Win.HAlign.Right;
@@ -653,7 +827,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
             if (detailBand.Columns["Cost"] != null)
             {
                 detailBand.Columns["Cost"].Header.Caption = "Cost";
-                detailBand.Columns["Cost"].Format = "? #,##0.00";
+                detailBand.Columns["Cost"].Format = "₹ #,##0.00";
                 detailBand.Columns["Cost"].Width = 90;
                 detailBand.Columns["Cost"].CellAppearance.TextHAlign = Infragistics.Win.HAlign.Right;
             }
@@ -669,7 +843,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
             if (detailBand.Columns["TaxAmt"] != null)
             {
                 detailBand.Columns["TaxAmt"].Header.Caption = "Tax Amount";
-                detailBand.Columns["TaxAmt"].Format = "? #,##0.00";
+                detailBand.Columns["TaxAmt"].Format = "₹ #,##0.00";
                 detailBand.Columns["TaxAmt"].Width = 100;
                 detailBand.Columns["TaxAmt"].CellAppearance.TextHAlign = Infragistics.Win.HAlign.Right;
                 detailBand.Columns["TaxAmt"].CellAppearance.ForeColor = Color.FromArgb(211, 84, 0);
@@ -678,7 +852,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
             if (detailBand.Columns["Amount"] != null)
             {
                 detailBand.Columns["Amount"].Header.Caption = "Amount";
-                detailBand.Columns["Amount"].Format = "? #,##0.00";
+                detailBand.Columns["Amount"].Format = "₹ #,##0.00";
                 detailBand.Columns["Amount"].Width = 120;
                 detailBand.Columns["Amount"].CellAppearance.TextHAlign = Infragistics.Win.HAlign.Right;
                 detailBand.Columns["Amount"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
@@ -728,7 +902,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 if (detailBand.Columns["TaxAmt"] != null)
                 {
                     SummarySettings sumTax = detailBand.Summaries.Add("SumTax", SummaryType.Sum, detailBand.Columns["TaxAmt"], SummaryPosition.UseSummaryPositionColumn);
-                    sumTax.DisplayFormat = "? {0:N2}";
+                    sumTax.DisplayFormat = "₹ {0:N2}";
                     sumTax.Appearance.BackColor = Color.FromArgb(236, 240, 241);
                     sumTax.Appearance.ForeColor = Color.FromArgb(211, 84, 0);
                     sumTax.Appearance.FontData.Bold = DefaultableBoolean.True;
@@ -737,7 +911,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 if (detailBand.Columns["Amount"] != null)
                 {
                     SummarySettings sumAmount = detailBand.Summaries.Add("SumAmount", SummaryType.Sum, detailBand.Columns["Amount"], SummaryPosition.UseSummaryPositionColumn);
-                    sumAmount.DisplayFormat = "? {0:N2}";
+                    sumAmount.DisplayFormat = "₹ {0:N2}";
                     sumAmount.Appearance.BackColor = Color.FromArgb(52, 73, 94);
                     sumAmount.Appearance.ForeColor = Color.White;
                     sumAmount.Appearance.FontData.Bold = DefaultableBoolean.True;
@@ -749,8 +923,6 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 detailBand.Override.SummaryFooterAppearance.ForeColor = Color.FromArgb(44, 62, 80);
                 detailBand.Override.SummaryFooterAppearance.FontData.Bold = DefaultableBoolean.True;
                 detailBand.Override.SummaryFooterAppearance.BorderColor = Color.FromArgb(52, 152, 219);
-
-                System.Diagnostics.Debug.WriteLine($"Configured {detailBand.Summaries.Count} summaries for detail band");
             }
             catch (Exception ex)
             {
@@ -818,8 +990,9 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 ultraGridMaster.Refresh();
                 Application.DoEvents();
 
-                // STEP 10: Update totals
-                UpdateGrandTotals();
+                // Update Grid Calculation Footer
+                RecalculateAggregations();
+                UpdateFooterCellPositions();
             }
             catch (Exception ex)
             {
@@ -912,41 +1085,349 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 throw new Exception($"Error loading detail data: {ex.Message}", ex);
             }
         }
+        #endregion
 
-        /// <summary>
-        /// Update grand totals for all loaded data and display in summary panel
-        /// </summary>
-        private void UpdateGrandTotals()
+        #region Grid Footer Calculation Bar
+        private void InitializeGridFooter()
         {
-            try
-            {
-                DataTable masterTable = dsHierarchical.Tables["PurchaseReturnMaster"];
-                decimal grandTotal = 0;
-                decimal grandSubTotal = 0;
-                int totalReturns = masterTable.Rows.Count;
+            if (ultraPanelGridFooter == null) return;
 
-                foreach (DataRow row in masterTable.Rows)
+            ultraPanelGridFooter.ClientArea.Controls.Clear();
+            footerLabels.Clear();
+
+            string[] masterColumns = { "PReturnNo", "PReturnDate", "InvoiceNo", "InvoiceDate", "VendorName", "Paymode", "SubTotal", "GrandTotal" };
+
+            foreach (string colKey in masterColumns)
+            {
+                Label lbl = new Label
                 {
-                    grandSubTotal += Convert.ToDecimal(row["SubTotal"]);
-                    grandTotal += Convert.ToDecimal(row["GrandTotal"]);
+                    Name = "lblFooter_" + colKey,
+                    Text = string.Empty,
+                    BackColor = GridHeaderBlue,
+                    ForeColor = Color.White,
+                    Font = new Font("Tahoma", 8.25F, FontStyle.Bold),
+                    TextAlign = ContentAlignment.MiddleRight,
+                    BorderStyle = BorderStyle.FixedSingle,
+                    Visible = false,
+                    Tag = colKey,
+                    Cursor = Cursors.Hand
+                };
+
+                lbl.MouseUp += FooterLabel_MouseUp;
+                ultraPanelGridFooter.ClientArea.Controls.Add(lbl);
+                footerLabels[colKey] = lbl;
+            }
+
+            // Set default footer calculations
+            columnAggregations["SubTotal"] = "SUM";
+            columnAggregations["GrandTotal"] = "SUM";
+            columnAggregations["PReturnNo"] = "COUNT";
+
+            UpdateFooterCellPositions();
+        }
+
+        private void FooterLabel_MouseUp(object sender, MouseEventArgs e)
+        {
+            if (e.Button != MouseButtons.Right) return;
+            if (!(sender is Label lbl)) return;
+            string colKey = lbl.Tag as string;
+            if (string.IsNullOrEmpty(colKey)) return;
+
+            ContextMenuStrip cms = new ContextMenuStrip();
+            string currentAgg = columnAggregations.ContainsKey(colKey) ? columnAggregations[colKey] : "NONE";
+
+            ToolStripMenuItem miNone = new ToolStripMenuItem("None", null, (s, ev) => SetColumnAggregation(colKey, "NONE")) { Checked = currentAgg == "NONE" };
+            ToolStripMenuItem miSum = new ToolStripMenuItem("Sum", null, (s, ev) => SetColumnAggregation(colKey, "SUM")) { Checked = currentAgg == "SUM" };
+            ToolStripMenuItem miAvg = new ToolStripMenuItem("Average", null, (s, ev) => SetColumnAggregation(colKey, "AVG")) { Checked = currentAgg == "AVG" };
+            ToolStripMenuItem miCount = new ToolStripMenuItem("Count", null, (s, ev) => SetColumnAggregation(colKey, "COUNT")) { Checked = currentAgg == "COUNT" };
+            ToolStripMenuItem miMin = new ToolStripMenuItem("Min", null, (s, ev) => SetColumnAggregation(colKey, "MIN")) { Checked = currentAgg == "MIN" };
+            ToolStripMenuItem miMax = new ToolStripMenuItem("Max", null, (s, ev) => SetColumnAggregation(colKey, "MAX")) { Checked = currentAgg == "MAX" };
+
+            cms.Items.AddRange(new ToolStripItem[] { miNone, new ToolStripSeparator(), miSum, miAvg, miCount, miMin, miMax });
+            cms.Show(lbl, e.Location);
+        }
+
+        private void SetColumnAggregation(string colKey, string aggType)
+        {
+            if (aggType == "NONE")
+                columnAggregations.Remove(colKey);
+            else
+                columnAggregations[colKey] = aggType;
+
+            RecalculateAggregations();
+        }
+
+        private void RecalculateAggregations()
+        {
+            if (ultraGridMaster.Rows == null || ultraGridMaster.Rows.Count == 0)
+            {
+                foreach (var kvp in footerLabels)
+                {
+                    kvp.Value.Text = string.Empty;
+                }
+                return;
+            }
+
+            var visibleRows = ultraGridMaster.Rows.Where(r => !r.IsFilteredOut).ToList();
+
+            foreach (var kvp in footerLabels)
+            {
+                string colKey = kvp.Key;
+                Label lbl = kvp.Value;
+
+                if (!columnAggregations.ContainsKey(colKey) || columnAggregations[colKey] == "NONE")
+                {
+                    lbl.Text = string.Empty;
+                    continue;
                 }
 
-                // Update summary labels with calculated totals
-                ultraLabelTotalReturnsValue.Text = totalReturns.ToString("N0");
-                ultraLabelSubTotalValue.Text = $"? {grandSubTotal:N2}";
-                ultraLabelGrandTotalValue.Text = $"? {grandTotal:N2}";
+                string agg = columnAggregations[colKey];
+                List<decimal> numericValues = new List<decimal>();
 
-                // Log for debugging
-                System.Diagnostics.Debug.WriteLine($"Grand Totals Updated - Returns: {totalReturns}, SubTotal: {grandSubTotal:N2}, Grand: {grandTotal:N2}");
+                foreach (var row in visibleRows)
+                {
+                    if (row.Cells.Exists(colKey) && row.Cells[colKey].Value != null && decimal.TryParse(row.Cells[colKey].Value.ToString(), out decimal d))
+                    {
+                        numericValues.Add(d);
+                    }
+                }
+
+                switch (agg)
+                {
+                    case "SUM":
+                        lbl.Text = numericValues.Count > 0 ? numericValues.Sum().ToString("N2") : "0.00";
+                        break;
+                    case "AVG":
+                        lbl.Text = numericValues.Count > 0 ? numericValues.Average().ToString("N2") : "0.00";
+                        break;
+                    case "COUNT":
+                        lbl.Text = visibleRows.Count.ToString("N0");
+                        break;
+                    case "MIN":
+                        lbl.Text = numericValues.Count > 0 ? numericValues.Min().ToString("N2") : "0.00";
+                        break;
+                    case "MAX":
+                        lbl.Text = numericValues.Count > 0 ? numericValues.Max().ToString("N2") : "0.00";
+                        break;
+                    default:
+                        lbl.Text = string.Empty;
+                        break;
+                }
             }
-            catch (Exception ex)
+        }
+
+        private void UpdateFooterCellPositions()
+        {
+            if (ultraPanelGridFooter == null || ultraGridMaster.DisplayLayout.Bands.Count == 0) return;
+
+            UltraGridBand masterBand = ultraGridMaster.DisplayLayout.Bands[0];
+            int selectorWidth = ultraGridMaster.DisplayLayout.Override.RowSelectors == DefaultableBoolean.True ? ultraGridMaster.DisplayLayout.Override.RowSelectorWidth : 0;
+
+            foreach (var kvp in footerLabels)
             {
-                System.Diagnostics.Debug.WriteLine($"Error updating grand totals: {ex.Message}");
-                // Reset to zeros on error
-                ultraLabelTotalReturnsValue.Text = "0";
-                ultraLabelSubTotalValue.Text = "? 0.00";
-                ultraLabelGrandTotalValue.Text = "? 0.00";
+                string colKey = kvp.Key;
+                Label lbl = kvp.Value;
+
+                if (!masterBand.Columns.Exists(colKey) || masterBand.Columns[colKey].Hidden)
+                {
+                    lbl.Visible = false;
+                    continue;
+                }
+
+                UltraGridColumn col = masterBand.Columns[colKey];
+                UIElement colElement = col.Header.GetUIElement();
+
+                if (colElement != null)
+                {
+                    Rectangle rect = colElement.Rect;
+                    lbl.SetBounds(rect.X, 1, rect.Width, ultraPanelGridFooter.Height - 2);
+                    lbl.Visible = true;
+
+                    if (col.CellAppearance.TextHAlign == HAlign.Right)
+                        lbl.TextAlign = ContentAlignment.MiddleRight;
+                    else if (col.CellAppearance.TextHAlign == HAlign.Center)
+                        lbl.TextAlign = ContentAlignment.MiddleCenter;
+                    else
+                        lbl.TextAlign = ContentAlignment.MiddleLeft;
+                }
+                else
+                {
+                    lbl.Visible = false;
+                }
             }
+        }
+        #endregion
+
+        #region Grid Context Menu & Drag-Drop Column Chooser
+        private void InitializeGridContextMenuAndDragDrop()
+        {
+            ContextMenuStrip gridMenu = new ContextMenuStrip();
+
+            ToolStripMenuItem miFreeze = new ToolStripMenuItem("Freeze Columns", null, (s, e) => FreezeSelectedColumn());
+            ToolStripMenuItem miHide = new ToolStripMenuItem("Hide Column", null, (s, e) => HideSelectedColumn());
+            ToolStripMenuItem miExport = new ToolStripMenuItem("Export to Excel", null, (s, e) => btnExport_Click(s, e));
+            ToolStripMenuItem miCopy = new ToolStripMenuItem("Copy Cell", null, (s, e) => CopySelectedCell());
+            ToolStripMenuItem miPrint = new ToolStripMenuItem("Print Report", null, (s, e) => btnPrint_Click(s, e));
+            ToolStripMenuItem miColumnChooser = new ToolStripMenuItem("Show Column Chooser", null, (s, e) => ShowColumnChooser());
+            ToolStripMenuItem miAutoSize = new ToolStripMenuItem("Auto Size All Columns", null, (s, e) => AutoSizeAllColumns());
+
+            gridMenu.Items.AddRange(new ToolStripItem[] {
+                miFreeze, miHide, new ToolStripSeparator(),
+                miColumnChooser, miAutoSize, new ToolStripSeparator(),
+                miCopy, miExport, miPrint
+            });
+
+            ultraGridMaster.ContextMenuStrip = gridMenu;
+            ultraGridMaster.MouseDown += UltraGridMaster_MouseDown;
+            ultraGridMaster.MouseMove += UltraGridMaster_MouseMove;
+            ultraGridMaster.MouseUp += UltraGridMaster_MouseUp;
+        }
+
+        private void FreezeSelectedColumn()
+        {
+            if (ultraGridMaster.ActiveCell != null)
+            {
+                UltraGridColumn col = ultraGridMaster.ActiveCell.Column;
+                col.Header.Fixed = !col.Header.Fixed;
+            }
+        }
+
+        private void HideSelectedColumn()
+        {
+            if (ultraGridMaster.ActiveCell != null)
+            {
+                ultraGridMaster.ActiveCell.Column.Hidden = true;
+                UpdateFooterCellPositions();
+            }
+        }
+
+        private void CopySelectedCell()
+        {
+            if (ultraGridMaster.ActiveCell != null && ultraGridMaster.ActiveCell.Value != null)
+            {
+                Clipboard.SetText(ultraGridMaster.ActiveCell.Value.ToString());
+            }
+        }
+
+        private void AutoSizeAllColumns()
+        {
+            ultraGridMaster.DisplayLayout.PerformAutoResizeColumns(false, PerformAutoSizeType.AllRowsInBand);
+            UpdateFooterCellPositions();
+        }
+
+        private void ShowColumnChooser()
+        {
+            if (columnChooserForm == null || columnChooserForm.IsDisposed)
+            {
+                columnChooserForm = new Form
+                {
+                    Text = "Column Chooser",
+                    Size = new Size(260, 350),
+                    StartPosition = FormStartPosition.CenterParent,
+                    FormBorderStyle = FormBorderStyle.FixedToolWindow,
+                    TopMost = true
+                };
+
+                CheckedListBox clb = new CheckedListBox
+                {
+                    Dock = DockStyle.Fill,
+                    CheckOnClick = true
+                };
+
+                if (ultraGridMaster.DisplayLayout.Bands.Count > 0)
+                {
+                    UltraGridBand band = ultraGridMaster.DisplayLayout.Bands[0];
+                    for (int i = 0; i < band.Columns.Count; i++)
+                    {
+                        UltraGridColumn col = band.Columns[i];
+                        clb.Items.Add(new ColumnItem(col.Key, col.Header.Caption ?? col.Key, 0), !col.Hidden);
+                    }
+                }
+
+                clb.ItemCheck += (s, e) =>
+                {
+                    if (clb.Items[e.Index] is ColumnItem item)
+                    {
+                        if (ultraGridMaster.DisplayLayout.Bands[item.BandIndex].Columns.Exists(item.ColumnKey))
+                        {
+                            ultraGridMaster.DisplayLayout.Bands[item.BandIndex].Columns[item.ColumnKey].Hidden = (e.NewValue != CheckState.Checked);
+                            this.BeginInvoke((MethodInvoker)delegate { UpdateFooterCellPositions(); });
+                        }
+                    }
+                };
+
+                columnChooserForm.Controls.Add(clb);
+            }
+
+            columnChooserForm.Show(this);
+        }
+
+        private void UltraGridMaster_MouseDown(object sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Left)
+            {
+                UIElement element = ultraGridMaster.DisplayLayout.UIElement.ElementFromPoint(e.Location);
+                HeaderUIElement headerElement = element as HeaderUIElement ?? element?.GetAncestor(typeof(HeaderUIElement)) as HeaderUIElement;
+
+                if (headerElement?.GetContext(typeof(UltraGridColumn)) is UltraGridColumn col)
+                {
+                    headerDragStartPoint = e.Location;
+                    columnToHideByDrag = col;
+                    isDraggingHeaderColumn = false;
+                }
+            }
+        }
+
+        private void UltraGridMaster_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Left && columnToHideByDrag != null)
+            {
+                if (!isDraggingHeaderColumn)
+                {
+                    int deltaX = Math.Abs(e.X - headerDragStartPoint.X);
+                    int deltaY = Math.Abs(e.Y - headerDragStartPoint.Y);
+                    if (deltaX > 8 || deltaY > 8)
+                    {
+                        isDraggingHeaderColumn = true;
+                    }
+                }
+            }
+        }
+
+        private void UltraGridMaster_MouseUp(object sender, MouseEventArgs e)
+        {
+            if (isDraggingHeaderColumn && columnToHideByDrag != null)
+            {
+                // If dropped far outside header area (e.g. dragged down into grid to hide)
+                if (e.Y > 70 && !ultraGridMaster.ClientRectangle.Contains(e.Location))
+                {
+                    columnToHideByDrag.Hidden = true;
+                    UpdateFooterCellPositions();
+                }
+            }
+
+            columnToHideByDrag = null;
+            isDraggingHeaderColumn = false;
+        }
+
+        private void UltraGridMaster_AfterColPosChanged(object sender, AfterColPosChangedEventArgs e)
+        {
+            UpdateFooterCellPositions();
+        }
+
+        private void UltraGridMaster_AfterRowFilterChanged(object sender, AfterRowFilterChangedEventArgs e)
+        {
+            RecalculateAggregations();
+        }
+
+        private void UltraGridMaster_AfterSortChange(object sender, BandEventArgs e)
+        {
+            RecalculateAggregations();
+        }
+
+        private void UltraGridMaster_Resize(object sender, EventArgs e)
+        {
+            UpdateFooterCellPositions();
         }
         #endregion
 
@@ -1000,15 +1481,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
         {
             try
             {
-                // Details are already loaded, so just update summary
-                if (e.Row.Band.Index == 0 && e.Row.Cells["PReturnNo"] != null)
-                {
-                    var dataRowView = e.Row.ListObject as DataRowView;
-                    if (dataRowView != null)
-                    {
-                        // Can add additional logic here if needed
-                    }
-                }
+                // Details are already loaded
             }
             catch (Exception ex)
             {
@@ -1027,7 +1500,6 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 {
                     int pReturnNo = Convert.ToInt32(e.Row.Cells["PReturnNo"].Value);
                     int detailCount = e.Row.ChildBands[0].Rows.Count;
-
                     System.Diagnostics.Debug.WriteLine($"Expanded Return No: {pReturnNo}, Detail Count: {detailCount}");
                 }
             }
@@ -1136,7 +1608,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
                 e.Graphics.DrawString($"Total Returns: {totalReturns}", summaryFont, Brushes.Black, leftMargin, yPosition);
                 yPosition += 20;
-                e.Graphics.DrawString($"Grand Total: ? {totalAmount:N2}", summaryFont, Brushes.Black, leftMargin, yPosition);
+                e.Graphics.DrawString($"Grand Total: ₹ {totalAmount:N2}", summaryFont, Brushes.Black, leftMargin, yPosition);
                 yPosition += 30;
 
                 // Print master data headers
@@ -1186,7 +1658,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 yPosition = e.MarginBounds.Bottom - 50;
                 e.Graphics.DrawLine(Pens.Black, leftMargin, yPosition, rightMargin, yPosition);
                 yPosition += 10;
-                e.Graphics.DrawString($"GRAND TOTAL: ? {totalAmount:N2}", summaryFont, Brushes.Black, leftMargin, yPosition);
+                e.Graphics.DrawString($"GRAND TOTAL: ₹ {totalAmount:N2}", summaryFont, Brushes.Black, leftMargin, yPosition);
             }
             catch (Exception ex)
             {
@@ -1317,25 +1789,26 @@ namespace PosBranch_Win.Reports.PurchaseReports
         }
 
         /// <summary>
-        /// Clear filters and reload
-        /// </summary>
-        private void btnClearFilters_Click(object sender, EventArgs e)
+        public void RibbonClear() => btnClearFilters_Click(this, EventArgs.Empty);
+        public void Clear() => btnClearFilters_Click(this, EventArgs.Empty);
+
+        public void btnClearFilters_Click(object sender, EventArgs e)
         {
             this.Cursor = Cursors.WaitCursor;
             try
             {
                 // Clear all search filters
-                ultraDateTimeEditorFrom.Value = DateTime.Now.AddDays(-30);
-                ultraDateTimeEditorTo.Value = DateTime.Now;
+                ultraDateTimeEditorFrom.Value = new DateTime(1990, 1, 1);
+                ultraDateTimeEditorTo.Value = DateTime.Today;
                 ultraNumericEditorAmountFrom.Value = null;
                 ultraNumericEditorAmountTo.Value = null;
                 ultraNumericEditorReturnNo.Value = null;
 
-                // Clear vendor text field - set both Value and Text to ensure it's cleared
+                // Clear vendor text field
                 ultraTextEditorVendor.Value = null;
                 ultraTextEditorVendor.Text = string.Empty;
 
-                ultraComboPresetDates.Value = "ThisMonth";
+                ultraComboPresetDates.Value = "ALL";
 
                 // Force UI update
                 Application.DoEvents();
@@ -1365,6 +1838,14 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
                 switch (preset)
                 {
+                    case "ALL":
+                        fromDate = new DateTime(1990, 1, 1);
+                        toDate = DateTime.Today;
+                        break;
+                    case "DATE_RANGE":
+                        fromDate = DateTime.Today.AddDays(-30);
+                        toDate = DateTime.Today;
+                        break;
                     case "Today":
                         fromDate = DateTime.Now.Date;
                         toDate = DateTime.Now.Date;
@@ -1421,6 +1902,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
                 ultraDateTimeEditorFrom.Value = fromDate;
                 ultraDateTimeEditorTo.Value = toDate;
+                UpdateDateControlVisibility();
             }
             catch (Exception ex)
             {
@@ -1460,8 +1942,9 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 ultraGridMaster.Refresh();
                 Application.DoEvents();
 
-                // Update totals
-                UpdateGrandTotals();
+                // Update Grid Calculation Footer
+                RecalculateAggregations();
+                UpdateFooterCellPositions();
 
                 // Show result count
                 int resultCount = dsHierarchical.Tables["PurchaseReturnMaster"].Rows.Count;
@@ -1565,7 +2048,6 @@ namespace PosBranch_Win.Reports.PurchaseReports
             }
 
             // Filter by Vendor Name (case-insensitive partial match)
-            // Check both Value and Text to handle Infragistics control behavior
             string vendorText = ultraTextEditorVendor.Value?.ToString() ?? ultraTextEditorVendor.Text;
             if (!string.IsNullOrWhiteSpace(vendorText))
             {
@@ -1651,10 +2133,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
                 if (saveDialog.ShowDialog() == DialogResult.OK)
                 {
-                    // Create a new DataTable for export with flattened data
                     DataTable exportTable = CreateExportTable();
-
-                    // Export to Excel using simple CSV approach
                     ExportToCSV(exportTable, saveDialog.FileName);
 
                     MessageBox.Show($"Report exported successfully to:\n{saveDialog.FileName}", "Export Complete",
@@ -1763,7 +2242,6 @@ namespace PosBranch_Win.Reports.PurchaseReports
                     for (int i = 0; i < dataTable.Columns.Count; i++)
                     {
                         string value = row[i].ToString();
-                        // Escape commas and quotes
                         if (value.Contains(",") || value.Contains("\""))
                         {
                             value = "\"" + value.Replace("\"", "\"\"") + "\"";
@@ -1781,7 +2259,6 @@ namespace PosBranch_Win.Reports.PurchaseReports
         #region Form Events
         private void PurchaseReturnReport_Load(object sender, EventArgs e)
         {
-            // Load data after form is shown with wait cursor
             this.Cursor = Cursors.WaitCursor;
 
             try
@@ -1804,7 +2281,6 @@ namespace PosBranch_Win.Reports.PurchaseReports
         {
             try
             {
-                // Cleanup if needed
                 if (dsHierarchical != null)
                 {
                     dsHierarchical.Dispose();

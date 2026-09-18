@@ -61,6 +61,21 @@ namespace PosBranch_Win.Reports.FinancialReports
             this.KeyDown += FrmCashBankBook_KeyDown;
         }
 
+        public void RibbonClear()
+        {
+            dtFromDate.Value = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
+            dtToDate.Value = DateTime.Now.Date;
+            cmbDateQuickSelect.SelectedIndex = 1;
+            _transactionsList = new BindingList<CashBankTransaction>();
+            ultraGridTransactions.DataSource = null;
+            lblOpeningBalanceValue.Text = "0.00";
+            lblTotalReceiptsValue.Text = "0.00";
+            lblTotalPaymentsValue.Text = "0.00";
+            lblClosingBalanceValue.Text = "0.00";
+        }
+
+        public void Clear() => RibbonClear();
+
         private void FrmCashBankBook_Load(object sender, EventArgs e)
         {
             // Apply professional theme

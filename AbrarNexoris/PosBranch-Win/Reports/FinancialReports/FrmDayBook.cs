@@ -51,6 +51,22 @@ namespace PosBranch_Win.Reports.FinancialReports
             this.KeyDown += FrmDayBook_KeyDown;
         }
 
+        public void RibbonClear()
+        {
+            dtFromDate.DateTime = DateTime.Today;
+            dtToDate.DateTime = DateTime.Today;
+            cmbDateQuickSelect.Text = "Today";
+            txtSearch.Text = string.Empty;
+            chkGroupByVoucher.Checked = false;
+            _currentReportData = new DayBookResponse();
+            _dsDayBook = null;
+            ultraGridTransactions.DataSource = null;
+            lblTotalReceiptsValue.Text = "0.00";
+            lblTotalPaymentsValue.Text = "0.00";
+        }
+
+        public void Clear() => RibbonClear();
+
         private void FrmDayBook_Load(object sender, EventArgs e)
         {
             dtFromDate.DateTime = DateTime.Today;

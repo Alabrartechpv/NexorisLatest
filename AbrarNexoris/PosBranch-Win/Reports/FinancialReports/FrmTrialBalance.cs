@@ -25,6 +25,21 @@ namespace PosBranch_Win.Reports.FinancialReports
             ultraGridTrialBalance.DisplayLayout.Override.HeaderAppearance.ThemedElementAlpha = Alpha.Transparent;
         }
 
+        public void RibbonClear()
+        {
+            int currentYear = DateTime.Now.Year;
+            int fyStartYear = DateTime.Now.Month >= 4 ? currentYear : currentYear - 1;
+            ultraDateTimeFrom.Value = new DateTime(fyStartYear, 4, 1);
+            ultraDateTimeTo.Value = DateTime.Now;
+            txtSearch.Text = string.Empty;
+            currentReport = null;
+            displayedLineItems = null;
+            ultraGridTrialBalance.DataSource = null;
+            ClearSummary();
+        }
+
+        public void Clear() => RibbonClear();
+
         private void InitializeForm()
         {
             try

@@ -532,6 +532,9 @@ namespace PosBranch_Win.Reports.SalesReports
         // ════════════════════════════════════════════════════════════
         //  Action Events
         // ════════════════════════════════════════════════════════════
+        public void RibbonClear() => BtnReset_Click(this, EventArgs.Empty);
+        public void Clear() => BtnReset_Click(this, EventArgs.Empty);
+
         private void BtnReset_Click(object sender, EventArgs e)
         {
             comboPeriod.Value      = "This Month";

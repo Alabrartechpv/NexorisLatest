@@ -163,6 +163,8 @@ namespace PosBranch_Win.Reports.InventoryReport
             comboStockFilter.Items.Add("Zero Stock",       "Zero Stock");
             comboStockFilter.Items.Add("Negative Stock",   "Negative Stock");
             comboStockFilter.Items.Add("Low Stock",        "Low Stock");
+            comboStockFilter.Items.Add("Excess Stock",     "Excess Stock");
+            comboStockFilter.Items.Add("Dead Stock",       "Dead Stock");
             comboStockFilter.Text = "All Items";
         }
 
@@ -642,6 +644,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                     SubCategoryName = r.SubCategoryName,
                     BaseUnitName    = r.BaseUnitName,
                     ClosingStock    = r.ClosingStock,
+                    Sales           = r.Sales,
                     Cost            = r.Cost,
                     RetailPrice     = r.RetailPrice,
                     ValueAtCost     = r.ClosingStock * r.Cost,
@@ -684,6 +687,8 @@ namespace PosBranch_Win.Reports.InventoryReport
                 case "Zero Stock":      filtered = filtered.Where(r => r.ClosingStock == 0); break;
                 case "Negative Stock":  filtered = filtered.Where(r => r.ClosingStock < 0);  break;
                 case "Low Stock":       filtered = filtered.Where(r => r.ClosingStock > 0 && r.ClosingStock < 5); break;
+                case "Excess Stock":    filtered = filtered.Where(r => r.ClosingStock > 100); break;
+                case "Dead Stock":      filtered = filtered.Where(r => r.ClosingStock > 0 && r.Sales == 0); break;
             }
 
             var result = filtered.ToList();
@@ -723,6 +728,9 @@ namespace PosBranch_Win.Reports.InventoryReport
         // ════════════════════════════════════════════════════════════
         //  Event handlers
         // ════════════════════════════════════════════════════════════
+        public void RibbonClear() => BtnReset_Click(this, EventArgs.Empty);
+        public void Clear() => BtnReset_Click(this, EventArgs.Empty);
+
         private void BtnReset_Click(object sender, EventArgs e)
         {
             DateTime now = DateTime.Now;
@@ -912,6 +920,7 @@ namespace PosBranch_Win.Reports.InventoryReport
         public string  SubCategoryName { get; set; }
         public string  BaseUnitName    { get; set; }
         public decimal ClosingStock    { get; set; }
+        public decimal Sales           { get; set; }
         public decimal Cost            { get; set; }
         public decimal RetailPrice     { get; set; }
         public decimal ValueAtCost     { get; set; }

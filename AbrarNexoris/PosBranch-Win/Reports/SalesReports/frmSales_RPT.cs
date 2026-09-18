@@ -24,6 +24,15 @@ namespace PosBranch_Win.Reports.SalesReports
             InitializeComponent();
         }
 
+        public void RibbonClear()
+        {
+            ultraDateTimeEditor1.Value = DateTime.Today;
+            ultraDateTimeEditor2.Value = DateTime.Today;
+            ultraGrid1.DataSource = null;
+        }
+
+        public void Clear() => RibbonClear();
+
         private void btn_Close_Click(object sender, EventArgs e)
         {
             this.Close();
