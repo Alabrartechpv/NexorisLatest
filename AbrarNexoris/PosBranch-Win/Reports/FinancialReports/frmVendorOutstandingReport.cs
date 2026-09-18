@@ -1574,6 +1574,8 @@ namespace PosBranch_Win.Reports.FinancialReports
             }
         }
 
+        public void RibbonClear() => Clear();
+
         public void Clear()
         {
             ClearForm();

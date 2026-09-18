@@ -238,7 +238,7 @@ namespace PosBranch_Win.Dashboard
                 CreateKpiCard("2. Stock Potential Profit", "Estimated gross profit on 100% stock liquidation", FormatCurr(_model.StockProfitPotential), $"Retail: {FormatCurr(_model.TotalStockRetailValue)}", Color.FromArgb(39, 174, 96), () => DrillDown("StockValuation")),
                 
                 // 3. Non-Moving / Dead Stock Value
-                CreateKpiCard("3. Dead Stock (>90d)", "Capital locked in stock with no sales in last 90 days", FormatCurr(_model.DeadStockValue), $"{_model.DeadStockItemCount:N0} Inactive Items", Color.FromArgb(211, 84, 0), () => DrillDown("StockAnalytics")),
+                CreateKpiCard("3. Dead Stock (>90d)", "Capital locked in stock with no sales in last 90 days", FormatCurr(_model.DeadStockValue), $"{_model.DeadStockItemCount:N0} Inactive Items", Color.FromArgb(211, 84, 0), () => DrillDown("StockValuationDead")),
 
                 // 4. Negative Stock Impact
                 CreateKpiCard("4. Neg. Stock Impact", "Estimated financial distortion due to negative stock at cost", FormatCurr(_model.NegativeStockImpactValue), "Cost of Negative Items", Color.FromArgb(231, 76, 60), () => DrillDown("StockValuationNegative")),
@@ -256,7 +256,7 @@ namespace PosBranch_Win.Dashboard
                 CreateKpiCard("8. Stock Adj. Balance", "Net variance between stock additions and write-offs", FormatCurr(_model.NetStockAdjustmentValue), _model.NetStockAdjustmentValue >= 0 ? "Surplus Net Balance" : "Shortage Variance", _model.NetStockAdjustmentValue >= 0 ? Color.FromArgb(22, 160, 133) : Color.FromArgb(192, 57, 43), () => DrillDown("StockAdjustment")),
                 
                 // 9. Excess Stock Alert
-                CreateKpiCard("9. Excess Stock Alert", "Products exceeding maximum inventory threshold", $"{_model.ExcessStockAlertCount} Items", "Over Maximum Limit", Color.FromArgb(243, 156, 18), () => DrillDown("SmartReorder")),
+                CreateKpiCard("9. Excess Stock Alert", "Products exceeding maximum inventory threshold", $"{_model.ExcessStockAlertCount} Items", "Over Maximum Limit", Color.FromArgb(243, 156, 18), () => DrillDown("StockValuationExcess")),
                 
                 // 10. Low Stock Alert
                 CreateKpiCard("10. Low Stock Alert", "Products below minimum critical inventory threshold", $"{_model.LowStockAlertCount} Items", "Below Minimum Limit", Color.FromArgb(230, 126, 34), () => DrillDown("LowStockAlert")),
@@ -265,16 +265,16 @@ namespace PosBranch_Win.Dashboard
                 CreateKpiCard("11. Reorder Alert", "Products at or below reorder level requiring purchase", $"{_model.ReorderAlertCount} Items", "Reorder Recommended", Color.FromArgb(192, 57, 43), () => DrillDown("SmartReorder")),
 
                 // 12. Total Sales Revenue
-                CreateKpiCard("12. Sales Turnover", "Total net billing revenue for the selected date period", FormatCurr(_model.TotalSalesRevenue), $"{_model.TotalSalesBillCount:N0} Invoices Billed", Color.FromArgb(30, 136, 229), () => DrillDown("SalesAnalytics")),
+                CreateKpiCard("12. Sales Turnover", "Total net billing revenue for the selected date period", FormatCurr(_model.TotalSalesRevenue), $"{_model.TotalSalesBillCount:N0} Invoices Billed", Color.FromArgb(30, 136, 229), () => DrillDown("SalesDetailsReport")),
 
                 // 13. Sales Return (Customer Returns)
                 CreateKpiCard("13. Sales Return (Cust)", "Goods returned and credit notes issued to customers", FormatCurr(_model.TotalSalesReturn), $"{_model.TotalSalesReturnCount} Return Vouchers", Color.FromArgb(231, 76, 60), () => DrillDown("SalesReturnReport")),
 
                 // 14. Total Purchases (Inward Stock)
-                CreateKpiCard("14. Total Purchases", "Total inward purchases billed from vendors and suppliers", FormatCurr(_model.TotalPurchases), $"{_model.TotalPurchasesBillCount:N0} Purchase Bills", Color.FromArgb(41, 128, 185), () => DrillDown("TradingPL")),
+                CreateKpiCard("14. Total Purchases", "Total inward purchases billed from vendors and suppliers", FormatCurr(_model.TotalPurchases), $"{_model.TotalPurchasesBillCount:N0} Purchase Bills", Color.FromArgb(41, 128, 185), () => DrillDown("PurchaseDetailsReport")),
 
                 // 15. Purchase Return (Vendor Returns)
-                CreateKpiCard("15. Purchase Return", "Goods returned back to suppliers and debit notes issued", FormatCurr(_model.TotalPurchaseReturn), $"{_model.TotalPurchaseReturnCount} Debit Vouchers", Color.FromArgb(230, 126, 34), () => DrillDown("VendorOutstanding")),
+                CreateKpiCard("15. Purchase Return", "Goods returned back to suppliers and debit notes issued", FormatCurr(_model.TotalPurchaseReturn), $"{_model.TotalPurchaseReturnCount} Debit Vouchers", Color.FromArgb(230, 126, 34), () => DrillDown("PurchaseReturnReport")),
 
                 // 16. Holded Items / Bills
                 CreateKpiCard("16. Hold Items / Bills", "Suspended sales bills and hold items pending counter checkout", FormatCurr(_model.HoldBillsValue), $"{_model.HoldBillsCount} Bills | {_model.HoldItemsCount:N0} Items", Color.FromArgb(230, 126, 34), () => DrillDown("HoldBills")),
@@ -337,7 +337,7 @@ namespace PosBranch_Win.Dashboard
                 CreateKpiCard("35. Price Change Logs", "Track of item selling and cost price edits in Item Master", $"{_model.PriceChangeCount} Events", "Item Master Edits", Color.FromArgb(41, 128, 185), () => DrillDown("AuditPriceChanges")),
                 
                 // 36. Physical Stock Discrepancy Logs
-                CreateKpiCard("36. Stock Variance", "Track of physical stock count reconciliations and adjustments", $"{_model.StockAdjustmentCount} Adjustments", "Stock Reconciliations", Color.FromArgb(142, 68, 173), () => DrillDown("StockAdjustment"))
+                CreateKpiCard("36. Stock Adjustment", "Track of physical stock count reconciliations and adjustments", $"{_model.StockAdjustmentCount} Adjustments", "Stock Adjustment Report", Color.FromArgb(142, 68, 173), () => DrillDown("StockAdjustment"))
             };
 
             // Display in clean full-width responsive grid:
@@ -730,6 +730,14 @@ namespace PosBranch_Win.Dashboard
                         formToOpen = new Reports.InventoryReport.frmStockValuationReport("Negative Stock");
                         title = "Stock Valuation Report (Negative Stock)";
                         break;
+                    case "StockValuationExcess":
+                        formToOpen = new Reports.InventoryReport.frmStockValuationReport("Excess Stock");
+                        title = "Stock Valuation Report (Excess Stock)";
+                        break;
+                    case "StockValuationDead":
+                        formToOpen = new Reports.InventoryReport.frmStockValuationReport("Dead Stock");
+                        title = "Stock Valuation Report (Dead Stock)";
+                        break;
                     case "StockAnalytics":
                         formToOpen = new FrmStockAnalytics();
                         title = "Stock Analytics";
@@ -774,6 +782,10 @@ namespace PosBranch_Win.Dashboard
                         formToOpen = new Reports.FinancialReports.frmCustomerReceiptReport();
                         title = "Customer Receipt Report";
                         break;
+                    case "SalesDetailsReport":
+                        formToOpen = new Reports.SalesReports.frmSalesReportMasterDetail();
+                        title = "Sales Details Report";
+                        break;
                     case "SalesAnalytics":
                         formToOpen = new FrmSalesAnalytics();
                         title = "Sales Analytics";
@@ -793,6 +805,15 @@ namespace PosBranch_Win.Dashboard
                     case "TradingPL":
                         formToOpen = new Reports.FinancialReports.FrmTradingPLAccount();
                         title = "Trading & P/L Account";
+                        break;
+                    case "PurchaseDetailsReport":
+                        formToOpen = new Reports.PurchaseReports.frmPurchaseReportDetails();
+                        title = "Purchase Details Report";
+                        break;
+                    case "PurchaseReturnReport":
+                    case "PurchaseReturn":
+                        formToOpen = new Reports.PurchaseReports.PurchaseReturnReport();
+                        title = "Purchase Return Report";
                         break;
                     case "GovtGSTReturnReport":
                         formToOpen = new Reports.FinancialReports.frmGovtGSTReturnReport();

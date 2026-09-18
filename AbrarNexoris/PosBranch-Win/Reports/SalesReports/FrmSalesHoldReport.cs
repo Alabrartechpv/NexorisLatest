@@ -280,6 +280,9 @@ namespace PosBranch_Win.Reports.SalesReports
             summaryFooterInitialized = true;
         }
 
+        public void RibbonClear() => ResetFilters(true);
+        public void Clear() => ResetFilters(true);
+
         private void ResetFilters(bool reload = true)
         {
             ultraComboDateMode.Value = "ALL";

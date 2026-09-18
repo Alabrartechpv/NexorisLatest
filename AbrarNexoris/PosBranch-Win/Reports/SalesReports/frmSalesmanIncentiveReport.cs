@@ -292,6 +292,27 @@ namespace PosBranch_Win.Reports.SalesReports
             return items.GroupBy(x => x.Id).Select(x => x.First()).OrderBy(x => x.Id == 0 ? -1 : 0).ThenBy(x => x.Name).ToList();
         }
 
+        public void RibbonClear()
+        {
+            _selectedSalesmanId = 0;
+            _selectedUserId = 0;
+            _selectedGroupId = 0;
+            _selectedCategoryId = 0;
+            _selectedBrandId = 0;
+            _selectedVendorId = 0;
+            txtSalesman.Text = "All";
+            txtUser.Text = "All";
+            txtGroup.Text = "All";
+            txtCategory.Text = "All";
+            txtBrand.Text = "All";
+            txtVendor.Text = "All";
+            if (cmbDatePreset != null && cmbDatePreset.Items.Count > 0) cmbDatePreset.SelectedIndex = 0;
+            gridSummary.DataSource = null;
+            gridDetails.DataSource = null;
+        }
+
+        public void Clear() => RibbonClear();
+
         private void ApplyDefaultFilters()
         {
             dtFromDate.Value = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);

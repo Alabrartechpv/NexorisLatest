@@ -938,6 +938,16 @@ namespace PosBranch_Win.Reports.InventoryReport
             LayoutPanels();
         }
 
+        public void RibbonClear()
+        {
+            selectedItemId = 0;
+            selectedItemName = string.Empty;
+            if (txtItemName != null) txtItemName.Text = string.Empty;
+            if (ultraGridTransactions != null) ultraGridTransactions.DataSource = null;
+        }
+
+        public void Clear() => RibbonClear();
+
         private void btnSearch_Click(object sender, EventArgs e)
         {
             if (selectedItemId <= 0)

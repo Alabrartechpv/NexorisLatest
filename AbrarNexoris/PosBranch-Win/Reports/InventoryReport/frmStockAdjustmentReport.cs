@@ -557,6 +557,9 @@ namespace PosBranch_Win.Reports.InventoryReport
             FetchFromDatabase();
         }
 
+        public void RibbonClear() => BtnReset_Click(this, EventArgs.Empty);
+        public void Clear() => BtnReset_Click(this, EventArgs.Empty);
+
         private void BtnReset_Click(object sender, EventArgs e)
         {
             comboPeriod.Value = "ALL";

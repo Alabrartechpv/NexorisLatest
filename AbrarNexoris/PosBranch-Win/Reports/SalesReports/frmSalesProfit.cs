@@ -376,6 +376,9 @@ namespace PosBranch_Win.Reports.SalesReports
             LoadData();
         }
 
+        public void RibbonClear() => btnClear_Click(this, EventArgs.Empty);
+        public void Clear() => btnClear_Click(this, EventArgs.Empty);
+
         private void btnClear_Click(object sender, EventArgs e)
         {
             ultraDateTimeFrom.Value = DateTime.Now.AddDays(-30);

@@ -329,6 +329,9 @@ namespace PosBranch_Win.Reports.FinancialReports
             _lblTotal.Text = $"Rs. {rows.Sum(x => x.TotalBalance):N2}";
         }
 
+        public void RibbonClear() => ClearFilters();
+        public void Clear() => ClearFilters();
+
         private void ClearFilters()
         {
             _isLoading = true;

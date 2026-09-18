@@ -100,6 +100,14 @@ namespace PosBranch_Win.Reports.FinancialReports
             LoadReport();
         }
 
+        public void RibbonClear()
+        {
+            InitializeFilterControls();
+            LoadReport();
+        }
+
+        public void Clear() => RibbonClear();
+
         private void InitializeFilterControls()
         {
             dtFrom.MaskInput = "{date}";

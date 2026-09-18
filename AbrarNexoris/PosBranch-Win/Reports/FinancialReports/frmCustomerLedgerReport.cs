@@ -392,6 +392,9 @@ namespace PosBranch_Win.Reports.FinancialReports
 
         private void btnSearch_Click(object sender, EventArgs e)   => FetchFromDatabase();
 
+        public void RibbonClear() => btnReset_Click(this, EventArgs.Empty);
+        public void Clear() => btnReset_Click(this, EventArgs.Empty);
+
         private void btnReset_Click(object sender, EventArgs e)
         {
             _isLoading = true;

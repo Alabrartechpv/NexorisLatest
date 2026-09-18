@@ -36,6 +36,23 @@ namespace PosBranch_Win.Reports.FinancialReports
         }
         #endregion
 
+        public void RibbonClear()
+        {
+            int currentYear = DateTime.Now.Year;
+            int fyStartYear = DateTime.Now.Month >= 4 ? currentYear : currentYear - 1;
+            ultraDateTimeFrom.Value = new DateTime(fyStartYear, 4, 1);
+            ultraDateTimeTo.Value = DateTime.Now;
+            currentReport = null;
+            ultraGridLiabilities.DataSource = null;
+            ultraGridAssets.DataSource = null;
+            lblNetProfitValue.Text = "₹ 0.00";
+            lblTotalLiabilitiesValue.Text = "₹ 0.00";
+            lblTotalAssetsValue.Text = "₹ 0.00";
+            lblDifferenceValue.Text = "₹ 0.00";
+        }
+
+        public void Clear() => RibbonClear();
+
         #region Form Initialization
         private void InitializeForm()
         {

@@ -366,6 +366,9 @@ namespace PosBranch_Win.Reports.SalesReports
             }
         }
 
+        public void RibbonClear() => ResetFilters(true);
+        public void Clear() => ResetFilters(true);
+
         private void ResetFilters(bool reload = true)
         {
             ultraComboDateMode.Value = "RANGE";

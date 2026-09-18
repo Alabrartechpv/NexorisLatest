@@ -665,6 +665,9 @@ namespace PosBranch_Win.Reports.FinancialReports
             LoadReport();
         }
 
+        public void RibbonClear() => ResetFormState();
+        public void Clear() => ResetFormState();
+
         private void btnClearFilters_Click(object sender, EventArgs e)
         {
             ResetFormState();

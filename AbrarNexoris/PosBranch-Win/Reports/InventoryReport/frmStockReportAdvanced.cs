@@ -709,6 +709,9 @@ namespace PosBranch_Win.Reports.InventoryReport
             ultraLabelTotalProfitValue.Text = "₹ 0.00";
         }
 
+        public void RibbonClear() => btnClearFilters_Click(this, EventArgs.Empty);
+        public void Clear() => btnClearFilters_Click(this, EventArgs.Empty);
+
         private void btnClearFilters_Click(object sender, EventArgs e)
         {
             ultraDateTimeEditorFrom.Value = DateTime.Now.AddDays(-30);

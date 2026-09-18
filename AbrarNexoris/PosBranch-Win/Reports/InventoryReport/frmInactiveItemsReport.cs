@@ -92,6 +92,16 @@ namespace PosBranch_Win.Reports.InventoryReport
             }
         }
 
+        public void RibbonClear()
+        {
+            InitializeFilterControls();
+            txtSearch.Text = string.Empty;
+            ultraComboDateMode.Value = "ALL";
+            ApplySearchFilter();
+        }
+
+        public void Clear() => RibbonClear();
+
         private void InitializeFilterControls()
         {
             DateTime today = DateTime.Today;

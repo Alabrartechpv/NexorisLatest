@@ -406,6 +406,9 @@ namespace PosBranch_Win.Reports.PurchaseReports
             LoadReport();
         }
 
+        public void RibbonClear() => ResetFilters();
+        public void Clear() => ResetFilters();
+
         private void btnClear_Click(object sender, EventArgs e)
         {
             ResetFilters();

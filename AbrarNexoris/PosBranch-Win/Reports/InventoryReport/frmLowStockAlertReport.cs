@@ -514,6 +514,9 @@ namespace PosBranch_Win.Reports.InventoryReport
 
         private void BtnSearch_Click(object sender, EventArgs e) => FetchFromDatabase();
 
+        public void RibbonClear() => BtnReset_Click(this, EventArgs.Empty);
+        public void Clear() => BtnReset_Click(this, EventArgs.Empty);
+
         private void BtnReset_Click(object sender, EventArgs e)
         {
             comboGroup.Value    = null;

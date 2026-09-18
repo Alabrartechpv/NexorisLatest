@@ -1228,6 +1228,8 @@ namespace PosBranch_Win.Reports.InventoryReport
             UpdateFooterCellPositions();
         }
 
+        public void RibbonClear() => Clear();
+
         public void Clear()
         {
             ClearForm();

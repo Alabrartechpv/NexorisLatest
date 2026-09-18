@@ -66,6 +66,23 @@ namespace PosBranch_Win.Reports.FinancialReports
             this.KeyDown += FrmBankStatementReport_KeyDown;
         }
 
+        public void RibbonClear()
+        {
+            dtFromDate.Value = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
+            dtToDate.Value = DateTime.Now.Date;
+            cmbDateQuickSelect.SelectedIndex = 1;
+            cmbPaymentMethod.Value = "All";
+            txtSearch.Text = string.Empty;
+            _transactionsList = new BindingList<BankStatementTransaction>();
+            _allTransactions = new List<BankStatementTransaction>();
+            ultraGridTransactions.DataSource = null;
+            lblTotalMoneyInValue.Text = "0.00";
+            lblTotalMoneyOutValue.Text = "0.00";
+            lblNetAmountValue.Text = "0.00";
+        }
+
+        public void Clear() => RibbonClear();
+
         private void FrmBankStatementReport_Load(object sender, EventArgs e)
         {
             SetupGrid();

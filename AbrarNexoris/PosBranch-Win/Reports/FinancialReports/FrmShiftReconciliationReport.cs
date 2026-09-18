@@ -657,6 +657,9 @@ namespace PosBranch_Win.Reports.FinancialReports
             LoadReport();
         }
 
+        public void RibbonClear() => BtnClearFilters_Click(this, EventArgs.Empty);
+        public void Clear() => BtnClearFilters_Click(this, EventArgs.Empty);
+
         private void BtnClearFilters_Click(object sender, EventArgs e)
         {
             _isLoading = true;

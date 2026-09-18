@@ -1,4 +1,4 @@
-﻿namespace PosBranch_Win.Reports.PurchaseReports
+namespace PosBranch_Win.Reports.PurchaseReports
 {
     partial class frmPurchaseReportDetails
     {
@@ -28,385 +28,365 @@
         /// </summary>
         private void InitializeComponent()
         {
-            Infragistics.Win.Appearance appearance1 = new Infragistics.Win.Appearance();
+            Infragistics.Win.Appearance appearanceControls = new Infragistics.Win.Appearance();
+            Infragistics.Win.Appearance appearanceAction = new Infragistics.Win.Appearance();
+            Infragistics.Win.Appearance appearanceMaster = new Infragistics.Win.Appearance();
+            Infragistics.Win.Appearance appearanceGrid = new Infragistics.Win.Appearance();
+            Infragistics.Win.Appearance appearanceHeader = new Infragistics.Win.Appearance();
+            Infragistics.Win.Appearance appearanceSelected = new Infragistics.Win.Appearance();
+            Infragistics.Win.Appearance appearanceGridFooter = new Infragistics.Win.Appearance();
+
             this.ultraPanelControls = new Infragistics.Win.Misc.UltraPanel();
-            this.btnClearFilters = new Infragistics.Win.Misc.UltraButton();
-            this.btnSearch = new Infragistics.Win.Misc.UltraButton();
-            this.ultraComboPresetDates = new Infragistics.Win.UltraWinEditors.UltraComboEditor();
-            this.ultraLabelPreset = new Infragistics.Win.Misc.UltraLabel();
-            this.ultraTextEditorVendor = new Infragistics.Win.UltraWinEditors.UltraTextEditor();
             this.ultraLabelVendorSearch = new Infragistics.Win.Misc.UltraLabel();
-            this.ultraNumericEditorPurchaseNo = new Infragistics.Win.UltraWinEditors.UltraNumericEditor();
+            this.ultraTextEditorVendor = new Infragistics.Win.UltraWinEditors.UltraTextEditor();
+            this.pbVendorSearch = new System.Windows.Forms.PictureBox();
             this.ultraLabelPurchaseNoSearch = new Infragistics.Win.Misc.UltraLabel();
-            this.ultraNumericEditorAmountTo = new Infragistics.Win.UltraWinEditors.UltraNumericEditor();
-            this.ultraLabelAmountTo = new Infragistics.Win.Misc.UltraLabel();
-            this.ultraNumericEditorAmountFrom = new Infragistics.Win.UltraWinEditors.UltraNumericEditor();
-            this.ultraLabelAmountFrom = new Infragistics.Win.Misc.UltraLabel();
-            this.btnExport = new Infragistics.Win.Misc.UltraButton();
-            this.btnPrint = new Infragistics.Win.Misc.UltraButton();
-            this.btnRefresh = new Infragistics.Win.Misc.UltraButton();
-            this.ultraDateTimeEditorTo = new Infragistics.Win.UltraWinEditors.UltraDateTimeEditor();
-            this.ultraLabelToDate = new Infragistics.Win.Misc.UltraLabel();
-            this.ultraDateTimeEditorFrom = new Infragistics.Win.UltraWinEditors.UltraDateTimeEditor();
+            this.ultraNumericEditorPurchaseNo = new Infragistics.Win.UltraWinEditors.UltraNumericEditor();
+            this.ultraLabelPreset = new Infragistics.Win.Misc.UltraLabel();
+            this.ultraComboPresetDates = new Infragistics.Win.UltraWinEditors.UltraComboEditor();
             this.ultraLabelFromDate = new Infragistics.Win.Misc.UltraLabel();
+            this.ultraDateTimeEditorFrom = new Infragistics.Win.UltraWinEditors.UltraDateTimeEditor();
+            this.ultraLabelToDate = new Infragistics.Win.Misc.UltraLabel();
+            this.ultraDateTimeEditorTo = new Infragistics.Win.UltraWinEditors.UltraDateTimeEditor();
+            this.ultraLabelAmountFrom = new Infragistics.Win.Misc.UltraLabel();
+            this.ultraNumericEditorAmountFrom = new Infragistics.Win.UltraWinEditors.UltraNumericEditor();
+            this.ultraLabelAmountTo = new Infragistics.Win.Misc.UltraLabel();
+            this.ultraNumericEditorAmountTo = new Infragistics.Win.UltraWinEditors.UltraNumericEditor();
+
+            this.ultraPanelAction = new Infragistics.Win.Misc.UltraPanel();
+            this.btnSearch = new Infragistics.Win.Misc.UltraButton();
+            this.btnRefresh = new Infragistics.Win.Misc.UltraButton();
+            this.btnPrint = new Infragistics.Win.Misc.UltraButton();
+            this.btnExport = new Infragistics.Win.Misc.UltraButton();
+            this.btnClearFilters = new Infragistics.Win.Misc.UltraButton();
+            this.btnToggleSelection = new Infragistics.Win.Misc.UltraButton();
+
             this.ultraPanelMaster = new Infragistics.Win.Misc.UltraPanel();
             this.ultraGridMaster = new Infragistics.Win.UltraWinGrid.UltraGrid();
-            this.ultraPanelSummary = new Infragistics.Win.Misc.UltraPanel();
-            this.ultraLabelTotalPurchasesCaption = new Infragistics.Win.Misc.UltraLabel();
-            this.ultraLabelTotalPurchasesValue = new Infragistics.Win.Misc.UltraLabel();
-            this.ultraLabelSubTotalCaption = new Infragistics.Win.Misc.UltraLabel();
-            this.ultraLabelSubTotalValue = new Infragistics.Win.Misc.UltraLabel();
-            this.ultraLabelGrandTotalCaption = new Infragistics.Win.Misc.UltraLabel();
-            this.ultraLabelGrandTotalValue = new Infragistics.Win.Misc.UltraLabel();
-            this.ultraLabelPayedAmountCaption = new Infragistics.Win.Misc.UltraLabel();
-            this.ultraLabelPayedAmountValue = new Infragistics.Win.Misc.UltraLabel();
+            this.ultraPanelGridFooter = new Infragistics.Win.Misc.UltraPanel();
+
             this.ultraPanelControls.ClientArea.SuspendLayout();
             this.ultraPanelControls.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.ultraComboPresetDates)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.ultraTextEditorVendor)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.pbVendorSearch)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.ultraNumericEditorPurchaseNo)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.ultraNumericEditorAmountTo)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.ultraNumericEditorAmountFrom)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.ultraDateTimeEditorTo)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.ultraComboPresetDates)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.ultraDateTimeEditorFrom)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.ultraDateTimeEditorTo)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.ultraNumericEditorAmountFrom)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.ultraNumericEditorAmountTo)).BeginInit();
+            this.ultraPanelAction.ClientArea.SuspendLayout();
+            this.ultraPanelAction.SuspendLayout();
             this.ultraPanelMaster.ClientArea.SuspendLayout();
             this.ultraPanelMaster.SuspendLayout();
+            this.ultraPanelGridFooter.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.ultraGridMaster)).BeginInit();
-            this.ultraPanelSummary.ClientArea.SuspendLayout();
-            this.ultraPanelSummary.SuspendLayout();
             this.SuspendLayout();
             // 
             // ultraPanelControls
             // 
-            appearance1.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(236)))), ((int)(((byte)(240)))), ((int)(((byte)(245)))));
-            appearance1.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(200)))), ((int)(((byte)(210)))), ((int)(((byte)(220)))));
-            this.ultraPanelControls.Appearance = appearance1;
+            appearanceControls.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(232)))), ((int)(((byte)(246)))), ((int)(((byte)(255)))));
+            appearanceControls.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(118)))), ((int)(((byte)(154)))), ((int)(((byte)(198)))));
+            this.ultraPanelControls.Appearance = appearanceControls;
+            this.ultraPanelControls.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
             // 
             // ultraPanelControls.ClientArea
             // 
-            this.ultraPanelControls.ClientArea.Controls.Add(this.btnClearFilters);
-            this.ultraPanelControls.ClientArea.Controls.Add(this.btnSearch);
-            this.ultraPanelControls.ClientArea.Controls.Add(this.ultraComboPresetDates);
-            this.ultraPanelControls.ClientArea.Controls.Add(this.ultraLabelPreset);
-            this.ultraPanelControls.ClientArea.Controls.Add(this.ultraTextEditorVendor);
             this.ultraPanelControls.ClientArea.Controls.Add(this.ultraLabelVendorSearch);
-            this.ultraPanelControls.ClientArea.Controls.Add(this.ultraNumericEditorPurchaseNo);
+            this.ultraPanelControls.ClientArea.Controls.Add(this.ultraTextEditorVendor);
+            this.ultraPanelControls.ClientArea.Controls.Add(this.pbVendorSearch);
             this.ultraPanelControls.ClientArea.Controls.Add(this.ultraLabelPurchaseNoSearch);
-            this.ultraPanelControls.ClientArea.Controls.Add(this.ultraNumericEditorAmountTo);
-            this.ultraPanelControls.ClientArea.Controls.Add(this.ultraLabelAmountTo);
-            this.ultraPanelControls.ClientArea.Controls.Add(this.ultraNumericEditorAmountFrom);
-            this.ultraPanelControls.ClientArea.Controls.Add(this.ultraLabelAmountFrom);
-            this.ultraPanelControls.ClientArea.Controls.Add(this.btnExport);
-            this.ultraPanelControls.ClientArea.Controls.Add(this.btnPrint);
-            this.ultraPanelControls.ClientArea.Controls.Add(this.btnRefresh);
-            this.ultraPanelControls.ClientArea.Controls.Add(this.ultraDateTimeEditorTo);
-            this.ultraPanelControls.ClientArea.Controls.Add(this.ultraLabelToDate);
-            this.ultraPanelControls.ClientArea.Controls.Add(this.ultraDateTimeEditorFrom);
+            this.ultraPanelControls.ClientArea.Controls.Add(this.ultraNumericEditorPurchaseNo);
+            this.ultraPanelControls.ClientArea.Controls.Add(this.ultraLabelPreset);
+            this.ultraPanelControls.ClientArea.Controls.Add(this.ultraComboPresetDates);
             this.ultraPanelControls.ClientArea.Controls.Add(this.ultraLabelFromDate);
+            this.ultraPanelControls.ClientArea.Controls.Add(this.ultraDateTimeEditorFrom);
+            this.ultraPanelControls.ClientArea.Controls.Add(this.ultraLabelToDate);
+            this.ultraPanelControls.ClientArea.Controls.Add(this.ultraDateTimeEditorTo);
+            this.ultraPanelControls.ClientArea.Controls.Add(this.ultraLabelAmountFrom);
+            this.ultraPanelControls.ClientArea.Controls.Add(this.ultraNumericEditorAmountFrom);
+            this.ultraPanelControls.ClientArea.Controls.Add(this.ultraLabelAmountTo);
+            this.ultraPanelControls.ClientArea.Controls.Add(this.ultraNumericEditorAmountTo);
             this.ultraPanelControls.Dock = System.Windows.Forms.DockStyle.Top;
             this.ultraPanelControls.Location = new System.Drawing.Point(0, 0);
             this.ultraPanelControls.Name = "ultraPanelControls";
-            this.ultraPanelControls.Size = new System.Drawing.Size(1349, 118);
+            this.ultraPanelControls.Size = new System.Drawing.Size(1349, 80);
             this.ultraPanelControls.TabIndex = 0;
             // 
-            // btnClearFilters
+            // ultraLabelVendorSearch
             // 
-            this.btnClearFilters.Location = new System.Drawing.Point(345, 79);
-            this.btnClearFilters.Name = "btnClearFilters";
-            this.btnClearFilters.Size = new System.Drawing.Size(95, 28);
-            this.btnClearFilters.TabIndex = 20;
-            this.btnClearFilters.Text = "Clear Filters";
-            this.btnClearFilters.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
-            this.btnClearFilters.Click += new System.EventHandler(this.btnClearFilters_Click);
+            this.ultraLabelVendorSearch.Location = new System.Drawing.Point(20, 15);
+            this.ultraLabelVendorSearch.Name = "ultraLabelVendorSearch";
+            this.ultraLabelVendorSearch.Size = new System.Drawing.Size(60, 20);
+            this.ultraLabelVendorSearch.TabIndex = 0;
+            this.ultraLabelVendorSearch.Text = "Vendor";
             // 
-            // btnSearch
+            // ultraTextEditorVendor
             // 
-            this.btnSearch.Location = new System.Drawing.Point(240, 79);
-            this.btnSearch.Name = "btnSearch";
-            this.btnSearch.Size = new System.Drawing.Size(95, 28);
-            this.btnSearch.TabIndex = 19;
-            this.btnSearch.Text = "Search";
-            this.btnSearch.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
-            this.btnSearch.Click += new System.EventHandler(this.btnSearch_Click);
+            this.ultraTextEditorVendor.Location = new System.Drawing.Point(85, 13);
+            this.ultraTextEditorVendor.Name = "ultraTextEditorVendor";
+            this.ultraTextEditorVendor.Size = new System.Drawing.Size(230, 24);
+            this.ultraTextEditorVendor.TabIndex = 1;
+            // 
+            // pbVendorSearch
+            // 
+            this.pbVendorSearch.Location = new System.Drawing.Point(320, 13);
+            this.pbVendorSearch.Name = "pbVendorSearch";
+            this.pbVendorSearch.Size = new System.Drawing.Size(26, 24);
+            this.pbVendorSearch.TabIndex = 2;
+            this.pbVendorSearch.TabStop = false;
+            // 
+            // ultraLabelPurchaseNoSearch
+            // 
+            this.ultraLabelPurchaseNoSearch.Location = new System.Drawing.Point(365, 15);
+            this.ultraLabelPurchaseNoSearch.Name = "ultraLabelPurchaseNoSearch";
+            this.ultraLabelPurchaseNoSearch.Size = new System.Drawing.Size(60, 20);
+            this.ultraLabelPurchaseNoSearch.TabIndex = 3;
+            this.ultraLabelPurchaseNoSearch.Text = "Doc No";
+            // 
+            // ultraNumericEditorPurchaseNo
+            // 
+            this.ultraNumericEditorPurchaseNo.Location = new System.Drawing.Point(430, 13);
+            this.ultraNumericEditorPurchaseNo.Name = "ultraNumericEditorPurchaseNo";
+            this.ultraNumericEditorPurchaseNo.Size = new System.Drawing.Size(120, 24);
+            this.ultraNumericEditorPurchaseNo.TabIndex = 4;
+            // 
+            // ultraLabelPreset
+            // 
+            this.ultraLabelPreset.Location = new System.Drawing.Point(20, 46);
+            this.ultraLabelPreset.Name = "ultraLabelPreset";
+            this.ultraLabelPreset.Size = new System.Drawing.Size(60, 20);
+            this.ultraLabelPreset.TabIndex = 5;
+            this.ultraLabelPreset.Text = "Date";
             // 
             // ultraComboPresetDates
             // 
             this.ultraComboPresetDates.DropDownStyle = Infragistics.Win.DropDownStyle.DropDownList;
-            this.ultraComboPresetDates.Location = new System.Drawing.Point(103, 82);
+            this.ultraComboPresetDates.Location = new System.Drawing.Point(85, 44);
             this.ultraComboPresetDates.Name = "ultraComboPresetDates";
-            this.ultraComboPresetDates.Size = new System.Drawing.Size(120, 25);
-            this.ultraComboPresetDates.TabIndex = 18;
+            this.ultraComboPresetDates.Size = new System.Drawing.Size(180, 24);
+            this.ultraComboPresetDates.TabIndex = 6;
             this.ultraComboPresetDates.ValueChanged += new System.EventHandler(this.ultraComboPresetDates_ValueChanged);
-            // 
-            // ultraLabelPreset
-            // 
-            this.ultraLabelPreset.Location = new System.Drawing.Point(12, 82);
-            this.ultraLabelPreset.Name = "ultraLabelPreset";
-            this.ultraLabelPreset.Size = new System.Drawing.Size(85, 23);
-            this.ultraLabelPreset.TabIndex = 17;
-            this.ultraLabelPreset.Text = "Quick Date:";
-            // 
-            // ultraTextEditorVendor
-            // 
-            this.ultraTextEditorVendor.Location = new System.Drawing.Point(675, 50);
-            this.ultraTextEditorVendor.Name = "ultraTextEditorVendor";
-            this.ultraTextEditorVendor.Size = new System.Drawing.Size(150, 25);
-            this.ultraTextEditorVendor.TabIndex = 16;
-            // 
-            // ultraLabelVendorSearch
-            // 
-            this.ultraLabelVendorSearch.Location = new System.Drawing.Point(609, 53);
-            this.ultraLabelVendorSearch.Name = "ultraLabelVendorSearch";
-            this.ultraLabelVendorSearch.Size = new System.Drawing.Size(60, 23);
-            this.ultraLabelVendorSearch.TabIndex = 15;
-            this.ultraLabelVendorSearch.Text = "Vendor:";
-            // 
-            // ultraNumericEditorPurchaseNo
-            // 
-            this.ultraNumericEditorPurchaseNo.Location = new System.Drawing.Point(485, 50);
-            this.ultraNumericEditorPurchaseNo.Name = "ultraNumericEditorPurchaseNo";
-            this.ultraNumericEditorPurchaseNo.Size = new System.Drawing.Size(100, 25);
-            this.ultraNumericEditorPurchaseNo.TabIndex = 14;
-            // 
-            // ultraLabelPurchaseNoSearch
-            // 
-            this.ultraLabelPurchaseNoSearch.Location = new System.Drawing.Point(404, 53);
-            this.ultraLabelPurchaseNoSearch.Name = "ultraLabelPurchaseNoSearch";
-            this.ultraLabelPurchaseNoSearch.Size = new System.Drawing.Size(80, 23);
-            this.ultraLabelPurchaseNoSearch.TabIndex = 13;
-            this.ultraLabelPurchaseNoSearch.Text = "Purchase No:";
-            // 
-            // ultraNumericEditorAmountTo
-            // 
-            this.ultraNumericEditorAmountTo.Location = new System.Drawing.Point(298, 51);
-            this.ultraNumericEditorAmountTo.Name = "ultraNumericEditorAmountTo";
-            this.ultraNumericEditorAmountTo.Size = new System.Drawing.Size(100, 25);
-            this.ultraNumericEditorAmountTo.TabIndex = 12;
-            // 
-            // ultraLabelAmountTo
-            // 
-            this.ultraLabelAmountTo.Location = new System.Drawing.Point(229, 54);
-            this.ultraLabelAmountTo.Name = "ultraLabelAmountTo";
-            this.ultraLabelAmountTo.Size = new System.Drawing.Size(70, 23);
-            this.ultraLabelAmountTo.TabIndex = 11;
-            this.ultraLabelAmountTo.Text = "Amount To:";
-            // 
-            // ultraNumericEditorAmountFrom
-            // 
-            this.ultraNumericEditorAmountFrom.Location = new System.Drawing.Point(101, 50);
-            this.ultraNumericEditorAmountFrom.Name = "ultraNumericEditorAmountFrom";
-            this.ultraNumericEditorAmountFrom.Size = new System.Drawing.Size(100, 25);
-            this.ultraNumericEditorAmountFrom.TabIndex = 10;
-            // 
-            // ultraLabelAmountFrom
-            // 
-            this.ultraLabelAmountFrom.Location = new System.Drawing.Point(12, 54);
-            this.ultraLabelAmountFrom.Name = "ultraLabelAmountFrom";
-            this.ultraLabelAmountFrom.Size = new System.Drawing.Size(87, 23);
-            this.ultraLabelAmountFrom.TabIndex = 9;
-            this.ultraLabelAmountFrom.Text = "Amount From:";
-            // 
-            // btnExport
-            // 
-            this.btnExport.Location = new System.Drawing.Point(633, 14);
-            this.btnExport.Name = "btnExport";
-            this.btnExport.Size = new System.Drawing.Size(105, 30);
-            this.btnExport.TabIndex = 7;
-            this.btnExport.Text = "Export";
-            this.btnExport.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
-            this.btnExport.Click += new System.EventHandler(this.btnExport_Click);
-            // 
-            // btnPrint
-            // 
-            this.btnPrint.Location = new System.Drawing.Point(523, 14);
-            this.btnPrint.Name = "btnPrint";
-            this.btnPrint.Size = new System.Drawing.Size(100, 30);
-            this.btnPrint.TabIndex = 6;
-            this.btnPrint.Text = "Print";
-            this.btnPrint.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
-            this.btnPrint.Click += new System.EventHandler(this.btnPrint_Click);
-            // 
-            // btnRefresh
-            // 
-            this.btnRefresh.Location = new System.Drawing.Point(408, 14);
-            this.btnRefresh.Name = "btnRefresh";
-            this.btnRefresh.Size = new System.Drawing.Size(105, 30);
-            this.btnRefresh.TabIndex = 5;
-            this.btnRefresh.Text = " Refresh";
-            this.btnRefresh.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
-            this.btnRefresh.Click += new System.EventHandler(this.btnRefresh_Click);
-            // 
-            // ultraDateTimeEditorTo
-            // 
-            this.ultraDateTimeEditorTo.Location = new System.Drawing.Point(276, 16);
-            this.ultraDateTimeEditorTo.Name = "ultraDateTimeEditorTo";
-            this.ultraDateTimeEditorTo.Size = new System.Drawing.Size(120, 25);
-            this.ultraDateTimeEditorTo.TabIndex = 4;
-            // 
-            // ultraLabelToDate
-            // 
-            this.ultraLabelToDate.Location = new System.Drawing.Point(220, 19);
-            this.ultraLabelToDate.Name = "ultraLabelToDate";
-            this.ultraLabelToDate.Size = new System.Drawing.Size(50, 23);
-            this.ultraLabelToDate.TabIndex = 3;
-            this.ultraLabelToDate.Text = "To Date:";
-            // 
-            // ultraDateTimeEditorFrom
-            // 
-            this.ultraDateTimeEditorFrom.Location = new System.Drawing.Point(85, 16);
-            this.ultraDateTimeEditorFrom.Name = "ultraDateTimeEditorFrom";
-            this.ultraDateTimeEditorFrom.Size = new System.Drawing.Size(120, 25);
-            this.ultraDateTimeEditorFrom.TabIndex = 2;
             // 
             // ultraLabelFromDate
             // 
-            this.ultraLabelFromDate.Location = new System.Drawing.Point(12, 19);
+            this.ultraLabelFromDate.Location = new System.Drawing.Point(280, 46);
             this.ultraLabelFromDate.Name = "ultraLabelFromDate";
-            this.ultraLabelFromDate.Size = new System.Drawing.Size(80, 23);
-            this.ultraLabelFromDate.TabIndex = 1;
-            this.ultraLabelFromDate.Text = "From Date:";
+            this.ultraLabelFromDate.Size = new System.Drawing.Size(42, 20);
+            this.ultraLabelFromDate.TabIndex = 7;
+            this.ultraLabelFromDate.Text = "From";
+            // 
+            // ultraDateTimeEditorFrom
+            // 
+            this.ultraDateTimeEditorFrom.Location = new System.Drawing.Point(326, 44);
+            this.ultraDateTimeEditorFrom.Name = "ultraDateTimeEditorFrom";
+            this.ultraDateTimeEditorFrom.Size = new System.Drawing.Size(120, 24);
+            this.ultraDateTimeEditorFrom.TabIndex = 8;
+            // 
+            // ultraLabelToDate
+            // 
+            this.ultraLabelToDate.Location = new System.Drawing.Point(460, 46);
+            this.ultraLabelToDate.Name = "ultraLabelToDate";
+            this.ultraLabelToDate.Size = new System.Drawing.Size(26, 20);
+            this.ultraLabelToDate.TabIndex = 9;
+            this.ultraLabelToDate.Text = "To";
+            // 
+            // ultraDateTimeEditorTo
+            // 
+            this.ultraDateTimeEditorTo.Location = new System.Drawing.Point(490, 44);
+            this.ultraDateTimeEditorTo.Name = "ultraDateTimeEditorTo";
+            this.ultraDateTimeEditorTo.Size = new System.Drawing.Size(120, 24);
+            this.ultraDateTimeEditorTo.TabIndex = 10;
+            // 
+            // ultraLabelAmountFrom
+            // 
+            this.ultraLabelAmountFrom.Location = new System.Drawing.Point(0, 0);
+            this.ultraLabelAmountFrom.Name = "ultraLabelAmountFrom";
+            this.ultraLabelAmountFrom.Size = new System.Drawing.Size(0, 0);
+            this.ultraLabelAmountFrom.TabIndex = 11;
+            this.ultraLabelAmountFrom.Visible = false;
+            // 
+            // ultraNumericEditorAmountFrom
+            // 
+            this.ultraNumericEditorAmountFrom.Location = new System.Drawing.Point(0, 0);
+            this.ultraNumericEditorAmountFrom.Name = "ultraNumericEditorAmountFrom";
+            this.ultraNumericEditorAmountFrom.Size = new System.Drawing.Size(0, 0);
+            this.ultraNumericEditorAmountFrom.TabIndex = 12;
+            this.ultraNumericEditorAmountFrom.Visible = false;
+            // 
+            // ultraLabelAmountTo
+            // 
+            this.ultraLabelAmountTo.Location = new System.Drawing.Point(0, 0);
+            this.ultraLabelAmountTo.Name = "ultraLabelAmountTo";
+            this.ultraLabelAmountTo.Size = new System.Drawing.Size(0, 0);
+            this.ultraLabelAmountTo.TabIndex = 13;
+            this.ultraLabelAmountTo.Visible = false;
+            // 
+            // ultraNumericEditorAmountTo
+            // 
+            this.ultraNumericEditorAmountTo.Location = new System.Drawing.Point(0, 0);
+            this.ultraNumericEditorAmountTo.Name = "ultraNumericEditorAmountTo";
+            this.ultraNumericEditorAmountTo.Size = new System.Drawing.Size(0, 0);
+            this.ultraNumericEditorAmountTo.TabIndex = 14;
+            this.ultraNumericEditorAmountTo.Visible = false;
+            // 
+            // ultraPanelAction
+            // 
+            appearanceAction.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(206)))), ((int)(((byte)(223)))), ((int)(((byte)(238)))));
+            appearanceAction.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(118)))), ((int)(((byte)(154)))), ((int)(((byte)(198)))));
+            this.ultraPanelAction.Appearance = appearanceAction;
+            this.ultraPanelAction.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
+            // 
+            // ultraPanelAction.ClientArea
+            // 
+            this.ultraPanelAction.ClientArea.Controls.Add(this.btnSearch);
+            this.ultraPanelAction.ClientArea.Controls.Add(this.btnRefresh);
+            this.ultraPanelAction.ClientArea.Controls.Add(this.btnPrint);
+            this.ultraPanelAction.ClientArea.Controls.Add(this.btnExport);
+            this.ultraPanelAction.ClientArea.Controls.Add(this.btnClearFilters);
+            this.ultraPanelAction.ClientArea.Controls.Add(this.btnToggleSelection);
+            this.ultraPanelAction.Dock = System.Windows.Forms.DockStyle.Top;
+            this.ultraPanelAction.Location = new System.Drawing.Point(0, 80);
+            this.ultraPanelAction.Name = "ultraPanelAction";
+            this.ultraPanelAction.Size = new System.Drawing.Size(1349, 45);
+            this.ultraPanelAction.TabIndex = 1;
+            // 
+            // btnSearch
+            // 
+            this.btnSearch.Location = new System.Drawing.Point(10, 8);
+            this.btnSearch.Name = "btnSearch";
+            this.btnSearch.Size = new System.Drawing.Size(136, 28);
+            this.btnSearch.TabIndex = 0;
+            this.btnSearch.Text = "View Grid";
+            this.btnSearch.Click += new System.EventHandler(this.btnSearch_Click);
+            // 
+            // btnRefresh
+            // 
+            this.btnRefresh.Location = new System.Drawing.Point(153, 8);
+            this.btnRefresh.Name = "btnRefresh";
+            this.btnRefresh.Size = new System.Drawing.Size(138, 28);
+            this.btnRefresh.TabIndex = 1;
+            this.btnRefresh.Text = "Preview Grid";
+            this.btnRefresh.Click += new System.EventHandler(this.btnRefresh_Click);
+            // 
+            // btnPrint
+            // 
+            this.btnPrint.Location = new System.Drawing.Point(298, 8);
+            this.btnPrint.Name = "btnPrint";
+            this.btnPrint.Size = new System.Drawing.Size(145, 28);
+            this.btnPrint.TabIndex = 2;
+            this.btnPrint.Text = "Preview Report";
+            this.btnPrint.Click += new System.EventHandler(this.btnPrint_Click);
+            // 
+            // btnExport
+            // 
+            this.btnExport.Location = new System.Drawing.Point(450, 8);
+            this.btnExport.Name = "btnExport";
+            this.btnExport.Size = new System.Drawing.Size(110, 28);
+            this.btnExport.TabIndex = 3;
+            this.btnExport.Text = "Export Grid";
+            this.btnExport.Click += new System.EventHandler(this.btnExport_Click);
+            // 
+            // btnClearFilters
+            // 
+            this.btnClearFilters.Location = new System.Drawing.Point(568, 8);
+            this.btnClearFilters.Name = "btnClearFilters";
+            this.btnClearFilters.Size = new System.Drawing.Size(110, 28);
+            this.btnClearFilters.TabIndex = 4;
+            this.btnClearFilters.Text = "Reset Filters";
+            this.btnClearFilters.Click += new System.EventHandler(this.btnClearFilters_Click);
+            // 
+            // btnToggleSelection
+            // 
+            this.btnToggleSelection.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.btnToggleSelection.Location = new System.Drawing.Point(1202, 8);
+            this.btnToggleSelection.Name = "btnToggleSelection";
+            this.btnToggleSelection.Size = new System.Drawing.Size(135, 28);
+            this.btnToggleSelection.TabIndex = 5;
+            this.btnToggleSelection.Text = "Hide Selection";
+            this.btnToggleSelection.Click += new System.EventHandler(this.btnToggleSelection_Click);
             // 
             // ultraPanelMaster
             // 
-            this.ultraPanelMaster.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)
-            | System.Windows.Forms.AnchorStyles.Left)
-            | System.Windows.Forms.AnchorStyles.Right)));
+            appearanceMaster.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(232)))), ((int)(((byte)(246)))), ((int)(((byte)(255)))));
+            appearanceMaster.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(118)))), ((int)(((byte)(154)))), ((int)(((byte)(198)))));
+            this.ultraPanelMaster.Appearance = appearanceMaster;
+            this.ultraPanelMaster.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
             // 
             // ultraPanelMaster.ClientArea
             // 
             this.ultraPanelMaster.ClientArea.Controls.Add(this.ultraGridMaster);
-            this.ultraPanelMaster.Location = new System.Drawing.Point(0, 119);
+            this.ultraPanelMaster.ClientArea.Controls.Add(this.ultraPanelGridFooter);
+            this.ultraPanelMaster.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.ultraPanelMaster.Location = new System.Drawing.Point(0, 125);
             this.ultraPanelMaster.Name = "ultraPanelMaster";
-            this.ultraPanelMaster.Size = new System.Drawing.Size(1349, 274);
-            this.ultraPanelMaster.TabIndex = 1;
+            this.ultraPanelMaster.Size = new System.Drawing.Size(1349, 366);
+            this.ultraPanelMaster.TabIndex = 2;
             // 
             // ultraGridMaster
             // 
-            this.ultraGridMaster.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom)
-            | System.Windows.Forms.AnchorStyles.Left)
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.ultraGridMaster.Location = new System.Drawing.Point(12, 7);
+            appearanceGrid.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(232)))), ((int)(((byte)(246)))), ((int)(((byte)(255)))));
+            this.ultraGridMaster.DisplayLayout.Appearance = appearanceGrid;
+            this.ultraGridMaster.DisplayLayout.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
+            appearanceHeader.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(93)))), ((int)(((byte)(151)))), ((int)(((byte)(214)))));
+            appearanceHeader.ForeColor = System.Drawing.Color.White;
+            this.ultraGridMaster.DisplayLayout.Override.HeaderAppearance = appearanceHeader;
+            appearanceSelected.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(126)))), ((int)(((byte)(126)))), ((int)(((byte)(245)))));
+            appearanceSelected.ForeColor = System.Drawing.Color.White;
+            this.ultraGridMaster.DisplayLayout.Override.SelectedRowAppearance = appearanceSelected;
+            this.ultraGridMaster.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.ultraGridMaster.Location = new System.Drawing.Point(0, 0);
             this.ultraGridMaster.Name = "ultraGridMaster";
-            this.ultraGridMaster.Size = new System.Drawing.Size(1325, 261);
-            this.ultraGridMaster.TabIndex = 1;
+            this.ultraGridMaster.Size = new System.Drawing.Size(1349, 340);
+            this.ultraGridMaster.TabIndex = 0;
             this.ultraGridMaster.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
             // 
-            // ultraPanelSummary
+            // ultraPanelGridFooter
             // 
-            this.ultraPanelSummary.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left)
-            | System.Windows.Forms.AnchorStyles.Right)));
-            // 
-            // ultraPanelSummary.ClientArea
-            // 
-            this.ultraPanelSummary.ClientArea.Controls.Add(this.ultraLabelPayedAmountValue);
-            this.ultraPanelSummary.ClientArea.Controls.Add(this.ultraLabelPayedAmountCaption);
-            this.ultraPanelSummary.ClientArea.Controls.Add(this.ultraLabelGrandTotalValue);
-            this.ultraPanelSummary.ClientArea.Controls.Add(this.ultraLabelGrandTotalCaption);
-            this.ultraPanelSummary.ClientArea.Controls.Add(this.ultraLabelSubTotalValue);
-            this.ultraPanelSummary.ClientArea.Controls.Add(this.ultraLabelSubTotalCaption);
-            this.ultraPanelSummary.ClientArea.Controls.Add(this.ultraLabelTotalPurchasesValue);
-            this.ultraPanelSummary.ClientArea.Controls.Add(this.ultraLabelTotalPurchasesCaption);
-            this.ultraPanelSummary.Location = new System.Drawing.Point(0, 399);
-            this.ultraPanelSummary.Name = "ultraPanelSummary";
-            this.ultraPanelSummary.Size = new System.Drawing.Size(1349, 160);
-            this.ultraPanelSummary.TabIndex = 2;
-            // 
-            // ultraLabelTotalPurchasesCaption
-            // 
-            this.ultraLabelTotalPurchasesCaption.Location = new System.Drawing.Point(20, 20);
-            this.ultraLabelTotalPurchasesCaption.Name = "ultraLabelTotalPurchasesCaption";
-            this.ultraLabelTotalPurchasesCaption.Size = new System.Drawing.Size(150, 25);
-            this.ultraLabelTotalPurchasesCaption.TabIndex = 0;
-            this.ultraLabelTotalPurchasesCaption.Text = "📋 Total Purchases:";
-            // 
-            // ultraLabelTotalPurchasesValue
-            // 
-            this.ultraLabelTotalPurchasesValue.Location = new System.Drawing.Point(20, 45);
-            this.ultraLabelTotalPurchasesValue.Name = "ultraLabelTotalPurchasesValue";
-            this.ultraLabelTotalPurchasesValue.Size = new System.Drawing.Size(150, 30);
-            this.ultraLabelTotalPurchasesValue.TabIndex = 1;
-            this.ultraLabelTotalPurchasesValue.Text = "0";
-            // 
-            // ultraLabelSubTotalCaption
-            // 
-            this.ultraLabelSubTotalCaption.Location = new System.Drawing.Point(220, 20);
-            this.ultraLabelSubTotalCaption.Name = "ultraLabelSubTotalCaption";
-            this.ultraLabelSubTotalCaption.Size = new System.Drawing.Size(180, 25);
-            this.ultraLabelSubTotalCaption.TabIndex = 2;
-            this.ultraLabelSubTotalCaption.Text = "💰 Sub Total:";
-            // 
-            // ultraLabelSubTotalValue
-            // 
-            this.ultraLabelSubTotalValue.Location = new System.Drawing.Point(220, 45);
-            this.ultraLabelSubTotalValue.Name = "ultraLabelSubTotalValue";
-            this.ultraLabelSubTotalValue.Size = new System.Drawing.Size(180, 30);
-            this.ultraLabelSubTotalValue.TabIndex = 3;
-            this.ultraLabelSubTotalValue.Text = "₹ 0.00";
-            // 
-            // ultraLabelGrandTotalCaption
-            // 
-            this.ultraLabelGrandTotalCaption.Location = new System.Drawing.Point(450, 20);
-            this.ultraLabelGrandTotalCaption.Name = "ultraLabelGrandTotalCaption";
-            this.ultraLabelGrandTotalCaption.Size = new System.Drawing.Size(180, 25);
-            this.ultraLabelGrandTotalCaption.TabIndex = 4;
-            this.ultraLabelGrandTotalCaption.Text = " Grand Total:";
-            // 
-            // ultraLabelGrandTotalValue
-            // 
-            this.ultraLabelGrandTotalValue.Location = new System.Drawing.Point(450, 45);
-            this.ultraLabelGrandTotalValue.Name = "ultraLabelGrandTotalValue";
-            this.ultraLabelGrandTotalValue.Size = new System.Drawing.Size(180, 30);
-            this.ultraLabelGrandTotalValue.TabIndex = 5;
-            this.ultraLabelGrandTotalValue.Text = "₹ 0.00";
-            // 
-            // ultraLabelPayedAmountCaption
-            // 
-            this.ultraLabelPayedAmountCaption.Location = new System.Drawing.Point(680, 20);
-            this.ultraLabelPayedAmountCaption.Name = "ultraLabelPayedAmountCaption";
-            this.ultraLabelPayedAmountCaption.Size = new System.Drawing.Size(200, 25);
-            this.ultraLabelPayedAmountCaption.TabIndex = 6;
-            this.ultraLabelPayedAmountCaption.Text = "💳 Payed Amount:";
-            // 
-            // ultraLabelPayedAmountValue
-            // 
-            this.ultraLabelPayedAmountValue.Location = new System.Drawing.Point(680, 45);
-            this.ultraLabelPayedAmountValue.Name = "ultraLabelPayedAmountValue";
-            this.ultraLabelPayedAmountValue.Size = new System.Drawing.Size(200, 30);
-            this.ultraLabelPayedAmountValue.TabIndex = 7;
-            this.ultraLabelPayedAmountValue.Text = "₹ 0.00";
+            appearanceGridFooter.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(93)))), ((int)(((byte)(151)))), ((int)(((byte)(214)))));
+            appearanceGridFooter.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(118)))), ((int)(((byte)(154)))), ((int)(((byte)(198)))));
+            this.ultraPanelGridFooter.Appearance = appearanceGridFooter;
+            this.ultraPanelGridFooter.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
+            this.ultraPanelGridFooter.Dock = System.Windows.Forms.DockStyle.Bottom;
+            this.ultraPanelGridFooter.Location = new System.Drawing.Point(0, 340);
+            this.ultraPanelGridFooter.Name = "ultraPanelGridFooter";
+            this.ultraPanelGridFooter.Size = new System.Drawing.Size(1349, 26);
+            this.ultraPanelGridFooter.TabIndex = 1;
             // 
             // frmPurchaseReportDetails
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(250)))), ((int)(((byte)(251)))), ((int)(((byte)(252)))));
+            this.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(232)))), ((int)(((byte)(246)))), ((int)(((byte)(255)))));
             this.ClientSize = new System.Drawing.Size(1349, 561);
-            this.Controls.Add(this.ultraPanelSummary);
             this.Controls.Add(this.ultraPanelMaster);
+            this.Controls.Add(this.ultraPanelAction);
             this.Controls.Add(this.ultraPanelControls);
             this.Font = new System.Drawing.Font("Segoe UI", 9F);
-            this.MinimumSize = new System.Drawing.Size(1024, 600);
+            this.MinimumSize = new System.Drawing.Size(0, 0);
             this.Name = "frmPurchaseReportDetails";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
-            this.Text = " Purchase Report - Master Detail View";
+            this.Text = "Purchase Details Report";
             this.WindowState = System.Windows.Forms.FormWindowState.Maximized;
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.frmPurchaseReportDetails_FormClosing);
             this.Load += new System.EventHandler(this.frmPurchaseReportDetails_Load);
             this.ultraPanelControls.ClientArea.ResumeLayout(false);
             this.ultraPanelControls.ClientArea.PerformLayout();
             this.ultraPanelControls.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)(this.ultraComboPresetDates)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.ultraTextEditorVendor)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.pbVendorSearch)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.ultraNumericEditorPurchaseNo)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.ultraNumericEditorAmountTo)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.ultraNumericEditorAmountFrom)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.ultraDateTimeEditorTo)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.ultraComboPresetDates)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.ultraDateTimeEditorFrom)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.ultraDateTimeEditorTo)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.ultraNumericEditorAmountFrom)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.ultraNumericEditorAmountTo)).EndInit();
+            this.ultraPanelAction.ClientArea.ResumeLayout(false);
+            this.ultraPanelAction.ResumeLayout(false);
             this.ultraPanelMaster.ClientArea.ResumeLayout(false);
             this.ultraPanelMaster.ResumeLayout(false);
+            this.ultraPanelGridFooter.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.ultraGridMaster)).EndInit();
-            this.ultraPanelSummary.ClientArea.ResumeLayout(false);
-            this.ultraPanelSummary.ResumeLayout(false);
             this.ResumeLayout(false);
 
         }
@@ -414,35 +394,30 @@
         #endregion
 
         private Infragistics.Win.Misc.UltraPanel ultraPanelControls;
+        private Infragistics.Win.Misc.UltraPanel ultraPanelAction;
+        private Infragistics.Win.Misc.UltraPanel ultraPanelMaster;
+        private Infragistics.Win.Misc.UltraLabel ultraLabelVendorSearch;
+        private Infragistics.Win.UltraWinEditors.UltraTextEditor ultraTextEditorVendor;
+        private System.Windows.Forms.PictureBox pbVendorSearch;
+        private Infragistics.Win.Misc.UltraLabel ultraLabelPurchaseNoSearch;
+        private Infragistics.Win.UltraWinEditors.UltraNumericEditor ultraNumericEditorPurchaseNo;
+        private Infragistics.Win.Misc.UltraLabel ultraLabelPreset;
+        private Infragistics.Win.UltraWinEditors.UltraComboEditor ultraComboPresetDates;
         private Infragistics.Win.Misc.UltraLabel ultraLabelFromDate;
         private Infragistics.Win.UltraWinEditors.UltraDateTimeEditor ultraDateTimeEditorFrom;
         private Infragistics.Win.Misc.UltraLabel ultraLabelToDate;
         private Infragistics.Win.UltraWinEditors.UltraDateTimeEditor ultraDateTimeEditorTo;
-        private Infragistics.Win.Misc.UltraButton btnRefresh;
-        private Infragistics.Win.Misc.UltraButton btnPrint;
-        private Infragistics.Win.Misc.UltraButton btnExport;
-        private Infragistics.Win.Misc.UltraPanel ultraPanelMaster;
         private Infragistics.Win.Misc.UltraLabel ultraLabelAmountFrom;
         private Infragistics.Win.UltraWinEditors.UltraNumericEditor ultraNumericEditorAmountFrom;
         private Infragistics.Win.Misc.UltraLabel ultraLabelAmountTo;
         private Infragistics.Win.UltraWinEditors.UltraNumericEditor ultraNumericEditorAmountTo;
-        private Infragistics.Win.Misc.UltraLabel ultraLabelPurchaseNoSearch;
-        private Infragistics.Win.UltraWinEditors.UltraNumericEditor ultraNumericEditorPurchaseNo;
-        private Infragistics.Win.Misc.UltraLabel ultraLabelVendorSearch;
-        private Infragistics.Win.UltraWinEditors.UltraTextEditor ultraTextEditorVendor;
-        private Infragistics.Win.Misc.UltraLabel ultraLabelPreset;
-        private Infragistics.Win.UltraWinEditors.UltraComboEditor ultraComboPresetDates;
         private Infragistics.Win.Misc.UltraButton btnSearch;
+        private Infragistics.Win.Misc.UltraButton btnRefresh;
+        private Infragistics.Win.Misc.UltraButton btnPrint;
+        private Infragistics.Win.Misc.UltraButton btnExport;
         private Infragistics.Win.Misc.UltraButton btnClearFilters;
+        private Infragistics.Win.Misc.UltraButton btnToggleSelection;
         private Infragistics.Win.UltraWinGrid.UltraGrid ultraGridMaster;
-        private Infragistics.Win.Misc.UltraPanel ultraPanelSummary;
-        private Infragistics.Win.Misc.UltraLabel ultraLabelPayedAmountValue;
-        private Infragistics.Win.Misc.UltraLabel ultraLabelPayedAmountCaption;
-        private Infragistics.Win.Misc.UltraLabel ultraLabelGrandTotalValue;
-        private Infragistics.Win.Misc.UltraLabel ultraLabelGrandTotalCaption;
-        private Infragistics.Win.Misc.UltraLabel ultraLabelSubTotalValue;
-        private Infragistics.Win.Misc.UltraLabel ultraLabelSubTotalCaption;
-        private Infragistics.Win.Misc.UltraLabel ultraLabelTotalPurchasesValue;
-        private Infragistics.Win.Misc.UltraLabel ultraLabelTotalPurchasesCaption;
+        private Infragistics.Win.Misc.UltraPanel ultraPanelGridFooter;
     }
 }

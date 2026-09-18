@@ -1183,6 +1183,8 @@ namespace PosBranch_Win.Reports.AuditReport
             }
         }
 
+        public void RibbonClear() => Clear();
+
         public void Clear()
         {
             ResetFilters(true);

@@ -737,6 +737,18 @@ namespace PosBranch_Win.Reports.InventoryReport
             }
         }
 
+        public void RibbonClear()
+        {
+            if (cmbItemNoMode != null && cmbItemNoMode.Items.Count > 0) cmbItemNoMode.SelectedIndex = 0;
+            if (cmbGroup != null && cmbGroup.Items.Count > 0) cmbGroup.SelectedIndex = 0;
+            if (cmbCategory != null && cmbCategory.Items.Count > 0) cmbCategory.SelectedIndex = 0;
+            if (cmbAlert != null && cmbAlert.Items.Count > 0) cmbAlert.SelectedIndex = 0;
+            if (cmbMoreOptions != null && cmbMoreOptions.Items.Count > 0) cmbMoreOptions.SelectedIndex = 0;
+            ApplyClientFilters();
+        }
+
+        public void Clear() => RibbonClear();
+
         private void ApplyClientFilters()
         {
             IEnumerable<SmartReorderItemModel> filtered = _allRows.Where(x =>
