@@ -531,6 +531,7 @@ END", (SqlConnection)DataConnection))
             add("stockvaluation", "Stock Valuation Report", "Reports");
             add("lowstockalert", "Low Stock Alert Report", "Reports");
             add("stockadjustmentreport", "Stock Adjustment Report", "Reports");
+            add("inactiveitemsreport", "Inactive Items Report", "Reports");
             add("manualpartybalancereport", "Manual Party Balance Report", "Reports");
             add("combinedpartybalancereport", "Combined Party Balance Report", "Reports");
             add("inputgst", "Input GST Report", "Reports");
@@ -764,6 +765,7 @@ BEGIN
     ('stockvaluation', 'Stock Valuation Report', 'Reports'),
     ('lowstockalert', 'Low Stock Alert Report', 'Reports'),
     ('stockadjustmentreport', 'Stock Adjustment Report', 'Reports'),
+    ('inactiveitemsreport', 'Inactive Items Report', 'Reports'),
 
     -- Settings & Utilities
     ('possettings', 'Sale Settings', 'Settings'),
