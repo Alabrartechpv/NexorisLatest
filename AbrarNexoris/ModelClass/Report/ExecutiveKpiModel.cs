@@ -94,6 +94,18 @@ namespace ModelClass.Report
         /// <summary>Customer Overpayment / Advance (കസ്റ്റമർ അധികം തന്ന പണം / അഡ്വാൻസ്)</summary>
         public decimal CustomerAdvanceBalance { get; set; }
 
+        /// <summary>Total Manual Party Balance (ബാക്കി നിൽക്കുന്ന ആകെ മാനുവൽ ബാലൻസ്)</summary>
+        public decimal TotalManualBalance { get; set; }
+
+        /// <summary>Manual Customer Balance (Receivables) (കസ്റ്റമർ മാനുവൽ ബാലൻസ്)</summary>
+        public decimal ManualCustomerBalance { get; set; }
+
+        /// <summary>Manual Vendor Balance (Payables) (വെണ്ടർ മാനുവൽ ബാലൻസ്)</summary>
+        public decimal ManualVendorBalance { get; set; }
+
+        /// <summary>Manual Balance Entries Count</summary>
+        public int ManualBalanceCount { get; set; }
+
         // ═══════════════════════════════════════════════════════════════════
         // SECTION 3: REVENUE, PURCHASES, PROFITABILITY & TAX
         // ═══════════════════════════════════════════════════════════════════
