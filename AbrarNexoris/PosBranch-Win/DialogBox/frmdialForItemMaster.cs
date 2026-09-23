@@ -2076,12 +2076,48 @@ namespace PosBranch_Win.DialogBox
                     return;
                 }
 
+                // For Purchase Order dialogs, get inactive item lookup (checks ItemId, Barcode, ItemName)
+                InactiveItemLookupInfo inactiveLookup = null;
+                if (IsPurchaseOrderDialog())
+                {
+                    try
+                    {
+                        Dropdowns inactiveDropdown = new Dropdowns();
+                        inactiveLookup = inactiveDropdown.GetInactiveItemLookup();
+                    }
+                    catch
+                    {
+                        inactiveLookup = new InactiveItemLookupInfo();
+                    }
+                }
+
                 List<DataRow> rowsToRemove = new List<DataRow>();
                 foreach (DataRow row in dataTable.Rows)
                 {
                     if (IsStatusBlockedForCurrentDialog(row))
                     {
                         rowsToRemove.Add(row);
+                    }
+                    else if (IsPurchaseOrderDialog() && inactiveLookup != null)
+                    {
+                        int itemId = 0;
+                        if (row.Table.Columns.Contains("ItemId") && row["ItemId"] != DBNull.Value)
+                        {
+                            int.TryParse(row["ItemId"].ToString(), out itemId);
+                        }
+
+                        string barcode = row.Table.Columns.Contains("Barcode") && row["Barcode"] != DBNull.Value
+                            ? row["Barcode"].ToString()
+                            : (row.Table.Columns.Contains("BarCode") && row["BarCode"] != DBNull.Value ? row["BarCode"].ToString() : null);
+
+                        string itemName = row.Table.Columns.Contains("Description") && row["Description"] != DBNull.Value
+                            ? row["Description"].ToString()
+                            : (row.Table.Columns.Contains("ItemName") && row["ItemName"] != DBNull.Value ? row["ItemName"].ToString() : null);
+
+                        if (inactiveLookup.IsInactive(itemId, barcode, itemName))
+                        {
+                            rowsToRemove.Add(row);
+                        }
                     }
                 }
 
@@ -2115,11 +2151,33 @@ namespace PosBranch_Win.DialogBox
                 ? Dropdowns.NormalizeItemStatusName(row.Cells["ItemStatus"].Value?.ToString())
                 : "Active";
 
+            int itemId = 0;
+            if (row.Cells.Exists("ItemId") && row.Cells["ItemId"].Value != null)
+            {
+                int.TryParse(row.Cells["ItemId"].Value.ToString(), out itemId);
+            }
+            string barcode = row.Cells.Exists("BarCode") && row.Cells["BarCode"].Value != null
+                ? row.Cells["BarCode"].Value.ToString()
+                : (row.Cells.Exists("Barcode") && row.Cells["Barcode"].Value != null ? row.Cells["Barcode"].Value.ToString() : null);
+            string itemNameCell = row.Cells.Exists("Description") && row.Cells["Description"].Value != null
+                ? row.Cells["Description"].Value.ToString()
+                : (row.Cells.Exists("ItemName") && row.Cells["ItemName"].Value != null ? row.Cells["ItemName"].Value.ToString() : null);
+
+            Dropdowns dropdowns = new Dropdowns();
+            InactiveItemLookupInfo inactiveLookup = dropdowns.GetInactiveItemLookup();
+            bool isInactive = string.Equals(statusName, "Inactive", StringComparison.OrdinalIgnoreCase) ||
+                              (inactiveLookup != null && inactiveLookup.IsInactive(itemId, barcode, itemNameCell));
+
             bool isBlocked = (IsSalesInvoiceDialog() && blockSale) ||
                              (IsPurchaseDialog() && blockPurchase) ||
-                             (IsPurchaseOrderDialog() && (string.Equals(statusName, "Inactive", StringComparison.OrdinalIgnoreCase) || blockPurchase));
+                             (IsPurchaseOrderDialog() && (isInactive || blockPurchase));
+
             if (!isBlocked)
             {
+                if ((IsSalesInvoiceDialog() || IsPurchaseDialog()) && isInactive)
+                {
+                    MessageBox.Show("This item has been inactivated.", "Item Inactive", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
                 return true;
             }
 

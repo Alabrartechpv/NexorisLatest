@@ -1,5 +1,6 @@
 using Infragistics.Win;
 using Infragistics.Win.UltraWinGrid;
+using ModelClass;
 using ModelClass.Report;
 using Repository.ReportRepository;
 using System;
@@ -58,6 +59,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             txtSearch.TextChanged += txtSearch_TextChanged;
 
             gridReport.InitializeLayout += gridReport_InitializeLayout;
+            gridReport.InitializeRow += gridReport_InitializeRow;
             gridReport.Resize += gridReport_Resize;
 
             KeyPreview = true;
@@ -260,43 +262,89 @@ namespace PosBranch_Win.Reports.InventoryReport
 
         private void SetupGrid()
         {
+            gridReport.DisplayLayout.Reset();
             gridReport.UseAppStyling = false;
             gridReport.UseOsThemes = DefaultableBoolean.False;
-            gridReport.DisplayLayout.Reset();
-            gridReport.DisplayLayout.CaptionVisible = DefaultableBoolean.True;
-            gridReport.Text = "Inactive Items Detailed Audit Report";
-            gridReport.DisplayLayout.Appearance.BackColor = FormBackColor;
-            gridReport.DisplayLayout.BorderStyle = UIElementBorderStyle.Solid;
-            gridReport.DisplayLayout.MaxColScrollRegions = 1;
-            gridReport.DisplayLayout.MaxRowScrollRegions = 1;
 
-            UltraGridOverride ov = gridReport.DisplayLayout.Override;
-            ov.AllowAddNew = AllowAddNew.No;
-            ov.AllowDelete = DefaultableBoolean.False;
-            ov.AllowUpdate = DefaultableBoolean.False;
-            ov.CellClickAction = CellClickAction.RowSelect;
-            ov.SelectTypeRow = SelectType.Single;
-            ov.HeaderClickAction = HeaderClickAction.SortMulti;
+            UltraGridLayout layout = gridReport.DisplayLayout;
+            layout.CaptionVisible = DefaultableBoolean.False;
+            layout.BorderStyle = UIElementBorderStyle.Solid;
 
-            ov.HeaderAppearance.BackColor = GridHeaderBlue;
-            ov.HeaderAppearance.BackColor2 = GridHeaderBlueDark;
-            ov.HeaderAppearance.BackGradientStyle = GradientStyle.Vertical;
-            ov.HeaderAppearance.ForeColor = Color.White;
-            ov.HeaderAppearance.FontData.Bold = DefaultableBoolean.True;
-            ov.HeaderAppearance.FontData.Name = "Segoe UI";
-            ov.HeaderAppearance.FontData.SizeInPoints = 9F;
+            layout.GroupByBox.Hidden = false;
+            layout.GroupByBox.BandLabelAppearance.BackColor = GridHeaderBlueDark;
+            layout.GroupByBox.BandLabelAppearance.ForeColor = Color.White;
+            layout.GroupByBox.BandLabelAppearance.FontData.Bold = DefaultableBoolean.True;
+            layout.GroupByBox.PromptAppearance.BackColor = GridHeaderBlue;
+            layout.GroupByBox.PromptAppearance.BackColor2 = GridHeaderBlueDark;
+            layout.GroupByBox.PromptAppearance.BackGradientStyle = GradientStyle.Horizontal;
+            layout.GroupByBox.PromptAppearance.ForeColor = Color.White;
+            layout.GroupByBox.Prompt = "Drag a column header here to group by that column";
+            layout.GroupByBox.Appearance.BackColor = Color.FromArgb(109, 167, 226);
+            layout.GroupByBox.Appearance.BackColor2 = Color.FromArgb(69, 125, 190);
+            layout.GroupByBox.Appearance.BackGradientStyle = GradientStyle.Vertical;
 
-            ov.RowAppearance.BackColor = Color.White;
-            ov.RowAppearance.ForeColor = Color.FromArgb(20, 20, 20);
-            ov.RowAppearance.FontData.Name = "Segoe UI";
-            ov.RowAppearance.FontData.SizeInPoints = 9F;
+            layout.Override.AllowAddNew = AllowAddNew.No;
+            layout.Override.AllowDelete = DefaultableBoolean.False;
+            layout.Override.AllowUpdate = DefaultableBoolean.False;
+            layout.Override.CellClickAction = CellClickAction.RowSelect;
+            layout.Override.HeaderClickAction = HeaderClickAction.SortSingle;
+            layout.Override.SelectTypeRow = SelectType.Single;
+            layout.Override.RowSelectors = DefaultableBoolean.True;
+            layout.Override.RowSelectorWidth = 35;
+            layout.Override.RowSelectorNumberStyle = RowSelectorNumberStyle.RowIndex;
 
-            ov.RowAlternateAppearance.BackColor = GridAltRow;
+            layout.Appearance.BackColor = FormBackColor;
+            layout.Appearance.BorderColor = BorderBlue;
+            layout.Appearance.BackColor2 = FormBackColor;
+            layout.Appearance.BackGradientStyle = GradientStyle.None;
 
-            ov.SelectedRowAppearance.BackColor = GridSelectedBlue;
-            ov.SelectedRowAppearance.ForeColor = Color.White;
-            ov.ActiveRowAppearance.BackColor = GridSelectedBlue;
-            ov.ActiveRowAppearance.ForeColor = Color.White;
+            layout.Override.RowSelectorAppearance.BackColor = GridHeaderBlueDark;
+            layout.Override.RowSelectorAppearance.BackColor2 = GridHeaderBlue;
+            layout.Override.RowSelectorAppearance.BackGradientStyle = GradientStyle.Vertical;
+            layout.Override.RowSelectorAppearance.BorderColor = BorderBlue;
+            layout.Override.RowSelectorAppearance.ForeColor = Color.White;
+            layout.Override.RowSelectorAppearance.FontData.Bold = DefaultableBoolean.True;
+            layout.Override.RowSelectorAppearance.TextHAlign = HAlign.Center;
+
+            layout.Override.HeaderAppearance.BackColor = GridHeaderBlue;
+            layout.Override.HeaderAppearance.BackColor2 = GridHeaderBlueDark;
+            layout.Override.HeaderAppearance.BackGradientStyle = GradientStyle.Vertical;
+            layout.Override.HeaderAppearance.ForeColor = Color.White;
+            layout.Override.HeaderAppearance.BorderColor = BorderBlue;
+            layout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.False;
+            layout.Override.HeaderAppearance.FontData.Name = "Microsoft Sans Serif";
+            layout.Override.HeaderAppearance.FontData.SizeInPoints = 8.25F;
+
+            layout.Override.RowAppearance.BackColor = Color.White;
+            layout.Override.RowAlternateAppearance.BackColor = GridAltRow;
+            layout.Override.RowAppearance.BorderColor = GridRowLine;
+            layout.Override.RowAlternateAppearance.BorderColor = GridRowLine;
+            layout.Override.ActiveRowAppearance.BackColor = GridSelectedBlue;
+            layout.Override.ActiveRowAppearance.ForeColor = Color.White;
+            layout.Override.ActiveRowAppearance.BorderColor = BorderBlue;
+            layout.Override.SelectedRowAppearance.BackColor = GridSelectedBlue;
+            layout.Override.SelectedRowAppearance.ForeColor = Color.White;
+            layout.Override.CellAppearance.BorderColor = GridRowLine;
+            layout.Override.CellAppearance.ForeColor = Color.FromArgb(10, 31, 79);
+            layout.Override.CellAppearance.FontData.Name = "Microsoft Sans Serif";
+            layout.Override.CellAppearance.FontData.SizeInPoints = 8.25F;
+            layout.Override.BorderStyleHeader = UIElementBorderStyle.Solid;
+            layout.Override.BorderStyleCell = UIElementBorderStyle.Solid;
+            layout.Override.BorderStyleRow = UIElementBorderStyle.Solid;
+            layout.Override.MinRowHeight = 19;
+            layout.Override.DefaultRowHeight = 19;
+            layout.RowConnectorStyle = RowConnectorStyle.Solid;
+            layout.RowConnectorColor = GridRowLine;
+            layout.ScrollBarLook.Appearance.BackColor = ActionPanelBackColor;
+            layout.ScrollBarLook.Appearance.BorderColor = BorderBlue;
+            layout.ScrollBarLook.TrackAppearance.BackColor = Color.FromArgb(225, 236, 246);
+            layout.ScrollBarLook.ButtonAppearance.BackColor = GridHeaderBlue;
+            layout.ScrollBarLook.ButtonAppearance.BackColor2 = GridHeaderBlueDark;
+            layout.ScrollBarLook.ButtonAppearance.BackGradientStyle = GradientStyle.Vertical;
+            layout.ScrollBarLook.ButtonAppearance.BorderColor = BorderBlue;
+
+            gridReport.BackColor = FormBackColor;
+            gridReport.Font = new Font("Microsoft Sans Serif", 8.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
         }
 
         private void InitializeGridFooter()
@@ -310,8 +358,8 @@ namespace PosBranch_Win.Reports.InventoryReport
                 Text = "Total Inactive Items: 0 | Total Stock: 0.00",
                 AutoSize = true,
                 ForeColor = Color.White,
-                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
-                Location = new Point(10, 3)
+                Font = new Font("Microsoft Sans Serif", 9.5F, FontStyle.Bold),
+                Location = new Point(10, 6)
             };
             ultraPanelGridFooter.ClientArea.Controls.Add(lblSummary);
             _footerLabels["Summary"] = lblSummary;
@@ -335,6 +383,8 @@ namespace PosBranch_Win.Reports.InventoryReport
 
                 InactiveItemsReportFilter filter = new InactiveItemsReportFilter
                 {
+                    CompanyId = SessionContext.CompanyId,
+                    BranchId = SessionContext.BranchId,
                     DateFilterMode = Convert.ToString(ultraComboDateMode.Value ?? "ALL"),
                     FromDate = dtFrom.Value != null ? Convert.ToDateTime(dtFrom.Value) : (DateTime?)null,
                     ToDate = dtTo.Value != null ? Convert.ToDateTime(dtTo.Value) : (DateTime?)null
@@ -378,13 +428,14 @@ namespace PosBranch_Win.Reports.InventoryReport
             }
 
             gridReport.DataSource = null;
+            SetupGrid();
             gridReport.DataSource = _filteredRows;
             UpdateGridFooter();
         }
 
         private void gridReport_InitializeLayout(object sender, InitializeLayoutEventArgs e)
         {
-            if (e.Layout.Bands.Count == 0)
+            if (e.Layout.Bands.Count == 0 || e.Layout.Bands[0].Columns.Count == 0)
                 return;
 
             UltraGridBand band = e.Layout.Bands[0];
@@ -410,7 +461,35 @@ namespace PosBranch_Win.Reports.InventoryReport
             ConfigureGridColumn(band, "CounterName", "Counter", 110, null, HAlign.Left, 14);
             ConfigureGridColumn(band, "BranchName", "Branch", 120, null, HAlign.Left, 15);
 
+            if (band.Columns.Exists("Stock"))
+                band.Columns["Stock"].CellAppearance.ForeColor = Color.FromArgb(27, 94, 32);
+            if (band.Columns.Exists("UnitCost"))
+                band.Columns["UnitCost"].CellAppearance.ForeColor = Color.FromArgb(191, 54, 12);
+            if (band.Columns.Exists("RetailPrice"))
+                band.Columns["RetailPrice"].CellAppearance.ForeColor = Color.FromArgb(1, 87, 155);
+            if (band.Columns.Exists("WalkinPrice"))
+                band.Columns["WalkinPrice"].CellAppearance.ForeColor = Color.FromArgb(0, 102, 204);
+            if (band.Columns.Exists("StatusDate"))
+                band.Columns["StatusDate"].CellAppearance.ForeColor = Color.FromArgb(128, 0, 128);
+
             e.Layout.AutoFitStyle = AutoFitStyle.None;
+        }
+
+        private void gridReport_InitializeRow(object sender, InitializeRowEventArgs e)
+        {
+            try
+            {
+                if (e.Row.Cells.Exists("Stock"))
+                {
+                    decimal stock = Convert.ToDecimal(e.Row.Cells["Stock"].Value ?? 0);
+                    if (stock < 0)
+                    {
+                        e.Row.Appearance.BackColor = Color.FromArgb(254, 226, 226);
+                        e.Row.Appearance.ForeColor = Color.FromArgb(153, 27, 27);
+                    }
+                }
+            }
+            catch { }
         }
 
         private void ConfigureGridColumn(UltraGridBand band, string key, string header, int width, string format, HAlign align, int visiblePosition)
@@ -426,8 +505,8 @@ namespace PosBranch_Win.Reports.InventoryReport
             column.Header.Appearance.BorderColor = GridRowLine;
             column.CellAppearance.BorderColor = GridRowLine;
             column.CellAppearance.TextHAlign = align;
-            column.CellAppearance.FontData.Name = "Segoe UI";
-            column.CellAppearance.FontData.SizeInPoints = 9F;
+            column.CellAppearance.FontData.Name = "Microsoft Sans Serif";
+            column.CellAppearance.FontData.SizeInPoints = 8.25F;
 
             if (!string.IsNullOrWhiteSpace(format))
             {

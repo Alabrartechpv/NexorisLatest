@@ -32,12 +32,22 @@ namespace Repository.TransactionRepository
                     parameters,
                     commandType: CommandType.StoredProcedure).ToList();
 
+                Dropdowns dropdowns = new Dropdowns();
+                InactiveItemLookupInfo inactiveLookup = dropdowns.GetInactiveItemLookup();
+
+                List<SmartReorderItemModel> result = new List<SmartReorderItemModel>();
                 foreach (SmartReorderItemModel item in suggestions)
                 {
+                    if (inactiveLookup != null && inactiveLookup.IsInactive(item.ItemId, item.Barcode, item.ItemName, item.Alert, item.Reason))
+                    {
+                        continue;
+                    }
+
                     item.FinalQuantity = item.SuggestedQuantity;
+                    result.Add(item);
                 }
 
-                return suggestions;
+                return result;
             }
             catch (Exception ex)
             {

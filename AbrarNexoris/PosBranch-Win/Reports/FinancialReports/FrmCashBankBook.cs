@@ -1,265 +1,588 @@
 using System;
-using System.Drawing;
-using System.Windows.Forms;
-using Infragistics.Win;
-using Infragistics.Win.UltraWinGrid;
-using Infragistics.Win.Misc;
-using Infragistics.Win.UltraWinEditors;
-using Repository;
-using Repository.ReportRepository;
-using Repository.MasterRepositry;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.IO;
 using System.Linq;
+using System.Text;
+using System.Windows.Forms;
+using Infragistics.Win;
+using Infragistics.Win.Misc;
+using Infragistics.Win.UltraWinEditors;
+using Infragistics.Win.UltraWinGrid;
 using ModelClass;
 using ModelClass.Report;
-using System.Text;
-using System.IO;
+using Repository;
+using Repository.MasterRepositry;
+using Repository.ReportRepository;
 
 namespace PosBranch_Win.Reports.FinancialReports
 {
     public partial class FrmCashBankBook : Form
     {
+        #region Private Fields
         private readonly CashBankBookRepository _repository;
         private readonly LedgerRepository _ledgerRepository;
-        private BindingList<CashBankTransaction> _transactionsList;
+        private CashBankBookModel _currentReport;
+        private List<CashBankTransaction> _filteredTransactions;
+        private bool _isSelectionHidden = false;
 
-        // Color constants for consistent theme
-        private static readonly Color HeaderBackColor = Color.FromArgb(38, 50, 56);
-        private static readonly Color HeaderBackColor2 = Color.FromArgb(55, 71, 79);
-        private static readonly Color RowAltColor = Color.FromArgb(250, 250, 252);
-        private static readonly Color ReceiptColor = Color.FromArgb(27, 94, 32);
-        private static readonly Color PaymentColor = Color.FromArgb(198, 40, 40);
-        private static readonly Color BalanceDrColor = Color.FromArgb(21, 101, 192);
-        private static readonly Color BalanceCrColor = Color.FromArgb(198, 40, 40);
-        private static readonly Color SelectedRowColor = Color.FromArgb(227, 242, 253);
-        private Infragistics.Win.UltraWinEditors.UltraTextEditor txtSearch;
-        private Infragistics.Win.Misc.UltraPanel panelChart;
-        // private Infragistics.Win.UltraWinChart.UltraChart ultraChart; // Temporarily removed to fix assembly error
+        // Unified IRS POS Design System Palette
+        private static readonly Color FormBackColor = Color.FromArgb(232, 246, 255);
+        private static readonly Color FilterPanelBackColor = Color.FromArgb(235, 245, 252);
+        private static readonly Color ActionPanelBackColor = Color.FromArgb(225, 238, 248);
+        private static readonly Color BorderBlue = Color.FromArgb(126, 170, 208);
+        private static readonly Color ControlTextColor = Color.FromArgb(18, 49, 102);
 
+        private static readonly Color GridHeaderBlue = Color.FromArgb(29, 78, 137);
+        private static readonly Color GridHeaderBlueDark = Color.FromArgb(22, 62, 108);
+        private static readonly Color ButtonTextBlue = Color.FromArgb(18, 49, 102);
+        private static readonly Color RowAltColor = Color.FromArgb(246, 251, 255);
+        private static readonly Color MutedZeroColor = Color.FromArgb(165, 175, 185);
+
+        private static readonly Color ReceiptGreen = Color.FromArgb(27, 94, 32);
+        private static readonly Color PaymentRed = Color.FromArgb(183, 28, 28);
+        private static readonly Color BalanceDrBlue = Color.FromArgb(18, 49, 102);
+        #endregion
+
+        #region Constructor & Lifecycle
         public FrmCashBankBook()
         {
             InitializeComponent();
+
             _repository = new CashBankBookRepository();
             _ledgerRepository = new LedgerRepository();
-            _transactionsList = new BindingList<CashBankTransaction>();
+            _currentReport = new CashBankBookModel();
+            _filteredTransactions = new List<CashBankTransaction>();
 
-            // Event Handlers
+            // Setup Panels, Docking and Z-Order immediately in constructor
+            InitializePanels();
+
             this.Load += FrmCashBankBook_Load;
-            btnGenerate.Click += BtnGenerate_Click;
-            btnExportCsv.Click += btnExportCsv_Click;
-            btnPrint.Click += btnPrint_Click;
-            btnClose.Click += (s, e) => this.Close();
+            this.KeyPreview = true;
+            this.KeyDown += FrmCashBankBook_KeyDown;
 
-            // UltraGrid events
+            // Wire Actions
+            btnGenerate.Click += (s, e) => LoadData();
+            btnPreviewGrid.Click += (s, e) => PreviewGrid();
+            btnPrint.Click += (s, e) => PrintReport();
+            btnExportCsv.Click += (s, e) => ExportCsv();
+            btnClearFilters.Click += (s, e) => ResetFilters();
+            btnToggleSelection.Click += (s, e) => ToggleSelectionPanel();
+
+            txtSearch.ValueChanged += (s, e) => ApplySearchFilter();
+
+            // Grid Events
             ultraGridTransactions.InitializeLayout += UltraGridTransactions_InitializeLayout;
             ultraGridTransactions.InitializeRow += UltraGridTransactions_InitializeRow;
             ultraGridTransactions.DoubleClickRow += UltraGridTransactions_DoubleClickRow;
-
-            // Keyboard Shortcuts
-            this.KeyPreview = true;
-            this.KeyDown += FrmCashBankBook_KeyDown;
         }
-
-        public void RibbonClear()
-        {
-            dtFromDate.Value = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
-            dtToDate.Value = DateTime.Now.Date;
-            cmbDateQuickSelect.SelectedIndex = 1;
-            _transactionsList = new BindingList<CashBankTransaction>();
-            ultraGridTransactions.DataSource = null;
-            lblOpeningBalanceValue.Text = "0.00";
-            lblTotalReceiptsValue.Text = "0.00";
-            lblTotalPaymentsValue.Text = "0.00";
-            lblClosingBalanceValue.Text = "0.00";
-        }
-
-        public void Clear() => RibbonClear();
 
         private void FrmCashBankBook_Load(object sender, EventArgs e)
         {
-            // Apply professional theme
-            SetupGrid();
-            StyleButtons();
-            StyleSummaryPanels();
-
-            // Default date range
-            dtFromDate.Value = new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
-            dtToDate.Value = DateTime.Now.Date;
-
-            // Load ledgers
+            PopulatePresetCombo();
             LoadLedgers();
 
-            // Default quick date
-            cmbDateQuickSelect.SelectedIndex = 1;
-            cmbDateQuickSelect.ValueChanged += cmbDateQuickSelect_ValueChanged;
+            // Default preset is ALL
+            cmbDateQuickSelect.Value = "ALL";
+            UpdateDateRangeForPreset("ALL");
+            cmbDateQuickSelect.ValueChanged += CmbDateQuickSelect_ValueChanged;
+
+            // Auto-load if ledger exists
+            if (ultraComboLedger.Value != null && Convert.ToInt32(ultraComboLedger.Value) > 0)
+            {
+                LoadData();
+            }
+        }
+        #endregion
+
+        #region Theme & UI Styling
+        private void InitializePanels()
+        {
+            this.BackColor = FormBackColor;
+
+            // Filter Panel
+            ultraPanelControls.Appearance.BackColor = FilterPanelBackColor;
+            ultraPanelControls.Appearance.BorderColor = BorderBlue;
+            ultraPanelControls.BorderStyle = UIElementBorderStyle.Solid;
+            ultraPanelControls.Dock = DockStyle.Top;
+            ultraPanelControls.Height = 78;
+
+            // Labels
+            lblSearch.Appearance.ForeColor = ControlTextColor;
+            lblLedger.Appearance.ForeColor = ControlTextColor;
+            lblPreset.Appearance.ForeColor = ControlTextColor;
+            lblFromDate.Appearance.ForeColor = ControlTextColor;
+            lblToDate.Appearance.ForeColor = ControlTextColor;
+            lblRowCount.Appearance.ForeColor = ControlTextColor;
+            lblRowCount.Appearance.FontData.SizeInPoints = 8.5f;
+
+            // Action Panel
+            ultraPanelAction.Appearance.BackColor = ActionPanelBackColor;
+            ultraPanelAction.Appearance.BorderColor = BorderBlue;
+            ultraPanelAction.BorderStyle = UIElementBorderStyle.Solid;
+            ultraPanelAction.Dock = DockStyle.Top;
+            ultraPanelAction.Height = 45;
+
+            // Master Panel
+            ultraPanelMaster.Appearance.BackColor = FormBackColor;
+            ultraPanelMaster.Appearance.BorderColor = BorderBlue;
+            ultraPanelMaster.BorderStyle = UIElementBorderStyle.Solid;
+            ultraPanelMaster.Dock = DockStyle.Fill;
+
+            // Footer Panel (Dock: Bottom, Height: 34)
+            ultraPanelGridFooter.Appearance.BackColor = GridHeaderBlue;
+            ultraPanelGridFooter.Appearance.BackColor2 = GridHeaderBlueDark;
+            ultraPanelGridFooter.Appearance.BackGradientStyle = GradientStyle.Vertical;
+            ultraPanelGridFooter.Appearance.BorderColor = BorderBlue;
+            ultraPanelGridFooter.BorderStyle = UIElementBorderStyle.Solid;
+            ultraPanelGridFooter.Dock = DockStyle.Bottom;
+            ultraPanelGridFooter.Height = 34;
+
+            // Grid (Dock: Fill)
+            ultraGridTransactions.Dock = DockStyle.Fill;
+
+            // Dock & Z-Order (Identical to working FrmTrialBalance and FrmTradingPLAccount)
+            ultraPanelControls.SendToBack();
+            ultraPanelAction.BringToFront();
+            ultraPanelMaster.BringToFront();
+            ultraPanelGridFooter.SendToBack();
+            ultraGridTransactions.BringToFront();
+
+            // Footer Labels
+            lblOpeningSummary.Appearance.ForeColor = Color.FromArgb(255, 255, 200);
+            lblOpeningSummary.Appearance.FontData.Bold = DefaultableBoolean.True;
+            lblOpeningSummary.Appearance.FontData.SizeInPoints = 8.5f;
+
+            lblReceiptsSummary.Appearance.ForeColor = Color.FromArgb(220, 255, 220);
+            lblReceiptsSummary.Appearance.FontData.Bold = DefaultableBoolean.True;
+            lblReceiptsSummary.Appearance.FontData.SizeInPoints = 8.5f;
+
+            lblPaymentsSummary.Appearance.ForeColor = Color.FromArgb(255, 220, 220);
+            lblPaymentsSummary.Appearance.FontData.Bold = DefaultableBoolean.True;
+            lblPaymentsSummary.Appearance.FontData.SizeInPoints = 8.5f;
+
+            SetClosingBadgeState(0);
+            StyleButtons();
+            SetupGridAppearance();
+
+            UpdateSelectionToggleButtonText();
         }
 
-        #region Grid Setup & Styling
+        private void SetClosingBadgeState(decimal closingBalance)
+        {
+            if (closingBalance >= 0)
+            {
+                // Positive Closing Balance (Debit)
+                lblClosingBadge.Appearance.BackColor = Color.FromArgb(232, 245, 233);
+                lblClosingBadge.Appearance.BackColor2 = Color.FromArgb(200, 230, 201);
+                lblClosingBadge.Appearance.BackGradientStyle = GradientStyle.Vertical;
+                lblClosingBadge.Appearance.BorderColor = Color.FromArgb(46, 125, 50);
+                lblClosingBadge.Appearance.ForeColor = Color.FromArgb(27, 94, 32);
+                lblClosingBadge.Appearance.FontData.Bold = DefaultableBoolean.True;
+                lblClosingBadge.Appearance.FontData.SizeInPoints = 9.5f;
+                lblClosingBadge.Text = $"CLOSING: ₹ {Math.Abs(closingBalance):N2} Dr";
+            }
+            else
+            {
+                // Negative / Overdrawn (Credit)
+                lblClosingBadge.Appearance.BackColor = Color.FromArgb(255, 235, 238);
+                lblClosingBadge.Appearance.BackColor2 = Color.FromArgb(255, 205, 210);
+                lblClosingBadge.Appearance.BackGradientStyle = GradientStyle.Vertical;
+                lblClosingBadge.Appearance.BorderColor = Color.FromArgb(198, 40, 40);
+                lblClosingBadge.Appearance.ForeColor = Color.FromArgb(183, 28, 28);
+                lblClosingBadge.Appearance.FontData.Bold = DefaultableBoolean.True;
+                lblClosingBadge.Appearance.FontData.SizeInPoints = 9.5f;
+                lblClosingBadge.Text = $"CLOSING: ₹ {Math.Abs(closingBalance):N2} Cr (Overdrawn)";
+            }
+        }
 
-        private void SetupGrid()
+        private void StyleButtons()
+        {
+            btnGenerate.Text = "View Grid";
+            btnPreviewGrid.Text = "Preview Grid";
+            btnPrint.Text = "Preview Report";
+            btnExportCsv.Text = "Export Grid";
+            btnClearFilters.Text = "Reset Filters";
+            btnToggleSelection.Text = "Hide Selection";
+
+            StyleClassicButton(btnGenerate);
+            StyleClassicButton(btnPreviewGrid);
+            StyleClassicButton(btnPrint);
+            StyleClassicButton(btnExportCsv);
+            StyleClassicButton(btnClearFilters);
+            StyleClassicButton(btnToggleSelection);
+        }
+
+        private static void StyleClassicButton(UltraButton button)
+        {
+            button.UseOsThemes = DefaultableBoolean.False;
+            button.ButtonStyle = UIElementButtonStyle.Flat;
+            button.Font = new Font("Segoe UI", 9F, FontStyle.Bold);
+
+            button.Appearance.BackColor = Color.FromArgb(240, 248, 255);
+            button.Appearance.BackColor2 = Color.FromArgb(196, 222, 245);
+            button.Appearance.BackGradientStyle = GradientStyle.Vertical;
+            button.Appearance.BorderColor = BorderBlue;
+            button.Appearance.ForeColor = ButtonTextBlue;
+
+            button.HotTrackAppearance.BackColor = Color.FromArgb(223, 240, 255);
+            button.HotTrackAppearance.BackColor2 = Color.FromArgb(173, 209, 240);
+            button.HotTrackAppearance.BackGradientStyle = GradientStyle.Vertical;
+            button.HotTrackAppearance.BorderColor = Color.FromArgb(43, 107, 168);
+            button.HotTrackAppearance.ForeColor = Color.FromArgb(10, 35, 75);
+
+            button.PressedAppearance.BackColor = Color.FromArgb(180, 213, 242);
+            button.PressedAppearance.BackColor2 = Color.FromArgb(150, 192, 228);
+            button.PressedAppearance.BackGradientStyle = GradientStyle.Vertical;
+            button.PressedAppearance.BorderColor = Color.FromArgb(29, 78, 137);
+            button.PressedAppearance.ForeColor = Color.FromArgb(6, 23, 50);
+        }
+
+        private void SetupGridAppearance()
         {
             var grid = ultraGridTransactions;
             grid.DisplayLayout.Reset();
 
-            // Read-only
             grid.DisplayLayout.Override.AllowAddNew = AllowAddNew.No;
             grid.DisplayLayout.Override.AllowDelete = DefaultableBoolean.False;
             grid.DisplayLayout.Override.AllowUpdate = DefaultableBoolean.False;
 
-            // Selection
             grid.DisplayLayout.Override.RowSelectors = DefaultableBoolean.True;
             grid.DisplayLayout.Override.RowSelectorNumberStyle = RowSelectorNumberStyle.RowIndex;
             grid.DisplayLayout.Override.RowSelectorWidth = 40;
             grid.DisplayLayout.Override.SelectTypeRow = SelectType.Single;
             grid.DisplayLayout.Override.CellClickAction = CellClickAction.RowSelect;
 
-            // Hide group-by box and caption
             grid.DisplayLayout.CaptionVisible = DefaultableBoolean.False;
             grid.DisplayLayout.GroupByBox.Hidden = true;
 
-            // Row height
-            grid.DisplayLayout.Override.MinRowHeight = 28;
-            grid.DisplayLayout.Override.DefaultRowHeight = 28;
+            grid.DisplayLayout.Override.MinRowHeight = 26;
+            grid.DisplayLayout.Override.DefaultRowHeight = 26;
 
-            // Row colors
             grid.DisplayLayout.Override.RowAppearance.BackColor = Color.White;
             grid.DisplayLayout.Override.RowAlternateAppearance.BackColor = RowAltColor;
 
-            // Header (gradient)
-            grid.DisplayLayout.Override.HeaderAppearance.BackColor = HeaderBackColor;
-            grid.DisplayLayout.Override.HeaderAppearance.BackColor2 = HeaderBackColor2;
+            grid.DisplayLayout.Override.HeaderAppearance.BackColor = GridHeaderBlue;
+            grid.DisplayLayout.Override.HeaderAppearance.BackColor2 = GridHeaderBlueDark;
             grid.DisplayLayout.Override.HeaderAppearance.BackGradientStyle = GradientStyle.Vertical;
             grid.DisplayLayout.Override.HeaderAppearance.ForeColor = Color.White;
             grid.DisplayLayout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.True;
-            grid.DisplayLayout.Override.HeaderAppearance.FontData.SizeInPoints = 9.5f;
+            grid.DisplayLayout.Override.HeaderAppearance.FontData.SizeInPoints = 9F;
             grid.DisplayLayout.Override.HeaderAppearance.TextHAlign = HAlign.Center;
             grid.DisplayLayout.Override.HeaderAppearance.ThemedElementAlpha = Alpha.Transparent;
 
-            // Selected row highlight
-            grid.DisplayLayout.Override.SelectedRowAppearance.BackColor = SelectedRowColor;
+            grid.DisplayLayout.Override.SelectedRowAppearance.BackColor = Color.FromArgb(218, 236, 252);
             grid.DisplayLayout.Override.SelectedRowAppearance.ForeColor = Color.Black;
 
-            // Cell border
-            grid.DisplayLayout.Override.CellAppearance.BorderColor = Color.FromArgb(230, 230, 230);
+            grid.DisplayLayout.Override.CellAppearance.BorderColor = Color.FromArgb(220, 230, 240);
             grid.DisplayLayout.Override.BorderStyleRow = UIElementBorderStyle.Solid;
         }
+        #endregion
 
+        #region Date Presets & Ledgers
+        private void PopulatePresetCombo()
+        {
+            cmbDateQuickSelect.Items.Clear();
+            cmbDateQuickSelect.Items.Add("ALL", "ALL (Full History)");
+            cmbDateQuickSelect.Items.Add("TODAY", "Today");
+            cmbDateQuickSelect.Items.Add("THIS_MONTH", "This Month");
+            cmbDateQuickSelect.Items.Add("LAST_MONTH", "Last Month");
+            cmbDateQuickSelect.Items.Add("THIS_FIN_YEAR", "This Financial Year");
+            cmbDateQuickSelect.Items.Add("CUSTOM", "Custom Range");
+        }
+
+        private void CmbDateQuickSelect_ValueChanged(object sender, EventArgs e)
+        {
+            if (cmbDateQuickSelect.Value == null) return;
+            string key = cmbDateQuickSelect.Value.ToString();
+            UpdateDateRangeForPreset(key);
+        }
+
+        private void UpdateDateRangeForPreset(string presetKey)
+        {
+            DateTime today = DateTime.Today;
+
+            switch (presetKey)
+            {
+                case "ALL":
+                    dtFromDate.DateTime = new DateTime(1990, 1, 1);
+                    dtToDate.DateTime = today;
+                    break;
+                case "TODAY":
+                    dtFromDate.DateTime = today;
+                    dtToDate.DateTime = today;
+                    break;
+                case "THIS_MONTH":
+                    dtFromDate.DateTime = new DateTime(today.Year, today.Month, 1);
+                    dtToDate.DateTime = today;
+                    break;
+                case "LAST_MONTH":
+                    var firstDayLastMonth = new DateTime(today.Year, today.Month, 1).AddMonths(-1);
+                    dtFromDate.DateTime = firstDayLastMonth;
+                    dtToDate.DateTime = firstDayLastMonth.AddMonths(1).AddDays(-1);
+                    break;
+                case "THIS_FIN_YEAR":
+                    int startYear = today.Month >= 4 ? today.Year : today.Year - 1;
+                    dtFromDate.DateTime = new DateTime(startYear, 4, 1);
+                    dtToDate.DateTime = today;
+                    break;
+                case "CUSTOM":
+                    break;
+            }
+        }
+
+        private void LoadLedgers()
+        {
+            try
+            {
+                int branchId = SessionContext.BranchId > 0 ? SessionContext.BranchId : Convert.ToInt32(DataBase.BranchId);
+                DataTable allLedgers = new Repository.Accounts.LedgerRepository().GetAllLedgers(branchId);
+
+                if (allLedgers != null && allLedgers.Rows.Count > 0)
+                {
+                    DataTable filteredTable = allLedgers.Clone();
+                    foreach (DataRow row in allLedgers.Rows)
+                    {
+                        string groupName = Convert.ToString(row["GroupName"]) ?? string.Empty;
+                        string ledgerName = Convert.ToString(row["LedgerName"]) ?? string.Empty;
+                        string combined = $"{groupName} {ledgerName}".ToUpperInvariant();
+
+                        if (combined.Contains("CASH") || combined.Contains("BANK"))
+                        {
+                            filteredTable.ImportRow(row);
+                        }
+                    }
+
+                    if (filteredTable.Rows.Count == 0)
+                    {
+                        filteredTable = allLedgers;
+                    }
+
+                    ultraComboLedger.DataSource = filteredTable;
+                    ultraComboLedger.ValueMember = "LedgerID";
+                    ultraComboLedger.DisplayMember = "LedgerName";
+                }
+                else
+                {
+                    var request = new AccountLedgerDDLRequest
+                    {
+                        BranchId = SessionContext.BranchId,
+                        For = "All"
+                    };
+                    var result = _ledgerRepository.getAccountLedgerDDL(request);
+                    if (result != null && result.List != null)
+                    {
+                        var list = result.List.Where(l => (l.Name ?? "").ToUpperInvariant().Contains("CASH") || (l.Name ?? "").ToUpperInvariant().Contains("BANK")).ToList();
+                        if (list.Count == 0) list = result.List.ToList();
+                        ultraComboLedger.DataSource = list;
+                        ultraComboLedger.ValueMember = "Id";
+                        ultraComboLedger.DisplayMember = "Name";
+                    }
+                }
+
+                ConfigureLedgerComboLayout();
+
+                // Select CASH-IN-HAND by default if present
+                if (ultraComboLedger.Rows.Count > 0)
+                {
+                    UltraGridRow defaultRow = null;
+                    string displayCol = ultraComboLedger.DisplayMember;
+                    string valueCol = ultraComboLedger.ValueMember;
+
+                    foreach (UltraGridRow row in ultraComboLedger.Rows)
+                    {
+                        string text = row.Cells[displayCol].Value?.ToString() ?? "";
+                        if (text.IndexOf("CASH", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            defaultRow = row;
+                            break;
+                        }
+                    }
+
+                    if (defaultRow == null)
+                    {
+                        defaultRow = ultraComboLedger.Rows[0];
+                    }
+
+                    ultraComboLedger.Value = defaultRow.Cells[valueCol].Value;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error loading ledgers: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void ConfigureLedgerComboLayout()
+        {
+            ultraComboLedger.DropDownWidth = 460;
+            ultraComboLedger.DisplayLayout.Override.HeaderClickAction = HeaderClickAction.SortMulti;
+            ultraComboLedger.AutoCompleteMode = Infragistics.Win.AutoCompleteMode.SuggestAppend;
+
+            ultraComboLedger.DisplayLayout.Override.HeaderAppearance.BackColor = GridHeaderBlue;
+            ultraComboLedger.DisplayLayout.Override.HeaderAppearance.BackColor2 = GridHeaderBlueDark;
+            ultraComboLedger.DisplayLayout.Override.HeaderAppearance.BackGradientStyle = GradientStyle.Vertical;
+            ultraComboLedger.DisplayLayout.Override.HeaderAppearance.ForeColor = Color.White;
+            ultraComboLedger.DisplayLayout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.True;
+            ultraComboLedger.DisplayLayout.Override.HeaderAppearance.ThemedElementAlpha = Alpha.Transparent;
+
+            if (ultraComboLedger.DisplayLayout.Bands.Count > 0)
+            {
+                var band = ultraComboLedger.DisplayLayout.Bands[0];
+                foreach (UltraGridColumn col in band.Columns)
+                {
+                    col.Hidden = true;
+                }
+
+                if (band.Columns.Exists("LedgerID")) band.Columns["LedgerID"].Hidden = true;
+                if (band.Columns.Exists("Id")) band.Columns["Id"].Hidden = true;
+                if (band.Columns.Exists("GroupID")) band.Columns["GroupID"].Hidden = true;
+                if (band.Columns.Exists("GroupId")) band.Columns["GroupId"].Hidden = true;
+
+                string nameCol = band.Columns.Exists("LedgerName") ? "LedgerName" : (band.Columns.Exists("Name") ? "Name" : "");
+                if (!string.IsNullOrEmpty(nameCol))
+                {
+                    band.Columns[nameCol].Hidden = false;
+                    band.Columns[nameCol].Header.Caption = "Account Name";
+                    band.Columns[nameCol].Width = 220;
+                    band.Columns[nameCol].Header.VisiblePosition = 0;
+                    band.Columns[nameCol].CellAppearance.FontData.Bold = DefaultableBoolean.True;
+                    band.Columns[nameCol].CellAppearance.ForeColor = ButtonTextBlue;
+                }
+
+                if (band.Columns.Exists("GroupName"))
+                {
+                    band.Columns["GroupName"].Hidden = false;
+                    band.Columns["GroupName"].Header.Caption = "Group";
+                    band.Columns["GroupName"].Width = 130;
+                    band.Columns["GroupName"].Header.VisiblePosition = 1;
+                }
+
+                if (band.Columns.Exists("Balance"))
+                {
+                    band.Columns["Balance"].Hidden = false;
+                    band.Columns["Balance"].Header.Caption = "Balance";
+                    band.Columns["Balance"].Width = 100;
+                    band.Columns["Balance"].CellAppearance.TextHAlign = HAlign.Right;
+                    band.Columns["Balance"].Header.VisiblePosition = 2;
+                }
+            }
+        }
+        #endregion
+
+        #region Grid Layout & Formatting
         private void UltraGridTransactions_InitializeLayout(object sender, InitializeLayoutEventArgs e)
         {
             var band = e.Layout.Bands[0];
 
-            // First hide all, then show only what we need
             foreach (UltraGridColumn col in band.Columns)
             {
                 col.Hidden = true;
             }
 
-            // ADD UNBOUND COLUMN FOR ICONS
-            if (!band.Columns.Exists("IconCol"))
+            ConfigureColumn(band, "VoucherDate", "Date", 95, HAlign.Center);
+            if (band.Columns.Exists("VoucherDate"))
             {
-                var iconCol = band.Columns.Add("IconCol", "");
-                iconCol.DataType = typeof(string);
-                iconCol.Header.VisiblePosition = 0;
-                iconCol.Width = 30;
-                iconCol.CellAppearance.TextHAlign = HAlign.Center;
+                band.Columns["VoucherDate"].Header.VisiblePosition = 0;
+                band.Columns["VoucherDate"].Format = "dd-MMM-yyyy";
             }
 
-            // Configure visible columns in order
-            ConfigureColumn(band, "VoucherDate", "Date", 100, HAlign.Center);
-            if (band.Columns.Exists("VoucherDate"))
-                band.Columns["VoucherDate"].Format = "dd-MMM-yyyy";
+            ConfigureColumn(band, "VoucherID", "Voucher ID", 85, HAlign.Center);
+            if (band.Columns.Exists("VoucherID"))
+            {
+                band.Columns["VoucherID"].Header.VisiblePosition = 1;
+            }
 
-            ConfigureColumn(band, "VoucherID", "Voucher ID", 90, HAlign.Center);
-
-            ConfigureColumn(band, "VoucherTypeName", "Type", 110, HAlign.Left);
+            ConfigureColumn(band, "VoucherTypeName", "Type", 100, HAlign.Left);
             if (band.Columns.Exists("VoucherTypeName"))
+            {
+                band.Columns["VoucherTypeName"].Header.VisiblePosition = 2;
                 band.Columns["VoucherTypeName"].CellAppearance.ForeColor = Color.FromArgb(69, 90, 100);
+            }
 
-            ConfigureColumn(band, "Particulars", "Particulars", 200, HAlign.Left);
+            ConfigureColumn(band, "Particulars", "Particulars / Account", 220, HAlign.Left);
+            if (band.Columns.Exists("Particulars"))
+            {
+                band.Columns["Particulars"].Header.VisiblePosition = 3;
+            }
 
-            ConfigureColumn(band, "Narration", "Narration", 250, HAlign.Left);
+            ConfigureColumn(band, "Narration", "Narration", 200, HAlign.Left);
+            if (band.Columns.Exists("Narration"))
+            {
+                band.Columns["Narration"].Header.VisiblePosition = 4;
+            }
 
-            ConfigureColumn(band, "ReceiptAmount", "Receipts (Dr) ₹", 130, HAlign.Right);
+            ConfigureColumn(band, "ReceiptAmount", "Receipts (Dr) ₹", 120, HAlign.Right);
             if (band.Columns.Exists("ReceiptAmount"))
             {
+                band.Columns["ReceiptAmount"].Header.VisiblePosition = 5;
                 band.Columns["ReceiptAmount"].Format = "N2";
-                band.Columns["ReceiptAmount"].CellAppearance.ForeColor = ReceiptColor;
+                band.Columns["ReceiptAmount"].CellAppearance.ForeColor = ReceiptGreen;
                 band.Columns["ReceiptAmount"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
             }
 
-            ConfigureColumn(band, "PaymentAmount", "Payments (Cr) ₹", 130, HAlign.Right);
+            ConfigureColumn(band, "PaymentAmount", "Payments (Cr) ₹", 120, HAlign.Right);
             if (band.Columns.Exists("PaymentAmount"))
             {
+                band.Columns["PaymentAmount"].Header.VisiblePosition = 6;
                 band.Columns["PaymentAmount"].Format = "N2";
-                band.Columns["PaymentAmount"].CellAppearance.ForeColor = PaymentColor;
+                band.Columns["PaymentAmount"].CellAppearance.ForeColor = PaymentRed;
                 band.Columns["PaymentAmount"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
             }
 
-            ConfigureColumn(band, "FormattedBalance", "Running Balance", 150, HAlign.Right);
+            ConfigureColumn(band, "FormattedBalance", "Running Balance", 130, HAlign.Right);
             if (band.Columns.Exists("FormattedBalance"))
             {
+                band.Columns["FormattedBalance"].Header.VisiblePosition = 7;
                 band.Columns["FormattedBalance"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
-                band.Columns["FormattedBalance"].CellAppearance.FontData.SizeInPoints = 9f;
             }
 
-            // Allow column resizing & auto-fit last column
             band.Override.AllowColSizing = AllowColSizing.Free;
-            e.Layout.AutoFitStyle = AutoFitStyle.ExtendLastColumn;
-
-            // Footer summaries
-            band.Override.SummaryDisplayArea = SummaryDisplayAreas.BottomFixed;
-            band.Override.SummaryFooterCaptionVisible = DefaultableBoolean.False;
-
-            if (band.Columns.Exists("ReceiptAmount") && !band.Summaries.Exists("TotalReceipts"))
-            {
-                var s = band.Summaries.Add("TotalReceipts", SummaryType.Sum, band.Columns["ReceiptAmount"]);
-                s.DisplayFormat = "₹ {0:N2}";
-                s.Appearance.TextHAlign = HAlign.Right;
-                s.Appearance.FontData.Bold = DefaultableBoolean.True;
-                s.Appearance.ForeColor = ReceiptColor;
-            }
-            if (band.Columns.Exists("PaymentAmount") && !band.Summaries.Exists("TotalPayments"))
-            {
-                var s = band.Summaries.Add("TotalPayments", SummaryType.Sum, band.Columns["PaymentAmount"]);
-                s.DisplayFormat = "₹ {0:N2}";
-                s.Appearance.TextHAlign = HAlign.Right;
-                s.Appearance.FontData.Bold = DefaultableBoolean.True;
-                s.Appearance.ForeColor = PaymentColor;
-            }
+            e.Layout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
         }
 
         private void UltraGridTransactions_InitializeRow(object sender, InitializeRowEventArgs e)
         {
-            // Indicator Icons
-            if (e.Row.Cells.Exists("IconCol"))
-            {
-                 e.Row.Cells["IconCol"].Value = (Convert.ToDecimal(e.Row.Cells["ReceiptAmount"].Value ?? 0) > 0) ? "💰" : "💸";
-            }
+            if (e.Row == null || !e.Row.IsDataRow) return;
 
-            // Color the Running Balance (Dr = blue, Cr = red)
+            // Running Balance Color
             if (e.Row.Cells.Exists("RunningBalance") && e.Row.Cells.Exists("FormattedBalance"))
             {
                 var val = e.Row.Cells["RunningBalance"].Value;
                 if (val != null && val != DBNull.Value)
                 {
                     decimal balance = Convert.ToDecimal(val);
-                    e.Row.Cells["FormattedBalance"].Appearance.ForeColor = balance >= 0 ? BalanceDrColor : BalanceCrColor;
+                    e.Row.Cells["FormattedBalance"].Appearance.ForeColor = balance >= 0 ? BalanceDrBlue : PaymentRed;
                 }
             }
 
-            // Highlight zero amounts as light gray
+            // Mute zero amounts in soft gray
             if (e.Row.Cells.Exists("ReceiptAmount"))
             {
                 var val = e.Row.Cells["ReceiptAmount"].Value;
                 if (val != null && val != DBNull.Value && Convert.ToDecimal(val) == 0)
-                    e.Row.Cells["ReceiptAmount"].Appearance.ForeColor = Color.LightGray;
+                {
+                    e.Row.Cells["ReceiptAmount"].Appearance.ForeColor = MutedZeroColor;
+                }
+                else
+                {
+                    e.Row.Cells["ReceiptAmount"].Appearance.ForeColor = ReceiptGreen;
+                }
             }
+
             if (e.Row.Cells.Exists("PaymentAmount"))
             {
                 var val = e.Row.Cells["PaymentAmount"].Value;
                 if (val != null && val != DBNull.Value && Convert.ToDecimal(val) == 0)
-                    e.Row.Cells["PaymentAmount"].Appearance.ForeColor = Color.LightGray;
+                {
+                    e.Row.Cells["PaymentAmount"].Appearance.ForeColor = MutedZeroColor;
+                }
+                else
+                {
+                    e.Row.Cells["PaymentAmount"].Appearance.ForeColor = PaymentRed;
+                }
             }
         }
 
@@ -274,205 +597,9 @@ namespace PosBranch_Win.Reports.FinancialReports
                 col.CellAppearance.TextHAlign = align;
             }
         }
-
         #endregion
 
-        #region Extra Features (Search, Drill-Down, Chart)
-
-        private void TxtSearch_ValueChanged(object sender, EventArgs e)
-        {
-            string filterText = txtSearch.Text.Trim().ToLower();
-            
-            if (string.IsNullOrEmpty(filterText))
-            {
-                ultraGridTransactions.DisplayLayout.Bands[0].ColumnFilters.ClearAllFilters();
-                return;
-            }
-
-            var band = ultraGridTransactions.DisplayLayout.Bands[0];
-            band.ColumnFilters.ClearAllFilters();
-            band.ColumnFilters.LogicalOperator = FilterLogicalOperator.Or;
-            
-            if (band.Columns.Exists("Particulars")) band.ColumnFilters["Particulars"].FilterConditions.Add(FilterComparisionOperator.Contains, filterText);
-            if (band.Columns.Exists("Narration")) band.ColumnFilters["Narration"].FilterConditions.Add(FilterComparisionOperator.Contains, filterText);
-            if (band.Columns.Exists("VoucherTypeName")) band.ColumnFilters["VoucherTypeName"].FilterConditions.Add(FilterComparisionOperator.Contains, filterText);
-            if (band.Columns.Exists("VoucherID")) band.ColumnFilters["VoucherID"].FilterConditions.Add(FilterComparisionOperator.Contains, filterText);
-        }
-
-        private void UltraGridTransactions_DoubleClickRow(object sender, DoubleClickRowEventArgs e)
-        {
-            if (e.Row == null || !e.Row.IsDataRow) return;
-
-            try
-            {
-                string voucherType = e.Row.Cells["VoucherTypeName"].Value?.ToString() ?? "";
-                int voucherId = Convert.ToInt32(e.Row.Cells["VoucherID"].Value ?? 0);
-
-                if (voucherId == 0) return;
-
-                Form targetForm = null;
-
-                // Open appropriate form based on type
-                if (voucherType.Equals("Sales", StringComparison.OrdinalIgnoreCase))
-                {
-                    targetForm = new Transaction.frmSalesInvoice();
-                    // Assumes Id assignment if property exists, or pass via constructor if available.
-                    // For now, we will notify user drill down triggered.
-                    MessageBox.Show($"[Drill-Down Triggered]\nOpening {voucherType} Voucher #{voucherId}\n(Routing to frmSalesInvoice...)", "Drill-Down", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
-                else if (voucherType.Equals("Payment", StringComparison.OrdinalIgnoreCase))
-                {
-                    MessageBox.Show($"[Drill-Down Triggered]\nOpening Payment Voucher #{voucherId}", "Drill-Down", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
-                else if (voucherType.Equals("Receipt", StringComparison.OrdinalIgnoreCase))
-                {
-                    MessageBox.Show($"[Drill-Down Triggered]\nOpening Receipt Voucher #{voucherId}", "Drill-Down", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
-                else
-                {
-                    MessageBox.Show($"Voucher Type '{voucherType}' (ID: {voucherId}) cannot be opened from here.", "Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Error opening voucher: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        private void BuildChart(List<CashBankTransaction> transactions)
-        {
-            // Chart feature temporarily disabled due to missing assembly references.
-            // Requires adding Infragistics.Win.UltraWinChart references to the project.
-        }
-
-        #endregion
-
-        #region Summary Panel & Button Styling
-
-        private void StyleSummaryPanels()
-        {
-            // Opening Balance — soft blue
-            StyleSinglePanel(panelOpening, lblOpeningBalanceTitle, lblOpeningBalanceValue,
-                Color.FromArgb(227, 242, 253), Color.FromArgb(21, 101, 192));
-
-            // Total Receipts — green
-            StyleSinglePanel(panelReceipts, lblTotalReceiptsTitle, lblTotalReceiptsValue,
-                Color.FromArgb(232, 245, 233), ReceiptColor);
-
-            // Total Payments — red
-            StyleSinglePanel(panelPayments, lblTotalPaymentsTitle, lblTotalPaymentsValue,
-                Color.FromArgb(255, 235, 238), PaymentColor);
-
-            // Closing Balance — teal
-            StyleSinglePanel(panelClosing, lblClosingBalanceTitle, lblClosingBalanceValue,
-                Color.FromArgb(224, 242, 241), Color.FromArgb(0, 105, 92));
-        }
-
-        private void StyleSinglePanel(UltraPanel panel, UltraLabel titleLbl, UltraLabel valueLbl, Color bgColor, Color valueColor)
-        {
-            panel.Appearance.BackColor = bgColor;
-            panel.Appearance.BorderColor = Color.FromArgb(200, 200, 200);
-            panel.BorderStyle = UIElementBorderStyle.Solid;
-
-            titleLbl.Appearance.ForeColor = Color.FromArgb(80, 80, 80);
-            valueLbl.Appearance.ForeColor = valueColor;
-        }
-
-        private void StyleButtons()
-        {
-            StyleSingleButton(btnGenerate, Color.FromArgb(21, 101, 192), "▶ Generate");
-            StyleSingleButton(btnExportCsv, Color.FromArgb(27, 94, 32), "⬇ CSV");
-            StyleSingleButton(btnPrint, Color.FromArgb(74, 20, 140), "🖨 Print");
-            StyleSingleButton(btnClose, Color.FromArgb(183, 28, 28), "✕ Close");
-        }
-
-        private void StyleSingleButton(UltraButton btn, Color backColor, string text)
-        {
-            btn.Text = text;
-            btn.UseOsThemes = DefaultableBoolean.False;
-            btn.Appearance.BackColor = backColor;
-            btn.Appearance.ForeColor = Color.White;
-            btn.Appearance.FontData.Bold = DefaultableBoolean.True;
-            btn.Appearance.FontData.SizeInPoints = 9f;
-            btn.Appearance.BorderColor = Color.FromArgb(
-                Math.Max(0, backColor.R - 30),
-                Math.Max(0, backColor.G - 30),
-                Math.Max(0, backColor.B - 30));
-            btn.ButtonStyle = UIElementButtonStyle.Flat;
-
-            var hoverColor = Color.FromArgb(
-                Math.Min(255, backColor.R + 25),
-                Math.Min(255, backColor.G + 25),
-                Math.Min(255, backColor.B + 25));
-
-            btn.MouseEnterElement += (s, e) => btn.Appearance.BackColor = hoverColor;
-            btn.MouseLeaveElement += (s, e) => btn.Appearance.BackColor = backColor;
-        }
-
-        #endregion
-
-        #region Data Loading
-
-        private void LoadLedgers()
-        {
-            try
-            {
-                var request = new AccountLedgerDDLRequest
-                {
-                    BranchId = SessionContext.BranchId,
-                    For = "All"
-                };
-                var result = _ledgerRepository.getAccountLedgerDDL(request);
-
-                if (result != null && result.List != null)
-                {
-                    var ledgerList = result.List.ToList();
-                    ultraComboLedger.DataSource = ledgerList;
-                    ultraComboLedger.ValueMember = "Id";
-                    ultraComboLedger.DisplayMember = "Name";
-
-                    ultraComboLedger.DisplayLayout.Override.HeaderClickAction = HeaderClickAction.SortMulti;
-                    ultraComboLedger.AutoCompleteMode = Infragistics.Win.AutoCompleteMode.SuggestAppend;
-                }
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Error loading ledgers: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        private void cmbDateQuickSelect_ValueChanged(object sender, EventArgs e)
-        {
-            DateTime today = DateTime.Now.Date;
-            switch (cmbDateQuickSelect.Value?.ToString())
-            {
-                case "Today":
-                    dtFromDate.Value = today;
-                    dtToDate.Value = today;
-                    break;
-                case "This Month":
-                    dtFromDate.Value = new DateTime(today.Year, today.Month, 1);
-                    dtToDate.Value = today;
-                    break;
-                case "Last Month":
-                    var firstDayLastMonth = new DateTime(today.Year, today.Month, 1).AddMonths(-1);
-                    dtFromDate.Value = firstDayLastMonth;
-                    dtToDate.Value = firstDayLastMonth.AddMonths(1).AddDays(-1);
-                    break;
-                case "This Financial Year":
-                    int startMonth = 4;
-                    int startYear = today.Month >= startMonth ? today.Year : today.Year - 1;
-                    dtFromDate.Value = new DateTime(startYear, startMonth, 1);
-                    dtToDate.Value = today;
-                    break;
-            }
-        }
-
-        private void BtnGenerate_Click(object sender, EventArgs e)
-        {
-            LoadData();
-        }
-
+        #region Data Loading & Filtering
         private void LoadData()
         {
             try
@@ -486,29 +613,11 @@ namespace PosBranch_Win.Reports.FinancialReports
                 this.Cursor = Cursors.WaitCursor;
 
                 int ledgerId = Convert.ToInt32(ultraComboLedger.Value);
-                DateTime from = Convert.ToDateTime(dtFromDate.Value).Date;
-                DateTime to = Convert.ToDateTime(dtToDate.Value).Date;
+                DateTime from = Convert.ToDateTime(dtFromDate.DateTime).Date;
+                DateTime to = Convert.ToDateTime(dtToDate.DateTime).Date.AddHours(23).AddMinutes(59).AddSeconds(59);
 
-                var reportData = _repository.GetCashBankBook(ledgerId, from, to);
-
-                // Bind Grid
-                _transactionsList = new BindingList<CashBankTransaction>(reportData.Transactions);
-                ultraGridTransactions.DataSource = _transactionsList;
-                ultraGridTransactions.DataBind();
-
-                // Bind Summary
-                lblOpeningBalanceValue.Text = reportData.Summary.OpeningBalance.ToString("N2");
-                lblTotalReceiptsValue.Text = reportData.Summary.TotalReceipts.ToString("N2");
-                lblTotalPaymentsValue.Text = reportData.Summary.TotalPayments.ToString("N2");
-                lblClosingBalanceValue.Text = reportData.Summary.ClosingBalance.ToString("N2");
-
-                // Dynamic color for closing balance
-                lblClosingBalanceValue.Appearance.ForeColor = reportData.Summary.ClosingBalance >= 0
-                    ? Color.FromArgb(0, 105, 92)
-                    : PaymentColor;
-
-                // Build Chart
-                BuildChart(reportData.Transactions);
+                _currentReport = _repository.GetCashBankBook(ledgerId, from, to) ?? new CashBankBookModel();
+                ApplySearchFilter();
             }
             catch (Exception ex)
             {
@@ -520,11 +629,109 @@ namespace PosBranch_Win.Reports.FinancialReports
             }
         }
 
+        private void ApplySearchFilter()
+        {
+            if (_currentReport == null || _currentReport.Transactions == null)
+            {
+                ultraGridTransactions.DataSource = null;
+                lblRowCount.Text = "Total: 0 rows";
+                ClearSummary();
+                return;
+            }
+
+            string searchText = txtSearch.Text.Trim();
+
+            if (string.IsNullOrWhiteSpace(searchText))
+            {
+                _filteredTransactions = new List<CashBankTransaction>(_currentReport.Transactions);
+            }
+            else
+            {
+                _filteredTransactions = _currentReport.Transactions
+                    .Where(t => (t.Particulars != null && t.Particulars.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0)
+                             || (t.Narration != null && t.Narration.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0)
+                             || (t.VoucherTypeName != null && t.VoucherTypeName.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0)
+                             || (t.VoucherNo != null && t.VoucherNo.IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0)
+                             || (t.VoucherID.ToString().IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0))
+                    .ToList();
+            }
+
+            ultraGridTransactions.DataSource = _filteredTransactions;
+            lblRowCount.Text = $"Total: {_filteredTransactions.Count} rows";
+
+            UpdateSummaryDisplay();
+        }
+
+        private void UpdateSummaryDisplay()
+        {
+            if (_currentReport == null || _currentReport.Summary == null)
+            {
+                ClearSummary();
+                return;
+            }
+
+            var sum = _currentReport.Summary;
+            lblOpeningSummary.Text = $"Opening: ₹ {Math.Abs(sum.OpeningBalance):N2} {(sum.OpeningBalance >= 0 ? "Dr" : "Cr")}";
+            lblReceiptsSummary.Text = $"Receipts (Dr): ₹ {sum.TotalReceipts:N2}";
+            lblPaymentsSummary.Text = $"Payments (Cr): ₹ {sum.TotalPayments:N2}";
+
+            SetClosingBadgeState(sum.ClosingBalance);
+        }
+
+        private void ClearSummary()
+        {
+            lblOpeningSummary.Text = "Opening: ₹ 0.00 Dr";
+            lblReceiptsSummary.Text = "Receipts (Dr): ₹ 0.00";
+            lblPaymentsSummary.Text = "Payments (Cr): ₹ 0.00";
+            SetClosingBadgeState(0);
+        }
+
+        private void ResetFilters()
+        {
+            txtSearch.Text = string.Empty;
+            cmbDateQuickSelect.Value = "ALL";
+            UpdateDateRangeForPreset("ALL");
+            LoadData();
+        }
+
+        public void RibbonClear() => ResetFilters();
+        public void Clear() => ResetFilters();
         #endregion
 
-        #region Actions (Export, Print, Shortcuts)
+        #region Actions & Drill-Down
+        private void PreviewGrid()
+        {
+            if (ultraGridTransactions.Rows.Count == 0)
+            {
+                MessageBox.Show("No data available to preview.", "Preview Grid", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
 
-        private void btnExportCsv_Click(object sender, EventArgs e)
+            try
+            {
+                var printDoc = new UltraGridPrintDocument();
+                printDoc.Grid = ultraGridTransactions;
+                printDoc.Header.TextLeft = "Cash & Bank Book — " + (ultraComboLedger.Text ?? "");
+                printDoc.Header.TextRight = $"Period: {Convert.ToDateTime(dtFromDate.DateTime):dd-MMM-yyyy} to {Convert.ToDateTime(dtToDate.DateTime):dd-MMM-yyyy}";
+                printDoc.Footer.TextCenter = "Page [Page #]";
+
+                var previewDialog = new PrintPreviewDialog();
+                previewDialog.Document = printDoc;
+                previewDialog.WindowState = FormWindowState.Maximized;
+                previewDialog.ShowDialog(this);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Preview failed: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void PrintReport()
+        {
+            PreviewGrid();
+        }
+
+        private void ExportCsv()
         {
             if (ultraGridTransactions.Rows.Count == 0)
             {
@@ -532,7 +739,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                 return;
             }
 
-            using (SaveFileDialog sfd = new SaveFileDialog() { Filter = "CSV|*.csv", FileName = "CashBank_Report.csv" })
+            using (SaveFileDialog sfd = new SaveFileDialog { Filter = "CSV Files (*.csv)|*.csv", FileName = $"CashBankBook_{DateTime.Now:yyyyMMdd_HHmm}.csv" })
             {
                 if (sfd.ShowDialog() == DialogResult.OK)
                 {
@@ -540,29 +747,28 @@ namespace PosBranch_Win.Reports.FinancialReports
                     {
                         var csv = new StringBuilder();
 
-                        // Headers
-                        foreach (UltraGridColumn col in ultraGridTransactions.DisplayLayout.Bands[0].Columns)
-                        {
-                            if (!col.Hidden)
-                                csv.Append($"\"{col.Header.Caption}\",");
-                        }
-                        csv.AppendLine();
+                        // Header
+                        var visibleCols = ultraGridTransactions.DisplayLayout.Bands[0].Columns
+                            .Cast<UltraGridColumn>()
+                            .Where(c => !c.Hidden)
+                            .OrderBy(c => c.Header.VisiblePosition)
+                            .ToList();
 
-                        // Data rows
+                        csv.AppendLine(string.Join(",", visibleCols.Select(c => $"\"{c.Header.Caption}\"")));
+
+                        // Rows
                         foreach (UltraGridRow row in ultraGridTransactions.Rows)
                         {
-                            foreach (UltraGridCell cell in row.Cells)
+                            var values = visibleCols.Select(col =>
                             {
-                                if (!cell.Column.Hidden)
-                                {
-                                    string text = (cell.Value?.ToString() ?? "").Replace("\"", "\"\"");
-                                    csv.Append($"\"{text}\",");
-                                }
-                            }
-                            csv.AppendLine();
+                                object val = row.Cells[col.Key].Value;
+                                string text = val != null ? val.ToString().Replace("\"", "\"\"") : string.Empty;
+                                return $"\"{text}\"";
+                            });
+                            csv.AppendLine(string.Join(",", values));
                         }
 
-                        File.WriteAllText(sfd.FileName, csv.ToString());
+                        File.WriteAllText(sfd.FileName, csv.ToString(), Encoding.UTF8);
                         MessageBox.Show("Data exported successfully.", "Export Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                     catch (Exception ex)
@@ -573,40 +779,59 @@ namespace PosBranch_Win.Reports.FinancialReports
             }
         }
 
-        private void btnPrint_Click(object sender, EventArgs e)
+        private void ToggleSelectionPanel()
         {
-            if (ultraGridTransactions.Rows.Count == 0)
-            {
-                MessageBox.Show("No data to print.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
+            _isSelectionHidden = !_isSelectionHidden;
+            ultraPanelControls.Visible = !_isSelectionHidden;
+            UpdateSelectionToggleButtonText();
+        }
+
+        private void UpdateSelectionToggleButtonText()
+        {
+            btnToggleSelection.Text = _isSelectionHidden ? "Show Selection" : "Hide Selection";
+        }
+
+        private void UltraGridTransactions_DoubleClickRow(object sender, DoubleClickRowEventArgs e)
+        {
+            if (e.Row == null || !e.Row.IsDataRow) return;
 
             try
             {
-                var printDoc = new Infragistics.Win.UltraWinGrid.UltraGridPrintDocument();
-                printDoc.Grid = ultraGridTransactions;
-                printDoc.Header.TextLeft = "Cash & Bank Book — " + (ultraComboLedger.Text ?? "");
-                printDoc.Header.TextRight = $"Period: {Convert.ToDateTime(dtFromDate.Value):dd-MMM-yyyy} to {Convert.ToDateTime(dtToDate.Value):dd-MMM-yyyy}";
-                printDoc.Footer.TextCenter = "Page [Page #]";
+                string voucherType = e.Row.Cells["VoucherTypeName"].Value?.ToString() ?? "";
+                int voucherId = Convert.ToInt32(e.Row.Cells["VoucherID"].Value ?? 0);
 
-                var previewDialog = new System.Windows.Forms.PrintPreviewDialog();
-                previewDialog.Document = printDoc;
-                previewDialog.ShowDialog();
+                if (voucherId == 0) return;
+
+                if (voucherType.Equals("Sales", StringComparison.OrdinalIgnoreCase))
+                {
+                    MessageBox.Show($"[Drill-Down]\nOpening Sales Voucher #{voucherId}", "Drill-Down", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                else if (voucherType.Equals("Payment", StringComparison.OrdinalIgnoreCase))
+                {
+                    MessageBox.Show($"[Drill-Down]\nOpening Payment Voucher #{voucherId}", "Drill-Down", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                else if (voucherType.Equals("Receipt", StringComparison.OrdinalIgnoreCase))
+                {
+                    MessageBox.Show($"[Drill-Down]\nOpening Receipt Voucher #{voucherId}", "Drill-Down", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                else
+                {
+                    MessageBox.Show($"Voucher Type '{voucherType}' (ID: {voucherId}) cannot be opened from here.", "Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Print failed: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("Error opening voucher: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 
         private void FrmCashBankBook_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.KeyCode == Keys.Escape) this.Close();
-            else if (e.KeyCode == Keys.F5) btnGenerate.PerformClick();
-            else if (e.Control && e.KeyCode == Keys.E) btnExportCsv.PerformClick();
-            else if (e.Control && e.KeyCode == Keys.P) btnPrint.PerformClick();
+            else if (e.KeyCode == Keys.F5) LoadData();
+            else if (e.Control && e.KeyCode == Keys.E) ExportCsv();
+            else if (e.Control && e.KeyCode == Keys.P) PreviewGrid();
         }
-
         #endregion
     }
 }

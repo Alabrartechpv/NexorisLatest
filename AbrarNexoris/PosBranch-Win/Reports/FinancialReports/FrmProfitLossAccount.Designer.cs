@@ -28,308 +28,373 @@ namespace PosBranch_Win.Reports.FinancialReports
         /// </summary>
         private void InitializeComponent()
         {
-            Infragistics.Win.Appearance appearance1 = new Infragistics.Win.Appearance();
-            this.ultraPanelMain = new Infragistics.Win.Misc.UltraPanel();
-            this.ultraGroupBoxPL = new Infragistics.Win.Misc.UltraGroupBox();
-            this.ultraGridProfitLoss = new Infragistics.Win.UltraWinGrid.UltraGrid();
-            this.panelNetProfit = new Infragistics.Win.Misc.UltraPanel();
-            this.lblNetProfitCaption = new Infragistics.Win.Misc.UltraLabel();
-            this.lblNetProfitValue = new Infragistics.Win.Misc.UltraLabel();
-            this.ultraPanelSummary = new Infragistics.Win.Misc.UltraPanel();
-            this.lblIndirectExpensesValue = new Infragistics.Win.Misc.UltraLabel();
-            this.lblIndirectExpensesCaption = new Infragistics.Win.Misc.UltraLabel();
-            this.lblIndirectIncomesValue = new Infragistics.Win.Misc.UltraLabel();
-            this.lblIndirectIncomesCaption = new Infragistics.Win.Misc.UltraLabel();
-            this.lblGrossProfitBfValue = new Infragistics.Win.Misc.UltraLabel();
-            this.lblGrossProfitBfCaption = new Infragistics.Win.Misc.UltraLabel();
-            this.ultraGroupBoxFilters = new Infragistics.Win.Misc.UltraGroupBox();
-            this.btnClose = new Infragistics.Win.Misc.UltraButton();
+            Infragistics.Win.Appearance appearanceControls = new Infragistics.Win.Appearance();
+            Infragistics.Win.Appearance appearanceAction = new Infragistics.Win.Appearance();
+            Infragistics.Win.Appearance appearanceMaster = new Infragistics.Win.Appearance();
+            Infragistics.Win.Appearance appearanceGrid = new Infragistics.Win.Appearance();
+            Infragistics.Win.Appearance appearanceHeader = new Infragistics.Win.Appearance();
+            Infragistics.Win.Appearance appearanceSelected = new Infragistics.Win.Appearance();
+            Infragistics.Win.Appearance appearanceGridFooter = new Infragistics.Win.Appearance();
+
+            this.ultraPanelControls = new Infragistics.Win.Misc.UltraPanel();
+            this.lblPreset = new Infragistics.Win.Misc.UltraLabel();
+            this.ultraComboPresetDates = new Infragistics.Win.UltraWinEditors.UltraComboEditor();
+            this.lblFromDate = new Infragistics.Win.Misc.UltraLabel();
+            this.ultraDateTimeFrom = new Infragistics.Win.UltraWinEditors.UltraDateTimeEditor();
+            this.lblToDate = new Infragistics.Win.Misc.UltraLabel();
+            this.ultraDateTimeTo = new Infragistics.Win.UltraWinEditors.UltraDateTimeEditor();
+
+            this.ultraPanelAction = new Infragistics.Win.Misc.UltraPanel();
+            this.btnGenerate = new Infragistics.Win.Misc.UltraButton();
+            this.btnPreviewGrid = new Infragistics.Win.Misc.UltraButton();
             this.btnPrint = new Infragistics.Win.Misc.UltraButton();
             this.btnExport = new Infragistics.Win.Misc.UltraButton();
-            this.btnGenerate = new Infragistics.Win.Misc.UltraButton();
-            this.ultraDateTimeTo = new Infragistics.Win.UltraWinEditors.UltraDateTimeEditor();
-            this.lblToDate = new System.Windows.Forms.Label();
-            this.ultraDateTimeFrom = new Infragistics.Win.UltraWinEditors.UltraDateTimeEditor();
-            this.lblFromDate = new System.Windows.Forms.Label();
-            this.ultraPanelMain.ClientArea.SuspendLayout();
-            this.ultraPanelMain.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.ultraGroupBoxPL)).BeginInit();
-            this.ultraGroupBoxPL.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.ultraGridProfitLoss)).BeginInit();
-            this.panelNetProfit.ClientArea.SuspendLayout();
-            this.panelNetProfit.SuspendLayout();
-            this.ultraPanelSummary.ClientArea.SuspendLayout();
-            this.ultraPanelSummary.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.ultraGroupBoxFilters)).BeginInit();
-            this.ultraGroupBoxFilters.SuspendLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.ultraDateTimeTo)).BeginInit();
+            this.btnClearFilters = new Infragistics.Win.Misc.UltraButton();
+            this.btnToggleSelection = new Infragistics.Win.Misc.UltraButton();
+
+            this.ultraPanelMaster = new Infragistics.Win.Misc.UltraPanel();
+            this.ultraGridProfitLoss = new Infragistics.Win.UltraWinGrid.UltraGrid();
+            this.ultraPanelGridFooter = new Infragistics.Win.Misc.UltraPanel();
+            this.lblGrossProfitBf = new Infragistics.Win.Misc.UltraLabel();
+            this.lblIndirectExpenses = new Infragistics.Win.Misc.UltraLabel();
+            this.lblIndirectIncomes = new Infragistics.Win.Misc.UltraLabel();
+            this.lblNetProfit = new Infragistics.Win.Misc.UltraLabel();
+
+            this.ultraPanelControls.ClientArea.SuspendLayout();
+            this.ultraPanelControls.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.ultraComboPresetDates)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.ultraDateTimeFrom)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.ultraDateTimeTo)).BeginInit();
+
+            this.ultraPanelAction.ClientArea.SuspendLayout();
+            this.ultraPanelAction.SuspendLayout();
+
+            this.ultraPanelMaster.ClientArea.SuspendLayout();
+            this.ultraPanelMaster.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.ultraGridProfitLoss)).BeginInit();
+            this.ultraPanelGridFooter.ClientArea.SuspendLayout();
+            this.ultraPanelGridFooter.SuspendLayout();
             this.SuspendLayout();
+
             // 
-            // ultraPanelMain
+            // ultraPanelControls
             // 
-            appearance1.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(236)))), ((int)(((byte)(240)))), ((int)(((byte)(245)))));
-            this.ultraPanelMain.Appearance = appearance1;
+            appearanceControls.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(232)))), ((int)(((byte)(246)))), ((int)(((byte)(255)))));
+            appearanceControls.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(118)))), ((int)(((byte)(154)))), ((int)(((byte)(198)))));
+            this.ultraPanelControls.Appearance = appearanceControls;
+            this.ultraPanelControls.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
             // 
-            // ultraPanelMain.ClientArea
+            // ultraPanelControls.ClientArea
             // 
-            this.ultraPanelMain.ClientArea.Controls.Add(this.ultraGroupBoxPL);
-            this.ultraPanelMain.ClientArea.Controls.Add(this.ultraPanelSummary);
-            this.ultraPanelMain.ClientArea.Controls.Add(this.ultraGroupBoxFilters);
-            this.ultraPanelMain.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.ultraPanelMain.Location = new System.Drawing.Point(0, 0);
-            this.ultraPanelMain.Name = "ultraPanelMain";
-            this.ultraPanelMain.Size = new System.Drawing.Size(1100, 700);
-            this.ultraPanelMain.TabIndex = 0;
+            this.ultraPanelControls.ClientArea.Controls.Add(this.lblPreset);
+            this.ultraPanelControls.ClientArea.Controls.Add(this.ultraComboPresetDates);
+            this.ultraPanelControls.ClientArea.Controls.Add(this.lblFromDate);
+            this.ultraPanelControls.ClientArea.Controls.Add(this.ultraDateTimeFrom);
+            this.ultraPanelControls.ClientArea.Controls.Add(this.lblToDate);
+            this.ultraPanelControls.ClientArea.Controls.Add(this.ultraDateTimeTo);
+            this.ultraPanelControls.Dock = System.Windows.Forms.DockStyle.Top;
+            this.ultraPanelControls.Location = new System.Drawing.Point(0, 0);
+            this.ultraPanelControls.Name = "ultraPanelControls";
+            this.ultraPanelControls.Size = new System.Drawing.Size(1180, 58);
+            this.ultraPanelControls.TabIndex = 0;
+
             // 
-            // ultraGroupBoxPL
+            // lblPreset
             // 
-            this.ultraGroupBoxPL.Controls.Add(this.ultraGridProfitLoss);
-            this.ultraGroupBoxPL.Controls.Add(this.panelNetProfit);
-            this.ultraGroupBoxPL.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.ultraGroupBoxPL.Location = new System.Drawing.Point(0, 80);
-            this.ultraGroupBoxPL.Name = "ultraGroupBoxPL";
-            this.ultraGroupBoxPL.Size = new System.Drawing.Size(1100, 550);
-            this.ultraGroupBoxPL.TabIndex = 1;
-            this.ultraGroupBoxPL.Text = "Profit & Loss Details";
+            this.lblPreset.Location = new System.Drawing.Point(20, 18);
+            this.lblPreset.Name = "lblPreset";
+            this.lblPreset.Size = new System.Drawing.Size(40, 20);
+            this.lblPreset.TabIndex = 0;
+            this.lblPreset.Text = "Period";
+
             // 
-            // ultraGridProfitLoss
+            // ultraComboPresetDates
             // 
-            this.ultraGridProfitLoss.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.ultraGridProfitLoss.Location = new System.Drawing.Point(3, 19);
-            this.ultraGridProfitLoss.Name = "ultraGridProfitLoss";
-            this.ultraGridProfitLoss.Size = new System.Drawing.Size(1094, 478);
-            this.ultraGridProfitLoss.TabIndex = 0;
-            // 
-            // panelNetProfit
-            // 
-            // 
-            // panelNetProfit.ClientArea
-            // 
-            this.panelNetProfit.ClientArea.Controls.Add(this.lblNetProfitCaption);
-            this.panelNetProfit.ClientArea.Controls.Add(this.lblNetProfitValue);
-            this.panelNetProfit.Dock = System.Windows.Forms.DockStyle.Bottom;
-            this.panelNetProfit.Location = new System.Drawing.Point(3, 497);
-            this.panelNetProfit.Name = "panelNetProfit";
-            this.panelNetProfit.Size = new System.Drawing.Size(1094, 50);
-            this.panelNetProfit.TabIndex = 1;
-            // 
-            // lblNetProfitCaption
-            // 
-            this.lblNetProfitCaption.Location = new System.Drawing.Point(20, 15);
-            this.lblNetProfitCaption.Name = "lblNetProfitCaption";
-            this.lblNetProfitCaption.Size = new System.Drawing.Size(200, 22);
-            this.lblNetProfitCaption.TabIndex = 0;
-            this.lblNetProfitCaption.Text = "★ NET PROFIT:";
-            // 
-            // lblNetProfitValue
-            // 
-            this.lblNetProfitValue.Location = new System.Drawing.Point(220, 12);
-            this.lblNetProfitValue.Name = "lblNetProfitValue";
-            this.lblNetProfitValue.Size = new System.Drawing.Size(250, 28);
-            this.lblNetProfitValue.TabIndex = 1;
-            this.lblNetProfitValue.Text = "₹ 0.00";
-            // 
-            // ultraPanelSummary
-            // 
-            // 
-            // ultraPanelSummary.ClientArea
-            // 
-            this.ultraPanelSummary.ClientArea.Controls.Add(this.lblIndirectExpensesValue);
-            this.ultraPanelSummary.ClientArea.Controls.Add(this.lblIndirectExpensesCaption);
-            this.ultraPanelSummary.ClientArea.Controls.Add(this.lblIndirectIncomesValue);
-            this.ultraPanelSummary.ClientArea.Controls.Add(this.lblIndirectIncomesCaption);
-            this.ultraPanelSummary.ClientArea.Controls.Add(this.lblGrossProfitBfValue);
-            this.ultraPanelSummary.ClientArea.Controls.Add(this.lblGrossProfitBfCaption);
-            this.ultraPanelSummary.Dock = System.Windows.Forms.DockStyle.Bottom;
-            this.ultraPanelSummary.Location = new System.Drawing.Point(0, 630);
-            this.ultraPanelSummary.Name = "ultraPanelSummary";
-            this.ultraPanelSummary.Size = new System.Drawing.Size(1100, 70);
-            this.ultraPanelSummary.TabIndex = 2;
-            // 
-            // lblIndirectExpensesValue
-            // 
-            this.lblIndirectExpensesValue.Location = new System.Drawing.Point(650, 31);
-            this.lblIndirectExpensesValue.Name = "lblIndirectExpensesValue";
-            this.lblIndirectExpensesValue.Size = new System.Drawing.Size(180, 28);
-            this.lblIndirectExpensesValue.TabIndex = 5;
-            this.lblIndirectExpensesValue.Text = "₹ 0.00";
-            // 
-            // lblIndirectExpensesCaption
-            // 
-            this.lblIndirectExpensesCaption.Location = new System.Drawing.Point(650, 10);
-            this.lblIndirectExpensesCaption.Name = "lblIndirectExpensesCaption";
-            this.lblIndirectExpensesCaption.Size = new System.Drawing.Size(140, 18);
-            this.lblIndirectExpensesCaption.TabIndex = 4;
-            this.lblIndirectExpensesCaption.Text = "Indirect Expenses:";
-            // 
-            // lblIndirectIncomesValue
-            // 
-            this.lblIndirectIncomesValue.Location = new System.Drawing.Point(380, 31);
-            this.lblIndirectIncomesValue.Name = "lblIndirectIncomesValue";
-            this.lblIndirectIncomesValue.Size = new System.Drawing.Size(180, 28);
-            this.lblIndirectIncomesValue.TabIndex = 3;
-            this.lblIndirectIncomesValue.Text = "₹ 0.00";
-            // 
-            // lblIndirectIncomesCaption
-            // 
-            this.lblIndirectIncomesCaption.Location = new System.Drawing.Point(380, 10);
-            this.lblIndirectIncomesCaption.Name = "lblIndirectIncomesCaption";
-            this.lblIndirectIncomesCaption.Size = new System.Drawing.Size(140, 18);
-            this.lblIndirectIncomesCaption.TabIndex = 2;
-            this.lblIndirectIncomesCaption.Text = "Indirect Incomes:";
-            // 
-            // lblGrossProfitBfValue
-            // 
-            this.lblGrossProfitBfValue.Location = new System.Drawing.Point(100, 31);
-            this.lblGrossProfitBfValue.Name = "lblGrossProfitBfValue";
-            this.lblGrossProfitBfValue.Size = new System.Drawing.Size(180, 28);
-            this.lblGrossProfitBfValue.TabIndex = 1;
-            this.lblGrossProfitBfValue.Text = "₹ 0.00";
-            // 
-            // lblGrossProfitBfCaption
-            // 
-            this.lblGrossProfitBfCaption.Location = new System.Drawing.Point(100, 10);
-            this.lblGrossProfitBfCaption.Name = "lblGrossProfitBfCaption";
-            this.lblGrossProfitBfCaption.Size = new System.Drawing.Size(200, 18);
-            this.lblGrossProfitBfCaption.TabIndex = 0;
-            this.lblGrossProfitBfCaption.Text = "Gross Profit (B/F):";
-            // 
-            // ultraGroupBoxFilters
-            // 
-            this.ultraGroupBoxFilters.Controls.Add(this.btnClose);
-            this.ultraGroupBoxFilters.Controls.Add(this.btnPrint);
-            this.ultraGroupBoxFilters.Controls.Add(this.btnExport);
-            this.ultraGroupBoxFilters.Controls.Add(this.btnGenerate);
-            this.ultraGroupBoxFilters.Controls.Add(this.ultraDateTimeTo);
-            this.ultraGroupBoxFilters.Controls.Add(this.lblToDate);
-            this.ultraGroupBoxFilters.Controls.Add(this.ultraDateTimeFrom);
-            this.ultraGroupBoxFilters.Controls.Add(this.lblFromDate);
-            this.ultraGroupBoxFilters.Dock = System.Windows.Forms.DockStyle.Top;
-            this.ultraGroupBoxFilters.Location = new System.Drawing.Point(0, 0);
-            this.ultraGroupBoxFilters.Name = "ultraGroupBoxFilters";
-            this.ultraGroupBoxFilters.Size = new System.Drawing.Size(1100, 80);
-            this.ultraGroupBoxFilters.TabIndex = 0;
-            this.ultraGroupBoxFilters.Text = "Search Criteria";
-            // 
-            // btnClose
-            // 
-            this.btnClose.Location = new System.Drawing.Point(850, 33);
-            this.btnClose.Name = "btnClose";
-            this.btnClose.Size = new System.Drawing.Size(85, 28);
-            this.btnClose.TabIndex = 7;
-            this.btnClose.Text = "Close";
-            this.btnClose.Click += new System.EventHandler(this.btnClose_Click);
-            // 
-            // btnPrint
-            // 
-            this.btnPrint.Location = new System.Drawing.Point(750, 33);
-            this.btnPrint.Name = "btnPrint";
-            this.btnPrint.Size = new System.Drawing.Size(85, 28);
-            this.btnPrint.TabIndex = 6;
-            this.btnPrint.Text = "Print";
-            this.btnPrint.Click += new System.EventHandler(this.btnPrint_Click);
-            // 
-            // btnExport
-            // 
-            this.btnExport.Location = new System.Drawing.Point(650, 33);
-            this.btnExport.Name = "btnExport";
-            this.btnExport.Size = new System.Drawing.Size(85, 28);
-            this.btnExport.TabIndex = 5;
-            this.btnExport.Text = "Export";
-            this.btnExport.Click += new System.EventHandler(this.btnExportCsv_Click);
-            // 
-            // btnGenerate
-            // 
-            this.btnGenerate.Location = new System.Drawing.Point(530, 33);
-            this.btnGenerate.Name = "btnGenerate";
-            this.btnGenerate.Size = new System.Drawing.Size(100, 28);
-            this.btnGenerate.TabIndex = 4;
-            this.btnGenerate.Text = "Generate";
-            this.btnGenerate.Click += new System.EventHandler(this.btnGenerate_Click);
-            // 
-            // ultraDateTimeTo
-            // 
-            this.ultraDateTimeTo.Location = new System.Drawing.Point(350, 35);
-            this.ultraDateTimeTo.Name = "ultraDateTimeTo";
-            this.ultraDateTimeTo.Size = new System.Drawing.Size(140, 21);
-            this.ultraDateTimeTo.TabIndex = 3;
-            // 
-            // lblToDate
-            // 
-            this.lblToDate.AutoSize = true;
-            this.lblToDate.Location = new System.Drawing.Point(280, 39);
-            this.lblToDate.Name = "lblToDate";
-            this.lblToDate.Size = new System.Drawing.Size(53, 17);
-            this.lblToDate.TabIndex = 2;
-            this.lblToDate.Text = "To Date";
-            // 
-            // ultraDateTimeFrom
-            // 
-            this.ultraDateTimeFrom.Location = new System.Drawing.Point(110, 35);
-            this.ultraDateTimeFrom.Name = "ultraDateTimeFrom";
-            this.ultraDateTimeFrom.Size = new System.Drawing.Size(140, 21);
-            this.ultraDateTimeFrom.TabIndex = 1;
+            this.ultraComboPresetDates.DropDownStyle = Infragistics.Win.DropDownStyle.DropDownList;
+            this.ultraComboPresetDates.Location = new System.Drawing.Point(65, 15);
+            this.ultraComboPresetDates.Name = "ultraComboPresetDates";
+            this.ultraComboPresetDates.Size = new System.Drawing.Size(160, 24);
+            this.ultraComboPresetDates.TabIndex = 1;
+            this.ultraComboPresetDates.ValueChanged += new System.EventHandler(this.UltraComboPresetDates_ValueChanged);
+
             // 
             // lblFromDate
             // 
-            this.lblFromDate.AutoSize = true;
-            this.lblFromDate.Location = new System.Drawing.Point(30, 39);
+            this.lblFromDate.Location = new System.Drawing.Point(245, 18);
             this.lblFromDate.Name = "lblFromDate";
-            this.lblFromDate.Size = new System.Drawing.Size(69, 17);
-            this.lblFromDate.TabIndex = 0;
-            this.lblFromDate.Text = "From Date";
+            this.lblFromDate.Size = new System.Drawing.Size(40, 20);
+            this.lblFromDate.TabIndex = 2;
+            this.lblFromDate.Text = "From";
+
+            // 
+            // ultraDateTimeFrom
+            // 
+            this.ultraDateTimeFrom.FormatString = "dd-MM-yyyy";
+            this.ultraDateTimeFrom.Location = new System.Drawing.Point(290, 15);
+            this.ultraDateTimeFrom.Name = "ultraDateTimeFrom";
+            this.ultraDateTimeFrom.Size = new System.Drawing.Size(120, 24);
+            this.ultraDateTimeFrom.TabIndex = 3;
+
+            // 
+            // lblToDate
+            // 
+            this.lblToDate.Location = new System.Drawing.Point(425, 18);
+            this.lblToDate.Name = "lblToDate";
+            this.lblToDate.Size = new System.Drawing.Size(25, 20);
+            this.lblToDate.TabIndex = 4;
+            this.lblToDate.Text = "To";
+
+            // 
+            // ultraDateTimeTo
+            // 
+            this.ultraDateTimeTo.FormatString = "dd-MM-yyyy";
+            this.ultraDateTimeTo.Location = new System.Drawing.Point(455, 15);
+            this.ultraDateTimeTo.Name = "ultraDateTimeTo";
+            this.ultraDateTimeTo.Size = new System.Drawing.Size(120, 24);
+            this.ultraDateTimeTo.TabIndex = 5;
+
+            // 
+            // ultraPanelAction
+            // 
+            appearanceAction.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(206)))), ((int)(((byte)(223)))), ((int)(((byte)(238)))));
+            appearanceAction.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(118)))), ((int)(((byte)(154)))), ((int)(((byte)(198)))));
+            this.ultraPanelAction.Appearance = appearanceAction;
+            this.ultraPanelAction.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
+            // 
+            // ultraPanelAction.ClientArea
+            // 
+            this.ultraPanelAction.ClientArea.Controls.Add(this.btnGenerate);
+            this.ultraPanelAction.ClientArea.Controls.Add(this.btnPreviewGrid);
+            this.ultraPanelAction.ClientArea.Controls.Add(this.btnPrint);
+            this.ultraPanelAction.ClientArea.Controls.Add(this.btnExport);
+            this.ultraPanelAction.ClientArea.Controls.Add(this.btnClearFilters);
+            this.ultraPanelAction.ClientArea.Controls.Add(this.btnToggleSelection);
+            this.ultraPanelAction.Dock = System.Windows.Forms.DockStyle.Top;
+            this.ultraPanelAction.Location = new System.Drawing.Point(0, 58);
+            this.ultraPanelAction.Name = "ultraPanelAction";
+            this.ultraPanelAction.Size = new System.Drawing.Size(1180, 45);
+            this.ultraPanelAction.TabIndex = 1;
+
+            // 
+            // btnGenerate
+            // 
+            this.btnGenerate.Location = new System.Drawing.Point(10, 8);
+            this.btnGenerate.Name = "btnGenerate";
+            this.btnGenerate.Size = new System.Drawing.Size(120, 28);
+            this.btnGenerate.TabIndex = 0;
+            this.btnGenerate.Text = "View Grid";
+            this.btnGenerate.Click += new System.EventHandler(this.btnGenerate_Click);
+
+            // 
+            // btnPreviewGrid
+            // 
+            this.btnPreviewGrid.Location = new System.Drawing.Point(136, 8);
+            this.btnPreviewGrid.Name = "btnPreviewGrid";
+            this.btnPreviewGrid.Size = new System.Drawing.Size(120, 28);
+            this.btnPreviewGrid.TabIndex = 1;
+            this.btnPreviewGrid.Text = "Preview Grid";
+            this.btnPreviewGrid.Click += new System.EventHandler(this.btnPreviewGrid_Click);
+
+            // 
+            // btnPrint
+            // 
+            this.btnPrint.Location = new System.Drawing.Point(262, 8);
+            this.btnPrint.Name = "btnPrint";
+            this.btnPrint.Size = new System.Drawing.Size(130, 28);
+            this.btnPrint.TabIndex = 2;
+            this.btnPrint.Text = "Preview Report";
+            this.btnPrint.Click += new System.EventHandler(this.btnPrint_Click);
+
+            // 
+            // btnExport
+            // 
+            this.btnExport.Location = new System.Drawing.Point(398, 8);
+            this.btnExport.Name = "btnExport";
+            this.btnExport.Size = new System.Drawing.Size(110, 28);
+            this.btnExport.TabIndex = 3;
+            this.btnExport.Text = "Export Grid";
+            this.btnExport.Click += new System.EventHandler(this.btnExportCsv_Click);
+
+            // 
+            // btnClearFilters
+            // 
+            this.btnClearFilters.Location = new System.Drawing.Point(514, 8);
+            this.btnClearFilters.Name = "btnClearFilters";
+            this.btnClearFilters.Size = new System.Drawing.Size(110, 28);
+            this.btnClearFilters.TabIndex = 4;
+            this.btnClearFilters.Text = "Reset Filters";
+            this.btnClearFilters.Click += new System.EventHandler(this.btnClearFilters_Click);
+
+            // 
+            // btnToggleSelection
+            // 
+            this.btnToggleSelection.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.btnToggleSelection.Location = new System.Drawing.Point(1035, 8);
+            this.btnToggleSelection.Name = "btnToggleSelection";
+            this.btnToggleSelection.Size = new System.Drawing.Size(135, 28);
+            this.btnToggleSelection.TabIndex = 5;
+            this.btnToggleSelection.Text = "Hide Selection";
+            this.btnToggleSelection.Click += new System.EventHandler(this.btnToggleSelection_Click);
+
+            // 
+            // ultraPanelMaster
+            // 
+            appearanceMaster.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(232)))), ((int)(((byte)(246)))), ((int)(((byte)(255)))));
+            appearanceMaster.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(118)))), ((int)(((byte)(154)))), ((int)(((byte)(198)))));
+            this.ultraPanelMaster.Appearance = appearanceMaster;
+            this.ultraPanelMaster.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
+            // 
+            // ultraPanelMaster.ClientArea
+            // 
+            this.ultraPanelMaster.ClientArea.Controls.Add(this.ultraGridProfitLoss);
+            this.ultraPanelMaster.ClientArea.Controls.Add(this.ultraPanelGridFooter);
+            this.ultraPanelMaster.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.ultraPanelMaster.Location = new System.Drawing.Point(0, 103);
+            this.ultraPanelMaster.Name = "ultraPanelMaster";
+            this.ultraPanelMaster.Size = new System.Drawing.Size(1180, 597);
+            this.ultraPanelMaster.TabIndex = 2;
+
+            // 
+            // ultraGridProfitLoss
+            // 
+            appearanceGrid.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(232)))), ((int)(((byte)(246)))), ((int)(((byte)(255)))));
+            this.ultraGridProfitLoss.DisplayLayout.Appearance = appearanceGrid;
+            this.ultraGridProfitLoss.DisplayLayout.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
+            appearanceHeader.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(93)))), ((int)(((byte)(151)))), ((int)(((byte)(214)))));
+            appearanceHeader.ForeColor = System.Drawing.Color.White;
+            this.ultraGridProfitLoss.DisplayLayout.Override.HeaderAppearance = appearanceHeader;
+            appearanceSelected.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(126)))), ((int)(((byte)(126)))), ((int)(((byte)(245)))));
+            appearanceSelected.ForeColor = System.Drawing.Color.White;
+            this.ultraGridProfitLoss.DisplayLayout.Override.SelectedRowAppearance = appearanceSelected;
+            this.ultraGridProfitLoss.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.ultraGridProfitLoss.Location = new System.Drawing.Point(0, 0);
+            this.ultraGridProfitLoss.Name = "ultraGridProfitLoss";
+            this.ultraGridProfitLoss.Size = new System.Drawing.Size(1180, 563);
+            this.ultraGridProfitLoss.TabIndex = 0;
+            this.ultraGridProfitLoss.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
+
+            // 
+            // ultraPanelGridFooter
+            // 
+            appearanceGridFooter.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(93)))), ((int)(((byte)(151)))), ((int)(((byte)(214)))));
+            appearanceGridFooter.BackColor2 = System.Drawing.Color.FromArgb(((int)(((byte)(67)))), ((int)(((byte)(118)))), ((int)(((byte)(184)))));
+            appearanceGridFooter.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
+            appearanceGridFooter.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(118)))), ((int)(((byte)(154)))), ((int)(((byte)(198)))));
+            this.ultraPanelGridFooter.Appearance = appearanceGridFooter;
+            this.ultraPanelGridFooter.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
+            // 
+            // ultraPanelGridFooter.ClientArea
+            // 
+            this.ultraPanelGridFooter.ClientArea.Controls.Add(this.lblGrossProfitBf);
+            this.ultraPanelGridFooter.ClientArea.Controls.Add(this.lblIndirectExpenses);
+            this.ultraPanelGridFooter.ClientArea.Controls.Add(this.lblIndirectIncomes);
+            this.ultraPanelGridFooter.ClientArea.Controls.Add(this.lblNetProfit);
+            this.ultraPanelGridFooter.Dock = System.Windows.Forms.DockStyle.Bottom;
+            this.ultraPanelGridFooter.Location = new System.Drawing.Point(0, 563);
+            this.ultraPanelGridFooter.Name = "ultraPanelGridFooter";
+            this.ultraPanelGridFooter.Size = new System.Drawing.Size(1180, 34);
+            this.ultraPanelGridFooter.TabIndex = 1;
+
+            // 
+            // lblGrossProfitBf
+            // 
+            this.lblGrossProfitBf.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
+            this.lblGrossProfitBf.Location = new System.Drawing.Point(12, 6);
+            this.lblGrossProfitBf.Name = "lblGrossProfitBf";
+            this.lblGrossProfitBf.Size = new System.Drawing.Size(240, 22);
+            this.lblGrossProfitBf.TabIndex = 0;
+            this.lblGrossProfitBf.Text = "Gross Profit (B/F): ₹ 0.00";
+
+            // 
+            // lblIndirectExpenses
+            // 
+            this.lblIndirectExpenses.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
+            this.lblIndirectExpenses.Location = new System.Drawing.Point(260, 6);
+            this.lblIndirectExpenses.Name = "lblIndirectExpenses";
+            this.lblIndirectExpenses.Size = new System.Drawing.Size(250, 22);
+            this.lblIndirectExpenses.TabIndex = 1;
+            this.lblIndirectExpenses.Text = "Indirect Expenses: ₹ 0.00";
+
+            // 
+            // lblIndirectIncomes
+            // 
+            this.lblIndirectIncomes.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold);
+            this.lblIndirectIncomes.Location = new System.Drawing.Point(520, 6);
+            this.lblIndirectIncomes.Name = "lblIndirectIncomes";
+            this.lblIndirectIncomes.Size = new System.Drawing.Size(240, 22);
+            this.lblIndirectIncomes.TabIndex = 2;
+            this.lblIndirectIncomes.Text = "Indirect Incomes: ₹ 0.00";
+
+            // 
+            // lblNetProfit
+            // 
+            this.lblNetProfit.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.lblNetProfit.Font = new System.Drawing.Font("Segoe UI", 9.5F, System.Drawing.FontStyle.Bold);
+            this.lblNetProfit.Location = new System.Drawing.Point(820, 5);
+            this.lblNetProfit.Name = "lblNetProfit";
+            this.lblNetProfit.Size = new System.Drawing.Size(350, 24);
+            this.lblNetProfit.TabIndex = 3;
+            this.lblNetProfit.Text = "★ NET PROFIT: ₹ 0.00";
+
             // 
             // FrmProfitLossAccount
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
+            this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(1100, 700);
-            this.Controls.Add(this.ultraPanelMain);
+            this.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(232)))), ((int)(((byte)(246)))), ((int)(((byte)(255)))));
+            this.ClientSize = new System.Drawing.Size(1180, 700);
+            this.Controls.Add(this.ultraPanelMaster);
+            this.Controls.Add(this.ultraPanelAction);
+            this.Controls.Add(this.ultraPanelControls);
+            this.Font = new System.Drawing.Font("Segoe UI", 9F);
             this.Name = "FrmProfitLossAccount";
+            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "Profit & Loss Account";
-            this.Load += new System.EventHandler(this.FrmProfitLossAccount_Load);
-            this.ultraPanelMain.ClientArea.ResumeLayout(false);
-            this.ultraPanelMain.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)(this.ultraGroupBoxPL)).EndInit();
-            this.ultraGroupBoxPL.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)(this.ultraGridProfitLoss)).EndInit();
-            this.panelNetProfit.ClientArea.ResumeLayout(false);
-            this.panelNetProfit.ResumeLayout(false);
-            this.ultraPanelSummary.ClientArea.ResumeLayout(false);
-            this.ultraPanelSummary.ResumeLayout(false);
-            ((System.ComponentModel.ISupportInitialize)(this.ultraGroupBoxFilters)).EndInit();
-            this.ultraGroupBoxFilters.ResumeLayout(false);
-            this.ultraGroupBoxFilters.PerformLayout();
-            ((System.ComponentModel.ISupportInitialize)(this.ultraDateTimeTo)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.ultraDateTimeFrom)).EndInit();
-            this.ResumeLayout(false);
+            this.WindowState = System.Windows.Forms.FormWindowState.Maximized;
 
+            this.ultraPanelControls.ClientArea.ResumeLayout(false);
+            this.ultraPanelControls.ClientArea.PerformLayout();
+            this.ultraPanelControls.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)(this.ultraComboPresetDates)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.ultraDateTimeFrom)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.ultraDateTimeTo)).EndInit();
+
+            this.ultraPanelAction.ClientArea.ResumeLayout(false);
+            this.ultraPanelAction.ResumeLayout(false);
+
+            this.ultraPanelMaster.ClientArea.ResumeLayout(false);
+            this.ultraPanelMaster.ResumeLayout(false);
+            ((System.ComponentModel.ISupportInitialize)(this.ultraGridProfitLoss)).EndInit();
+
+            this.ultraPanelGridFooter.ClientArea.ResumeLayout(false);
+            this.ultraPanelGridFooter.ResumeLayout(false);
+            this.ResumeLayout(false);
         }
 
         #endregion
 
-        private Infragistics.Win.Misc.UltraPanel ultraPanelMain;
-        private Infragistics.Win.Misc.UltraGroupBox ultraGroupBoxFilters;
-        private System.Windows.Forms.Label lblFromDate;
+        private Infragistics.Win.Misc.UltraPanel ultraPanelControls;
+        private Infragistics.Win.Misc.UltraLabel lblPreset;
+        private Infragistics.Win.UltraWinEditors.UltraComboEditor ultraComboPresetDates;
+        private Infragistics.Win.Misc.UltraLabel lblFromDate;
         private Infragistics.Win.UltraWinEditors.UltraDateTimeEditor ultraDateTimeFrom;
-        private System.Windows.Forms.Label lblToDate;
+        private Infragistics.Win.Misc.UltraLabel lblToDate;
         private Infragistics.Win.UltraWinEditors.UltraDateTimeEditor ultraDateTimeTo;
+
+        private Infragistics.Win.Misc.UltraPanel ultraPanelAction;
         private Infragistics.Win.Misc.UltraButton btnGenerate;
-        private Infragistics.Win.Misc.UltraButton btnExport;
+        private Infragistics.Win.Misc.UltraButton btnPreviewGrid;
         private Infragistics.Win.Misc.UltraButton btnPrint;
-        private Infragistics.Win.Misc.UltraButton btnClose;
-        private Infragistics.Win.Misc.UltraPanel ultraPanelSummary;
-        private Infragistics.Win.Misc.UltraLabel lblGrossProfitBfCaption;
-        private Infragistics.Win.Misc.UltraLabel lblGrossProfitBfValue;
-        private Infragistics.Win.Misc.UltraLabel lblIndirectIncomesCaption;
-        private Infragistics.Win.Misc.UltraLabel lblIndirectIncomesValue;
-        private Infragistics.Win.Misc.UltraLabel lblIndirectExpensesCaption;
-        private Infragistics.Win.Misc.UltraLabel lblIndirectExpensesValue;
-        private Infragistics.Win.Misc.UltraGroupBox ultraGroupBoxPL;
+        private Infragistics.Win.Misc.UltraButton btnExport;
+        private Infragistics.Win.Misc.UltraButton btnClearFilters;
+        private Infragistics.Win.Misc.UltraButton btnToggleSelection;
+
+        private Infragistics.Win.Misc.UltraPanel ultraPanelMaster;
         private Infragistics.Win.UltraWinGrid.UltraGrid ultraGridProfitLoss;
-        private Infragistics.Win.Misc.UltraPanel panelNetProfit;
-        private Infragistics.Win.Misc.UltraLabel lblNetProfitCaption;
-        private Infragistics.Win.Misc.UltraLabel lblNetProfitValue;
+        private Infragistics.Win.Misc.UltraPanel ultraPanelGridFooter;
+        private Infragistics.Win.Misc.UltraLabel lblGrossProfitBf;
+        private Infragistics.Win.Misc.UltraLabel lblIndirectExpenses;
+        private Infragistics.Win.Misc.UltraLabel lblIndirectIncomes;
+        private Infragistics.Win.Misc.UltraLabel lblNetProfit;
     }
 }

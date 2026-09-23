@@ -68,23 +68,23 @@ namespace PosBranch_Win.Reports.InventoryReport
             // 
             // lblDate
             // 
-            this.lblDate.Location = new System.Drawing.Point(30, 20);
+            this.lblDate.Location = new System.Drawing.Point(20, 20);
             this.lblDate.Name = "lblDate";
-            this.lblDate.Size = new System.Drawing.Size(70, 20);
+            this.lblDate.Size = new System.Drawing.Size(85, 20);
             this.lblDate.TabIndex = 0;
             this.lblDate.Text = "Date Period:";
             // 
             // ultraComboDateMode
             // 
             this.ultraComboDateMode.DropDownStyle = Infragistics.Win.DropDownStyle.DropDownList;
-            this.ultraComboDateMode.Location = new System.Drawing.Point(110, 18);
+            this.ultraComboDateMode.Location = new System.Drawing.Point(110, 17);
             this.ultraComboDateMode.Name = "ultraComboDateMode";
             this.ultraComboDateMode.Size = new System.Drawing.Size(180, 21);
             this.ultraComboDateMode.TabIndex = 1;
             // 
             // lblFromDate
             // 
-            this.lblFromDate.Location = new System.Drawing.Point(310, 20);
+            this.lblFromDate.Location = new System.Drawing.Point(305, 20);
             this.lblFromDate.Name = "lblFromDate";
             this.lblFromDate.Size = new System.Drawing.Size(45, 20);
             this.lblFromDate.TabIndex = 2;
@@ -92,14 +92,14 @@ namespace PosBranch_Win.Reports.InventoryReport
             // 
             // dtFrom
             // 
-            this.dtFrom.Location = new System.Drawing.Point(360, 18);
+            this.dtFrom.Location = new System.Drawing.Point(355, 17);
             this.dtFrom.Name = "dtFrom";
             this.dtFrom.Size = new System.Drawing.Size(130, 21);
             this.dtFrom.TabIndex = 3;
             // 
             // lblToDate
             // 
-            this.lblToDate.Location = new System.Drawing.Point(510, 20);
+            this.lblToDate.Location = new System.Drawing.Point(500, 20);
             this.lblToDate.Name = "lblToDate";
             this.lblToDate.Size = new System.Drawing.Size(30, 20);
             this.lblToDate.TabIndex = 4;
@@ -107,24 +107,24 @@ namespace PosBranch_Win.Reports.InventoryReport
             // 
             // dtTo
             // 
-            this.dtTo.Location = new System.Drawing.Point(545, 18);
+            this.dtTo.Location = new System.Drawing.Point(535, 17);
             this.dtTo.Name = "dtTo";
             this.dtTo.Size = new System.Drawing.Size(130, 21);
             this.dtTo.TabIndex = 5;
             // 
             // lblSearch
             // 
-            this.lblSearch.Location = new System.Drawing.Point(30, 50);
+            this.lblSearch.Location = new System.Drawing.Point(20, 50);
             this.lblSearch.Name = "lblSearch";
-            this.lblSearch.Size = new System.Drawing.Size(70, 20);
+            this.lblSearch.Size = new System.Drawing.Size(85, 20);
             this.lblSearch.TabIndex = 6;
             this.lblSearch.Text = "Search:";
             // 
             // txtSearch
             // 
-            this.txtSearch.Location = new System.Drawing.Point(110, 48);
+            this.txtSearch.Location = new System.Drawing.Point(110, 47);
             this.txtSearch.Name = "txtSearch";
-            this.txtSearch.Size = new System.Drawing.Size(565, 21);
+            this.txtSearch.Size = new System.Drawing.Size(555, 21);
             this.txtSearch.TabIndex = 7;
             // 
             // ultraPanelAction
@@ -209,7 +209,6 @@ namespace PosBranch_Win.Reports.InventoryReport
             this.gridReport.Name = "gridReport";
             this.gridReport.Size = new System.Drawing.Size(1194, 544);
             this.gridReport.TabIndex = 0;
-            this.gridReport.Text = "Inactive Items Report";
             // 
             // frmInactiveItemsReport
             // 

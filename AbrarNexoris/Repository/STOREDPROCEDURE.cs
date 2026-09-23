@@ -132,6 +132,7 @@ namespace Repository
         public static string POS_OutputGSTReport = "POS_OutputGSTReport";
         public static string POS_GovtGSTReturnReport = "POS_GovtGSTReturnReport";
         public static string _POS_ExecutiveDashboardKPIs = "_POS_ExecutiveDashboardKPIs";
+        public static string POS_InactiveItemsReport = "POS_InactiveItemsReport";
 
         #endregion
 
