@@ -276,6 +276,107 @@ namespace Repository.ReportRepository
                     // If the reconciliation query fails, keep the original dashboard values
                     System.Diagnostics.Debug.WriteLine($"Stock reconciliation fallback: {exStock.Message}");
                 }
+
+                // ═══════════════════════════════════════════════════════════════════
+                // MANUAL PARTY BALANCE INTEGRATION
+                // Fetch active manual customer and vendor balances
+                // ═══════════════════════════════════════════════════════════════════
+                try
+                {
+                    if (DataConnection.State != ConnectionState.Open)
+                        DataConnection.Open();
+
+                    const string sqlManual = @"
+IF OBJECT_ID('dbo.ManualPartyBalance', 'U') IS NOT NULL
+BEGIN
+    SELECT 
+        b.Id,
+        b.PartyType,
+        b.BalanceType,
+        b.Amount,
+        ISNULL(s.SettledAmount, 0) AS SettledAmount,
+        (b.Amount - ISNULL(s.SettledAmount, 0)) AS RemainingAmount
+    FROM dbo.ManualPartyBalance b
+    OUTER APPLY (
+        SELECT SUM(SettlementAmount) AS SettledAmount
+        FROM dbo.ManualPartyBalanceSettlement
+        WHERE ManualPartyBalanceId = b.Id AND IsDeleted = 0
+    ) s
+    WHERE b.IsDeleted = 0
+      AND b.Status <> 'Settled'
+      AND (@CompanyId = 0 OR b.CompanyId = @CompanyId)
+      AND (@BranchId = 0 OR b.BranchId = @BranchId)
+      AND (b.EntryDate <= @ToDate);
+END";
+
+                    using (SqlCommand cmdManual = new SqlCommand(sqlManual, (SqlConnection)DataConnection))
+                    {
+                        cmdManual.CommandType = CommandType.Text;
+                        cmdManual.CommandTimeout = 60;
+                        cmdManual.Parameters.AddWithValue("@CompanyId", effectiveCompany);
+                        cmdManual.Parameters.AddWithValue("@BranchId", effectiveBranch);
+                        cmdManual.Parameters.AddWithValue("@ToDate", rangeTo.AddDays(1).AddTicks(-1));
+
+                        using (SqlDataAdapter adaptManual = new SqlDataAdapter(cmdManual))
+                        {
+                            DataTable dtManual = new DataTable();
+                            adaptManual.Fill(dtManual);
+
+                            if (dtManual != null && dtManual.Rows.Count > 0)
+                            {
+                                decimal totalManual = 0;
+                                decimal manualCust = 0;
+                                decimal manualVend = 0;
+                                int manualCount = 0;
+
+                                foreach (DataRow mr in dtManual.Rows)
+                                {
+                                    decimal rem = mr["RemainingAmount"] != DBNull.Value ? Convert.ToDecimal(mr["RemainingAmount"]) : 0;
+                                    if (rem <= 0) continue;
+
+                                    string pType = mr["PartyType"]?.ToString() ?? "";
+                                    string bType = mr["BalanceType"]?.ToString() ?? "";
+
+                                    totalManual += rem;
+                                    manualCount++;
+
+                                    bool isCustomer = pType.IndexOf("Customer", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                                      pType.IndexOf("Debtor", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                                      bType.IndexOf("Receivable", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                                      bType.IndexOf("Debit", StringComparison.OrdinalIgnoreCase) >= 0;
+
+                                    bool isVendor = pType.IndexOf("Vendor", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                                    pType.IndexOf("Supplier", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                                    pType.IndexOf("Creditor", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                                    bType.IndexOf("Payable", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                                    bType.IndexOf("Credit", StringComparison.OrdinalIgnoreCase) >= 0;
+
+                                    if (isCustomer && !isVendor)
+                                    {
+                                        manualCust += rem;
+                                    }
+                                    else if (isVendor)
+                                    {
+                                        manualVend += rem;
+                                    }
+                                    else
+                                    {
+                                        manualCust += rem;
+                                    }
+                                }
+
+                                model.TotalManualBalance = totalManual;
+                                model.ManualCustomerBalance = manualCust;
+                                model.ManualVendorBalance = manualVend;
+                                model.ManualBalanceCount = manualCount;
+                            }
+                        }
+                    }
+                }
+                catch (Exception exManual)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Manual balance calculation fallback: {exManual.Message}");
+                }
             }
             catch (Exception ex)
             {
