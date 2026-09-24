@@ -379,20 +379,27 @@ namespace Repository.TransactionRepository
                             objPricesettingsStock.MDStaffPrice = existingPrices.MDStaffPrice;
                             objPricesettingsStock.MDMinPrice = existingPrices.MDMinPrice;
 
-                            // Calculate weighted average cost based on existing stock and new purchase
-                            float existingCost = (float)existingPrices.Cost;
-                            float existingStock = (float)existingPrices.Stock;
-                            float purchaseCost = baseCost > 0 ? baseCost : cost;
-                            float totalPurchaseQty = gridQty + free;
+                            // Calculate weighted average cost based on existing stock and new purchase (on base unit level)
+                            int packingVal = packingValue > 0 ? packingValue : 1;
+                            float purchasePricePerUnit = baseCost > 0 ? baseCost : cost;
+                            float baseUnitPurchaseCost = purchasePricePerUnit / packingVal;
+                            float totalBaseUnitPurchaseQty = (gridQty + free) * packingVal;
 
-                            float calculatedAvgCost = CalculateAverageCost(existingCost, existingStock, purchaseCost, totalPurchaseQty);
+                            var baseUnitPrices = GetExistingBaseUnitPrices(objPricesettingsStock.ItemID, trans);
+                            float existingBaseCost = (float)baseUnitPrices.Cost;
+                            float existingBaseStock = (float)baseUnitPrices.Stock;
+
+                            float calculatedAvgCost = CalculateAverageCost(existingBaseCost, existingBaseStock, baseUnitPurchaseCost, totalBaseUnitPurchaseQty);
                             objPricesettingsStock.SingleItemCost = calculatedAvgCost;
-                            System.Diagnostics.Debug.WriteLine($"CREATE Purchase - Calculated Weighted Average Cost={calculatedAvgCost} (OldCost={existingCost}, OldStock={existingStock}, PurchCost={purchaseCost}, PurchQty={totalPurchaseQty}) for ItemId={objPricesettingsStock.ItemID}, UnitId={objPricesettingsStock.UnitId}");
+                            System.Diagnostics.Debug.WriteLine($"CREATE Purchase - Calculated Weighted Average Cost={calculatedAvgCost} (OldCost={existingBaseCost}, OldStock={existingBaseStock}, PurchCost={baseUnitPurchaseCost}, PurchQty={totalBaseUnitPurchaseQty}) for ItemId={objPricesettingsStock.ItemID}, UnitId={objPricesettingsStock.UnitId}");
 
                             List<PurchaseStockUpdateOnPricesettings> UpdatePriceSettingsWithStock = DataConnection.Query<PurchaseStockUpdateOnPricesettings>(STOREDPROCEDURE.POS_PurchaseInvoice_PriceSettings, objPricesettingsStock, trans, commandType: CommandType.StoredProcedure).ToList<PurchaseStockUpdateOnPricesettings>();
 
-                            // NOTE: Do not overwrite item's master Unit Cost (PriceSettings.Cost) on purchase per user requirements
-                            // UpdateItemMasterCostDirectly(objPricesettingsStock.ItemID, objPricesettingsStock.UnitId, calculatedAvgCost, packingValue, trans);
+                            // Calculate unit cost from purchase grid to check if user edited grid Cost column
+                            float gridUnitCost = cost / packingVal;
+
+                            // If user ONLY changed Qty during purchase, keep Txt_UnitCost unchanged; if user changed Cost, update to Weighted Average Cost
+                            UpdateItemMasterCostOnPurchase(objPricesettingsStock.ItemID, existingBaseCost, gridUnitCost, calculatedAvgCost, trans);
                         }
                         catch (Exception ex)
                         {
@@ -794,20 +801,33 @@ namespace Repository.TransactionRepository
                                 System.Diagnostics.Debug.WriteLine($"UPDATE Purchase STEP1 DELETE - ItemId={objPricesettingsStock.ItemID}, OldQty={oldPurchaseQty}, OldFree={oldPurchaseFree}, OldCost={oldPurchaseCost}, Packing={packingValue}");
                             }
 
-                            // Calculate weighted average cost for UPDATE operation
-                            float currentCost = (float)existingPrices.Cost;
-                            float currentStock = (float)existingPrices.Stock;
-                            float newPurchaseCost = baseCost > 0 ? baseCost : cost;
-                            float newPurchaseQty = gridQty + free;
+                            // Calculate weighted average cost for UPDATE operation (on base unit level)
+                            int packingVal = packingValue > 0 ? packingValue : 1;
+                            float newPurchasePricePerUnit = baseCost > 0 ? baseCost : cost;
+                            float newBaseUnitPurchaseCost = newPurchasePricePerUnit / packingVal;
+                            float newBaseUnitPurchaseQty = (gridQty + free) * packingVal;
 
-                            float calculatedAvgCost = currentCost;
+                            float oldBaseUnitPurchaseCost = 0;
+                            float oldBaseUnitPurchaseQty = 0;
                             if (oldDetail != null)
                             {
-                                calculatedAvgCost = CalculateAverageCostForUpdate(currentCost, currentStock, oldPurchaseCost, oldPurchaseQty + oldPurchaseFree, newPurchaseCost, newPurchaseQty);
+                                int oldPackingVal = oldDetail.Packing > 0 ? (int)oldDetail.Packing : packingVal;
+                                oldBaseUnitPurchaseCost = (float)oldDetail.Cost / oldPackingVal;
+                                oldBaseUnitPurchaseQty = ((float)oldDetail.Qty + (float)oldDetail.Free) * oldPackingVal;
+                            }
+
+                            var baseUnitPrices = GetExistingBaseUnitPrices(objPricesettingsStock.ItemID, trans);
+                            float currentBaseCost = (float)baseUnitPrices.Cost;
+                            float currentBaseStock = (float)baseUnitPrices.Stock;
+
+                            float calculatedAvgCost = currentBaseCost;
+                            if (oldDetail != null)
+                            {
+                                calculatedAvgCost = CalculateAverageCostForUpdate(currentBaseCost, currentBaseStock, oldBaseUnitPurchaseCost, oldBaseUnitPurchaseQty, newBaseUnitPurchaseCost, newBaseUnitPurchaseQty);
                             }
                             else
                             {
-                                calculatedAvgCost = CalculateAverageCost(currentCost, currentStock, newPurchaseCost, newPurchaseQty);
+                                calculatedAvgCost = CalculateAverageCost(currentBaseCost, currentBaseStock, newBaseUnitPurchaseCost, newBaseUnitPurchaseQty);
                             }
 
                             objPricesettingsStock.SingleItemCost = calculatedAvgCost;
@@ -817,8 +837,11 @@ namespace Repository.TransactionRepository
                             objPricesettingsStock._Operation = "CREATE";
                             List<PurchaseStockUpdateOnPricesettings> UpdatePriceSettingsWithStock = DataConnection.Query<PurchaseStockUpdateOnPricesettings>(STOREDPROCEDURE.POS_PurchaseInvoice_PriceSettings, objPricesettingsStock, trans, commandType: CommandType.StoredProcedure).ToList<PurchaseStockUpdateOnPricesettings>();
 
-                            // NOTE: Do not overwrite item's master Unit Cost (PriceSettings.Cost) on purchase update per user requirements
-                            // UpdateItemMasterCostDirectly(objPricesettingsStock.ItemID, objPricesettingsStock.UnitId, calculatedAvgCost, packingValue, trans);
+                            // Calculate unit cost from purchase grid to check if user edited grid Cost column
+                            float gridUnitCost = cost / packingVal;
+
+                            // If user ONLY changed Qty during purchase, keep Txt_UnitCost unchanged; if user changed Cost, update to Weighted Average Cost
+                            UpdateItemMasterCostOnPurchase(objPricesettingsStock.ItemID, currentBaseCost, gridUnitCost, calculatedAvgCost, trans);
                         }
                         catch (Exception ex)
                         {
@@ -1413,6 +1436,133 @@ namespace Repository.TransactionRepository
             {
                 System.Diagnostics.Debug.WriteLine($"Error getting old purchase details: {ex.Message}");
                 return new List<PurchaseDetails>();
+            }
+        }
+
+        /// <summary>
+        /// Gets existing Base Unit prices, cost, and stock from PriceSettings table
+        /// </summary>
+        private dynamic GetExistingBaseUnitPrices(int itemId, IDbTransaction transaction)
+        {
+            try
+            {
+                int targetBranchId = SessionContext.BranchId > 0 ? SessionContext.BranchId : Convert.ToInt32(DataBase.BranchId);
+                var query = @"
+                    SELECT TOP 1
+                        ISNULL(Cost, 0) as Cost,
+                        ISNULL(Stock, 0) as Stock,
+                        ISNULL(Packing, 1) as Packing
+                    FROM PriceSettings 
+                    WHERE BranchId = @BranchId 
+                        AND ItemId = @ItemId
+                    ORDER BY CASE WHEN IsBaseUnit = 'Y' THEN 0 WHEN Packing = 1 THEN 1 ELSE 2 END, UnitId";
+
+                var result = DataConnection.QueryFirstOrDefault(query, new
+                {
+                    BranchId = targetBranchId,
+                    ItemId = itemId
+                }, transaction);
+
+                if (result == null)
+                {
+                    return new { Cost = 0.0, Stock = 0.0, Packing = 1.0 };
+                }
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error getting base unit prices: {ex.Message}");
+                return new { Cost = 0.0, Stock = 0.0, Packing = 1.0 };
+            }
+        }
+
+        /// <summary>
+        /// Ensures PriceSettings table has SingleItemCost column for weighted average cost tracking
+        /// </summary>
+        private void EnsureSingleItemCostColumnExists(IDbTransaction transaction)
+        {
+            try
+            {
+                string sql = @"
+                    IF EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'PriceSettings')
+                       AND NOT EXISTS (SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = 'PriceSettings' AND COLUMN_NAME = 'SingleItemCost')
+                    BEGIN
+                        ALTER TABLE dbo.PriceSettings ADD SingleItemCost FLOAT NULL;
+                    END";
+                DataConnection.Execute(sql, transaction: transaction);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"EnsureSingleItemCostColumnExists error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Updates or preserves PriceSettings.Cost based on user changes in FrmPurchase:
+        /// 1. If user ONLY changed Qty (gridUnitCost == existingBaseCost), PriceSettings.Cost is preserved (not changed).
+        /// 2. If user changed Cost (gridUnitCost != existingBaseCost), PriceSettings.Cost is updated to the calculated Weighted Average Cost.
+        /// </summary>
+        private void UpdateItemMasterCostOnPurchase(int itemId, float existingBaseCost, float gridUnitCost, float calculatedBaseAvgCost, IDbTransaction transaction)
+        {
+            try
+            {
+                int targetBranchId = SessionContext.BranchId > 0 ? SessionContext.BranchId : Convert.ToInt32(DataBase.BranchId);
+
+                EnsureSingleItemCostColumnExists(transaction);
+
+                // Check if cost was changed by user during purchase (difference >= 0.01)
+                bool costWasChangedByUser = existingBaseCost <= 0 || Math.Abs(gridUnitCost - existingBaseCost) >= 0.01f;
+
+                if (costWasChangedByUser)
+                {
+                    // User changed Cost during purchase -> Update PriceSettings.Cost to calculated Weighted Average Cost
+                    string updateAvgCostQuery = @"
+                        UPDATE PriceSettings 
+                        SET Cost = CASE 
+                                WHEN ISNULL(Packing, 1) > 0 THEN @CalculatedBaseAvgCost * ISNULL(Packing, 1)
+                                ELSE @CalculatedBaseAvgCost
+                            END,
+                            SingleItemCost = @CalculatedBaseAvgCost
+                        WHERE BranchId = @BranchId 
+                            AND ItemId = @ItemId";
+
+                    DataConnection.Execute(updateAvgCostQuery, new
+                    {
+                        CalculatedBaseAvgCost = calculatedBaseAvgCost,
+                        BranchId = targetBranchId,
+                        ItemId = itemId
+                    }, transaction);
+
+                    System.Diagnostics.Debug.WriteLine($"User changed Cost during purchase - Updated Weighted Average Cost ({calculatedBaseAvgCost}) for ItemId={itemId} in PriceSettings.");
+                }
+                else
+                {
+                    // User ONLY changed Qty (Cost was not changed) -> Preserve existing Master Unit Cost (PriceSettings.Cost)!
+                    string preserveCostQuery = @"
+                        UPDATE PriceSettings 
+                        SET Cost = CASE 
+                                WHEN ISNULL(Packing, 1) > 0 THEN @ExistingBaseCost * ISNULL(Packing, 1)
+                                ELSE @ExistingBaseCost
+                            END,
+                            SingleItemCost = @CalculatedBaseAvgCost
+                        WHERE BranchId = @BranchId 
+                            AND ItemId = @ItemId";
+
+                    DataConnection.Execute(preserveCostQuery, new
+                    {
+                        ExistingBaseCost = existingBaseCost,
+                        CalculatedBaseAvgCost = calculatedBaseAvgCost,
+                        BranchId = targetBranchId,
+                        ItemId = itemId
+                    }, transaction);
+
+                    System.Diagnostics.Debug.WriteLine($"User ONLY changed Qty during purchase - Preserved Master Unit Cost ({existingBaseCost}) for ItemId={itemId} in PriceSettings.");
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error updating item master cost on purchase: {ex.Message}");
             }
         }
 

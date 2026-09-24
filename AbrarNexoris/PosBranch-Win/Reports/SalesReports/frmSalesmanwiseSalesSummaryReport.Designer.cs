@@ -95,7 +95,7 @@ namespace PosBranch_Win.Reports.SalesReports
             this.panelHeader.Height = 45;
             this.panelHeader.UseAppStyling = false;
             this.panelHeader.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
-            this.panelHeader.Appearance.BackColor = System.Drawing.Color.FromArgb(30, 40, 55);
+            this.panelHeader.Appearance.BackColor = System.Drawing.Color.White;
             this.panelHeader.ClientArea.Controls.Add(this.lblTitle);
             this.panelHeader.Name = "panelHeader";
             // 
@@ -105,7 +105,7 @@ namespace PosBranch_Win.Reports.SalesReports
             this.lblTitle.UseAppStyling = false;
             this.lblTitle.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
             this.lblTitle.Font = new System.Drawing.Font("Segoe UI Semibold", 13F, System.Drawing.FontStyle.Bold);
-            this.lblTitle.Appearance.ForeColor = System.Drawing.Color.White;
+            this.lblTitle.Appearance.ForeColor = System.Drawing.Color.FromArgb(18, 49, 102);
             this.lblTitle.Location = new System.Drawing.Point(15, 10);
             this.lblTitle.Name = "lblTitle";
             this.lblTitle.Size = new System.Drawing.Size(262, 21);

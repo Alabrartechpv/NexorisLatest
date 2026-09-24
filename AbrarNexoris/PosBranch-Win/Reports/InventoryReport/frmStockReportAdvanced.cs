@@ -1,4 +1,5 @@
 using Infragistics.Win;
+using Infragistics.Win.Misc;
 using Infragistics.Win.UltraWinGrid;
 using ModelClass;
 using ModelClass.Report;
@@ -20,6 +21,32 @@ namespace PosBranch_Win.Reports.InventoryReport
 {
     public partial class frmStockReportAdvanced : Form
     {
+        // ─── Theme Palette (matches frmItemReport / FrmSmartReorderDashboard) ────────
+        private static readonly Color FormBackColor        = Color.FromArgb(232, 246, 255);
+        private static readonly Color FilterPanelBackColor = Color.FromArgb(232, 246, 255);
+        private static readonly Color ActionPanelBackColor = Color.FromArgb(206, 223, 238);
+        private static readonly Color BorderBlue           = Color.FromArgb(118, 154, 198);
+        private static readonly Color ControlBackColor     = Color.White;
+        private static readonly Color ControlTextColor     = Color.FromArgb(18, 49, 102);
+        private static readonly Color GridHeaderBlue       = Color.FromArgb(93, 151, 214);
+        private static readonly Color GridHeaderBlueDark   = Color.FromArgb(67, 118, 184);
+        private static readonly Color GridSelectedBlue     = Color.FromArgb(173, 216, 255);
+        private static readonly Color GridRowLine          = Color.FromArgb(197, 217, 241);
+        private static readonly Color GridAltRow           = Color.FromArgb(246, 250, 255);
+        private static readonly Color GridFooterBorder     = Color.FromArgb(144, 181, 223);
+        private static readonly Color SkyBlueOutline       = Color.FromArgb(160, 210, 255);
+
+        private static readonly Color ButtonTopColor       = Color.FromArgb(234, 244, 255);
+        private static readonly Color ButtonBottomColor    = Color.FromArgb(152, 188, 235);
+        private static readonly Color ButtonBorderColor    = Color.FromArgb(73, 119, 184);
+        private static readonly Color ButtonTextBlue       = Color.FromArgb(14, 47, 108);
+
+        private static readonly Color PanelHoverTopColor   = Color.FromArgb(245, 250, 255);
+        private static readonly Color PanelHoverBottomColor= Color.FromArgb(170, 206, 244);
+
+        private static readonly Color PanelPressedTopColor = Color.FromArgb(205, 226, 248);
+        private static readonly Color PanelPressedBottomColor = Color.FromArgb(128, 170, 224);
+
         private StockReportAdvanceRepo reportRepo;
         private Dropdowns dropdownRepo;
         private BackgroundWorker searchWorker;
@@ -67,10 +94,11 @@ namespace PosBranch_Win.Reports.InventoryReport
         {
             try
             {
-                // Remove ALL SetChildIndex calls - they broke the layout
-
                 reportRepo = new StockReportAdvanceRepo();
                 dropdownRepo = new Dropdowns();
+
+                // Apply unified theme appearance
+                InitializeRuntimeAppearance();
 
                 // Initialize Dates
                 ultraDateTimeEditorFrom.Value = DateTime.Now.AddDays(-30);
@@ -84,18 +112,181 @@ namespace PosBranch_Win.Reports.InventoryReport
                 LoadLedgers();
 
                 // Configure Grid
-                ConfigureGrid();
+                ApplyGridStyling(ultraGridStock);
 
                 // Setup column chooser
                 SetupColumnChooserMenu();
                 LoadGridLayout();
 
-                // Style Buttons
+                // Style Buttons & Summary Cards
                 StyleButtons();
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Error initializing form: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void InitializeRuntimeAppearance()
+        {
+            BackColor = FormBackColor;
+
+            // Panels
+            if (ultraPanelControls != null)
+            {
+                ultraPanelControls.Appearance.BackColor = FilterPanelBackColor;
+                ultraPanelControls.Appearance.BorderColor = BorderBlue;
+                ultraPanelControls.BorderStyle = UIElementBorderStyle.Solid;
+            }
+
+            if (ultraPanelFilters != null)
+            {
+                ultraPanelFilters.Appearance.BackColor = FilterPanelBackColor;
+                ultraPanelFilters.Appearance.BorderColor = BorderBlue;
+                ultraPanelFilters.BorderStyle = UIElementBorderStyle.Solid;
+            }
+
+            if (ultraPanelActionBar != null)
+            {
+                ultraPanelActionBar.Appearance.BackColor = ActionPanelBackColor;
+                ultraPanelActionBar.Appearance.BorderColor = BorderBlue;
+                ultraPanelActionBar.BorderStyle = UIElementBorderStyle.Solid;
+                ultraPanelActionBar.Size = new Size(ultraPanelActionBar.Width, 38);
+            }
+
+            if (ultraPanelGrid != null)
+            {
+                ultraPanelGrid.Appearance.BackColor = FormBackColor;
+                ultraPanelGrid.Appearance.BorderColor = BorderBlue;
+                ultraPanelGrid.BorderStyle = UIElementBorderStyle.Solid;
+            }
+
+            if (gridFooterPanel != null)
+            {
+                gridFooterPanel.Appearance.BackColor = GridHeaderBlue;
+                gridFooterPanel.Appearance.BackColor2 = GridHeaderBlue;
+                gridFooterPanel.Appearance.BackGradientStyle = GradientStyle.None;
+                gridFooterPanel.Appearance.BorderColor = GridFooterBorder;
+                gridFooterPanel.BorderStyle = UIElementBorderStyle.Solid;
+                gridFooterPanel.Height = 26;
+            }
+
+            // Labels
+            StyleLabel(ultraLabelFromDate);
+            StyleLabel(ultraLabelToDate);
+            StyleLabel(ultraLabelPreset);
+            StyleLabel(ultraLabelGroup);
+            StyleLabel(ultraLabelCategory);
+            StyleLabel(ultraLabelSubCategory);
+            StyleLabel(ultraLabelBarcode);
+            StyleLabel(ultraLabelLedger);
+
+            // Controls
+            StyleDateTimeEditor(ultraDateTimeEditorFrom);
+            StyleDateTimeEditor(ultraDateTimeEditorTo);
+            StyleFilterCombo(ultraComboPresetDates);
+            StyleFilterCombo(ultraComboGroup);
+            StyleFilterCombo(ultraComboCategory);
+            StyleFilterCombo(ultraComboSubCategory);
+            StyleFilterCombo(ultraComboLedger);
+            StyleTextEditor(ultraTextEditorBarcode);
+
+            // Summary Cards
+            StyleSummaryCards();
+        }
+
+        private static void StyleLabel(Infragistics.Win.Misc.UltraLabel lbl)
+        {
+            if (lbl == null) return;
+            lbl.Appearance.BackColor = Color.Transparent;
+            lbl.Appearance.ForeColor = Color.FromArgb(18, 47, 95);
+            lbl.Appearance.FontData.Bold = DefaultableBoolean.False;
+            lbl.Appearance.FontData.Name = "Microsoft Sans Serif";
+            lbl.Appearance.FontData.SizeInPoints = 9F;
+        }
+
+        private static void StyleFilterCombo(Infragistics.Win.UltraWinEditors.UltraComboEditor combo)
+        {
+            if (combo == null) return;
+            combo.UseAppStyling = false;
+            combo.UseOsThemes = DefaultableBoolean.False;
+            combo.DisplayStyle = EmbeddableElementDisplayStyle.Office2013;
+            combo.BorderStyle = UIElementBorderStyle.Solid;
+            combo.Appearance.BackColor = ControlBackColor;
+            combo.Appearance.BorderColor = SkyBlueOutline;
+            combo.Appearance.ForeColor = ControlTextColor;
+            combo.Appearance.FontData.Name = "Microsoft Sans Serif";
+            combo.Appearance.FontData.SizeInPoints = 9F;
+            combo.ButtonStyle = UIElementButtonStyle.Office2003ToolbarButton;
+        }
+
+        private static void StyleTextEditor(Infragistics.Win.UltraWinEditors.UltraTextEditor editor)
+        {
+            if (editor == null) return;
+            editor.UseAppStyling = false;
+            editor.UseOsThemes = DefaultableBoolean.False;
+            editor.DisplayStyle = EmbeddableElementDisplayStyle.Office2013;
+            editor.BorderStyle = UIElementBorderStyle.Solid;
+            editor.Appearance.BackColor = ControlBackColor;
+            editor.Appearance.BorderColor = SkyBlueOutline;
+            editor.Appearance.ForeColor = ControlTextColor;
+            editor.Appearance.FontData.Name = "Microsoft Sans Serif";
+            editor.Appearance.FontData.SizeInPoints = 9F;
+        }
+
+        private static void StyleDateTimeEditor(Infragistics.Win.UltraWinEditors.UltraDateTimeEditor editor)
+        {
+            if (editor == null) return;
+            editor.UseAppStyling = false;
+            editor.UseOsThemes = DefaultableBoolean.False;
+            editor.DisplayStyle = EmbeddableElementDisplayStyle.Office2013;
+            editor.BorderStyle = UIElementBorderStyle.Solid;
+            editor.Appearance.BackColor = ControlBackColor;
+            editor.Appearance.BorderColor = SkyBlueOutline;
+            editor.Appearance.ForeColor = ControlTextColor;
+            editor.Appearance.FontData.Name = "Microsoft Sans Serif";
+            editor.Appearance.FontData.SizeInPoints = 9F;
+            editor.ButtonStyle = UIElementButtonStyle.Office2003ToolbarButton;
+        }
+
+        private void StyleSummaryCards()
+        {
+            UltraLabel[] captions = new UltraLabel[]
+            {
+                ultraLabelTotalItemsCaption, ultraLabelTotalValueCaption, ultraLabelTotalSalesCaption,
+                ultraLabelTotalPurchaseCaption, ultraLabelTotalProfitCaption
+            };
+
+            UltraLabel[] values = new UltraLabel[]
+            {
+                ultraLabelTotalItemsValue, ultraLabelTotalValueValue, ultraLabelTotalSalesValue,
+                ultraLabelTotalPurchaseValue, ultraLabelTotalProfitValue
+            };
+
+            foreach (var cap in captions)
+            {
+                if (cap == null) continue;
+                cap.Appearance.BackColor = Color.Transparent;
+                cap.Appearance.ForeColor = Color.FromArgb(14, 47, 108);
+                cap.Appearance.FontData.Name = "Microsoft Sans Serif";
+                cap.Appearance.FontData.SizeInPoints = 8.25F;
+                cap.Appearance.FontData.Bold = DefaultableBoolean.True;
+                cap.Appearance.TextHAlign = Infragistics.Win.HAlign.Center;
+                cap.Appearance.TextVAlign = Infragistics.Win.VAlign.Middle;
+            }
+
+            foreach (var val in values)
+            {
+                if (val == null) continue;
+                val.Appearance.BackColor = Color.White;
+                val.Appearance.BorderColor = SkyBlueOutline;
+                val.BorderStyleInner = UIElementBorderStyle.Solid;
+                val.Appearance.ForeColor = ControlTextColor;
+                val.Appearance.FontData.Name = "Microsoft Sans Serif";
+                val.Appearance.FontData.SizeInPoints = 12F;
+                val.Appearance.FontData.Bold = DefaultableBoolean.True;
+                val.Appearance.TextHAlign = Infragistics.Win.HAlign.Center;
+                val.Appearance.TextVAlign = Infragistics.Win.VAlign.Middle;
             }
         }
 
@@ -116,14 +307,10 @@ namespace PosBranch_Win.Reports.InventoryReport
         {
             try
             {
-                // Use Dropdowns repository
                 var groups = dropdownRepo.getGroupDDl();
                 if (groups != null && groups.List != null)
                 {
-                    // Add "All" option manually or handle null in Value
-                    // UltraCombo doesn't easily support inserting into IEnumerable, so we might need a List
                     var list = groups.List.ToList();
-
                     ultraComboGroup.DataSource = list;
                     ultraComboGroup.ValueMember = "Id";
                     ultraComboGroup.DisplayMember = "GroupName";
@@ -150,15 +337,12 @@ namespace PosBranch_Win.Reports.InventoryReport
 
         private void LoadSubCategories()
         {
-            // Placeholder: Need to know SP for SubCategory
-            // Can be implemented once SubCategory SP is identified
         }
 
         private void LoadLedgers()
         {
             try
             {
-                // Using Vendor DDL for Ledger filter (assuming Supplier/Vendor context for stock)
                 var vendors = dropdownRepo.VendorDDL();
                 if (vendors != null && vendors.List != null)
                 {
@@ -171,180 +355,136 @@ namespace PosBranch_Win.Reports.InventoryReport
             catch { }
         }
 
-        private void ConfigureGrid()
+        private void ApplyGridStyling(UltraGrid targetGrid)
         {
-            // Sorting & Filtering
-            ultraGridStock.DisplayLayout.Override.HeaderClickAction = HeaderClickAction.SortMulti;
-            ultraGridStock.DisplayLayout.Override.AllowRowFiltering = DefaultableBoolean.True;
-            ultraGridStock.DisplayLayout.Override.FilterUIType = FilterUIType.FilterRow;
-            ultraGridStock.DisplayLayout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
+            if (targetGrid == null) return;
 
-            // Row selectors - Modern look
-            ultraGridStock.DisplayLayout.Override.RowSelectorAppearance.BackColor = Color.FromArgb(69, 90, 100);
-            ultraGridStock.DisplayLayout.Override.RowSelectorAppearance.ForeColor = Color.White;
-            ultraGridStock.DisplayLayout.Override.RowSelectorAppearance.FontData.Bold = DefaultableBoolean.True;
-            ultraGridStock.DisplayLayout.Override.RowSelectorAppearance.TextHAlign = Infragistics.Win.HAlign.Center;
+            targetGrid.UseAppStyling = false;
+            targetGrid.UseOsThemes = DefaultableBoolean.False;
+            targetGrid.DisplayLayout.Appearance.BackColor = FormBackColor;
+            targetGrid.DisplayLayout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
+            targetGrid.DisplayLayout.BorderStyle = UIElementBorderStyle.Solid;
+            targetGrid.DisplayLayout.CaptionVisible = DefaultableBoolean.False;
+            targetGrid.DisplayLayout.GroupByBox.Hidden = true;
+            targetGrid.DisplayLayout.GroupByBox.BorderStyle = UIElementBorderStyle.None;
 
-            // Modern header styling - Deep Blue-Grey gradient
-            ultraGridStock.DisplayLayout.Override.HeaderAppearance.BackColor = Color.FromArgb(55, 71, 79);
-            ultraGridStock.DisplayLayout.Override.HeaderAppearance.BackColor2 = Color.FromArgb(69, 90, 100);
-            ultraGridStock.DisplayLayout.Override.HeaderAppearance.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
-            ultraGridStock.DisplayLayout.Override.HeaderAppearance.ForeColor = Color.White;
-            ultraGridStock.DisplayLayout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.True;
-            ultraGridStock.DisplayLayout.Override.HeaderAppearance.FontData.SizeInPoints = 9;
+            targetGrid.DisplayLayout.Override.HeaderStyle = HeaderStyle.Standard;
+            targetGrid.DisplayLayout.Override.HeaderClickAction = HeaderClickAction.SortMulti;
+            targetGrid.DisplayLayout.Override.AllowAddNew = AllowAddNew.No;
+            targetGrid.DisplayLayout.Override.AllowDelete = DefaultableBoolean.False;
+            targetGrid.DisplayLayout.Override.AllowUpdate = DefaultableBoolean.False;
+            targetGrid.DisplayLayout.Override.AllowColMoving = AllowColMoving.WithinBand;
+            targetGrid.DisplayLayout.Override.AllowColSizing = AllowColSizing.Free;
+            targetGrid.DisplayLayout.Override.AllowRowFiltering = DefaultableBoolean.True;
+            targetGrid.DisplayLayout.Override.FilterUIType = FilterUIType.FilterRow;
+            targetGrid.DisplayLayout.Override.CellClickAction = CellClickAction.RowSelect;
 
-            // Row height
-            ultraGridStock.DisplayLayout.Override.MinRowHeight = 25;
-            ultraGridStock.DisplayLayout.Override.DefaultRowHeight = 25;
+            targetGrid.DisplayLayout.Override.RowSelectors = DefaultableBoolean.True;
+            targetGrid.DisplayLayout.Override.RowSelectorHeaderStyle = RowSelectorHeaderStyle.ColumnChooserButton;
+            targetGrid.DisplayLayout.Override.RowSelectorWidth = 25;
+            targetGrid.DisplayLayout.Override.RowSelectorNumberStyle = RowSelectorNumberStyle.RowIndex;
+            targetGrid.DisplayLayout.Override.RowSelectorAppearance.BackColor = GridHeaderBlueDark;
+            targetGrid.DisplayLayout.Override.RowSelectorAppearance.BackColor2 = GridHeaderBlue;
+            targetGrid.DisplayLayout.Override.RowSelectorAppearance.BackGradientStyle = GradientStyle.Vertical;
+            targetGrid.DisplayLayout.Override.RowSelectorAppearance.BorderColor = BorderBlue;
+            targetGrid.DisplayLayout.Override.RowSelectorAppearance.ForeColor = Color.White;
+            targetGrid.DisplayLayout.Override.RowSelectorAppearance.FontData.Bold = DefaultableBoolean.True;
+            targetGrid.DisplayLayout.Override.RowSelectorAppearance.TextHAlign = Infragistics.Win.HAlign.Center;
 
-            // Alternating row colors - Soft gradient
-            ultraGridStock.DisplayLayout.Override.RowAppearance.BackColor = Color.White;
-            ultraGridStock.DisplayLayout.Override.RowAlternateAppearance.BackColor = Color.FromArgb(250, 250, 252);
+            targetGrid.DisplayLayout.Override.MinRowHeight = 24;
+            targetGrid.DisplayLayout.Override.DefaultRowHeight = 24;
+            targetGrid.DisplayLayout.Override.RowAppearance.BackColor = Color.White;
+            targetGrid.DisplayLayout.Override.RowAppearance.ForeColor = ControlTextColor;
+            targetGrid.DisplayLayout.Override.RowAppearance.BorderColor = GridRowLine;
+            targetGrid.DisplayLayout.Override.RowAlternateAppearance.BackColor = GridAltRow;
+            targetGrid.DisplayLayout.Override.RowAlternateAppearance.BorderColor = GridRowLine;
+            targetGrid.DisplayLayout.Override.ActiveRowAppearance.BackColor = GridSelectedBlue;
+            targetGrid.DisplayLayout.Override.ActiveRowAppearance.ForeColor = ControlTextColor;
+            targetGrid.DisplayLayout.Override.SelectedRowAppearance.BackColor = GridSelectedBlue;
+            targetGrid.DisplayLayout.Override.SelectedRowAppearance.ForeColor = ControlTextColor;
 
-            // Selection colors - Material Design Blue
-            ultraGridStock.DisplayLayout.Override.SelectedRowAppearance.BackColor = Color.FromArgb(66, 165, 245);
-            ultraGridStock.DisplayLayout.Override.SelectedRowAppearance.ForeColor = Color.White;
-            ultraGridStock.DisplayLayout.Override.SelectedRowAppearance.FontData.Bold = DefaultableBoolean.True;
+            targetGrid.DisplayLayout.Override.HeaderAppearance.BackColor = GridHeaderBlue;
+            targetGrid.DisplayLayout.Override.HeaderAppearance.BackColor2 = GridHeaderBlueDark;
+            targetGrid.DisplayLayout.Override.HeaderAppearance.BackGradientStyle = GradientStyle.Vertical;
+            targetGrid.DisplayLayout.Override.HeaderAppearance.ForeColor = Color.White;
+            targetGrid.DisplayLayout.Override.HeaderAppearance.BorderColor = BorderBlue;
+            targetGrid.DisplayLayout.Override.HeaderAppearance.TextHAlign = Infragistics.Win.HAlign.Center;
+            targetGrid.DisplayLayout.Override.HeaderAppearance.TextVAlign = Infragistics.Win.VAlign.Middle;
+            targetGrid.DisplayLayout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.False;
+            targetGrid.DisplayLayout.Override.HeaderAppearance.FontData.Name = "Microsoft Sans Serif";
+            targetGrid.DisplayLayout.Override.HeaderAppearance.FontData.SizeInPoints = 8.25F;
+            targetGrid.DisplayLayout.Override.HeaderAppearance.ThemedElementAlpha = Alpha.Transparent;
 
-            // Active row - Light blue hover
-            ultraGridStock.DisplayLayout.Override.ActiveRowAppearance.BackColor = Color.FromArgb(227, 242, 253);
-            ultraGridStock.DisplayLayout.Override.ActiveRowAppearance.ForeColor = Color.FromArgb(33, 33, 33);
-            ultraGridStock.DisplayLayout.Override.ActiveRowAppearance.BorderColor = Color.FromArgb(66, 165, 245);
-
-            // Border styles
-            ultraGridStock.DisplayLayout.CaptionVisible = DefaultableBoolean.False;
-            ultraGridStock.DisplayLayout.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
-            ultraGridStock.DisplayLayout.Override.BorderStyleCell = Infragistics.Win.UIElementBorderStyle.Solid;
-            ultraGridStock.DisplayLayout.Override.BorderStyleRow = Infragistics.Win.UIElementBorderStyle.Solid;
-            ultraGridStock.DisplayLayout.GroupByBox.Hidden = true;
-
-            // Column interactions
-            ultraGridStock.DisplayLayout.Override.AllowColMoving = AllowColMoving.WithinBand;
-            ultraGridStock.DisplayLayout.Override.AllowColSizing = AllowColSizing.Free;
-            ultraGridStock.DisplayLayout.Override.CellClickAction = CellClickAction.RowSelect;
+            targetGrid.DisplayLayout.Override.BorderStyleHeader = UIElementBorderStyle.Solid;
+            targetGrid.DisplayLayout.Override.BorderStyleCell = UIElementBorderStyle.Solid;
+            targetGrid.DisplayLayout.Override.BorderStyleRow = UIElementBorderStyle.Solid;
+            targetGrid.DisplayLayout.Override.CellAppearance.BorderColor = GridRowLine;
+            targetGrid.DisplayLayout.Override.CellAppearance.ForeColor = ControlTextColor;
+            targetGrid.DisplayLayout.Override.CellAppearance.FontData.Name = "Microsoft Sans Serif";
+            targetGrid.DisplayLayout.Override.CellAppearance.FontData.SizeInPoints = 8.25F;
+            targetGrid.DisplayLayout.Override.RowSizing = RowSizing.AutoFree;
         }
 
         private void StyleButtons()
         {
-            // Style search button - Primary Blue with gradient
-            btnSearch.UseAppStyling = false;
-            btnSearch.UseOsThemes = DefaultableBoolean.False;
-            btnSearch.Appearance.BackColor = Color.FromArgb(25, 118, 210);
-            btnSearch.Appearance.BackColor2 = Color.FromArgb(33, 150, 243);
-            btnSearch.Appearance.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
-            btnSearch.Appearance.ForeColor = Color.White;
-            btnSearch.Appearance.FontData.Bold = DefaultableBoolean.True;
-            btnSearch.Appearance.FontData.SizeInPoints = 10;
-            btnSearch.Appearance.BorderColor = Color.FromArgb(21, 101, 192);
-            btnSearch.HotTrackAppearance.BackColor = Color.FromArgb(66, 165, 245);
-            btnSearch.HotTrackAppearance.ForeColor = Color.White;
+            StyleButton(btnSearch);
+            StyleButton(btnClearFilters);
+            StyleButton(btnExport);
+            StyleButton(btnPrint);
+            StyleButton(btnClose);
+            StyleButton(btnHideSelection);
 
-            // Style export button - Teal with gradient
-            btnExport.UseAppStyling = false;
-            btnExport.UseOsThemes = DefaultableBoolean.False;
-            btnExport.Appearance.BackColor = Color.FromArgb(0, 121, 107);
-            btnExport.Appearance.BackColor2 = Color.FromArgb(0, 150, 136);
-            btnExport.Appearance.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
-            btnExport.Appearance.ForeColor = Color.White;
-            btnExport.Appearance.FontData.Bold = DefaultableBoolean.True;
-            btnExport.Appearance.FontData.SizeInPoints = 10;
-            btnExport.Appearance.BorderColor = Color.FromArgb(0, 105, 92);
-            btnExport.HotTrackAppearance.BackColor = Color.FromArgb(38, 166, 154);
-            btnExport.HotTrackAppearance.ForeColor = Color.White;
-
-            // Style clear filters button - Orange with gradient
-            btnClearFilters.UseAppStyling = false;
-            btnClearFilters.UseOsThemes = DefaultableBoolean.False;
-            btnClearFilters.Appearance.BackColor = Color.FromArgb(245, 124, 0);
-            btnClearFilters.Appearance.BackColor2 = Color.FromArgb(255, 152, 0);
-            btnClearFilters.Appearance.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
-            btnClearFilters.Appearance.ForeColor = Color.White;
-            btnClearFilters.Appearance.FontData.Bold = DefaultableBoolean.True;
-            btnClearFilters.Appearance.FontData.SizeInPoints = 10;
-            btnClearFilters.Appearance.BorderColor = Color.FromArgb(230, 81, 0);
-            btnClearFilters.HotTrackAppearance.BackColor = Color.FromArgb(255, 167, 38);
-            btnClearFilters.HotTrackAppearance.ForeColor = Color.White;
-
-            // Style print button - Deep Purple with gradient
-            btnPrint.UseAppStyling = false;
-            btnPrint.UseOsThemes = DefaultableBoolean.False;
-            btnPrint.Appearance.BackColor = Color.FromArgb(81, 45, 168);
-            btnPrint.Appearance.BackColor2 = Color.FromArgb(103, 58, 183);
-            btnPrint.Appearance.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
-            btnPrint.Appearance.ForeColor = Color.White;
-            btnPrint.Appearance.FontData.Bold = DefaultableBoolean.True;
-            btnPrint.Appearance.FontData.SizeInPoints = 10;
-            btnPrint.Appearance.BorderColor = Color.FromArgb(69, 39, 160);
-            btnPrint.HotTrackAppearance.BackColor = Color.FromArgb(126, 87, 194);
-            btnPrint.HotTrackAppearance.ForeColor = Color.White;
-
-            // Style close button - Red with gradient
-            btnClose.UseAppStyling = false;
-            btnClose.UseOsThemes = DefaultableBoolean.False;
-            btnClose.Appearance.BackColor = Color.FromArgb(211, 47, 47);
-            btnClose.Appearance.BackColor2 = Color.FromArgb(244, 67, 54);
-            btnClose.Appearance.BackGradientStyle = Infragistics.Win.GradientStyle.Vertical;
-            btnClose.Appearance.ForeColor = Color.White;
-            btnClose.Appearance.FontData.Bold = DefaultableBoolean.True;
-            btnClose.Appearance.FontData.SizeInPoints = 10;
-            btnClose.Appearance.BorderColor = Color.FromArgb(183, 28, 28);
-            btnClose.HotTrackAppearance.BackColor = Color.FromArgb(229, 115, 115);
-            btnClose.HotTrackAppearance.ForeColor = Color.White;
-
-            // Style summary labels
-            StyleSummaryLabels();
+            SetupEnhancedSummaryPanel();
         }
 
-        /// <summary>
-        /// Style summary labels with colors and bold text
-        /// </summary>
-        private void StyleSummaryLabels()
+        private static void StyleButton(Infragistics.Win.Misc.UltraButton button)
         {
-            // Caption labels - bold with accent colors
-            ultraLabelTotalItemsCaption.Appearance.ForeColor = Color.FromArgb(25, 118, 210); // Blue
-            ultraLabelTotalItemsCaption.Appearance.FontData.Bold = DefaultableBoolean.True;
-            ultraLabelTotalItemsCaption.Appearance.FontData.SizeInPoints = 10;
+            if (button == null) return;
+            button.UseAppStyling = false;
+            button.UseOsThemes = DefaultableBoolean.False;
+            button.ButtonStyle = UIElementButtonStyle.Office2013Button;
+            button.Appearance.BackColor = ButtonTopColor;
+            button.Appearance.BackColor2 = ButtonBottomColor;
+            button.Appearance.BackGradientStyle = GradientStyle.Vertical;
+            button.Appearance.BorderColor = ButtonBorderColor;
+            button.Appearance.ForeColor = ButtonTextBlue;
+            button.Appearance.FontData.Name = "Microsoft Sans Serif";
+            button.Appearance.FontData.SizeInPoints = 9F;
+            button.Appearance.FontData.Bold = DefaultableBoolean.False;
 
-            ultraLabelTotalValueCaption.Appearance.ForeColor = Color.FromArgb(123, 31, 162); // Purple
-            ultraLabelTotalValueCaption.Appearance.FontData.Bold = DefaultableBoolean.True;
-            ultraLabelTotalValueCaption.Appearance.FontData.SizeInPoints = 10;
+            button.HotTrackAppearance.BackColor = PanelHoverTopColor;
+            button.HotTrackAppearance.BackColor2 = PanelHoverBottomColor;
+            button.HotTrackAppearance.BorderColor = ButtonBorderColor;
+            button.HotTrackAppearance.ForeColor = ButtonTextBlue;
 
-            ultraLabelTotalSalesCaption.Appearance.ForeColor = Color.FromArgb(211, 84, 0); // Orange
-            ultraLabelTotalSalesCaption.Appearance.FontData.Bold = DefaultableBoolean.True;
-            ultraLabelTotalSalesCaption.Appearance.FontData.SizeInPoints = 10;
-
-            ultraLabelTotalPurchaseCaption.Appearance.ForeColor = Color.FromArgb(56, 142, 60); // Green
-            ultraLabelTotalPurchaseCaption.Appearance.FontData.Bold = DefaultableBoolean.True;
-            ultraLabelTotalPurchaseCaption.Appearance.FontData.SizeInPoints = 10;
-
-            ultraLabelTotalProfitCaption.Appearance.ForeColor = Color.FromArgb(22, 160, 133); // Teal
-            ultraLabelTotalProfitCaption.Appearance.FontData.Bold = DefaultableBoolean.True;
-            ultraLabelTotalProfitCaption.Appearance.FontData.SizeInPoints = 10;
-
-            // Value labels - larger, bold
-            ultraLabelTotalItemsValue.Appearance.ForeColor = Color.FromArgb(13, 71, 161);
-            ultraLabelTotalItemsValue.Appearance.FontData.Bold = DefaultableBoolean.True;
-            ultraLabelTotalItemsValue.Appearance.FontData.SizeInPoints = 14;
-
-            ultraLabelTotalValueValue.Appearance.ForeColor = Color.FromArgb(74, 20, 140);
-            ultraLabelTotalValueValue.Appearance.FontData.Bold = DefaultableBoolean.True;
-            ultraLabelTotalValueValue.Appearance.FontData.SizeInPoints = 16;
-
-            ultraLabelTotalSalesValue.Appearance.ForeColor = Color.FromArgb(191, 54, 12);
-            ultraLabelTotalSalesValue.Appearance.FontData.Bold = DefaultableBoolean.True;
-            ultraLabelTotalSalesValue.Appearance.FontData.SizeInPoints = 14;
-
-            ultraLabelTotalPurchaseValue.Appearance.ForeColor = Color.FromArgb(27, 94, 32);
-            ultraLabelTotalPurchaseValue.Appearance.FontData.Bold = DefaultableBoolean.True;
-            ultraLabelTotalPurchaseValue.Appearance.FontData.SizeInPoints = 14;
-
-            ultraLabelTotalProfitValue.Appearance.ForeColor = Color.FromArgb(0, 121, 107);
-            ultraLabelTotalProfitValue.Appearance.FontData.Bold = DefaultableBoolean.True;
-            ultraLabelTotalProfitValue.Appearance.FontData.SizeInPoints = 16;
+            button.PressedAppearance.BackColor = PanelPressedTopColor;
+            button.PressedAppearance.BackColor2 = PanelPressedBottomColor;
+            button.PressedAppearance.BorderColor = ButtonBorderColor;
+            button.PressedAppearance.ForeColor = ButtonTextBlue;
         }
 
-        private void frmStockReportAdvanced_Load(object sender, EventArgs e)
+        private void SetupEnhancedSummaryPanel()
         {
+            if (ultraPanelSummary == null) return;
+
+            ultraPanelSummary.Dock = DockStyle.Bottom;
+            ultraPanelSummary.Height = 72;
+            ultraPanelSummary.Visible = true;
+
+            gridFooterPanel.Dock = DockStyle.Bottom;
+            gridFooterPanel.Height = 26;
+            ultraGridStock.Dock = DockStyle.Fill;
+
+            ultraPanelSummary.ClientArea.AutoScroll = false;
+            ultraPanelSummary.Resize += (s, e) => AlignSummaryCards();
+        }
+
+        private void btnHideSelection_Click(object sender, EventArgs e)
+        {
+            bool show = !ultraPanelControls.Visible;
+            ultraPanelControls.Visible = show;
+            ultraPanelFilters.Visible = show;
+            btnHideSelection.Text = show ? "Hide Selection" : "Show Selection";
             LayoutPanels();
         }
 
@@ -354,22 +494,120 @@ namespace PosBranch_Win.Reports.InventoryReport
             LayoutPanels();
         }
 
+        private void frmStockReportAdvanced_Load(object sender, EventArgs e)
+        {
+            LayoutPanels();
+        }
+
         private void LayoutPanels()
         {
-            int topUsed = ultraPanelControls.Height + ultraPanelFilters.Height;
-            int summaryHeight = 85;
-            int clientH = this.ClientSize.Height;
+            if (ultraPanelActionBar == null || ultraPanelGrid == null || ultraPanelSummary == null || ultraPanelControls == null || ultraPanelFilters == null) return;
 
-            // Summary panel: pinned to bottom
-            ultraPanelSummary.SetBounds(0, clientH - summaryHeight, this.ClientSize.Width, summaryHeight);
+            if (TopLevel == false)
+            {
+                FormBorderStyle = FormBorderStyle.None;
+                WindowState = FormWindowState.Normal;
+                Dock = DockStyle.Fill;
+            }
 
-            // Grid panel: fills remaining middle space
-            int gridTop = topUsed;
-            int gridHeight = clientH - topUsed - summaryHeight;
-            if (gridHeight < 50) gridHeight = 50;
-            ultraPanelGrid.SetBounds(0, gridTop, this.ClientSize.Width, gridHeight);
+            SuspendLayout();
 
+            ultraPanelControls.Dock = DockStyle.Top;
+            ultraPanelFilters.Dock = DockStyle.Top;
+            ultraPanelActionBar.Dock = DockStyle.Top;
+            ultraPanelSummary.Dock = DockStyle.Bottom;
+            ultraPanelSummary.Height = 72;
             ultraPanelSummary.Visible = true;
+            ultraPanelGrid.Dock = DockStyle.Fill;
+
+            if (!Controls.Contains(ultraPanelControls)) Controls.Add(ultraPanelControls);
+            if (!Controls.Contains(ultraPanelFilters)) Controls.Add(ultraPanelFilters);
+            if (!Controls.Contains(ultraPanelActionBar)) Controls.Add(ultraPanelActionBar);
+            if (!Controls.Contains(ultraPanelSummary)) Controls.Add(ultraPanelSummary);
+            if (!Controls.Contains(ultraPanelGrid)) Controls.Add(ultraPanelGrid);
+
+            Controls.SetChildIndex(ultraPanelControls, 4);
+            Controls.SetChildIndex(ultraPanelFilters, 3);
+            Controls.SetChildIndex(ultraPanelActionBar, 2);
+            Controls.SetChildIndex(ultraPanelSummary, 1);
+            Controls.SetChildIndex(ultraPanelGrid, 0);
+
+            if (ultraPanelGrid.ClientArea != null)
+            {
+                ultraPanelGrid.ClientArea.SuspendLayout();
+                gridFooterPanel.Dock = DockStyle.Bottom;
+                gridFooterPanel.Height = 26;
+                ultraGridStock.Dock = DockStyle.Fill;
+
+                if (!ultraPanelGrid.ClientArea.Controls.Contains(gridFooterPanel))
+                    ultraPanelGrid.ClientArea.Controls.Add(gridFooterPanel);
+                if (!ultraPanelGrid.ClientArea.Controls.Contains(ultraGridStock))
+                    ultraPanelGrid.ClientArea.Controls.Add(ultraGridStock);
+
+                ultraPanelGrid.ClientArea.Controls.SetChildIndex(gridFooterPanel, 1);
+                ultraPanelGrid.ClientArea.Controls.SetChildIndex(ultraGridStock, 0);
+
+                ultraPanelGrid.ClientArea.ResumeLayout(true);
+                ultraPanelGrid.ClientArea.PerformLayout();
+            }
+
+            ResumeLayout(true);
+            PerformLayout();
+
+            AlignSummaryCards();
+            AlignSummaryLabels();
+        }
+
+        private void AlignSummaryCards()
+        {
+            if (ultraPanelSummary == null || ultraPanelSummary.ClientArea == null) return;
+            int totalWidth = ultraPanelSummary.ClientArea.Width;
+            if (totalWidth <= 0) return;
+
+            UltraLabel[] captions = new UltraLabel[]
+            {
+                ultraLabelTotalItemsCaption, ultraLabelTotalValueCaption, ultraLabelTotalSalesCaption,
+                ultraLabelTotalPurchaseCaption, ultraLabelTotalProfitCaption
+            };
+
+            UltraLabel[] values = new UltraLabel[]
+            {
+                ultraLabelTotalItemsValue, ultraLabelTotalValueValue, ultraLabelTotalSalesValue,
+                ultraLabelTotalPurchaseValue, ultraLabelTotalProfitValue
+            };
+
+            int count = 5;
+            int padding = 16;
+            int baseCardWidth = 160;
+
+            int availableWidth = totalWidth - (padding * 2);
+            if (availableWidth <= 0) return;
+
+            int gap = 12;
+            int computedWidth = (availableWidth - (gap * (count - 1))) / count;
+            int cardWidth = Math.Max(baseCardWidth, Math.Min(260, computedWidth));
+
+            int remainingForGaps = availableWidth - (count * cardWidth);
+            if (count > 1)
+            {
+                gap = Math.Max(8, remainingForGaps / (count - 1));
+            }
+
+            int currentX = padding;
+            for (int i = 0; i < count; i++)
+            {
+                if (captions[i] != null)
+                {
+                    captions[i].Location = new Point(currentX, 2);
+                    captions[i].Size = new Size(cardWidth, 16);
+                }
+                if (values[i] != null)
+                {
+                    values[i].Location = new Point(currentX, 18);
+                    values[i].Size = new Size(cardWidth, 48);
+                }
+                currentX += cardWidth + gap;
+            }
         }
 
         // --- BEGIN: Grid Footer Summary Panel Logic ---
@@ -463,7 +701,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                     Name = $"lblSummary_{col.Key}",
                     AutoSize = false,
                     TextAlign = ContentAlignment.MiddleRight,
-                    ForeColor = Color.White,
+                    ForeColor = Color.FromArgb(17, 52, 102),
                     BackColor = Color.Transparent,
                     Font = new Font("Segoe UI", 9, FontStyle.Bold),
                     Height = gridFooterPanel.Height - 4,

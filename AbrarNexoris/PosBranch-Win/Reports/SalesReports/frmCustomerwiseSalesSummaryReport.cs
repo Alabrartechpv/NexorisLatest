@@ -18,6 +18,25 @@ namespace PosBranch_Win.Reports.SalesReports
 {
     public partial class frmCustomerwiseSalesSummaryReport : Form
     {
+        // ─── Colour Palette (matches frmStockReport theme) ─────────────────────────
+        private static readonly Color FormBackColor        = Color.FromArgb(232, 246, 255);
+        private static readonly Color FilterPanelBackColor = Color.FromArgb(232, 246, 255);
+        private static readonly Color ActionPanelBackColor = Color.FromArgb(206, 223, 238);
+        private static readonly Color BorderBlue           = Color.FromArgb(118, 154, 198);
+        private static readonly Color ControlBackColor     = Color.White;
+        private static readonly Color ControlTextColor     = Color.FromArgb(18, 49, 102);
+        private static readonly Color GridHeaderBlue       = Color.FromArgb(93, 151, 214);
+        private static readonly Color GridHeaderBlueDark   = Color.FromArgb(67, 118, 184);
+        private static readonly Color GridSelectedBlue     = Color.FromArgb(126, 126, 245);
+        private static readonly Color GridRowLine          = Color.FromArgb(197, 217, 241);
+        private static readonly Color GridAltRow           = Color.FromArgb(246, 250, 255);
+        private static readonly Color GridFooterBorder     = Color.FromArgb(144, 181, 223);
+        private static readonly Color ButtonBlueTop        = Color.FromArgb(232, 241, 252);
+        private static readonly Color ButtonBlueBottom     = Color.FromArgb(145, 181, 224);
+        private static readonly Color ButtonLightOutline   = Color.FromArgb(166, 183, 202);
+        private static readonly Color SkyBlueOutline       = Color.FromArgb(160, 210, 255);
+        private static readonly Color ButtonTextBlue       = Color.FromArgb(14, 47, 108);
+
         // ════════════════════════════════════════════════════════════
         //  Fields
         // ════════════════════════════════════════════════════════════
@@ -56,6 +75,7 @@ namespace PosBranch_Win.Reports.SalesReports
         {
             try
             {
+                this.BackColor = FormBackColor;
                 _reportRepo = new CustomerwiseSalesSummaryRepo();
                 _dropdownRepo = new Dropdowns();
 
@@ -144,40 +164,89 @@ namespace PosBranch_Win.Reports.SalesReports
         }
 
         // ════════════════════════════════════════════════════════════
-        //  Grid styling
+        //  Grid styling (matches frmStockReport theme)
         // ════════════════════════════════════════════════════════════
         private void StyleGrid()
         {
-            gridReport.UseOsThemes = DefaultableBoolean.False;
-            gridReport.DisplayLayout.Override.AllowRowFiltering   = DefaultableBoolean.True;
-            gridReport.DisplayLayout.Override.FilterUIType        = FilterUIType.FilterRow;
-            gridReport.DisplayLayout.Override.HeaderClickAction   = HeaderClickAction.SortMulti;
-            gridReport.DisplayLayout.AutoFitStyle                  = AutoFitStyle.ResizeAllColumns;
-            gridReport.DisplayLayout.CaptionVisible                = DefaultableBoolean.False;
-            gridReport.DisplayLayout.GroupByBox.Hidden             = true;
+            gridReport.DisplayLayout.Reset();
+            gridReport.UseAppStyling = false;
+            gridReport.UseOsThemes   = DefaultableBoolean.False;
 
-            // Header
-            gridReport.DisplayLayout.Override.HeaderAppearance.BackColor  = Color.FromArgb(30, 40, 55);
-            gridReport.DisplayLayout.Override.HeaderAppearance.BackColor2 = Color.FromArgb(42, 55, 72);
-            gridReport.DisplayLayout.Override.HeaderAppearance.BackGradientStyle = GradientStyle.Vertical;
-            gridReport.DisplayLayout.Override.HeaderAppearance.ForeColor  = Color.White;
-            gridReport.DisplayLayout.Override.HeaderAppearance.FontData.Bold      = DefaultableBoolean.True;
-            gridReport.DisplayLayout.Override.HeaderAppearance.FontData.SizeInPoints = 9;
-            gridReport.DisplayLayout.Override.HeaderStyle          = HeaderStyle.Standard;
+            UltraGridLayout layout = gridReport.DisplayLayout;
+            layout.CaptionVisible = DefaultableBoolean.False;
+            layout.BorderStyle    = UIElementBorderStyle.Solid;
 
-            // Rows
-            gridReport.DisplayLayout.Override.RowAppearance.BackColor          = Color.White;
-            gridReport.DisplayLayout.Override.RowAlternateAppearance.BackColor = Color.FromArgb(248, 250, 253);
-            gridReport.DisplayLayout.Override.MinRowHeight                     = 24;
-            gridReport.DisplayLayout.Override.DefaultRowHeight                 = 24;
+            layout.GroupByBox.Hidden = true;
 
-            // Selection
-            gridReport.DisplayLayout.Override.SelectedRowAppearance.BackColor  = Color.FromArgb(66, 165, 245);
-            gridReport.DisplayLayout.Override.SelectedRowAppearance.ForeColor  = Color.White;
-            gridReport.DisplayLayout.Override.ActiveRowAppearance.BackColor    = Color.FromArgb(227, 242, 253);
-            gridReport.DisplayLayout.Override.ActiveRowAppearance.ForeColor    = Color.FromArgb(33, 33, 33);
-            gridReport.DisplayLayout.Override.ActiveRowAppearance.BorderColor  = Color.FromArgb(66, 165, 245);
-            gridReport.DisplayLayout.Override.CellClickAction                  = CellClickAction.RowSelect;
+            layout.Override.AllowAddNew       = AllowAddNew.No;
+            layout.Override.AllowDelete       = DefaultableBoolean.False;
+            layout.Override.AllowUpdate       = DefaultableBoolean.False;
+            layout.Override.AllowRowFiltering = DefaultableBoolean.True;
+            layout.Override.FilterUIType      = FilterUIType.FilterRow;
+            layout.Override.CellClickAction   = CellClickAction.RowSelect;
+            layout.Override.HeaderClickAction = HeaderClickAction.SortMulti;
+            layout.Override.SelectTypeRow     = SelectType.Single;
+            layout.Override.RowSelectors      = DefaultableBoolean.True;
+            layout.Override.RowSelectorWidth  = 35;
+            layout.Override.RowSelectorNumberStyle = RowSelectorNumberStyle.RowIndex;
+
+            layout.Appearance.BackColor  = FormBackColor;
+            layout.Appearance.BorderColor = BorderBlue;
+            layout.Appearance.BackColor2 = FormBackColor;
+            layout.Appearance.BackGradientStyle = GradientStyle.None;
+
+            layout.Override.RowSelectorAppearance.BackColor  = GridHeaderBlueDark;
+            layout.Override.RowSelectorAppearance.BackColor2 = GridHeaderBlue;
+            layout.Override.RowSelectorAppearance.BackGradientStyle = GradientStyle.Vertical;
+            layout.Override.RowSelectorAppearance.BorderColor = BorderBlue;
+            layout.Override.RowSelectorAppearance.ForeColor   = Color.White;
+            layout.Override.RowSelectorAppearance.FontData.Bold = DefaultableBoolean.True;
+            layout.Override.RowSelectorAppearance.TextHAlign  = HAlign.Center;
+
+            layout.Override.HeaderAppearance.BackColor  = GridHeaderBlue;
+            layout.Override.HeaderAppearance.BackColor2 = GridHeaderBlueDark;
+            layout.Override.HeaderAppearance.BackGradientStyle = GradientStyle.Vertical;
+            layout.Override.HeaderAppearance.ForeColor  = Color.White;
+            layout.Override.HeaderAppearance.BorderColor = BorderBlue;
+            layout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.True;
+            layout.Override.HeaderAppearance.FontData.Name = "Segoe UI";
+            layout.Override.HeaderAppearance.FontData.SizeInPoints = 9F;
+
+            layout.Override.RowAppearance.BackColor          = Color.White;
+            layout.Override.RowAlternateAppearance.BackColor = GridAltRow;
+            layout.Override.RowAppearance.BorderColor        = GridRowLine;
+            layout.Override.RowAlternateAppearance.BorderColor = GridRowLine;
+            layout.Override.ActiveRowAppearance.BackColor    = GridSelectedBlue;
+            layout.Override.ActiveRowAppearance.ForeColor    = Color.White;
+            layout.Override.ActiveRowAppearance.BorderColor  = BorderBlue;
+            layout.Override.SelectedRowAppearance.BackColor  = GridSelectedBlue;
+            layout.Override.SelectedRowAppearance.ForeColor  = Color.White;
+            layout.Override.CellAppearance.BorderColor       = GridRowLine;
+            layout.Override.CellAppearance.ForeColor         = Color.FromArgb(10, 31, 79);
+            layout.Override.CellAppearance.FontData.Name     = "Segoe UI";
+            layout.Override.CellAppearance.FontData.SizeInPoints = 9F;
+            layout.Override.BorderStyleHeader = UIElementBorderStyle.Solid;
+            layout.Override.BorderStyleCell   = UIElementBorderStyle.Solid;
+            layout.Override.BorderStyleRow    = UIElementBorderStyle.Solid;
+            layout.Override.MinRowHeight      = 24;
+            layout.Override.DefaultRowHeight  = 24;
+            layout.RowConnectorStyle  = RowConnectorStyle.Solid;
+            layout.RowConnectorColor  = GridRowLine;
+            layout.ScrollBarLook.Appearance.BackColor  = ActionPanelBackColor;
+            layout.ScrollBarLook.Appearance.BorderColor = BorderBlue;
+            layout.ScrollBarLook.TrackAppearance.BackColor = Color.FromArgb(225, 236, 246);
+            layout.ScrollBarLook.ButtonAppearance.BackColor  = GridHeaderBlue;
+            layout.ScrollBarLook.ButtonAppearance.BackColor2 = GridHeaderBlueDark;
+            layout.ScrollBarLook.ButtonAppearance.BackGradientStyle = GradientStyle.Vertical;
+            layout.ScrollBarLook.ButtonAppearance.BorderColor = BorderBlue;
+
+            // Filter row styling
+            layout.Override.FilterRowAppearance.BackColor   = Color.FromArgb(255, 255, 230);
+            layout.Override.FilterRowAppearance.ForeColor   = Color.FromArgb(33, 33, 33);
+            layout.Override.FilterRowPromptAppearance.ForeColor = Color.FromArgb(140, 140, 140);
+
+            gridReport.BackColor = FormBackColor;
+            gridReport.Font = new Font("Segoe UI", 9F, FontStyle.Regular, GraphicsUnit.Point, 0);
 
             gridReport.InitializeLayout += GridReport_InitializeLayout;
             gridReport.InitializeRow    += GridReport_InitializeRow;
@@ -251,40 +320,44 @@ namespace PosBranch_Win.Reports.SalesReports
 
         private void StyleButtons()
         {
-            StyleButton(btnSearch, Color.FromArgb(25, 118, 210), Color.FromArgb(33, 150, 243), Color.FromArgb(66, 165, 245));
-            StyleButton(btnReset,  Color.FromArgb(245, 124, 0),  Color.FromArgb(255, 152, 0),  Color.FromArgb(255, 167, 38));
-            StyleButton(btnExport, Color.FromArgb(0, 121, 107),  Color.FromArgb(0, 150, 136),  Color.FromArgb(38, 166, 154));
-            StyleButton(btnPrint,  Color.FromArgb(81, 45, 168),  Color.FromArgb(103, 58, 183), Color.FromArgb(126, 87, 194));
-            StyleButton(btnClose,  Color.FromArgb(198, 40, 40),  Color.FromArgb(244, 67, 54),  Color.FromArgb(229, 115, 115));
+            StyleClassicButton(btnSearch);
+            StyleClassicButton(btnReset);
+            StyleClassicButton(btnExport);
+            StyleClassicButton(btnPrint);
+            StyleClassicButton(btnClose);
             
             // Standard small dialog buttons styling
-            StyleDialogButton(btnSelectCustomer, Color.FromArgb(51, 65, 85));
-            StyleDialogButton(btnClearCustomer, Color.FromArgb(100, 116, 139));
+            StyleClassicButton(btnSelectCustomer);
+            StyleClassicButton(btnClearCustomer);
         }
 
-        private void StyleButton(Infragistics.Win.Misc.UltraButton btn, Color c1, Color c2, Color hover)
+        private static void StyleClassicButton(Infragistics.Win.Misc.UltraButton btn)
         {
+            if (btn == null) return;
             btn.UseAppStyling  = false;
             btn.UseOsThemes    = DefaultableBoolean.False;
-            btn.Appearance.BackColor            = c1;
-            btn.Appearance.BackColor2           = c2;
-            btn.Appearance.BackGradientStyle    = GradientStyle.Vertical;
-            btn.Appearance.ForeColor            = Color.White;
-            btn.Appearance.FontData.Bold        = DefaultableBoolean.True;
+            btn.ButtonStyle    = UIElementButtonStyle.Flat;
+            btn.UseFlatMode    = DefaultableBoolean.False;
+            btn.Appearance.BackColor  = ButtonBlueTop;
+            btn.Appearance.BackColor2 = ButtonBlueBottom;
+            btn.Appearance.BackGradientStyle = GradientStyle.Vertical;
+            btn.Appearance.ForeColor   = ButtonTextBlue;
+            btn.Appearance.BorderColor = ButtonLightOutline;
+            btn.Appearance.TextHAlign  = HAlign.Center;
+            btn.Appearance.TextVAlign  = VAlign.Middle;
+            btn.Appearance.FontData.Bold = DefaultableBoolean.False;
             btn.Appearance.FontData.SizeInPoints = 9;
-            btn.HotTrackAppearance.BackColor    = hover;
-            btn.HotTrackAppearance.ForeColor    = Color.White;
-        }
-
-        private void StyleDialogButton(Infragistics.Win.Misc.UltraButton btn, Color baseColor)
-        {
-            btn.UseAppStyling = false;
-            btn.UseOsThemes = DefaultableBoolean.False;
-            btn.Appearance.BackColor = baseColor;
-            btn.Appearance.ForeColor = Color.White;
-            btn.Appearance.FontData.Bold = DefaultableBoolean.True;
-            btn.Appearance.FontData.SizeInPoints = 8.5F;
-            btn.HotTrackAppearance.BackColor = Color.FromArgb(15, 23, 42);
+            btn.Font = new Font("Tahoma", 9F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            btn.HotTrackAppearance.BackColor  = Color.FromArgb(241, 247, 254);
+            btn.HotTrackAppearance.BackColor2 = Color.FromArgb(166, 195, 231);
+            btn.HotTrackAppearance.BackGradientStyle = GradientStyle.Vertical;
+            btn.HotTrackAppearance.BorderColor = ButtonLightOutline;
+            btn.HotTrackAppearance.ForeColor   = ButtonTextBlue;
+            btn.PressedAppearance.BackColor  = Color.FromArgb(118, 161, 214);
+            btn.PressedAppearance.BackColor2 = Color.FromArgb(217, 231, 247);
+            btn.PressedAppearance.BackGradientStyle = GradientStyle.Vertical;
+            btn.PressedAppearance.BorderColor = Color.FromArgb(148, 163, 182);
+            btn.PressedAppearance.ForeColor   = ButtonTextBlue;
         }
 
         // ════════════════════════════════════════════════════════════

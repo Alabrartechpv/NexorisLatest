@@ -3930,14 +3930,15 @@ namespace PosBranch_Win.Transaction
                             if (e.Cell.Column.Key == "Cost")
                             {
                                 RecalculateBaseCostAndTaxFromCost(e.Cell.Row, costWithTax, qty);
-                                // Recalculate NewBaseCost (average cost) for all rows
-                                RecalculateNewBaseCostForAllRows();
                             }
                             else
                             {
                                 // Otherwise recalculate based on current values
                                 RecalculateTaxForRow(e.Cell.Row, costWithTax, qty);
                             }
+
+                            // Recalculate NewBaseCost (weighted average cost) for all rows on Cost/Qty changes
+                            RecalculateNewBaseCostForAllRows();
 
                             // If TaxType was changed, update column visibility
                             if (e.Cell.Column.Key == "TaxType")
