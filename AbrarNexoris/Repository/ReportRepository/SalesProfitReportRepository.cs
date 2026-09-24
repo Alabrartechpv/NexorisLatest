@@ -91,7 +91,9 @@ namespace Repository.ReportRepository
                                     subTotal = billAmount - taxAmt;
                                 }
 
-                                double profitExclGst = profit - taxAmt;
+                                double profitExclGst = row.Table.Columns.Contains("ProfitExclGst") && row["ProfitExclGst"] != DBNull.Value
+                                    ? Convert.ToDouble(row["ProfitExclGst"])
+                                    : (profit > taxAmt && billAmount > subTotal ? profit - taxAmt : profit);
 
                                 list.Add(new SalesProfitReport
                                 {

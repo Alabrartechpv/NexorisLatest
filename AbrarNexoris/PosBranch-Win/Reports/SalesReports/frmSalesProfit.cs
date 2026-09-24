@@ -42,7 +42,7 @@ namespace PosBranch_Win.Reports.SalesReports
         private Label lblCount;
         private readonly Dictionary<string, Label> summaryLabels = new Dictionary<string, Label>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, string> columnAggregations = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        private readonly string[] summaryTypes = new[] { "Sum", "Average", "Min", "Max", "Count", "None" };
+        private readonly string[] summaryTypes = new[] { "Weighted", "Average", "Sum", "Min", "Max", "Count", "None" };
         private readonly HashSet<string> numericSummaryColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "BillAmount",
@@ -432,7 +432,7 @@ namespace PosBranch_Win.Reports.SalesReports
         {
             columnAggregations["BillAmount"] = "Sum";
             columnAggregations["Profit"] = "Sum";
-            columnAggregations["ProfitMarginPercent"] = "Average";
+            columnAggregations["ProfitMarginPercent"] = "Weighted";
             columnAggregations["SubTotal"] = "Sum";
             columnAggregations["TaxAmt"] = "Sum";
 
@@ -557,9 +557,33 @@ namespace PosBranch_Win.Reports.SalesReports
                 string text = "";
                 switch (agg)
                 {
+                    case "Weighted":
+                        if (isPercent)
+                        {
+                            double totalSales = _filteredData.Sum(x => x.SubTotal > 0 ? x.SubTotal : x.BillAmount);
+                            double totalProfit = _filteredData.Sum(x => x.Profit);
+                            double weightedMargin = totalSales > 0 ? (totalProfit / totalSales) * 100 : 0;
+                            text = weightedMargin.ToString("N2") + " %";
+                        }
+                        else
+                        {
+                            double sumVal = values.Sum();
+                            text = "₹ " + sumVal.ToString("N2");
+                        }
+                        break;
                     case "Sum":
-                        double sum = values.Sum();
-                        text = isPercent ? (sum.ToString("N2") + " %") : ("₹ " + sum.ToString("N2"));
+                        if (isPercent)
+                        {
+                            double totalSales = _filteredData.Sum(x => x.SubTotal > 0 ? x.SubTotal : x.BillAmount);
+                            double totalProfit = _filteredData.Sum(x => x.Profit);
+                            double weightedMargin = totalSales > 0 ? (totalProfit / totalSales) * 100 : 0;
+                            text = weightedMargin.ToString("N2") + " %";
+                        }
+                        else
+                        {
+                            double sum = values.Sum();
+                            text = "₹ " + sum.ToString("N2");
+                        }
                         break;
                     case "Average":
                         double avg = values.Average();
@@ -1083,17 +1107,21 @@ namespace PosBranch_Win.Reports.SalesReports
                 var rawList = _reportRepository.GetSalesProfitReport(billNo, fromDate, toDate);
 
                 _rawData = rawList != null
-                    ? rawList.Select(r => new SalesProfitViewModel
+                    ? rawList.Select(r =>
                     {
-                        BillNo = r.BillNo,
-                        BillDate = r.BillDate,
-                        BillAmount = r.BillAmount,
-                        Profit = r.Profit,
-                        ProfitMarginPercent = r.BillAmount > 0 ? (r.Profit / r.BillAmount) * 100 : 0,
-                        PayMode = r.PayMode ?? string.Empty,
-                        CashMode = r.CashMode ?? string.Empty,
-                        SubTotal = r.SubTotal,
-                        TaxAmt = r.TaxAmt
+                        double salesBase = r.SubTotal > 0 ? r.SubTotal : r.BillAmount;
+                        return new SalesProfitViewModel
+                        {
+                            BillNo = r.BillNo,
+                            BillDate = r.BillDate,
+                            BillAmount = r.BillAmount,
+                            Profit = r.Profit,
+                            ProfitMarginPercent = salesBase > 0 ? (r.Profit / salesBase) * 100 : 0,
+                            PayMode = r.PayMode ?? string.Empty,
+                            CashMode = r.CashMode ?? string.Empty,
+                            SubTotal = r.SubTotal,
+                            TaxAmt = r.TaxAmt
+                        };
                     }).ToList()
                     : new List<SalesProfitViewModel>();
 
@@ -1308,7 +1336,7 @@ namespace PosBranch_Win.Reports.SalesReports
                         sb.AppendLine($"Total Bills,{_filteredData.Count}");
                         sb.AppendLine($"Total Sales Amount,{_filteredData.Sum(x => x.BillAmount):F2}");
                         sb.AppendLine($"Total Profit Amount,{_filteredData.Sum(x => x.Profit):F2}");
-                        double totalSales = _filteredData.Sum(x => x.BillAmount);
+                        double totalSales = _filteredData.Sum(x => x.SubTotal > 0 ? x.SubTotal : x.BillAmount);
                         double totalProfit = _filteredData.Sum(x => x.Profit);
                         double margin = totalSales > 0 ? (totalProfit / totalSales) * 100 : 0;
                         sb.AppendLine($"Overall Profit Margin %,{margin:F2}%");

@@ -454,8 +454,8 @@ namespace Repository.TransactionRepository
                             }
                             catch (Exception priceEx)
                             {
-                                // Don't throw here - the main detail record was saved successfully
-                                // Base unit stock update failure shouldn't prevent the sale from completing
+                                // Log warning so stock deduction discrepancies can be identified and audited
+                                System.Diagnostics.Debug.WriteLine($"[SalesRepository.SaveSales] Stock deduction warning for ItemId: {salesDetails.ItemId}, UnitId: {salesDetails.UnitId}, BillNo: {salesDetails.BillNo}. Error: {priceEx.Message}");
                             }
                         }
                         catch (Exception detailEx)
@@ -1035,8 +1035,8 @@ namespace Repository.TransactionRepository
                             }
                             catch (Exception priceEx)
                             {
-                                // Don't throw here - the main detail record was saved successfully
-                                // Base unit stock update failure shouldn't prevent the sale from completing
+                                // Log warning so stock deduction discrepancies can be identified and audited
+                                System.Diagnostics.Debug.WriteLine($"[SalesRepository.UpdateSales] Stock deduction warning for ItemId: {salesDetails.ItemId}, UnitId: {salesDetails.UnitId}, BillNo: {salesDetails.BillNo}. Error: {priceEx.Message}");
                             }
                         }
                         catch (Exception)
