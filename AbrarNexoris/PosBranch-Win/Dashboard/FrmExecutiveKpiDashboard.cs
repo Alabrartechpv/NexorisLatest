@@ -280,16 +280,16 @@ namespace PosBranch_Win.Dashboard
                 CreateKpiCard("16. Hold Items / Bills", "Suspended sales bills and hold items pending counter checkout", FormatCurr(_model.HoldBillsValue), $"{_model.HoldBillsCount} Bills | {_model.HoldItemsCount:N0} Items", Color.FromArgb(230, 126, 34), () => DrillDown("HoldBills")),
 
                 // 17. Gross Profit & Margin %
-                CreateKpiCard("17. Gross Margin %", "Gross earnings on sold goods (Sales Revenue - Cost of Sales)", FormatCurr(_model.GrossProfit), $"Gross Margin: {_model.GrossProfitMarginPercent:N1}%", Color.FromArgb(39, 174, 96), () => DrillDown("TradingPL")),
+                CreateKpiCard("17. Gross Margin %", "Gross earnings on sold goods (Sales Revenue - Cost of Sales)", FormatCurr(_model.GrossProfit), $"Gross Margin: {_model.GrossProfitMarginPercent:N1}%", Color.FromArgb(39, 174, 96), () => DrillDown("SalesProfit")),
 
                 // 18. Total Business Expenses
                 CreateKpiCard("18. Business Expenses", "Combined operational overheads, utilities, and running costs", FormatCurr(_model.TotalBusinessExpenses), $"Dir: {FormatCurr(_model.DirectExpenses)} | Indir: {FormatCurr(_model.IndirectExpenses)}", Color.FromArgb(192, 57, 43), () => DrillDown("ProfitLoss")),
 
                 // 19. Actual Net Profit
-                CreateKpiCard("19. Actual Net Profit", "Bottom-line net earnings after deducting cost of sales and expenses", FormatCurr(_model.ActualNetProfit), $"Margin: {_model.OperatingProfitMarginPercent:N2}%", _model.ActualNetProfit >= 0 ? Color.FromArgb(39, 174, 96) : Color.FromArgb(192, 57, 43), () => DrillDown("ProfitLoss")),
+                CreateKpiCard("19. Actual Net Profit", "Bottom-line net earnings after deducting cost of sales and expenses", FormatCurr(_model.ActualNetProfit), $"Margin: {_model.OperatingProfitMarginPercent:N2}%", _model.ActualNetProfit >= 0 ? Color.FromArgb(39, 174, 96) : Color.FromArgb(192, 57, 43), () => DrillDown("SalesProfit")),
 
                 // 20. Operating Profit Margin %
-                CreateKpiCard("20. Profit Margin %", "Ratio of net profit generated from sales turnover", $"{_model.OperatingProfitMarginPercent:N2}%", "Net Profit / Sales", _model.OperatingProfitMarginPercent >= 0 ? Color.FromArgb(22, 160, 133) : Color.FromArgb(192, 57, 43), () => DrillDown("ProfitLoss")),
+                CreateKpiCard("20. Profit Margin %", "Ratio of net profit generated from sales turnover", $"{_model.OperatingProfitMarginPercent:N2}%", "Net Profit / Sales", _model.OperatingProfitMarginPercent >= 0 ? Color.FromArgb(22, 160, 133) : Color.FromArgb(192, 57, 43), () => DrillDown("SalesProfit")),
 
                 // 21. GST / Net Tax Liability
                 CreateKpiCard("21. GST Tax Liability", "Net government GST liability (Output GST - Input GST credit)", FormatCurr(_model.NetTaxLiability), $"Out: {FormatCurr(_model.OutputGstAmount)} | In: {FormatCurr(_model.InputGstAmount)}", Color.FromArgb(52, 73, 94), () => DrillDown("GovtGSTReturnReport")),
@@ -808,6 +808,11 @@ namespace PosBranch_Win.Dashboard
                     case "TradingPL":
                         formToOpen = new Reports.FinancialReports.FrmTradingPLAccount();
                         title = "Trading & P/L Account";
+                        break;
+                    case "SalesProfit":
+                    case "SalesProfitReport":
+                        formToOpen = new Reports.SalesReports.frmSalesProfit();
+                        title = "Sales Profit Report";
                         break;
                     case "PurchaseDetailsReport":
                         formToOpen = new Reports.PurchaseReports.frmPurchaseReportDetails();
