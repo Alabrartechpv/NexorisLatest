@@ -2468,10 +2468,12 @@ namespace PosBranch_Win.Transaction
 
         private void RegularBarcodeLookup(string input)
         {
-            // Check if this is a weight item barcode (format: $baseBarcodeweight, e.g., $200009300270)
-            if (input.StartsWith("$") && input.Length > 1)
+            if (string.IsNullOrWhiteSpace(input)) return;
+            input = input.Trim();
+
+            // First check if this is a weighing scale barcode (e.g., prefix 20-29 or $ prefix)
+            if (TryProcessScaleBarcode(input))
             {
-                ProcessWeightItemBarcode(input);
                 CheckExists = false;
                 txtBarcode.Clear();
                 return;
@@ -2537,99 +2539,167 @@ namespace PosBranch_Win.Transaction
         }
 
         /// <summary>
-        /// Processes weight item barcodes that contain weight information
-        /// Format: $ItemCodeWeightChecksum (e.g., $456345601490 where 45634 is item code, 56014 is weight, 90 is checksum)
-        /// Common formats:
-        /// - $ItemCode(5) + Weight(5) + Checksum(2) = 12 digits total
-        /// - $ItemCode(7-9) + Weight(5) = 12-14 digits total
+        /// Attempts to parse and process standard supermarket weighing scale barcodes (EAN-13 prefixes 20-29 or $ prefix).
+        /// Returns true if successfully parsed and added to grid, false otherwise.
         /// </summary>
-        private void ProcessWeightItemBarcode(string weightBarcode)
+        private bool TryProcessScaleBarcode(string input)
         {
             try
             {
-                // Remove the $ prefix
-                string barcodeWithoutPrefix = weightBarcode.Substring(1);
+                if (string.IsNullOrEmpty(input)) return false;
 
-                System.Diagnostics.Debug.WriteLine($"Processing weight barcode: {weightBarcode} (length without $: {barcodeWithoutPrefix.Length})");
+                bool hasDollarPrefix = input.StartsWith("$");
+                string cleanInput = hasDollarPrefix ? input.Substring(1) : input;
 
-                // Scale format: Item code (padded to 7 digits with leading zeros) + Weight (5 digits)
-                // Example: $006754301485
-                //          Item: 0067543 â†’ 67543 (after removing leading zeros)
-                //          Weight: 01485
+                // Check if this matches a weighing scale barcode format:
+                // 1. Explicit $ prefix (e.g. $006754301485 or $200009300270)
+                // 2. Standard EAN-13 In-Store Scale Barcode (12-14 digits starting with 20-29)
+                bool isStandardScalePrefix = cleanInput.Length >= 12 && cleanInput.Length <= 14 &&
+                                             (cleanInput.StartsWith("20") || cleanInput.StartsWith("21") ||
+                                              cleanInput.StartsWith("22") || cleanInput.StartsWith("23") ||
+                                              cleanInput.StartsWith("24") || cleanInput.StartsWith("25") ||
+                                              cleanInput.StartsWith("26") || cleanInput.StartsWith("27") ||
+                                              cleanInput.StartsWith("28") || cleanInput.StartsWith("29"));
 
-                bool parsed = false;
-
-                // Weight is always last 5 digits, item code is everything before that (with leading zeros removed)
-                if (barcodeWithoutPrefix.Length >= 10) // Minimum: 5 digit item code + 5 digit weight
+                if (!hasDollarPrefix && !isStandardScalePrefix)
                 {
-                    // Extract weight (last 5 digits)
-                    int weightStartPos = barcodeWithoutPrefix.Length - 5;
-                    string weightPart = barcodeWithoutPrefix.Substring(weightStartPos, 5);
+                    return false;
+                }
 
-                    // Extract item code (everything before weight, remove leading zeros)
-                    string itemCodeWithZeros = barcodeWithoutPrefix.Substring(0, weightStartPos);
-                    string itemCode = itemCodeWithZeros.TrimStart('0');
+                // Format 1: Standard 13-digit EAN-13 Scale Barcode (Prefix: 2 digits, PLU: 5 digits, Weight/Price: 5 digits, Checksum: 1 digit)
+                if (cleanInput.Length == 13 && isStandardScalePrefix)
+                {
+                    string prefix = cleanInput.Substring(0, 2);
+                    string rawPlu = cleanInput.Substring(2, 5);
+                    string plu = rawPlu.TrimStart('0');
+                    if (string.IsNullOrEmpty(plu)) plu = rawPlu;
+                    string valuePart = cleanInput.Substring(7, 5);
 
-                    System.Diagnostics.Debug.WriteLine($"Extracted: itemCode={itemCode} (from {itemCodeWithZeros}), weight={weightPart}");
-
-                    // Try to find item with this item code
-                    if (!string.IsNullOrEmpty(itemCode) && float.TryParse(weightPart, out float weight))
+                    if (float.TryParse(valuePart, out float val))
                     {
-                        DataBase.Operations = "GETITEMBYBARCODE";
-                        ItemDDlGrid items = dp.itemDDlGrid(itemCode, "");
+                        // Check for Price-embedded barcode (Prefix 22)
+                        bool isPriceEmbedded = (prefix == "22");
 
-                        if (items != null && items.List != null && items.List.Count() > 0)
+                        ItemDDl item = FindScaleItem(plu, rawPlu);
+                        if (item != null && EnsureItemAllowedForSale(item))
                         {
-                            var item = items.List.First();
-                            System.Diagnostics.Debug.WriteLine($"Found item: {item.Description} (ID: {item.ItemId})");
-
-                            if (!EnsureItemAllowedForSale(item))
+                            float qty = 1.0f;
+                            if (isPriceEmbedded)
                             {
-                                return;
-                            }
-
-                            // Verify this is a weight item
-                            if (IsWeightItem(item.ItemId, item))
-                            {
-                                System.Diagnostics.Debug.WriteLine($"Confirmed weight item, converting weight {weight}");
-
-                                // Convert weight to base unit
-                                float qty = ConvertWeightToBaseUnit(item, weight);
-
-                                System.Diagnostics.Debug.WriteLine($"Final quantity: {qty}");
-
-                                // Add item with the extracted weight as quantity
-                                AddToGrid(item, qty);
-                                parsed = true;
+                                float price = val / 100.0f; // 5 digits price in paise/cents
+                                float itemUnitPrice = item.RetailPrice > 0 ? (float)item.RetailPrice : (item.MRP > 0 ? (float)item.MRP : 0);
+                                qty = itemUnitPrice > 0 ? (float)Math.Round(price / itemUnitPrice, 3) : 1.0f;
                             }
                             else
                             {
-                                System.Diagnostics.Debug.WriteLine($"Item {item.Description} is NOT a weight item");
+                                // Weight in grams (e.g., 00450 = 450g)
+                                qty = ConvertWeightToBaseUnit(item, val);
                             }
-                        }
-                        else
-                        {
-                            System.Diagnostics.Debug.WriteLine($"No item found with barcode: {itemCode}");
+
+                            AddToGrid(item, qty);
+                            return true;
                         }
                     }
                 }
 
-                if (!parsed)
+                // Format 2: Flexible Scale / Legacy $ Format (Weight is last 5 digits or last 5 before checksum)
+                if (cleanInput.Length >= 10)
                 {
-                    MessageBox.Show($"Could not parse weight item barcode: {weightBarcode}\n\n" +
-                        "Expected format: $[item code][5-digit weight]\n" +
-                        "Examples:\n" +
-                        "  $006754301485 â†’ Item: 67543, Weight: 01485\n" +
-                        "  $0012345600123 â†’ Item: 12345, Weight: 00123\n" +
-                        "  $123456700456 â†’ Item: 1234567, Weight: 00456",
-                        "Invalid Weight Barcode", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    int weightLen = 5;
+                    int weightStartPos = cleanInput.Length - weightLen;
+                    // If 13 digits with checksum at end
+                    if (cleanInput.Length == 13 && isStandardScalePrefix)
+                    {
+                        weightStartPos = 7;
+                    }
+
+                    if (weightStartPos > 0 && weightStartPos + weightLen <= cleanInput.Length)
+                    {
+                        string weightPart = cleanInput.Substring(weightStartPos, weightLen);
+                        string rawCode = cleanInput.Substring(0, weightStartPos);
+                        if (rawCode.StartsWith("20") || rawCode.StartsWith("21") || rawCode.StartsWith("22") ||
+                            rawCode.StartsWith("23") || rawCode.StartsWith("24") || rawCode.StartsWith("25") ||
+                            rawCode.StartsWith("26") || rawCode.StartsWith("27") || rawCode.StartsWith("28") || rawCode.StartsWith("29"))
+                        {
+                            rawCode = rawCode.Substring(2);
+                        }
+                        string itemCode = rawCode.TrimStart('0');
+                        if (string.IsNullOrEmpty(itemCode)) itemCode = rawCode;
+
+                        if (!string.IsNullOrEmpty(itemCode) && float.TryParse(weightPart, out float weight))
+                        {
+                            ItemDDl item = FindScaleItem(itemCode, rawCode);
+                            if (item != null && EnsureItemAllowedForSale(item))
+                            {
+                                float qty = ConvertWeightToBaseUnit(item, weight);
+                                AddToGrid(item, qty);
+                                return true;
+                            }
+                        }
+                    }
+                }
+
+                // If explicit $ was provided but item was not found, show user warning
+                if (hasDollarPrefix)
+                {
+                    MessageBox.Show($"Could not find scale item for barcode: {input}\nExpected: $[item code][weight]",
+                        "Scale Item Not Found", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return true; // Handled, don't fall through
+                }
+
+                return false;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error in TryProcessScaleBarcode: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Helper to lookup item by PLU / code for weighing scale barcode
+        /// </summary>
+        private ItemDDl FindScaleItem(string plu, string rawPlu)
+        {
+            try
+            {
+                DataBase.Operations = "GETITEMBYBARCODE";
+                ItemDDlGrid items = dp.itemDDlGrid(plu, "");
+                if (items?.List != null && items.List.Any())
+                {
+                    return items.List.First();
+                }
+
+                if (!string.IsNullOrEmpty(rawPlu) && rawPlu != plu)
+                {
+                    items = dp.itemDDlGrid(rawPlu, "");
+                    if (items?.List != null && items.List.Any())
+                    {
+                        return items.List.First();
+                    }
+                }
+
+                DataBase.Operations = "GETITEM";
+                items = dp.itemDDlGrid(plu, plu);
+                if (items?.List != null && items.List.Any())
+                {
+                    return items.List.First();
+                }
+
+                if (!string.IsNullOrEmpty(rawPlu) && rawPlu != plu)
+                {
+                    items = dp.itemDDlGrid(rawPlu, rawPlu);
+                    if (items?.List != null && items.List.Any())
+                    {
+                        return items.List.First();
+                    }
                 }
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Error processing weight item barcode: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                System.Diagnostics.Debug.WriteLine($"Error in ProcessWeightItemBarcode: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"Error in FindScaleItem: {ex.Message}");
             }
+            return null;
         }
 
         /// <summary>
@@ -2639,18 +2709,19 @@ namespace PosBranch_Win.Transaction
         {
             try
             {
-                // First check by unit name if item is provided (fastest check)
+                // First check by unit name if item is provided (fastest check without DB query)
                 if (item != null && !string.IsNullOrEmpty(item.Unit))
                 {
-                    string unitUpper = item.Unit.ToUpper();
-                    if (unitUpper.Contains("KG") || unitUpper.Contains("GRAM") || unitUpper.Contains("G ") ||
-                        unitUpper.Contains("G.") || unitUpper.Contains("G,"))
+                    string unit = item.Unit.Trim().ToUpper();
+                    if (unit == "KG" || unit == "KGS" || unit == "KILOGRAM" || unit == "KILOGRAMS" ||
+                        unit == "G" || unit == "GM" || unit == "GMS" || unit == "GRAM" || unit == "GRAMS" ||
+                        unit.StartsWith("KG") || unit.StartsWith("GM") || unit.StartsWith("GRAM"))
                     {
                         return true;
                     }
                 }
 
-                // Query the database to get ItemTypeId for this item
+                // Query the database to get ItemTypeId for this item if needed
                 Repository.MasterRepositry.ItemMasterRepository itemRepo = new Repository.MasterRepositry.ItemMasterRepository();
                 ModelClass.Master.ItemGet itemDetails = itemRepo.GetByIdItem(itemId);
 
@@ -2669,7 +2740,7 @@ namespace PosBranch_Win.Transaction
         }
 
         /// <summary>
-        /// Converts weight in grams to the item's base unit
+        /// Converts weight in grams to the item's base unit (KG or Grams)
         /// </summary>
         private float ConvertWeightToBaseUnit(ItemDDl item, float weightInGrams)
         {
@@ -2677,21 +2748,18 @@ namespace PosBranch_Win.Transaction
             {
                 if (item == null) return weightInGrams / 1000f; // Default: convert to KG
 
-                string unit = item.Unit?.ToUpper() ?? "";
+                string unit = item.Unit?.Trim().ToUpper() ?? "";
 
-                // If unit is already in grams, return as-is
-                if (unit.Contains("G") && !unit.Contains("KG"))
+                // Check exact unit matches for grams (do not use simple Contains("G") which matches "BAG")
+                bool isGramUnit = unit == "G" || unit == "GM" || unit == "GMS" || unit == "GRAM" || unit == "GRAMS" ||
+                                  unit.StartsWith("GM") || unit.StartsWith("GRAM");
+
+                if (isGramUnit)
                 {
                     return weightInGrams;
                 }
 
-                // If unit is KG or contains KG, convert grams to KG
-                if (unit.Contains("KG"))
-                {
-                    return weightInGrams / 1000f;
-                }
-
-                // Default: assume grams need to be converted to KG
+                // Default for loose weight items in supermarkets is KG (e.g. 450 grams = 0.450 KG)
                 return weightInGrams / 1000f;
             }
             catch (Exception ex)
