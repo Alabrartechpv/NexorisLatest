@@ -125,6 +125,10 @@ namespace PosBranch_Win.Transaction
         private const int FLASH_TIMES = 4; // Number of times to flash (2 on, 2 off = 2 complete flashes)
         private Color flashColor = Color.LightGreen; // Highlight color for flash
 
+        // Cached default customer info (loaded once at form load, reused in ResetCustomer)
+        private string _cachedDefaultCustomerName = null;
+        private int _cachedDefaultCustomerLedgerId = 0;
+
         // Call this in your constructor or after InitializeComponent()
         private void InitializeSummaryFooterPanel()
         {
@@ -945,13 +949,15 @@ namespace PosBranch_Win.Transaction
                     System.Diagnostics.Debug.WriteLine($"Failed to load custom font: {fontEx.Message}");
                 }
 
-                // Set up customer default
+                // Set up customer default and cache it for ResetCustomer()
                 CustomerDDlGrid cs = dp.CustomerDDl();
                 if (cs?.List != null && cs.List.Any())
                 {
                     var led = cs.List.Where(f => f.LedgerName == DEFAULT_CUSTOMER_NAME).FirstOrDefault();
                     if (led != null)
                     {
+                        _cachedDefaultCustomerName = led.LedgerName;
+                        _cachedDefaultCustomerLedgerId = led.LedgerID;
                         txtCustomer.Text = led.LedgerName;
                         sales.LedgerID = led.LedgerID;
                         lblledger.Text = led.LedgerID.ToString();
@@ -962,12 +968,16 @@ namespace PosBranch_Win.Transaction
                         var firstCustomer = cs.List.FirstOrDefault();
                         if (firstCustomer != null)
                         {
+                            _cachedDefaultCustomerName = firstCustomer.LedgerName;
+                            _cachedDefaultCustomerLedgerId = firstCustomer.LedgerID;
                             txtCustomer.Text = firstCustomer.LedgerName;
                             sales.LedgerID = firstCustomer.LedgerID;
                             lblledger.Text = firstCustomer.LedgerID.ToString();
                         }
                         else
                         {
+                            _cachedDefaultCustomerName = null;
+                            _cachedDefaultCustomerLedgerId = 0;
                             txtCustomer.Text = "";
                             sales.LedgerID = 0;
                             lblledger.Text = "0";
@@ -3344,18 +3354,36 @@ namespace PosBranch_Win.Transaction
             // Validate that no items are sold below cost unless allowed
             if (!SessionContext.AllowSaleBelowCost)
             {
+                // Calculate invoice-level discount multiplier if applicable
+                float overallDiscountFactor = 1.0f;
+                if (sales != null && sales.DiscountPer > 0 && sales.DiscountPer < 100)
+                {
+                    overallDiscountFactor = (float)((100.0 - sales.DiscountPer) / 100.0);
+                }
+
                 foreach (Infragistics.Win.UltraWinGrid.UltraGridRow row in ultraGrid1.Rows)
                 {
-                    float cost = ParseFloat(row.Cells["Cost"].Value, 0);
-                    float sellingPrice = ParseFloat(row.Cells["Amount"].Value, 0);
-                    string itemName = row.Cells["ItemName"].Value?.ToString() ?? "Item";
+                    if (row == null) continue;
 
-                    // If cost is 0, we don't need to validate it
+                    float cost = ParseFloat(row.Cells["Cost"]?.Value, 0);
+                    // If cost is 0 or negative (not tracked or free), no validation needed
                     if (cost <= 0) continue;
 
-                    if (sellingPrice < cost)
+                    float qty = ParseFloat(row.Cells["Qty"]?.Value, 0);
+                    // If qty is 0 or negative (e.g. sales return), skip cost comparison
+                    if (qty <= 0) continue;
+
+                    float totalAmount = ParseFloat(row.Cells["TotalAmount"]?.Value, 0);
+                    // Apply overall bill discount factor to the line realization
+                    float effectiveLineTotal = totalAmount * overallDiscountFactor;
+                    float effectiveUnitPrice = (float)Math.Round(effectiveLineTotal / qty, 2);
+                    string itemName = row.Cells["ItemName"]?.Value?.ToString() ?? "Item";
+
+                    // Allow a 0.01 tolerance for minor floating point rounding
+                    if (effectiveUnitPrice < (cost - 0.01f))
                     {
-                        MessageBox.Show($"Selling price for '{itemName}' cannot be less than cost price (₹{cost:F2}).", "Price Below Cost", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        MessageBox.Show($"Item '{itemName}' is being sold below cost price.\n\nCost Price: ₹{cost:F2}\nEffective Selling Price: ₹{effectiveUnitPrice:F2}\n\nSale below cost is disabled in POS Settings.", 
+                            "Price Below Cost Blocked", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                         return false;
                     }
                 }
@@ -3464,7 +3492,7 @@ namespace PosBranch_Win.Transaction
             // Set missing properties that were showing as 0/NULL in database
             // Get default currency from database
             LoadDefaultCurrency();
-            sales.BillCost = 0; // Default to 0, can be calculated from item costs if needed
+            sales.BillCost = CalculateBillCost(); // Sum of (Cost * Qty) for all line items
             // Note: IsPaid is already set in cash/credit logic above, don't override it
             sales.IsSyncd = false; // Default to false for new sales
             sales.CancelFlag = false; // Default to false for new sales
@@ -3484,6 +3512,35 @@ namespace PosBranch_Win.Transaction
             System.Diagnostics.Debug.WriteLine($"Customer: Name={sales.CustomerName}, LedgerID={sales.LedgerID}, PaymodeId={sales.PaymodeId}");
             System.Diagnostics.Debug.WriteLine($"Financial: NetAmount={sales.NetAmount}, SubTotal={sales.SubTotal}, RoundOff={sales.RoundOff}");
             System.Diagnostics.Debug.WriteLine($"Discount: Percentage={sales.DiscountPer}, Amount={sales.DiscountAmt}");
+        }
+
+        /// <summary>
+        /// Calculates the total cost of goods for the current invoice (sum of Cost * Qty for all line items).
+        /// Used to populate sales.BillCost for accurate profit reporting.
+        /// </summary>
+        private double CalculateBillCost()
+        {
+            double totalCost = 0;
+            try
+            {
+                DataTable dt = ultraGrid1.DataSource as DataTable;
+                if (dt == null || dt.Rows.Count == 0) return 0;
+
+                foreach (DataRow row in dt.Rows)
+                {
+                    int itemId = ParseInt(row["ItemId"], 0);
+                    if (itemId <= 0) continue;
+
+                    float cost = ParseFloat(row["Cost"], 0);
+                    float qty = ParseFloat(row["Qty"], 1);
+                    totalCost += cost * qty;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error calculating BillCost: {ex.Message}");
+            }
+            return totalCost;
         }
 
         private DataGridView PrepareGridData()
@@ -4037,29 +4094,18 @@ namespace PosBranch_Win.Transaction
 
         private void ResetCustomer()
         {
-            try
+            // Use cached default customer (loaded once at form load) to avoid DB call on every Clear()
+            if (!string.IsNullOrEmpty(_cachedDefaultCustomerName))
             {
-                CustomerDDlGrid cs = dp.CustomerDDl();
-                var defaultCustomer = cs.List.FirstOrDefault(f => f.LedgerName == "DEFAULT CUSTOMER");
-                if (defaultCustomer != null)
-                {
-                    txtCustomer.Text = defaultCustomer.LedgerName;
-                    sales.LedgerID = defaultCustomer.LedgerID;
-                    lblledger.Text = defaultCustomer.LedgerID.ToString();
-                }
-                else
-                {
-                    txtCustomer.Text = "";
-                    sales.LedgerID = 0;
-                    lblledger.Text = "0";
-                }
+                txtCustomer.Text = _cachedDefaultCustomerName;
+                sales.LedgerID = _cachedDefaultCustomerLedgerId;
+                lblledger.Text = _cachedDefaultCustomerLedgerId.ToString();
             }
-            catch (Exception ex)
+            else
             {
-                txtCustomer.Text = "Error";
+                txtCustomer.Text = "";
                 sales.LedgerID = 0;
                 lblledger.Text = "0";
-                System.Diagnostics.Debug.WriteLine($"Error resetting customer in Clear(): {ex.Message}");
             }
         }
 
@@ -5473,9 +5519,24 @@ namespace PosBranch_Win.Transaction
                 // If in credit mode, don't show payment panel
                 if (isCreditMode)
                 {
+                    // Block credit sale for DEFAULT CUSTOMER — debt cannot be collected from anonymous customer
+                    string currentCustomerName = txtCustomer.Text?.Trim() ?? "";
+                    if (string.Equals(currentCustomerName, DEFAULT_CUSTOMER_NAME, StringComparison.OrdinalIgnoreCase)
+                        || string.IsNullOrEmpty(currentCustomerName))
+                    {
+                        MessageBox.Show(
+                            "Credit sales cannot be created for the DEFAULT CUSTOMER.\n\n" +
+                            "Please select a specific customer before proceeding with a credit sale.",
+                            "Customer Required",
+                            MessageBoxButtons.OK,
+                            MessageBoxIcon.Warning);
+                        txtBarcode.Focus();
+                        return;
+                    }
+
                     // Confirm credit sale creation
                     DialogResult result = MessageBox.Show(
-                        "Do you want to create a credit sale?\n\n" +
+                        $"Do you want to create a credit sale for {currentCustomerName}?\n\n" +
                         "This will create a pending invoice that can be paid later through the Receipt form.",
                         "Confirm Credit Sale",
                         MessageBoxButtons.YesNo,
