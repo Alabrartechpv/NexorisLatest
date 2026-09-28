@@ -30,6 +30,7 @@ namespace PosBranch_Win.Reports.SalesReports
             this.lblDetailCount = new Infragistics.Win.Misc.UltraLabel();
             this.lblSummaryCount = new Infragistics.Win.Misc.UltraLabel();
             this.pnlToolbar = new Infragistics.Win.Misc.UltraPanel();
+            this.btnExportGrid = new Infragistics.Win.Misc.UltraButton();
             this.btnHideSelection = new Infragistics.Win.Misc.UltraButton();
             this.btnPreviewReport = new Infragistics.Win.Misc.UltraButton();
             this.btnPreviewGrid = new Infragistics.Win.Misc.UltraButton();
@@ -239,6 +240,7 @@ namespace PosBranch_Win.Reports.SalesReports
             // pnlToolbar.ClientArea
             // 
             this.pnlToolbar.ClientArea.Controls.Add(this.btnHideSelection);
+            this.pnlToolbar.ClientArea.Controls.Add(this.btnExportGrid);
             this.pnlToolbar.ClientArea.Controls.Add(this.btnPreviewReport);
             this.pnlToolbar.ClientArea.Controls.Add(this.btnPreviewGrid);
             this.pnlToolbar.ClientArea.Controls.Add(this.btnViewGrid);
@@ -247,6 +249,15 @@ namespace PosBranch_Win.Reports.SalesReports
             this.pnlToolbar.Name = "pnlToolbar";
             this.pnlToolbar.Size = new System.Drawing.Size(1244, 52);
             this.pnlToolbar.TabIndex = 1;
+            // 
+            // btnExportGrid
+            // 
+            this.btnExportGrid.Location = new System.Drawing.Point(386, 12);
+            this.btnExportGrid.Name = "btnExportGrid";
+            this.btnExportGrid.Size = new System.Drawing.Size(114, 28);
+            this.btnExportGrid.TabIndex = 4;
+            this.btnExportGrid.Text = "Export Grid";
+            this.btnExportGrid.Click += new System.EventHandler(this.btnExportGrid_Click);
             // 
             // btnHideSelection
             // 
@@ -601,6 +612,7 @@ namespace PosBranch_Win.Reports.SalesReports
         private Infragistics.Win.Misc.UltraButton btnViewGrid;
         private Infragistics.Win.Misc.UltraButton btnPreviewGrid;
         private Infragistics.Win.Misc.UltraButton btnPreviewReport;
+        private Infragistics.Win.Misc.UltraButton btnExportGrid;
         private Infragistics.Win.Misc.UltraButton btnHideSelection;
         private Infragistics.Win.UltraWinEditors.UltraDateTimeEditor dtFromDate;
         private Infragistics.Win.UltraWinEditors.UltraDateTimeEditor dtToDate;
