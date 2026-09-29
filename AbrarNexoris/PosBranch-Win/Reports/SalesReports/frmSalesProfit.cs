@@ -37,6 +37,10 @@ namespace PosBranch_Win.Reports.SalesReports
         private List<SalesProfitViewModel> _rawData = new List<SalesProfitViewModel>();
         private List<SalesProfitViewModel> _filteredData = new List<SalesProfitViewModel>();
         private bool _isSelectionHidden = false;
+        private double _periodExpenses = 0;
+        private List<SalesProfitReportRepository.ExpenseLedgerItem> _expenseBreakdown = new List<SalesProfitReportRepository.ExpenseLedgerItem>();
+        private Label lblActualNetProfitBadge;
+        private UltraButton btnNetProfitAudit;
 
         // Dynamic summary footer fields
         private Label lblCount;
@@ -337,6 +341,39 @@ namespace PosBranch_Win.Reports.SalesReports
             ultraPanelGridFooter.SendToBack();
             ultraGridProfit.BringToFront();
 
+            // Net Profit Executive KPI Card on Filter Panel (Top-Right)
+            lblActualNetProfitBadge = new Label
+            {
+                Name = "lblActualNetProfitBadge",
+                AutoSize = false,
+                TextAlign = ContentAlignment.MiddleCenter,
+                ForeColor = Color.FromArgb(27, 94, 32),
+                BackColor = Color.FromArgb(232, 245, 233),
+                Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                BorderStyle = BorderStyle.FixedSingle,
+                Cursor = Cursors.Hand,
+                Padding = new Padding(6, 4, 6, 4),
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                Location = new Point(ultraPanelControls.Width - 450, 9),
+                Size = new Size(435, 58),
+                Text = "Gross Profit: ₹ 0.00 | Expenses: ₹ 0.00\n★ Actual Net Profit: ₹ 0.00 (0.0%) [🔍 View Details]"
+            };
+            lblActualNetProfitBadge.Click += (s, e) => ShowNetProfitBreakdownDialog();
+            gridToolTip.SetToolTip(lblActualNetProfitBadge, "Click to view full Ledger Expense breakdown & Net Profit calculation audit.");
+            ultraPanelControls.ClientArea.Controls.Add(lblActualNetProfitBadge);
+
+            // Net Profit Audit Action Button on Action Panel
+            btnNetProfitAudit = new UltraButton
+            {
+                Name = "btnNetProfitAudit",
+                Text = "Net Profit Audit",
+                Size = new Size(130, btnClearFilters.Height),
+                Location = new Point(btnClearFilters.Right + 8, btnClearFilters.Top)
+            };
+            btnNetProfitAudit.Click += (s, e) => ShowNetProfitBreakdownDialog();
+            gridToolTip.SetToolTip(btnNetProfitAudit, "Open full financial audit breakdown of Gross Profit, Ledger Expenses & Actual Net Profit.");
+            ultraPanelAction.ClientArea.Controls.Add(btnNetProfitAudit);
+
             StyleButtons();
             SetupGridAppearance();
             UpdateSelectionToggleButtonText();
@@ -358,6 +395,7 @@ namespace PosBranch_Win.Reports.SalesReports
             StyleClassicButton(btnExportCsv);
             StyleClassicButton(btnColumnChooser);
             StyleClassicButton(btnClearFilters);
+            StyleClassicButton(btnNetProfitAudit);
             StyleClassicButton(btnToggleSelection);
         }
 
@@ -602,6 +640,20 @@ namespace PosBranch_Win.Reports.SalesReports
                         break;
                 }
                 lbl.Text = text;
+            }
+
+            // Update Net Profit Summary Badge
+            double filteredTotalSales = _filteredData != null && _filteredData.Count > 0 ? _filteredData.Sum(x => x.SubTotal > 0 ? x.SubTotal : x.BillAmount) : 0;
+            double grossProfit = _filteredData != null && _filteredData.Count > 0 ? _filteredData.Sum(x => x.Profit) : 0;
+            double grossMargin = filteredTotalSales > 0 ? (grossProfit / filteredTotalSales) * 100 : 0;
+            double netProfit = grossProfit - _periodExpenses;
+            double netMargin = filteredTotalSales > 0 ? (netProfit / filteredTotalSales) * 100 : 0;
+
+            if (lblActualNetProfitBadge != null)
+            {
+                lblActualNetProfitBadge.Text = $"Gross Profit: ₹ {grossProfit:N2} ({grossMargin:N1}%)  |  Expenses: -₹ {_periodExpenses:N2}\n★ ACTUAL NET PROFIT: ₹ {netProfit:N2} ({netMargin:N1}%)  [🔍 Click Audit]";
+                lblActualNetProfitBadge.ForeColor = netProfit >= 0 ? Color.FromArgb(27, 94, 32) : Color.FromArgb(183, 28, 28);
+                lblActualNetProfitBadge.BackColor = netProfit >= 0 ? Color.FromArgb(232, 245, 233) : Color.FromArgb(255, 235, 238);
             }
         }
 
@@ -1106,6 +1158,12 @@ namespace PosBranch_Win.Reports.SalesReports
 
                 var rawList = _reportRepository.GetSalesProfitReport(billNo, fromDate, toDate);
 
+                int branchId = 0;
+                if (!string.IsNullOrEmpty(ModelClass.DataBase.BranchId) && int.TryParse(ModelClass.DataBase.BranchId, out int bid))
+                    branchId = bid;
+                _expenseBreakdown = _reportRepository.GetExpenseBreakdown(fromDate, toDate, branchId) ?? new List<SalesProfitReportRepository.ExpenseLedgerItem>();
+                _periodExpenses = _expenseBreakdown.Sum(x => x.Amount);
+
                 _rawData = rawList != null
                     ? rawList.Select(r =>
                     {
@@ -1181,8 +1239,8 @@ namespace PosBranch_Win.Reports.SalesReports
             ConfigureColumn(band, "BillNo", "Bill No", 90, HAlign.Center);
             ConfigureDateColumn(band, "BillDate", "Bill Date", 110, HAlign.Center);
             ConfigureMoneyColumn(band, "BillAmount", "Sales Amount (₹)", 150, Color.FromArgb(20, 50, 90));
-            ConfigureMoneyColumn(band, "Profit", "Profit Amount (₹)", 150, Color.FromArgb(27, 94, 32));
-            ConfigurePercentColumn(band, "ProfitMarginPercent", "Profit Margin %", 130);
+            ConfigureMoneyColumn(band, "Profit", "Gross Profit (₹)", 150, Color.FromArgb(27, 94, 32));
+            ConfigurePercentColumn(band, "ProfitMarginPercent", "Gross Margin %", 130);
             ConfigureColumn(band, "PayMode", "Pay Mode", 120, HAlign.Left);
             ConfigureColumn(band, "CashMode", "Cash Mode", 120, HAlign.Left);
 
@@ -1362,6 +1420,170 @@ namespace PosBranch_Win.Reports.SalesReports
         private void UpdateSelectionToggleButtonText()
         {
             btnToggleSelection.Text = _isSelectionHidden ? "Show Selection" : "Hide Selection";
+        }
+        #endregion
+
+        #region Net Profit Audit Breakdown Dialog
+        private void ShowNetProfitBreakdownDialog()
+        {
+            double filteredTotalSales = _filteredData != null && _filteredData.Count > 0 ? _filteredData.Sum(x => x.SubTotal > 0 ? x.SubTotal : x.BillAmount) : 0;
+            double grossProfit = _filteredData != null && _filteredData.Count > 0 ? _filteredData.Sum(x => x.Profit) : 0;
+            double cogs = filteredTotalSales - grossProfit;
+            double grossMargin = filteredTotalSales > 0 ? (grossProfit / filteredTotalSales) * 100 : 0;
+            double netProfit = grossProfit - _periodExpenses;
+            double netMargin = filteredTotalSales > 0 ? (netProfit / filteredTotalSales) * 100 : 0;
+
+            DateTime fromDate = Convert.ToDateTime(ultraDateTimeFrom.Value);
+            DateTime toDate = Convert.ToDateTime(ultraDateTimeTo.Value);
+
+            using (Form dialog = new Form())
+            {
+                dialog.Text = "Actual Net Profit & Operating Expenses Breakdown";
+                dialog.Size = new Size(650, 580);
+                dialog.StartPosition = FormStartPosition.CenterParent;
+                dialog.FormBorderStyle = FormBorderStyle.FixedDialog;
+                dialog.MaximizeBox = false;
+                dialog.MinimizeBox = false;
+                dialog.ShowInTaskbar = false;
+                dialog.BackColor = Color.FromArgb(245, 248, 252);
+                dialog.Font = new Font("Segoe UI", 9F, FontStyle.Regular);
+
+                // Top Header / Summary Panel
+                Panel pnlHeader = new Panel
+                {
+                    Dock = DockStyle.Top,
+                    Height = 175,
+                    BackColor = Color.FromArgb(232, 246, 255),
+                    Padding = new Padding(15, 10, 15, 10)
+                };
+
+                Label lblPeriod = new Label
+                {
+                    Text = $"Period: {fromDate:dd-MMM-yyyy}  to  {toDate:dd-MMM-yyyy}  |  Bills Count: {_filteredData.Count:N0}",
+                    Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                    ForeColor = Color.FromArgb(14, 47, 108),
+                    Dock = DockStyle.Top,
+                    Height = 24
+                };
+
+                TableLayoutPanel tlpSummary = new TableLayoutPanel
+                {
+                    Dock = DockStyle.Fill,
+                    ColumnCount = 2,
+                    RowCount = 5,
+                    Padding = new Padding(0, 4, 0, 0)
+                };
+                tlpSummary.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(SizeType.Percent, 60F));
+                tlpSummary.ColumnStyles.Add(new System.Windows.Forms.ColumnStyle(SizeType.Percent, 40F));
+
+                void AddSummaryRow(string title, string value, Color valColor, bool bold = false)
+                {
+                    var lblT = new Label
+                    {
+                        Text = title,
+                        Font = new Font("Segoe UI", 9F, bold ? FontStyle.Bold : FontStyle.Regular),
+                        ForeColor = Color.FromArgb(30, 41, 59),
+                        Dock = DockStyle.Fill,
+                        TextAlign = ContentAlignment.MiddleLeft
+                    };
+                    var lblV = new Label
+                    {
+                        Text = value,
+                        Font = new Font("Segoe UI", 9F, bold ? FontStyle.Bold : FontStyle.Regular),
+                        ForeColor = valColor,
+                        Dock = DockStyle.Fill,
+                        TextAlign = ContentAlignment.MiddleRight
+                    };
+                    tlpSummary.Controls.Add(lblT);
+                    tlpSummary.Controls.Add(lblV);
+                }
+
+                AddSummaryRow("1. Total Sales Turnover (Base):", $"₹ {filteredTotalSales:N2}", Color.FromArgb(18, 49, 102));
+                AddSummaryRow("2. Cost of Goods Sold (COGS):", $"- ₹ {cogs:N2}", Color.FromArgb(100, 116, 139));
+                AddSummaryRow("3. Total Gross Profit (Grid):", $"₹ {grossProfit:N2} ({grossMargin:N1}%)", Color.FromArgb(27, 94, 32), true);
+                AddSummaryRow("4. Total Operating Expenses:", $"- ₹ {_periodExpenses:N2}", Color.FromArgb(183, 28, 28), true);
+                AddSummaryRow("★ ACTUAL NET PROFIT:", $"₹ {netProfit:N2} ({netMargin:N1}%)", netProfit >= 0 ? Color.FromArgb(27, 94, 32) : Color.FromArgb(183, 28, 28), true);
+
+                pnlHeader.Controls.Add(tlpSummary);
+                pnlHeader.Controls.Add(lblPeriod);
+
+                // Bottom Panel (Close Button)
+                Panel pnlBottom = new Panel
+                {
+                    Dock = DockStyle.Bottom,
+                    Height = 45,
+                    BackColor = Color.FromArgb(232, 240, 248)
+                };
+                Button btnClose = new Button
+                {
+                    Text = "Close",
+                    Size = new Size(85, 30),
+                    Location = new Point(dialog.ClientSize.Width - 100, 7),
+                    Anchor = AnchorStyles.Bottom | AnchorStyles.Right,
+                    BackColor = Color.FromArgb(220, 235, 252),
+                    FlatStyle = FlatStyle.Flat
+                };
+                btnClose.FlatAppearance.BorderColor = Color.FromArgb(118, 154, 198);
+                btnClose.Click += (s, e) => dialog.Close();
+                pnlBottom.Controls.Add(btnClose);
+
+                // Center: Itemized Expense Breakdown Table/ListView
+                Panel pnlExpenses = new Panel
+                {
+                    Dock = DockStyle.Fill,
+                    Padding = new Padding(12, 10, 12, 5)
+                };
+
+                Label lblExpTitle = new Label
+                {
+                    Text = "Operating Expense Ledgers (Direct & Indirect from Vouchers):",
+                    Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                    ForeColor = Color.FromArgb(18, 49, 102),
+                    Dock = DockStyle.Top,
+                    Height = 22
+                };
+
+                ListView lvExpenses = new ListView
+                {
+                    Dock = DockStyle.Fill,
+                    View = View.Details,
+                    FullRowSelect = true,
+                    GridLines = true,
+                    HeaderStyle = ColumnHeaderStyle.Nonclickable,
+                    Font = new Font("Segoe UI", 9F)
+                };
+                lvExpenses.Columns.Add("Expense Ledger Name", 280, HorizontalAlignment.Left);
+                lvExpenses.Columns.Add("Group", 140, HorizontalAlignment.Left);
+                lvExpenses.Columns.Add("Debit Amount (₹)", 150, HorizontalAlignment.Right);
+
+                if (_expenseBreakdown != null && _expenseBreakdown.Count > 0)
+                {
+                    foreach (var item in _expenseBreakdown.OrderByDescending(x => x.Amount))
+                    {
+                        var lvi = new ListViewItem(item.LedgerName);
+                        lvi.SubItems.Add(item.GroupName);
+                        lvi.SubItems.Add($"₹ {item.Amount:N2}");
+                        lvExpenses.Items.Add(lvi);
+                    }
+                }
+                else
+                {
+                    var lvi = new ListViewItem("No expense vouchers found in this period");
+                    lvi.SubItems.Add("-");
+                    lvi.SubItems.Add("₹ 0.00");
+                    lvi.ForeColor = Color.Gray;
+                    lvExpenses.Items.Add(lvi);
+                }
+
+                pnlExpenses.Controls.Add(lvExpenses);
+                pnlExpenses.Controls.Add(lblExpTitle);
+
+                dialog.Controls.Add(pnlExpenses);
+                dialog.Controls.Add(pnlBottom);
+                dialog.Controls.Add(pnlHeader);
+
+                dialog.ShowDialog(this);
+            }
         }
         #endregion
 

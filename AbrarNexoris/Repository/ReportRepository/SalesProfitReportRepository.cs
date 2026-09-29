@@ -161,5 +161,74 @@ END";
             }
             return lookup;
         }
+
+        public class ExpenseLedgerItem
+        {
+            public string LedgerName { get; set; }
+            public string GroupName { get; set; }
+            public double Amount { get; set; }
+        }
+
+        public List<ExpenseLedgerItem> GetExpenseBreakdown(DateTime fromDate, DateTime toDate, int branchId)
+        {
+            var list = new List<ExpenseLedgerItem>();
+            try
+            {
+                if (DataConnection.State != ConnectionState.Open)
+                    DataConnection.Open();
+
+                string sql = @"
+SELECT 
+    lm.LedgerName,
+    ag.GroupName,
+    ISNULL(SUM(v.Debit), 0) AS Amount
+FROM Vouchers v
+INNER JOIN LedgerMaster lm ON lm.LedgerID = v.LedgerID
+INNER JOIN AccountGroupMaster ag ON ag.GroupID = lm.GroupID
+WHERE (ag.GroupID IN (10, 12) OR ag.GroupName LIKE '%Expense%')
+  AND v.VoucherDate >= @FromDate AND v.VoucherDate <= @ToDate
+  AND (@BranchId = 0 OR v.BranchID = @BranchId)
+  AND ISNULL(v.CancelFlag, 0) = 0
+GROUP BY lm.LedgerName, ag.GroupName
+HAVING ISNULL(SUM(v.Debit), 0) <> 0
+ORDER BY ag.GroupName, lm.LedgerName;";
+
+                using (SqlCommand cmd = new SqlCommand(sql, (SqlConnection)DataConnection))
+                {
+                    cmd.Parameters.AddWithValue("@FromDate", fromDate);
+                    cmd.Parameters.AddWithValue("@ToDate", toDate.Date.AddDays(1).AddSeconds(-1));
+                    cmd.Parameters.AddWithValue("@BranchId", branchId);
+
+                    using (SqlDataReader reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            list.Add(new ExpenseLedgerItem
+                            {
+                                LedgerName = reader["LedgerName"]?.ToString() ?? "",
+                                GroupName = reader["GroupName"]?.ToString() ?? "",
+                                Amount = reader["Amount"] != DBNull.Value ? Convert.ToDouble(reader["Amount"]) : 0
+                            });
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("GetExpenseBreakdown error: " + ex.Message);
+            }
+            finally
+            {
+                if (DataConnection.State == ConnectionState.Open)
+                    DataConnection.Close();
+            }
+            return list;
+        }
+
+        public double GetTotalExpenses(DateTime fromDate, DateTime toDate, int branchId)
+        {
+            var items = GetExpenseBreakdown(fromDate, toDate, branchId);
+            return items.Sum(x => x.Amount);
+        }
     }
 }
