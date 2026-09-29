@@ -252,7 +252,7 @@ namespace PosBranch_Win.Reports.SalesReports
             // 
             // btnExportGrid
             // 
-            this.btnExportGrid.Location = new System.Drawing.Point(386, 12);
+             this.btnExportGrid.Location = new System.Drawing.Point(386, 12);
             this.btnExportGrid.Name = "btnExportGrid";
             this.btnExportGrid.Size = new System.Drawing.Size(114, 28);
             this.btnExportGrid.TabIndex = 4;

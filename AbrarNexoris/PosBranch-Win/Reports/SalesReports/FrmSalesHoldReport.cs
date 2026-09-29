@@ -18,6 +18,25 @@ namespace PosBranch_Win.Reports.SalesReports
 {
     public partial class FrmSalesHoldReport : Form
     {
+        private static readonly Color FormBackColor        = Color.FromArgb(232, 246, 255);
+        private static readonly Color FilterPanelBackColor = Color.FromArgb(232, 246, 255);
+        private static readonly Color ActionPanelBackColor = Color.FromArgb(206, 223, 238);
+        private static readonly Color BorderBlue           = Color.FromArgb(118, 154, 198);
+        private static readonly Color ControlBackColor     = Color.White;
+        private static readonly Color ControlTextColor     = Color.FromArgb(18, 49, 102);
+        private static readonly Color GridHeaderBlue       = Color.FromArgb(93, 151, 214);
+        private static readonly Color GridHeaderBlueDark   = Color.FromArgb(67, 118, 184);
+        private static readonly Color GridSelectedBlue     = Color.FromArgb(126, 126, 245);
+        private static readonly Color GridRowLine          = Color.FromArgb(197, 217, 241);
+        private static readonly Color GridAltRow           = Color.FromArgb(246, 250, 255);
+        private static readonly Color GridFooterBorder     = Color.FromArgb(144, 181, 223);
+        private static readonly Color ButtonBlueTop        = Color.FromArgb(232, 241, 252);
+        private static readonly Color ButtonBlueBottom     = Color.FromArgb(145, 181, 224);
+        private static readonly Color ButtonBlueBorder     = Color.FromArgb(62, 104, 166);
+        private static readonly Color ButtonLightOutline   = Color.FromArgb(166, 183, 202);
+        private static readonly Color SkyBlueOutline       = Color.FromArgb(160, 210, 255);
+        private static readonly Color ButtonTextBlue       = Color.FromArgb(14, 47, 108);
+
         private SalesHoldReportRepository _repository;
         private Dropdowns _dropdowns;
         private readonly List<SalesHoldSummaryItem> _summaryItems;
@@ -178,73 +197,222 @@ namespace PosBranch_Win.Reports.SalesReports
 
         private void InitializeRuntimeAppearance()
         {
-            ConfigureButton(btnViewGrid, Color.FromArgb(72, 122, 214), Color.FromArgb(95, 145, 230));
-            ConfigureButton(btnPreviewGrid, Color.FromArgb(94, 116, 202), Color.FromArgb(121, 141, 222));
-            ConfigureButton(btnExportExcel, Color.FromArgb(46, 125, 50), Color.FromArgb(76, 175, 80));
-            ConfigureButton(btnColumnChooser, Color.FromArgb(90, 110, 160), Color.FromArgb(115, 135, 185));
-            ConfigureButton(btnHideSelection, Color.FromArgb(84, 120, 190), Color.FromArgb(112, 148, 214));
+            BackColor = FormBackColor;
+
+            ultraPanelSelection.Appearance.BackColor = FilterPanelBackColor;
+            ultraPanelSelection.Appearance.BorderColor = BorderBlue;
+            ultraPanelSelection.BorderStyle = UIElementBorderStyle.Solid;
+
+            ultraPanelActionBar.Appearance.BackColor = ActionPanelBackColor;
+            ultraPanelActionBar.Appearance.BorderColor = BorderBlue;
+            ultraPanelActionBar.BorderStyle = UIElementBorderStyle.Solid;
+
+            ultraPanelGrid.Appearance.BackColor = FormBackColor;
+
+            gridFooterPanel.Appearance.BackColor = GridHeaderBlue;
+            gridFooterPanel.Appearance.BorderColor = GridFooterBorder;
+            gridFooterPanel.BorderStyle = UIElementBorderStyle.Solid;
+
+            StyleFilterLabel(lblDate);
+            StyleFilterLabel(lblFromDate);
+            StyleFilterLabel(lblToDate);
+            StyleFilterLabel(lblViewMode);
+            StyleFilterLabel(lblCustomer);
+            StyleFilterLabel(lblUser);
+            StyleFilterLabel(lblStatus);
+
+            StyleFooterLabel(lblCount);
+
+            StyleFilterCombo(ultraComboDateMode);
+            StyleDateEditor(dtFromDate);
+            StyleDateEditor(dtToDate);
+            StyleFilterCombo(cmbViewMode);
+            StyleFilterCombo(cmbCustomer);
+            StyleFilterCombo(cmbUser);
+            StyleFilterCombo(cmbStatus);
+
+            StyleClassicButton(btnViewGrid);
+            StyleClassicButton(btnPreviewGrid);
+            StyleClassicButton(btnExportExcel);
+            StyleClassicButton(btnColumnChooser);
+            StyleClassicButton(btnHideSelection);
 
             ConfigureGridAppearance(gridHold);
             InitializeSummaryFooterPanel();
             InitializeColumnChooserBehavior();
         }
 
-        private void ConfigureButton(Infragistics.Win.Misc.UltraButton button, Color startColor, Color endColor)
+        private static void StyleFilterLabel(Infragistics.Win.Misc.UltraLabel label)
         {
+            if (label == null) return;
+            label.Appearance.BackColor = Color.Transparent;
+            label.Appearance.ForeColor = Color.FromArgb(18, 47, 95);
+            label.Appearance.FontData.Name = "Tahoma";
+            label.Appearance.FontData.SizeInPoints = 9.5F;
+        }
+
+        private static void StyleFooterLabel(Infragistics.Win.Misc.UltraLabel label)
+        {
+            if (label == null) return;
+            label.Appearance.BackColor = Color.Transparent;
+            label.Appearance.ForeColor = Color.White;
+            label.Appearance.FontData.Bold = DefaultableBoolean.True;
+            label.Appearance.FontData.Name = "Tahoma";
+            label.Appearance.FontData.SizeInPoints = 9.5F;
+        }
+
+        private static void StyleClassicButton(Infragistics.Win.Misc.UltraButton button)
+        {
+            if (button == null) return;
             button.UseAppStyling = false;
             button.UseOsThemes = DefaultableBoolean.False;
-            button.Appearance.BackColor = startColor;
-            button.Appearance.BackColor2 = endColor;
+            button.ButtonStyle = UIElementButtonStyle.Flat;
+            button.UseFlatMode = DefaultableBoolean.False;
+            button.Appearance.BackColor = ButtonBlueTop;
+            button.Appearance.BackColor2 = ButtonBlueBottom;
             button.Appearance.BackGradientStyle = GradientStyle.Vertical;
-            button.Appearance.ForeColor = Color.White;
-            button.Appearance.FontData.Bold = DefaultableBoolean.True;
-            button.Appearance.BorderColor = startColor;
-            button.HotTrackAppearance.BackColor = endColor;
-            button.HotTrackAppearance.ForeColor = Color.White;
+            button.Appearance.ForeColor = ButtonTextBlue;
+            button.Appearance.BorderColor = ButtonLightOutline;
+            button.Appearance.TextHAlign = HAlign.Center;
+            button.Appearance.TextVAlign = VAlign.Middle;
+            button.Appearance.FontData.Bold = DefaultableBoolean.False;
+            button.Appearance.FontData.SizeInPoints = 9;
+            button.Font = new Font("Tahoma", 9F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            button.HotTrackAppearance.BackColor = Color.FromArgb(241, 247, 254);
+            button.HotTrackAppearance.BackColor2 = Color.FromArgb(166, 195, 231);
+            button.HotTrackAppearance.BackGradientStyle = GradientStyle.Vertical;
+            button.HotTrackAppearance.BorderColor = ButtonLightOutline;
+            button.HotTrackAppearance.ForeColor = ButtonTextBlue;
+            button.PressedAppearance.BackColor = Color.FromArgb(118, 161, 214);
+            button.PressedAppearance.BackColor2 = Color.FromArgb(217, 231, 247);
+            button.PressedAppearance.BackGradientStyle = GradientStyle.Vertical;
+            button.PressedAppearance.BorderColor = Color.FromArgb(148, 163, 182);
+            button.PressedAppearance.ForeColor = ButtonTextBlue;
+        }
+
+        private static void StyleFilterCombo(UltraComboEditor combo)
+        {
+            if (combo == null) return;
+            combo.UseAppStyling = false;
+            combo.UseOsThemes = DefaultableBoolean.False;
+            combo.DisplayStyle = EmbeddableElementDisplayStyle.Office2013;
+            combo.BorderStyle = UIElementBorderStyle.Solid;
+            combo.Appearance.BackColor = ControlBackColor;
+            combo.Appearance.BorderColor = SkyBlueOutline;
+            combo.Appearance.ForeColor = ControlTextColor;
+            combo.Appearance.FontData.Name = "Tahoma";
+            combo.Appearance.FontData.SizeInPoints = 9.5F;
+            combo.ButtonStyle = UIElementButtonStyle.Office2003ToolbarButton;
+            combo.AutoCompleteMode = Infragistics.Win.AutoCompleteMode.SuggestAppend;
+        }
+
+        private static void StyleDateEditor(UltraDateTimeEditor editor)
+        {
+            if (editor == null) return;
+            editor.UseAppStyling = false;
+            editor.UseOsThemes = DefaultableBoolean.False;
+            editor.DisplayStyle = EmbeddableElementDisplayStyle.Office2013;
+            editor.BorderStyle = UIElementBorderStyle.Solid;
+            editor.Appearance.BackColor = ControlBackColor;
+            editor.Appearance.BorderColor = SkyBlueOutline;
+            editor.Appearance.ForeColor = ControlTextColor;
+            editor.Appearance.FontData.Name = "Tahoma";
+            editor.Appearance.FontData.SizeInPoints = 9.5F;
+            editor.ButtonStyle = UIElementButtonStyle.Office2003ToolbarButton;
+            editor.MaskInput = "{date}";
+            editor.FormatString = "dd/MM/yyyy";
         }
 
         private void ConfigureGridAppearance(UltraGrid targetGrid)
         {
+            if (targetGrid == null) return;
+            targetGrid.DisplayLayout.Reset();
             targetGrid.UseAppStyling = false;
             targetGrid.UseOsThemes = DefaultableBoolean.False;
-            targetGrid.DisplayLayout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
-            targetGrid.DisplayLayout.BorderStyle = UIElementBorderStyle.Solid;
-            targetGrid.DisplayLayout.CaptionVisible = DefaultableBoolean.False;
-            targetGrid.DisplayLayout.GroupByBox.Hidden = true;
-            targetGrid.DisplayLayout.GroupByBox.BorderStyle = UIElementBorderStyle.None;
-            targetGrid.DisplayLayout.Override.AllowAddNew = AllowAddNew.No;
-            targetGrid.DisplayLayout.Override.AllowDelete = DefaultableBoolean.False;
-            targetGrid.DisplayLayout.Override.AllowUpdate = DefaultableBoolean.False;
-            targetGrid.DisplayLayout.Override.AllowColMoving = AllowColMoving.WithinBand;
-            targetGrid.DisplayLayout.Override.AllowColSizing = AllowColSizing.Free;
-            targetGrid.DisplayLayout.Override.AllowRowFiltering = DefaultableBoolean.True;
-            targetGrid.DisplayLayout.Override.FilterUIType = FilterUIType.HeaderIcons;
-            targetGrid.DisplayLayout.Override.FilterOperatorLocation = FilterOperatorLocation.Hidden;
-            targetGrid.DisplayLayout.Override.CellClickAction = CellClickAction.RowSelect;
-            targetGrid.DisplayLayout.Override.HeaderClickAction = HeaderClickAction.SortMulti;
-            targetGrid.DisplayLayout.Override.RowSelectors = DefaultableBoolean.True;
-            targetGrid.DisplayLayout.Override.RowSelectorWidth = 28;
-            targetGrid.DisplayLayout.Override.MinRowHeight = 24;
-            targetGrid.DisplayLayout.Override.DefaultRowHeight = 24;
-            targetGrid.DisplayLayout.Override.RowAppearance.BackColor = Color.White;
-            targetGrid.DisplayLayout.Override.RowAlternateAppearance.BackColor = Color.FromArgb(247, 250, 255);
-            targetGrid.DisplayLayout.Override.ActiveRowAppearance.BackColor = Color.FromArgb(120, 116, 235);
-            targetGrid.DisplayLayout.Override.ActiveRowAppearance.ForeColor = Color.White;
-            targetGrid.DisplayLayout.Override.SelectedRowAppearance.BackColor = Color.FromArgb(120, 116, 235);
-            targetGrid.DisplayLayout.Override.SelectedRowAppearance.ForeColor = Color.White;
-            targetGrid.DisplayLayout.Override.HeaderAppearance.BackColor = Color.FromArgb(145, 179, 222);
-            targetGrid.DisplayLayout.Override.HeaderAppearance.BackColor2 = Color.FromArgb(118, 157, 209);
-            targetGrid.DisplayLayout.Override.HeaderAppearance.BackGradientStyle = GradientStyle.Vertical;
-            targetGrid.DisplayLayout.Override.HeaderAppearance.ForeColor = Color.FromArgb(17, 52, 102);
-            targetGrid.DisplayLayout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.True;
-            targetGrid.DisplayLayout.Override.HeaderAppearance.BorderColor = Color.FromArgb(103, 142, 196);
-            targetGrid.DisplayLayout.Override.FilterCellAppearance.BackColor = Color.White;
-            targetGrid.DisplayLayout.Override.FilterCellAppearance.BorderColor = Color.FromArgb(180, 198, 220);
-            targetGrid.DisplayLayout.Override.BorderStyleCell = UIElementBorderStyle.Solid;
-            targetGrid.DisplayLayout.Override.BorderStyleRow = UIElementBorderStyle.Solid;
-            targetGrid.DisplayLayout.Override.CellAppearance.BorderColor = Color.FromArgb(210, 220, 235);
-            targetGrid.DisplayLayout.Override.RowSizing = RowSizing.AutoFree;
-            targetGrid.DisplayLayout.Override.WrapHeaderText = DefaultableBoolean.True;
+
+            UltraGridLayout layout = targetGrid.DisplayLayout;
+            layout.CaptionVisible = DefaultableBoolean.False;
+            layout.BorderStyle = UIElementBorderStyle.Solid;
+            layout.GroupByBox.Hidden = false;
+            layout.GroupByBox.BandLabelAppearance.BackColor = GridHeaderBlueDark;
+            layout.GroupByBox.BandLabelAppearance.ForeColor = Color.White;
+            layout.GroupByBox.BandLabelAppearance.FontData.Bold = DefaultableBoolean.True;
+            layout.GroupByBox.PromptAppearance.BackColor = GridHeaderBlue;
+            layout.GroupByBox.PromptAppearance.BackColor2 = GridHeaderBlueDark;
+            layout.GroupByBox.PromptAppearance.BackGradientStyle = GradientStyle.Horizontal;
+            layout.GroupByBox.PromptAppearance.ForeColor = Color.White;
+            layout.GroupByBox.Prompt = "Drag a column header here to group by that column";
+            layout.GroupByBox.Appearance.BackColor = Color.FromArgb(109, 167, 226);
+            layout.GroupByBox.Appearance.BackColor2 = Color.FromArgb(69, 125, 190);
+            layout.GroupByBox.Appearance.BackGradientStyle = GradientStyle.Vertical;
+
+            layout.Override.AllowAddNew = AllowAddNew.No;
+            layout.Override.AllowDelete = DefaultableBoolean.False;
+            layout.Override.AllowUpdate = DefaultableBoolean.False;
+            layout.Override.AllowColMoving = AllowColMoving.WithinBand;
+            layout.Override.AllowColSizing = AllowColSizing.Free;
+            layout.Override.AllowRowFiltering = DefaultableBoolean.True;
+            layout.Override.FilterUIType = FilterUIType.HeaderIcons;
+            layout.Override.FilterOperatorLocation = FilterOperatorLocation.Hidden;
+            layout.Override.CellClickAction = CellClickAction.RowSelect;
+            layout.Override.HeaderClickAction = HeaderClickAction.SortMulti;
+            layout.Override.RowSelectors = DefaultableBoolean.True;
+            layout.Override.RowSelectorWidth = 25;
+            layout.Override.RowSelectorNumberStyle = RowSelectorNumberStyle.RowIndex;
+
+            layout.Appearance.BackColor = FormBackColor;
+            layout.Appearance.BorderColor = BorderBlue;
+            layout.Appearance.BackColor2 = FormBackColor;
+            layout.Appearance.BackGradientStyle = GradientStyle.None;
+
+            layout.Override.RowSelectorAppearance.BackColor = GridHeaderBlueDark;
+            layout.Override.RowSelectorAppearance.BackColor2 = GridHeaderBlue;
+            layout.Override.RowSelectorAppearance.BackGradientStyle = GradientStyle.Vertical;
+            layout.Override.RowSelectorAppearance.BorderColor = BorderBlue;
+            layout.Override.RowSelectorAppearance.ForeColor = Color.White;
+            layout.Override.RowSelectorAppearance.FontData.Bold = DefaultableBoolean.True;
+            layout.Override.RowSelectorAppearance.TextHAlign = HAlign.Center;
+
+            layout.Override.HeaderAppearance.BackColor = GridHeaderBlue;
+            layout.Override.HeaderAppearance.BackColor2 = GridHeaderBlueDark;
+            layout.Override.HeaderAppearance.BackGradientStyle = GradientStyle.Vertical;
+            layout.Override.HeaderAppearance.ForeColor = Color.White;
+            layout.Override.HeaderAppearance.BorderColor = BorderBlue;
+            layout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.True;
+
+            layout.Override.RowAppearance.BackColor = Color.White;
+            layout.Override.RowAlternateAppearance.BackColor = GridAltRow;
+            layout.Override.RowAppearance.BorderColor = GridRowLine;
+            layout.Override.RowAlternateAppearance.BorderColor = GridRowLine;
+
+            layout.Override.ActiveRowAppearance.BackColor = GridSelectedBlue;
+            layout.Override.ActiveRowAppearance.ForeColor = Color.White;
+            layout.Override.ActiveRowAppearance.BorderColor = BorderBlue;
+            layout.Override.SelectedRowAppearance.BackColor = GridSelectedBlue;
+            layout.Override.SelectedRowAppearance.ForeColor = Color.White;
+
+            layout.Override.FilterCellAppearance.BackColor = Color.White;
+            layout.Override.FilterCellAppearance.BorderColor = SkyBlueOutline;
+            layout.Override.CellAppearance.BorderColor = GridRowLine;
+            layout.Override.CellAppearance.ForeColor = Color.FromArgb(10, 31, 79);
+
+            layout.Override.BorderStyleHeader = UIElementBorderStyle.Solid;
+            layout.Override.BorderStyleCell = UIElementBorderStyle.Solid;
+            layout.Override.BorderStyleRow = UIElementBorderStyle.Solid;
+            layout.Override.MinRowHeight = 22;
+            layout.Override.DefaultRowHeight = 22;
+            layout.RowConnectorStyle = RowConnectorStyle.Solid;
+            layout.RowConnectorColor = GridRowLine;
+
+            layout.ScrollBarLook.Appearance.BackColor = ActionPanelBackColor;
+            layout.ScrollBarLook.Appearance.BorderColor = BorderBlue;
+            layout.ScrollBarLook.TrackAppearance.BackColor = Color.FromArgb(225, 236, 246);
+            layout.ScrollBarLook.ButtonAppearance.BackColor = GridHeaderBlue;
+            layout.ScrollBarLook.ButtonAppearance.BackColor2 = GridHeaderBlueDark;
+            layout.ScrollBarLook.ButtonAppearance.BackGradientStyle = GradientStyle.Vertical;
+            layout.ScrollBarLook.ButtonAppearance.BorderColor = BorderBlue;
+
+            targetGrid.BackColor = FormBackColor;
         }
 
         private void InitializeSummaryFooterPanel()
@@ -631,8 +799,8 @@ namespace PosBranch_Win.Reports.SalesReports
                         AutoSize = false,
                         Height = 22,
                         TextAlign = ContentAlignment.MiddleRight,
-                        Font = new Font("Segoe UI", 9f, FontStyle.Bold),
-                        ForeColor = Color.FromArgb(17, 52, 102),
+                        Font = new Font("Tahoma", 9f, FontStyle.Bold),
+                        ForeColor = Color.White,
                         BackColor = Color.Transparent,
                         Cursor = Cursors.Hand
                     };
