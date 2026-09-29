@@ -213,7 +213,7 @@ namespace PosBranch_Win.Reports.SalesReports
             // lblNetProfitCaption
             // 
             this.lblNetProfitCaption.Location = new System.Drawing.Point(586, 26);
-            this.lblNetProfitCaption.Name = "lblNetProfitCaption";
+            t his.lblNetProfitCaption.Name = "lblNetProfitCaption";
             this.lblNetProfitCaption.Size = new System.Drawing.Size(94, 23);
             this.lblNetProfitCaption.TabIndex = 2;
             this.lblNetProfitCaption.Text = "Net Profit Total";
@@ -252,7 +252,7 @@ namespace PosBranch_Win.Reports.SalesReports
             // 
             // btnExportGrid
             // 
-            this.btnExportGrid.Location = new System.Drawing.Point(386, 12);
+             this.btnExportGrid.Location = new System.Drawing.Point(386, 12);
             this.btnExportGrid.Name = "btnExportGrid";
             this.btnExportGrid.Size = new System.Drawing.Size(114, 28);
             this.btnExportGrid.TabIndex = 4;
