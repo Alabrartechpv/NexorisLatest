@@ -56,10 +56,10 @@ BEGIN
     LEFT JOIN PayMode pm ON sp.PaymodeId = pm.PayModeID
     WHERE sp.CompanyId  = @CompanyId
       AND sp.BranchId   = @BranchId
-      AND sp.FinYearId  = @FinYearId
+      AND (@FinYearId <= 0 OR sp.FinYearId = @FinYearId OR @FinYearId IS NULL)
       AND CAST(sm.BillDate AS DATE) BETWEEN CAST(@FromDate AS DATE) AND CAST(@ToDate AS DATE)
       AND ISNULL(sm.CancelFlag, 0) = 0
-      AND sp.PaymodeId NOT IN (1, 2)
+      AND ISNULL(sp.PaymodeId, 0) NOT IN (1, 2)
 
     UNION ALL
 
@@ -76,10 +76,10 @@ BEGIN
     FROM PMaster p
     WHERE p.CompanyId  = @CompanyId
       AND p.BranchId   = @BranchId
-      AND p.FinYearId  = @FinYearId
+      AND (@FinYearId <= 0 OR p.FinYearId = @FinYearId OR @FinYearId IS NULL)
       AND CAST(p.PurchaseDate AS DATE) BETWEEN CAST(@FromDate AS DATE) AND CAST(@ToDate AS DATE)
       AND ISNULL(p.CancelFlag, 0) = 0
-      AND p.PaymodeID NOT IN (1, 2)
+      AND ISNULL(p.PaymodeID, 0) NOT IN (1, 2)
 
     UNION ALL
 
@@ -100,7 +100,7 @@ BEGIN
       AND vp.BranchId   = @BranchId
       AND CAST(vp.VoucherDate AS DATE) BETWEEN CAST(@FromDate AS DATE) AND CAST(@ToDate AS DATE)
       AND ISNULL(vp.CancelFlag, 0) = 0
-      AND vp.PaymentMethodLedgerId NOT IN (1, 2)
+      AND ISNULL(vp.PaymentMethodLedgerId, 0) NOT IN (1, 2)
 
     UNION ALL
 
@@ -121,7 +121,7 @@ BEGIN
       AND cr.BranchId   = @BranchId
       AND CAST(cr.VoucherDate AS DATE) BETWEEN CAST(@FromDate AS DATE) AND CAST(@ToDate AS DATE)
       AND ISNULL(cr.CancelFlag, 0) = 0
-      AND cr.PaymentMethodLedgerId NOT IN (1, 2)
+      AND ISNULL(cr.PaymentMethodLedgerId, 0) NOT IN (1, 2)
 
     UNION ALL
 
@@ -152,8 +152,16 @@ BEGIN
     FROM Vouchers v
     WHERE v.CompanyID = @CompanyId
       AND v.BranchID = @BranchId
-      AND v.FinYearID = @FinYearId
-      AND v.LedgerID IN (SELECT LedgerID FROM LedgerMaster WHERE GroupID IN (15, 25))
+      AND (@FinYearId <= 0 OR v.FinYearID = @FinYearId OR @FinYearId IS NULL)
+      AND v.LedgerID IN (
+          SELECT lm.LedgerID 
+          FROM LedgerMaster lm 
+          LEFT JOIN AccountGroupMaster ag ON lm.GroupID = ag.GroupID 
+          WHERE lm.GroupID IN (15, 25) 
+             OR ag.GroupUnder LIKE '%/15/%' 
+             OR ag.GroupUnder LIKE '%/25/%' 
+             OR ag.GroupName LIKE '%Bank%'
+      )
       AND CAST(v.VoucherDate AS DATE) BETWEEN CAST(@FromDate AS DATE) AND CAST(@ToDate AS DATE)
       AND ISNULL(v.CancelFlag, 0) = 0
       AND ISNULL(v.Debit, 0) > 0
@@ -188,8 +196,16 @@ BEGIN
     FROM Vouchers v
     WHERE v.CompanyID = @CompanyId
       AND v.BranchID = @BranchId
-      AND v.FinYearID = @FinYearId
-      AND v.LedgerID IN (SELECT LedgerID FROM LedgerMaster WHERE GroupID IN (15, 25))
+      AND (@FinYearId <= 0 OR v.FinYearID = @FinYearId OR @FinYearId IS NULL)
+      AND v.LedgerID IN (
+          SELECT lm.LedgerID 
+          FROM LedgerMaster lm 
+          LEFT JOIN AccountGroupMaster ag ON lm.GroupID = ag.GroupID 
+          WHERE lm.GroupID IN (15, 25) 
+             OR ag.GroupUnder LIKE '%/15/%' 
+             OR ag.GroupUnder LIKE '%/25/%' 
+             OR ag.GroupName LIKE '%Bank%'
+      )
       AND CAST(v.VoucherDate AS DATE) BETWEEN CAST(@FromDate AS DATE) AND CAST(@ToDate AS DATE)
       AND ISNULL(v.CancelFlag, 0) = 0
       AND ISNULL(v.Credit, 0) > 0
