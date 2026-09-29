@@ -5,7 +5,9 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Data;
 using System.Data.SqlClient;
+using ModelClass;
 using ModelClass.Accounts;
+using Ledger = ModelClass.Accounts.Ledger;
 
 namespace Repository.Accounts
 {
@@ -93,6 +95,62 @@ namespace Repository.Accounts
             }
 
             return balances;
+        }
+
+        /// <summary>
+        /// Gets live inventory stock valuation (Sum of ClosingStock * Cost) for Stock In Hand (Group 18)
+        /// matching the Balance Sheet and Stock Valuation report calculation.
+        /// </summary>
+        public decimal GetLiveStockValuation(int companyId, int branchId, int finYearId)
+        {
+            decimal stockValuation = 0;
+            bool wasClosed = DataConnection.State == ConnectionState.Closed;
+            if (wasClosed) DataConnection.Open();
+
+            try
+            {
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._POS_StockReportAdvanced, (SqlConnection)DataConnection))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.CommandTimeout = 60;
+                    cmd.Parameters.AddWithValue("@FromDate", new DateTime(1753, 1, 1));
+                    cmd.Parameters.AddWithValue("@ToDate", DateTime.Today.AddDays(1).AddSeconds(-1));
+                    cmd.Parameters.AddWithValue("@CompanyId", companyId > 0 ? companyId : (DataBase.CompanyId != null ? Convert.ToInt32(DataBase.CompanyId) : 1));
+                    cmd.Parameters.AddWithValue("@BranchId", branchId > 0 ? branchId : (DataBase.BranchId != null ? Convert.ToInt32(DataBase.BranchId) : 1));
+                    cmd.Parameters.AddWithValue("@FinYearId", finYearId > 0 ? finYearId : (DataBase.FinyearId != null ? Convert.ToInt32(DataBase.FinyearId) : 1));
+                    cmd.Parameters.AddWithValue("@BarcodeContains", DBNull.Value);
+                    cmd.Parameters.AddWithValue("@GroupId", DBNull.Value);
+                    cmd.Parameters.AddWithValue("@CategoryId", DBNull.Value);
+                    cmd.Parameters.AddWithValue("@SubCategoryId", DBNull.Value);
+                    cmd.Parameters.AddWithValue("@LedgerId", DBNull.Value);
+
+                    using (SqlDataAdapter adapter = new SqlDataAdapter(cmd))
+                    {
+                        DataTable dt = new DataTable();
+                        adapter.Fill(dt);
+                        if (dt != null && dt.Rows.Count > 0)
+                        {
+                            foreach (DataRow row in dt.Rows)
+                            {
+                                decimal closingStock = row["ClosingStock"] != DBNull.Value ? Convert.ToDecimal(row["ClosingStock"]) : 0;
+                                decimal cost = row["Cost"] != DBNull.Value ? Convert.ToDecimal(row["Cost"]) : 0;
+                                stockValuation += (closingStock * cost);
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("GetLiveStockValuation error: " + ex.Message);
+            }
+            finally
+            {
+                if (wasClosed && DataConnection.State == ConnectionState.Open)
+                    DataConnection.Close();
+            }
+
+            return stockValuation;
         }
 
         // Method to create a new ledger

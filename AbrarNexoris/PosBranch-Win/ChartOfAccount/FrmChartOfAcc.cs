@@ -951,6 +951,16 @@ namespace PosBranch_Win.ChartOfAccount
                 Debug.WriteLine($"Error fetching ledger balances: {ex.Message}");
             }
 
+            decimal liveStockValuation = 0;
+            try
+            {
+                liveStockValuation = ledgerRepo.GetLiveStockValuation(companyId, branchId, finYearId);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Error fetching live stock valuation: {ex.Message}");
+            }
+
             foreach (DataRow row in ledgersTable.Rows)
             {
                 if (row["LedgerID"] == DBNull.Value)
@@ -959,6 +969,16 @@ namespace PosBranch_Win.ChartOfAccount
                 }
 
                 int ledgerId = Convert.ToInt32(row["LedgerID"]);
+                int groupId = row.Table.Columns.Contains("GroupID") && row["GroupID"] != DBNull.Value
+                    ? Convert.ToInt32(row["GroupID"])
+                    : 0;
+
+                // Priority for Group 18 (STOCK_IN_HAND): Use live inventory valuation matching Balance Sheet
+                if (groupId == (int)AccountGroup.STOCK_IN_HAND && liveStockValuation > 0)
+                {
+                    row["Balance"] = liveStockValuation;
+                    continue;
+                }
 
                 // 1st priority: Closing balance from POS_TrialBalance SP
                 decimal txnBalance = 0;
