@@ -38,11 +38,6 @@ namespace Repository.TransactionRepository
                 List<SmartReorderItemModel> result = new List<SmartReorderItemModel>();
                 foreach (SmartReorderItemModel item in suggestions)
                 {
-                    if (inactiveLookup != null && inactiveLookup.IsInactive(item.ItemId, item.Barcode, item.ItemName, item.Alert, item.Reason))
-                    {
-                        continue;
-                    }
-
                     item.FinalQuantity = item.SuggestedQuantity;
                     result.Add(item);
                 }

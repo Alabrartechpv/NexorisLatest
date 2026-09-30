@@ -601,6 +601,8 @@ namespace PosBranch_Win.Reports.InventoryReport
             {
                 new ComboItem { Text = "ALL", Value = "ALL" },
                 new ComboItem { Text = "URGENT", Value = "URGENT" },
+                new ComboItem { Text = "Negative Stock", Value = "Negative Stock" },
+                new ComboItem { Text = "Zero Stock", Value = "Zero Stock" },
                 new ComboItem { Text = "Reorder Level Reached", Value = "Reorder Level Reached" },
                 new ComboItem { Text = "Below Target Stock", Value = "Below Target Stock" },
                 new ComboItem { Text = "Near Expiry", Value = "Near Expiry" },
@@ -719,16 +721,8 @@ namespace PosBranch_Win.Reports.InventoryReport
 
                 _allRows = data.ToList();
 
-                // Exclude inactive items from Smart Reorder Dashboard completely
-                // Uses GetInactiveItemLookup() which checks BOTH POS_ItemMasterStatusRules
-                // AND ItemMaster.Status/IsActive columns by ItemId, Barcode, ItemName, Alert, and Reason
                 Dropdowns statusDropdown = new Dropdowns();
                 _inactiveLookup = statusDropdown.GetInactiveItemLookup();
-
-                if (_allRows.Count > 0 && _inactiveLookup != null)
-                {
-                    _allRows.RemoveAll(x => _inactiveLookup.IsInactive(x.ItemId, x.Barcode, x.ItemName, x.Alert, x.Reason));
-                }
 
                 ApplyClientFilters();
             }
@@ -765,19 +759,42 @@ namespace PosBranch_Win.Reports.InventoryReport
                 }
             }
 
-            IEnumerable<SmartReorderItemModel> filtered = _allRows.Where(x =>
-                !_inactiveLookup.IsInactive(x.ItemId, x.Barcode, x.ItemName, x.Alert, x.Reason));
-
             string alertFilter = GetSelectedValue(cmbAlert);
-            if (!string.IsNullOrWhiteSpace(alertFilter) && !string.Equals(alertFilter, "ALL", StringComparison.OrdinalIgnoreCase))
+            bool isFilteringInactive = string.Equals(alertFilter, "INACTIVE ITEM", StringComparison.OrdinalIgnoreCase);
+
+            IEnumerable<SmartReorderItemModel> filtered;
+            if (isFilteringInactive)
             {
-                if (string.Equals(alertFilter, "URGENT", StringComparison.OrdinalIgnoreCase))
+                // When explicitly selected, display inactive items
+                filtered = _allRows.Where(x =>
+                    string.Equals(x.Alert, "INACTIVE ITEM", StringComparison.OrdinalIgnoreCase) ||
+                    (_inactiveLookup != null && _inactiveLookup.IsInactive(x.ItemId, x.Barcode, x.ItemName, x.Alert, x.Reason)));
+            }
+            else
+            {
+                // By default (ALL or other filters), hide inactive items from reordering
+                filtered = _allRows.Where(x =>
+                    !(_inactiveLookup != null && _inactiveLookup.IsInactive(x.ItemId, x.Barcode, x.ItemName, x.Alert, x.Reason)) &&
+                    !string.Equals(x.Alert, "INACTIVE ITEM", StringComparison.OrdinalIgnoreCase));
+
+                if (!string.IsNullOrWhiteSpace(alertFilter) && !string.Equals(alertFilter, "ALL", StringComparison.OrdinalIgnoreCase))
                 {
-                    filtered = filtered.Where(x => (x.Alert ?? string.Empty).StartsWith("URGENT", StringComparison.OrdinalIgnoreCase));
-                }
-                else
-                {
-                    filtered = filtered.Where(x => string.Equals(x.Alert ?? string.Empty, alertFilter, StringComparison.OrdinalIgnoreCase));
+                    if (string.Equals(alertFilter, "URGENT", StringComparison.OrdinalIgnoreCase))
+                    {
+                        filtered = filtered.Where(x => (x.Alert ?? string.Empty).StartsWith("URGENT", StringComparison.OrdinalIgnoreCase));
+                    }
+                    else if (string.Equals(alertFilter, "Negative Stock", StringComparison.OrdinalIgnoreCase))
+                    {
+                        filtered = filtered.Where(x => (x.Alert ?? string.Empty).IndexOf("Negative", StringComparison.OrdinalIgnoreCase) >= 0 || x.CurrentStock < 0);
+                    }
+                    else if (string.Equals(alertFilter, "Zero Stock", StringComparison.OrdinalIgnoreCase))
+                    {
+                        filtered = filtered.Where(x => (x.Alert ?? string.Empty).IndexOf("ZERO STOCK", StringComparison.OrdinalIgnoreCase) >= 0 || x.CurrentStock == 0);
+                    }
+                    else
+                    {
+                        filtered = filtered.Where(x => string.Equals(x.Alert ?? string.Empty, alertFilter, StringComparison.OrdinalIgnoreCase));
+                    }
                 }
             }
 
