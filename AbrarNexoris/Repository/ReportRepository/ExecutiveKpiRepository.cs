@@ -212,7 +212,7 @@ namespace Repository.ReportRepository
                         cmdStock.CommandType = CommandType.StoredProcedure;
                         cmdStock.CommandTimeout = 180;
                         cmdStock.Parameters.AddWithValue("@FromDate", new DateTime(1753, 1, 1));
-                        cmdStock.Parameters.AddWithValue("@ToDate", DateTime.Today.AddDays(1).AddTicks(-1));
+                        cmdStock.Parameters.AddWithValue("@ToDate", DateTime.Today.AddDays(1).AddSeconds(-1));
                         cmdStock.Parameters.AddWithValue("@CompanyId", effectiveCompany);
                         cmdStock.Parameters.AddWithValue("@BranchId", effectiveBranch);
                         cmdStock.Parameters.AddWithValue("@FinYearId", effectiveFinYear);
@@ -229,7 +229,6 @@ namespace Repository.ReportRepository
 
                             if (dtStock != null && dtStock.Rows.Count > 0)
                             {
-                                decimal totalCostValueAll = 0;
                                 decimal totalRetailValueAll = 0;
                                 decimal totalQtyAll = 0;
                                 int itemCountAll = 0;
@@ -244,23 +243,19 @@ namespace Repository.ReportRepository
                                     decimal cost = sr["Cost"] != DBNull.Value ? Convert.ToDecimal(sr["Cost"]) : 0;
                                     decimal retail = sr["RetailPrice"] != DBNull.Value ? Convert.ToDecimal(sr["RetailPrice"]) : 0;
 
-                                    totalCostValueAll += closingStock * cost;
-                                    totalRetailValueAll += closingStock * retail;
+                                    totalRetailValueAll += Math.Round(closingStock * retail, 2);
                                     totalQtyAll += closingStock;
                                     itemCountAll++;
 
                                     if (closingStock < 0)
                                     {
-                                        negImpactValue += Math.Abs(closingStock) * cost;
+                                        negImpactValue += Math.Round(Math.Abs(closingStock) * cost, 2);
                                         negTotalQty += closingStock; // negative
                                         negItemCount++;
                                     }
                                 }
 
-                                // Override with accurate net values matching the Stock Report
-                                model.TotalStockCostValue = totalCostValueAll;
                                 model.TotalStockRetailValue = totalRetailValueAll;
-                                model.StockProfitPotential = totalRetailValueAll - totalCostValueAll;
                                 model.TotalStockItemCount = itemCountAll;
                                 model.TotalStockQuantity = totalQtyAll;
 
@@ -270,6 +265,41 @@ namespace Repository.ReportRepository
                             }
                         }
                     }
+
+                    // Get TotalStockCostValue using SQL-side SUM to match Balance Sheet / Trading P&L SP precision
+                    string sqlStockSum = @"
+                        CREATE TABLE #DashStockVal (
+                            ItemId INT, GroupName NVARCHAR(500), CategoryName NVARCHAR(500), SubCategoryName NVARCHAR(500),
+                            Barcode NVARCHAR(100), ItemName NVARCHAR(500), OpeningStock DECIMAL(18,5), Purchase DECIMAL(18,5),
+                            PurchaseReturn DECIMAL(18,5), StockAdjustmentIn DECIMAL(18,5), StockAdjustmentOut DECIMAL(18,5),
+                            StockTransferIn DECIMAL(18,5), StockTransferOut DECIMAL(18,5), Sales DECIMAL(18,5), Profit DECIMAL(18,5),
+                            SaleAmount DECIMAL(18,5), SalesReturn DECIMAL(18,5), ClosingStock DECIMAL(18,5), OrderedStock DECIMAL(18,5),
+                            HoldQty DECIMAL(18,5), Cost DECIMAL(18,5), RetailPrice DECIMAL(18,5), WholeSalePrice DECIMAL(18,5),
+                            CreditPrice DECIMAL(18,5), BaseUnitName NVARCHAR(100)
+                        );
+                        INSERT INTO #DashStockVal
+                        EXEC [dbo].[_Test16] 
+                            @FromDate = '1753-01-01', @ToDate = @p_ToDate, 
+                            @CompanyId = @p_CompanyId, @BranchId = @p_BranchId, @FinYearId = @p_FinYearId;
+                        SELECT ISNULL(SUM(ClosingStock * Cost), 0) AS StockValuation FROM #DashStockVal;
+                        DROP TABLE #DashStockVal;";
+
+                    using (SqlCommand cmdSum = new SqlCommand(sqlStockSum, (SqlConnection)DataConnection))
+                    {
+                        cmdSum.CommandTimeout = 180;
+                        cmdSum.Parameters.AddWithValue("@p_ToDate", DateTime.Today.AddDays(1).AddSeconds(-1));
+                        cmdSum.Parameters.AddWithValue("@p_CompanyId", effectiveCompany);
+                        cmdSum.Parameters.AddWithValue("@p_BranchId", effectiveBranch);
+                        cmdSum.Parameters.AddWithValue("@p_FinYearId", effectiveFinYear);
+
+                        object sumResult = cmdSum.ExecuteScalar();
+                        if (sumResult != null && sumResult != DBNull.Value)
+                        {
+                            model.TotalStockCostValue = Convert.ToDecimal(sumResult);
+                        }
+                    }
+
+                    model.StockProfitPotential = model.TotalStockRetailValue - model.TotalStockCostValue;
                 }
                 catch (Exception exStock)
                 {

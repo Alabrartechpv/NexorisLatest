@@ -99,7 +99,8 @@ namespace Repository.Accounts
 
         /// <summary>
         /// Gets live inventory stock valuation (Sum of ClosingStock * Cost) for Stock In Hand (Group 18)
-        /// matching the Balance Sheet and Stock Valuation report calculation.
+        /// Uses the same SQL-side SUM pattern as POS_BalanceSheet and POS_TradingPLAccount SPs
+        /// to guarantee identical precision across all reports.
         /// </summary>
         public decimal GetLiveStockValuation(int companyId, int branchId, int finYearId)
         {
@@ -109,34 +110,40 @@ namespace Repository.Accounts
 
             try
             {
-                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._POS_StockReportAdvanced, (SqlConnection)DataConnection))
-                {
-                    cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.CommandTimeout = 60;
-                    cmd.Parameters.AddWithValue("@FromDate", new DateTime(1753, 1, 1));
-                    cmd.Parameters.AddWithValue("@ToDate", DateTime.Today.AddDays(1).AddSeconds(-1));
-                    cmd.Parameters.AddWithValue("@CompanyId", companyId > 0 ? companyId : (DataBase.CompanyId != null ? Convert.ToInt32(DataBase.CompanyId) : 1));
-                    cmd.Parameters.AddWithValue("@BranchId", branchId > 0 ? branchId : (DataBase.BranchId != null ? Convert.ToInt32(DataBase.BranchId) : 1));
-                    cmd.Parameters.AddWithValue("@FinYearId", finYearId > 0 ? finYearId : (DataBase.FinyearId != null ? Convert.ToInt32(DataBase.FinyearId) : 1));
-                    cmd.Parameters.AddWithValue("@BarcodeContains", DBNull.Value);
-                    cmd.Parameters.AddWithValue("@GroupId", DBNull.Value);
-                    cmd.Parameters.AddWithValue("@CategoryId", DBNull.Value);
-                    cmd.Parameters.AddWithValue("@SubCategoryId", DBNull.Value);
-                    cmd.Parameters.AddWithValue("@LedgerId", DBNull.Value);
+                int effCompanyId = companyId > 0 ? companyId : (DataBase.CompanyId != null ? Convert.ToInt32(DataBase.CompanyId) : 1);
+                int effBranchId = branchId > 0 ? branchId : (DataBase.BranchId != null ? Convert.ToInt32(DataBase.BranchId) : 1);
+                int effFinYearId = finYearId > 0 ? finYearId : (DataBase.FinyearId != null ? Convert.ToInt32(DataBase.FinyearId) : 1);
 
-                    using (SqlDataAdapter adapter = new SqlDataAdapter(cmd))
+                // Use SQL-side SUM to match Balance Sheet / Trading P&L SP precision exactly
+                string sql = @"
+                    CREATE TABLE #StockVal (
+                        ItemId INT, GroupName NVARCHAR(500), CategoryName NVARCHAR(500), SubCategoryName NVARCHAR(500),
+                        Barcode NVARCHAR(100), ItemName NVARCHAR(500), OpeningStock DECIMAL(18,5), Purchase DECIMAL(18,5),
+                        PurchaseReturn DECIMAL(18,5), StockAdjustmentIn DECIMAL(18,5), StockAdjustmentOut DECIMAL(18,5),
+                        StockTransferIn DECIMAL(18,5), StockTransferOut DECIMAL(18,5), Sales DECIMAL(18,5), Profit DECIMAL(18,5),
+                        SaleAmount DECIMAL(18,5), SalesReturn DECIMAL(18,5), ClosingStock DECIMAL(18,5), OrderedStock DECIMAL(18,5),
+                        HoldQty DECIMAL(18,5), Cost DECIMAL(18,5), RetailPrice DECIMAL(18,5), WholeSalePrice DECIMAL(18,5),
+                        CreditPrice DECIMAL(18,5), BaseUnitName NVARCHAR(100)
+                    );
+                    INSERT INTO #StockVal
+                    EXEC [dbo].[_Test16] 
+                        @FromDate = '1753-01-01', @ToDate = @p_ToDate, 
+                        @CompanyId = @p_CompanyId, @BranchId = @p_BranchId, @FinYearId = @p_FinYearId;
+                    SELECT ISNULL(SUM(ClosingStock * Cost), 0) AS StockValuation FROM #StockVal;
+                    DROP TABLE #StockVal;";
+
+                using (SqlCommand cmd = new SqlCommand(sql, (SqlConnection)DataConnection))
+                {
+                    cmd.CommandTimeout = 60;
+                    cmd.Parameters.AddWithValue("@p_ToDate", DateTime.Today.AddDays(1).AddSeconds(-1));
+                    cmd.Parameters.AddWithValue("@p_CompanyId", effCompanyId);
+                    cmd.Parameters.AddWithValue("@p_BranchId", effBranchId);
+                    cmd.Parameters.AddWithValue("@p_FinYearId", effFinYearId);
+
+                    object result = cmd.ExecuteScalar();
+                    if (result != null && result != DBNull.Value)
                     {
-                        DataTable dt = new DataTable();
-                        adapter.Fill(dt);
-                        if (dt != null && dt.Rows.Count > 0)
-                        {
-                            foreach (DataRow row in dt.Rows)
-                            {
-                                decimal closingStock = row["ClosingStock"] != DBNull.Value ? Convert.ToDecimal(row["ClosingStock"]) : 0;
-                                decimal cost = row["Cost"] != DBNull.Value ? Convert.ToDecimal(row["Cost"]) : 0;
-                                stockValuation += (closingStock * cost);
-                            }
-                        }
+                        stockValuation = Convert.ToDecimal(result);
                     }
                 }
             }
