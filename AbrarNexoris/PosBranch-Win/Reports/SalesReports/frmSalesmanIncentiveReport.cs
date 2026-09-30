@@ -85,6 +85,7 @@ namespace PosBranch_Win.Reports.SalesReports
             KeyPreview = true;
             KeyDown += frmSalesmanIncentiveReport_KeyDown;
             FormClosing += frmSalesmanIncentiveReport_FormClosing;
+            Load += frmSalesmanIncentiveReport_Load;
 
             InitializePanels();
             StyleButtons();
@@ -330,6 +331,7 @@ namespace PosBranch_Win.Reports.SalesReports
             UltraGridLayout layout = grid.DisplayLayout;
             layout.CaptionVisible = DefaultableBoolean.False;
             layout.BorderStyle = UIElementBorderStyle.Solid;
+            layout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
             layout.GroupByBox.Hidden = false;
             layout.GroupByBox.BandLabelAppearance.BackColor = GridHeaderBlueDark;
             layout.GroupByBox.BandLabelAppearance.ForeColor = Color.White;
@@ -689,6 +691,10 @@ namespace PosBranch_Win.Reports.SalesReports
         {
             if (e.Layout.Bands.Count == 0) return;
             UltraGridBand band = e.Layout.Bands[0];
+
+            if (band.Columns.Exists("SalesmanId")) band.Columns["SalesmanId"].Hidden = true;
+            if (band.Columns.Exists("BranchId")) band.Columns["BranchId"].Hidden = true;
+
             ConfigureNumberColumn(band, "SalesQty", "Sales Qty");
             ConfigureNumberColumn(band, "IncentivePercent", "Incentive %");
             ConfigureNumberColumn(band, "SalesAmount", "Sales Amount");
@@ -709,13 +715,18 @@ namespace PosBranch_Win.Reports.SalesReports
                 band.Columns["IncentiveAmount"].CellAppearance.ForeColor = Color.FromArgb(191, 54, 12);
             }
 
-            e.Layout.AutoFitStyle = AutoFitStyle.None;
+            e.Layout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
         }
 
         private void gridDetails_InitializeLayout(object sender, InitializeLayoutEventArgs e)
         {
             if (e.Layout.Bands.Count == 0) return;
             UltraGridBand band = e.Layout.Bands[0];
+
+            if (band.Columns.Exists("SalesmanId")) band.Columns["SalesmanId"].Hidden = true;
+            if (band.Columns.Exists("BranchId")) band.Columns["BranchId"].Hidden = true;
+            if (band.Columns.Exists("ItemId")) band.Columns["ItemId"].Hidden = true;
+
             ConfigureNumberColumn(band, "Qty", "Qty");
             ConfigureNumberColumn(band, "CostPerUnit", "Cost/Unit");
             ConfigureNumberColumn(band, "SalesPricePerUnit", "Price/Unit");
@@ -734,7 +745,7 @@ namespace PosBranch_Win.Reports.SalesReports
                 band.Columns["ProfitValue"].CellAppearance.ForeColor = Color.FromArgb(27, 94, 32);
             }
 
-            e.Layout.AutoFitStyle = AutoFitStyle.None;
+            e.Layout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
         }
 
         private static void ConfigureNumberColumn(UltraGridBand band, string key, string caption)

@@ -5922,7 +5922,7 @@ namespace PosBranch_Win.Master
                                         try
                                         {
                                             using (System.Data.SqlClient.SqlCommand sCmd = new System.Data.SqlClient.SqlCommand(
-                                                "SELECT ISNULL(SUM(Stock), 0) AS TotalStock, ISNULL(SUM(OrderedStock), 0) AS TotalHold FROM ItemMasterPriceSettings WHERE ItemId = @ItemId AND (IsBaseUnit = 'Y' OR Packing = 1)",
+                                                "SELECT ISNULL(SUM(Stock), 0) AS TotalStock, ISNULL(SUM(OrderedStock), 0) AS TotalHold FROM PriceSettings WHERE ItemId = @ItemId AND (IsBaseUnit = 'Y' OR Packing = 1)",
                                                 dbConn))
                                             {
                                                 sCmd.Parameters.AddWithValue("@ItemId", itemId);
