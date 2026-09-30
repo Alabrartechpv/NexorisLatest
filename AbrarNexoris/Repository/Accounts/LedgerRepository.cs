@@ -5,7 +5,9 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Data;
 using System.Data.SqlClient;
+using ModelClass;
 using ModelClass.Accounts;
+using Ledger = ModelClass.Accounts.Ledger;
 
 namespace Repository.Accounts
 {
@@ -93,6 +95,69 @@ namespace Repository.Accounts
             }
 
             return balances;
+        }
+
+        /// <summary>
+        /// Gets live inventory stock valuation (Sum of ClosingStock * Cost) for Stock In Hand (Group 18)
+        /// Uses the same SQL-side SUM pattern as POS_BalanceSheet and POS_TradingPLAccount SPs
+        /// to guarantee identical precision across all reports.
+        /// </summary>
+        public decimal GetLiveStockValuation(int companyId, int branchId, int finYearId)
+        {
+            decimal stockValuation = 0;
+            bool wasClosed = DataConnection.State == ConnectionState.Closed;
+            if (wasClosed) DataConnection.Open();
+
+            try
+            {
+                int effCompanyId = companyId > 0 ? companyId : (DataBase.CompanyId != null ? Convert.ToInt32(DataBase.CompanyId) : 1);
+                int effBranchId = branchId > 0 ? branchId : (DataBase.BranchId != null ? Convert.ToInt32(DataBase.BranchId) : 1);
+                int effFinYearId = finYearId > 0 ? finYearId : (DataBase.FinyearId != null ? Convert.ToInt32(DataBase.FinyearId) : 1);
+
+                // Use SQL-side SUM to match Balance Sheet / Trading P&L SP precision exactly
+                string sql = @"
+                    CREATE TABLE #StockVal (
+                        ItemId INT, GroupName NVARCHAR(500), CategoryName NVARCHAR(500), SubCategoryName NVARCHAR(500),
+                        Barcode NVARCHAR(100), ItemName NVARCHAR(500), OpeningStock DECIMAL(18,5), Purchase DECIMAL(18,5),
+                        PurchaseReturn DECIMAL(18,5), StockAdjustmentIn DECIMAL(18,5), StockAdjustmentOut DECIMAL(18,5),
+                        StockTransferIn DECIMAL(18,5), StockTransferOut DECIMAL(18,5), Sales DECIMAL(18,5), Profit DECIMAL(18,5),
+                        SaleAmount DECIMAL(18,5), SalesReturn DECIMAL(18,5), ClosingStock DECIMAL(18,5), OrderedStock DECIMAL(18,5),
+                        HoldQty DECIMAL(18,5), Cost DECIMAL(18,5), RetailPrice DECIMAL(18,5), WholeSalePrice DECIMAL(18,5),
+                        CreditPrice DECIMAL(18,5), BaseUnitName NVARCHAR(100)
+                    );
+                    INSERT INTO #StockVal
+                    EXEC [dbo].[_Test16] 
+                        @FromDate = '1753-01-01', @ToDate = @p_ToDate, 
+                        @CompanyId = @p_CompanyId, @BranchId = @p_BranchId, @FinYearId = @p_FinYearId;
+                    SELECT ISNULL(SUM(ClosingStock * Cost), 0) AS StockValuation FROM #StockVal;
+                    DROP TABLE #StockVal;";
+
+                using (SqlCommand cmd = new SqlCommand(sql, (SqlConnection)DataConnection))
+                {
+                    cmd.CommandTimeout = 60;
+                    cmd.Parameters.AddWithValue("@p_ToDate", DateTime.Today.AddDays(1).AddSeconds(-1));
+                    cmd.Parameters.AddWithValue("@p_CompanyId", effCompanyId);
+                    cmd.Parameters.AddWithValue("@p_BranchId", effBranchId);
+                    cmd.Parameters.AddWithValue("@p_FinYearId", effFinYearId);
+
+                    object result = cmd.ExecuteScalar();
+                    if (result != null && result != DBNull.Value)
+                    {
+                        stockValuation = Convert.ToDecimal(result);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("GetLiveStockValuation error: " + ex.Message);
+            }
+            finally
+            {
+                if (wasClosed && DataConnection.State == ConnectionState.Open)
+                    DataConnection.Close();
+            }
+
+            return stockValuation;
         }
 
         // Method to create a new ledger
