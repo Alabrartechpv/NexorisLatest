@@ -750,7 +750,7 @@ namespace PosBranch_Win.Dashboard
                         title = "Stock Adjustment Report";
                         break;
                     case "SmartReorder":
-                        formToOpen = new Reports.InventoryReport.FrmSmartReorderDashboard();
+                        formToOpen = new Reports.InventoryReport.FrmSmartReorderDashboard("Reorder Level Reached");
                         title = "Smart Reorder Dashboard";
                         break;
                     case "LowStockAlert":

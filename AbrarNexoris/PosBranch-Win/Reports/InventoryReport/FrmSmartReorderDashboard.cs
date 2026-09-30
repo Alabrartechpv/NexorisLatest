@@ -79,12 +79,14 @@ namespace PosBranch_Win.Reports.InventoryReport
         // ─── Attached Cell Footer Synchronization State ─────────────────────────────
         private readonly Dictionary<string, Label> _footerLabels = new Dictionary<string, Label>();
         private readonly Dictionary<string, string> _columnAggregations = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private readonly string _initialAlertFilter;
 
         private const string GridLayoutFileName = "SmartReorderGridLayout.xml";
         private string GridLayoutPath => Path.Combine(Application.StartupPath, GridLayoutFileName);
 
-        public FrmSmartReorderDashboard()
+        public FrmSmartReorderDashboard(string initialAlertFilter = null)
         {
+            _initialAlertFilter = initialAlertFilter;
             _repository = new SmartReorderRepository();
             _dropdowns = new Dropdowns();
             _toolTip = new WinFormsToolTip();
@@ -609,7 +611,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                 new ComboItem { Text = "Dead Stock", Value = "Dead Stock" },
                 new ComboItem { Text = "INACTIVE ITEM", Value = "INACTIVE ITEM" },
                 new ComboItem { Text = "Normal", Value = "Normal" }
-            }, "ALL");
+            }, string.IsNullOrWhiteSpace(_initialAlertFilter) ? "ALL" : _initialAlertFilter);
         }
 
         private void LoadLookupData()
@@ -790,6 +792,16 @@ namespace PosBranch_Win.Reports.InventoryReport
                     else if (string.Equals(alertFilter, "Zero Stock", StringComparison.OrdinalIgnoreCase))
                     {
                         filtered = filtered.Where(x => (x.Alert ?? string.Empty).IndexOf("ZERO STOCK", StringComparison.OrdinalIgnoreCase) >= 0 || x.CurrentStock == 0);
+                    }
+                    else if (string.Equals(alertFilter, "Reorder Level Reached", StringComparison.OrdinalIgnoreCase))
+                    {
+                        filtered = filtered.Where(x => string.Equals(x.Alert ?? string.Empty, alertFilter, StringComparison.OrdinalIgnoreCase) || 
+                                                       (x.CurrentStock <= x.ReorderLevel && x.ReorderLevel > 0));
+                    }
+                    else if (string.Equals(alertFilter, "Below Target Stock", StringComparison.OrdinalIgnoreCase))
+                    {
+                        filtered = filtered.Where(x => string.Equals(x.Alert ?? string.Empty, alertFilter, StringComparison.OrdinalIgnoreCase) || 
+                                                       (x.CurrentStock < x.TargetStock && x.TargetStock > 0));
                     }
                     else
                     {
