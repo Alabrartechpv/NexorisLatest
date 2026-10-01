@@ -130,6 +130,9 @@ namespace ModelClass.Report
         public int HoldBillsCount { get; set; }
         public decimal HoldItemsCount { get; set; }
 
+        /// <summary>Cost of Goods Sold (COGS) (വിറ്റ സാധനങ്ങളുടെ വാങ്ങൽ വില)</summary>
+        public decimal CostOfGoodsSold { get; set; }
+
         /// <summary>Gross Profit (മൊത്തം ലാഭം = Sales - Cost)</summary>
         public decimal GrossProfit { get; set; }
 
