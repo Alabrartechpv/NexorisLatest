@@ -177,6 +177,138 @@ namespace PosBranch_Win
             }
         }
 
+        public bool PreviewPurchase(long purchaseNo)
+        {
+            string reportPath = ResolveReportPath("CrystalReportPurcase.rpt");
+            if (reportPath == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                rpt.Load(reportPath);
+
+                DataTable dt = new DataTable();
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._POS_GetPurchasePrint, (SqlConnection)cn.DataConnection))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@PurchaseNo", purchaseNo);
+                    cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
+                    cmd.Parameters.AddWithValue("@_Operations", "GETPURCHASE");
+
+                    using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
+                    {
+                        adapt.Fill(dt);
+                        if (dt.Rows.Count == 0)
+                        {
+                            MessageBox.Show($"No data found for Purchase No: {purchaseNo}", "Purchase Report", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            return false;
+                        }
+
+                        rpt.SetDataSource(dt);
+                    }
+                }
+
+                setReportConnection(rpt);
+                SetMainReportParameter(rpt, "@PurchaseNo", purchaseNo);
+                SetMainReportParameter(rpt, "@BranchId", SessionContext.BranchId);
+                SetMainReportParameter(rpt, "@_Operations", "GETPURCHASE");
+                PreviewReport(rpt, $"Purchase Invoice - {purchaseNo}");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error loading purchase report preview: {ex.Message}\n\nReport Path: {reportPath}", "Preview Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return false;
+            }
+            finally
+            {
+                if (cn.DataConnection.State == ConnectionState.Open)
+                {
+                    cn.DataConnection.Close();
+                }
+            }
+        }
+
+        public void PrintPurchase(long purchaseNo)
+        {
+            DataTable dt = new DataTable();
+            string reportPath = ResolveReportPath("CrystalReportPurcase.rpt");
+            if (reportPath == null)
+            {
+                return;
+            }
+
+            try
+            {
+                rpt.Load(reportPath);
+
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._POS_GetPurchasePrint, (SqlConnection)cn.DataConnection))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@PurchaseNo", purchaseNo);
+                    cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
+                    cmd.Parameters.AddWithValue("@_Operations", "GETPURCHASE");
+
+                    using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
+                    {
+                        adapt.Fill(dt);
+                        rpt.SetDataSource(dt);
+                    }
+                }
+
+                setReportConnection(rpt);
+                SetMainReportParameter(rpt, "@PurchaseNo", purchaseNo);
+                SetMainReportParameter(rpt, "@BranchId", SessionContext.BranchId);
+                SetMainReportParameter(rpt, "@_Operations", "GETPURCHASE");
+
+                // Prevent printing to barcode printers
+                try
+                {
+                    string currentPrinter = rpt.PrintOptions.PrinterName;
+                    if (string.IsNullOrEmpty(currentPrinter))
+                    {
+                        currentPrinter = new System.Drawing.Printing.PrinterSettings().PrinterName;
+                    }
+
+                    if (!string.IsNullOrEmpty(currentPrinter) &&
+                       (currentPrinter.IndexOf("snbc", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        currentPrinter.IndexOf("lpneo", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        currentPrinter.IndexOf("tvse", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        currentPrinter.IndexOf("bple", StringComparison.OrdinalIgnoreCase) >= 0))
+                    {
+                        foreach (string printer in System.Drawing.Printing.PrinterSettings.InstalledPrinters)
+                        {
+                            if (printer.IndexOf("snbc", StringComparison.OrdinalIgnoreCase) < 0 &&
+                                printer.IndexOf("lpneo", StringComparison.OrdinalIgnoreCase) < 0 &&
+                                printer.IndexOf("tvse", StringComparison.OrdinalIgnoreCase) < 0 &&
+                                printer.IndexOf("bple", StringComparison.OrdinalIgnoreCase) < 0)
+                            {
+                                rpt.PrintOptions.PrinterName = printer;
+                                break;
+                            }
+                        }
+                    }
+                }
+                catch (Exception)
+                {
+                    // Ignore printer enumeration errors
+                }
+
+                rpt.PrintToPrinter(1, false, 0, 0);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error printing purchase: {ex.Message}\n\nReport Path: {reportPath}", "Print Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                if (cn.DataConnection.State == ConnectionState.Open)
+                    cn.DataConnection.Close();
+            }
+        }
+
         public void PrintBill(Int64 BillNo)
         {
             PrintBill(BillNo, null);

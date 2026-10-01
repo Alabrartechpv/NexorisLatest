@@ -4945,6 +4945,11 @@ namespace PosBranch_Win.Transaction
                 }
                 e.Handled = true;
             }
+            else if (e.KeyCode == Keys.F9 || (e.Control && e.KeyCode == Keys.P))
+            {
+                PreviewPurchaseInvoice();
+                e.Handled = true;
+            }
             else if (e.KeyCode == Keys.F12)
             {
                 // Delete the purchase (Mapped to ultraPictureBox2 action - F12 label)
@@ -6117,8 +6122,25 @@ namespace PosBranch_Win.Transaction
                     );
                     successDialog.ShowDialog();
 
+                    long savedPurchaseNo = ObjPurchaseMaster.PurchaseNo;
+
                     // Clear fields after successful save (this will regenerate the next purchase number)
                     Clear();
+
+                    // Offer to preview the saved purchase invoice
+                    if (savedPurchaseNo > 0)
+                    {
+                        DialogResult printChoice = MessageBox.Show(
+                            "Do you want to preview the Purchase Invoice?",
+                            "Print Preview",
+                            MessageBoxButtons.YesNo,
+                            MessageBoxIcon.Question
+                        );
+                        if (printChoice == DialogResult.Yes)
+                        {
+                            PreviewPurchaseInvoice(savedPurchaseNo);
+                        }
+                    }
                 }
                 else
                 {
@@ -6617,6 +6639,72 @@ namespace PosBranch_Win.Transaction
                 // If OK is returned, dialog already loaded data
                 // Calculate totals
                 this.CaluateTotals();
+            }
+        }
+
+        /// <summary>
+        /// Opens the Crystal Report preview for a given Purchase Number (or currently loaded/typed purchase).
+        /// </summary>
+        public void PreviewPurchaseInvoice(long purchaseNo = 0)
+        {
+            try
+            {
+                if (purchaseNo <= 0)
+                {
+                    string rawNo = txtPurchaseNo != null ? txtPurchaseNo.Text.Replace("GRN-", "").Trim() : "";
+                    if (!long.TryParse(rawNo, out purchaseNo) || purchaseNo <= 0)
+                    {
+                        purchaseNo = ObjPurchaseMaster != null ? ObjPurchaseMaster.PurchaseNo : 0;
+                    }
+                }
+
+                if (purchaseNo <= 0)
+                {
+                    MessageBox.Show("Please enter or load a valid Purchase / GRN number to preview.", "Preview Purchase", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                ReportViewer rv = new ReportViewer();
+                bool previewSuccess = rv.PreviewPurchase(purchaseNo);
+                if (previewSuccess)
+                {
+                    rv.Show();
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error opening purchase preview: {ex.Message}", "Preview Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// Sends the Purchase Invoice directly to the printer.
+        /// </summary>
+        public void PrintPurchaseInvoice(long purchaseNo = 0)
+        {
+            try
+            {
+                if (purchaseNo <= 0)
+                {
+                    string rawNo = txtPurchaseNo != null ? txtPurchaseNo.Text.Replace("GRN-", "").Trim() : "";
+                    if (!long.TryParse(rawNo, out purchaseNo) || purchaseNo <= 0)
+                    {
+                        purchaseNo = ObjPurchaseMaster != null ? ObjPurchaseMaster.PurchaseNo : 0;
+                    }
+                }
+
+                if (purchaseNo <= 0)
+                {
+                    MessageBox.Show("Please enter or load a valid Purchase / GRN number to print.", "Print Purchase", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                ReportViewer rv = new ReportViewer();
+                rv.PrintPurchase(purchaseNo);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error printing purchase: {ex.Message}", "Print Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 

@@ -1980,5 +1980,41 @@ namespace Repository.TransactionRepository
             }
         }
 
+        /// <summary>
+        /// Fetches purchase print data for Crystal Reports.
+        /// </summary>
+        public DataTable GetPurchasePrint(long purchaseNo, int branchId)
+        {
+            DataTable dt = new DataTable();
+            bool wasClosed = DataConnection.State == ConnectionState.Closed;
+
+            try
+            {
+                if (wasClosed) DataConnection.Open();
+
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._POS_GetPurchasePrint, (SqlConnection)DataConnection))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@PurchaseNo", purchaseNo);
+                    cmd.Parameters.AddWithValue("@BranchId", branchId);
+                    cmd.Parameters.AddWithValue("@_Operations", "GETPURCHASE");
+
+                    using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
+                    {
+                        adapt.Fill(dt);
+                    }
+                }
+            }
+            finally
+            {
+                if (wasClosed && DataConnection.State == ConnectionState.Open)
+                {
+                    DataConnection.Close();
+                }
+            }
+
+            return dt;
+        }
+
     }
 }
