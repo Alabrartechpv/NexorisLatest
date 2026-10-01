@@ -598,7 +598,7 @@ namespace PosBranch_Win.Reports.SalesReports
                     case "Weighted":
                         if (isPercent)
                         {
-                            double totalSales = _filteredData.Sum(x => x.SubTotal > 0 ? x.SubTotal : x.BillAmount);
+                            double totalSales = _filteredData.Sum(x => x.BillAmount > 0 ? x.BillAmount : x.SubTotal);
                             double totalProfit = _filteredData.Sum(x => x.Profit);
                             double weightedMargin = totalSales > 0 ? (totalProfit / totalSales) * 100 : 0;
                             text = weightedMargin.ToString("N2") + " %";
@@ -612,7 +612,7 @@ namespace PosBranch_Win.Reports.SalesReports
                     case "Sum":
                         if (isPercent)
                         {
-                            double totalSales = _filteredData.Sum(x => x.SubTotal > 0 ? x.SubTotal : x.BillAmount);
+                            double totalSales = _filteredData.Sum(x => x.BillAmount > 0 ? x.BillAmount : x.SubTotal);
                             double totalProfit = _filteredData.Sum(x => x.Profit);
                             double weightedMargin = totalSales > 0 ? (totalProfit / totalSales) * 100 : 0;
                             text = weightedMargin.ToString("N2") + " %";
@@ -643,7 +643,7 @@ namespace PosBranch_Win.Reports.SalesReports
             }
 
             // Update Net Profit Summary Badge
-            double filteredTotalSales = _filteredData != null && _filteredData.Count > 0 ? _filteredData.Sum(x => x.SubTotal > 0 ? x.SubTotal : x.BillAmount) : 0;
+            double filteredTotalSales = _filteredData != null && _filteredData.Count > 0 ? _filteredData.Sum(x => x.BillAmount > 0 ? x.BillAmount : x.SubTotal) : 0;
             double grossProfit = _filteredData != null && _filteredData.Count > 0 ? _filteredData.Sum(x => x.Profit) : 0;
             double grossMargin = filteredTotalSales > 0 ? (grossProfit / filteredTotalSales) * 100 : 0;
             double netProfit = grossProfit - _periodExpenses;
@@ -1426,7 +1426,7 @@ namespace PosBranch_Win.Reports.SalesReports
         #region Net Profit Audit Breakdown Dialog
         private void ShowNetProfitBreakdownDialog()
         {
-            double filteredTotalSales = _filteredData != null && _filteredData.Count > 0 ? _filteredData.Sum(x => x.SubTotal > 0 ? x.SubTotal : x.BillAmount) : 0;
+            double filteredTotalSales = _filteredData != null && _filteredData.Count > 0 ? _filteredData.Sum(x => x.BillAmount > 0 ? x.BillAmount : x.SubTotal) : 0;
             double grossProfit = _filteredData != null && _filteredData.Count > 0 ? _filteredData.Sum(x => x.Profit) : 0;
             double cogs = filteredTotalSales - grossProfit;
             double grossMargin = filteredTotalSales > 0 ? (grossProfit / filteredTotalSales) * 100 : 0;
@@ -1498,7 +1498,7 @@ namespace PosBranch_Win.Reports.SalesReports
                     tlpSummary.Controls.Add(lblV);
                 }
 
-                AddSummaryRow("1. Total Sales Turnover (Base):", $"₹ {filteredTotalSales:N2}", Color.FromArgb(18, 49, 102));
+                AddSummaryRow("1. Total Sales Turnover:", $"₹ {filteredTotalSales:N2}", Color.FromArgb(18, 49, 102));
                 AddSummaryRow("2. Cost of Goods Sold (COGS):", $"- ₹ {cogs:N2}", Color.FromArgb(100, 116, 139));
                 AddSummaryRow("3. Total Gross Profit (Grid):", $"₹ {grossProfit:N2} ({grossMargin:N1}%)", Color.FromArgb(27, 94, 32), true);
                 AddSummaryRow("4. Total Operating Expenses:", $"- ₹ {_periodExpenses:N2}", Color.FromArgb(183, 28, 28), true);
