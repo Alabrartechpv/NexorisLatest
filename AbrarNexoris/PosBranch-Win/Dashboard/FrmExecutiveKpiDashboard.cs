@@ -267,80 +267,83 @@ namespace PosBranch_Win.Dashboard
                 // 12. Total Sales Revenue
                 CreateKpiCard("12. Sales Turnover", "Total net billing revenue for the selected date period", FormatCurr(_model.TotalSalesRevenue), $"{_model.TotalSalesBillCount:N0} Invoices Billed", Color.FromArgb(30, 136, 229), () => DrillDown("SalesDetailsReport")),
 
-                // 13. Sales Return (Customer Returns)
-                CreateKpiCard("13. Sales Return (Cust)", "Goods returned and credit notes issued to customers", FormatCurr(_model.TotalSalesReturn), $"{_model.TotalSalesReturnCount} Return Vouchers", Color.FromArgb(231, 76, 60), () => DrillDown("SalesReturnReport")),
+                // 13. Cost of Goods Sold (COGS)
+                CreateKpiCard("13. Cost of Goods (COGS)", "Total purchase cost of merchandise sold during the period", FormatCurr(_model.CostOfGoodsSold), "Cost of Sold Items", Color.FromArgb(100, 116, 139), () => DrillDown("SalesProfit")),
 
-                // 14. Total Purchases (Inward Stock)
-                CreateKpiCard("14. Total Purchases", "Total inward purchases billed from vendors and suppliers", FormatCurr(_model.TotalPurchases), $"{_model.TotalPurchasesBillCount:N0} Purchase Bills", Color.FromArgb(41, 128, 185), () => DrillDown("PurchaseDetailsReport")),
+                // 14. Sales Return (Customer Returns)
+                CreateKpiCard("14. Sales Return (Cust)", "Goods returned and credit notes issued to customers", FormatCurr(_model.TotalSalesReturn), $"{_model.TotalSalesReturnCount} Return Vouchers", Color.FromArgb(231, 76, 60), () => DrillDown("SalesReturnReport")),
 
-                // 15. Purchase Return (Vendor Returns)
-                CreateKpiCard("15. Purchase Return", "Goods returned back to suppliers and debit notes issued", FormatCurr(_model.TotalPurchaseReturn), $"{_model.TotalPurchaseReturnCount} Debit Vouchers", Color.FromArgb(230, 126, 34), () => DrillDown("PurchaseReturnReport")),
+                // 15. Total Purchases (Inward Stock)
+                CreateKpiCard("15. Total Purchases", "Total inward purchases billed from vendors and suppliers", FormatCurr(_model.TotalPurchases), $"{_model.TotalPurchasesBillCount:N0} Purchase Bills", Color.FromArgb(41, 128, 185), () => DrillDown("PurchaseDetailsReport")),
 
-                // 16. Holded Items / Bills
-                CreateKpiCard("16. Hold Items / Bills", "Suspended sales bills and hold items pending counter checkout", FormatCurr(_model.HoldBillsValue), $"{_model.HoldBillsCount} Bills | {_model.HoldItemsCount:N0} Items", Color.FromArgb(230, 126, 34), () => DrillDown("HoldBills")),
+                // 16. Purchase Return (Vendor Returns)
+                CreateKpiCard("16. Purchase Return", "Goods returned back to suppliers and debit notes issued", FormatCurr(_model.TotalPurchaseReturn), $"{_model.TotalPurchaseReturnCount} Debit Vouchers", Color.FromArgb(230, 126, 34), () => DrillDown("PurchaseReturnReport")),
 
-                // 17. Gross Profit & Margin %
-                CreateKpiCard("17. Gross Margin %", "Gross earnings on sold goods (Sales Revenue - Cost of Sales)", FormatCurr(_model.GrossProfit), $"Gross Margin: {_model.GrossProfitMarginPercent:N1}%", Color.FromArgb(39, 174, 96), () => DrillDown("SalesProfit")),
+                // 17. Holded Items / Bills
+                CreateKpiCard("17. Hold Items / Bills", "Suspended sales bills and hold items pending counter checkout", FormatCurr(_model.HoldBillsValue), $"{_model.HoldBillsCount} Bills | {_model.HoldItemsCount:N0} Items", Color.FromArgb(230, 126, 34), () => DrillDown("HoldBills")),
 
-                // 18. Total Business Expenses
-                CreateKpiCard("18. Business Expenses", "Combined operational overheads, utilities, and running costs", FormatCurr(_model.TotalBusinessExpenses), $"Dir: {FormatCurr(_model.DirectExpenses)} | Indir: {FormatCurr(_model.IndirectExpenses)}", Color.FromArgb(192, 57, 43), () => DrillDown("ProfitLoss")),
+                // 18. Gross Profit & Margin %
+                CreateKpiCard("18. Gross Margin %", "Gross earnings on sold goods (Sales Revenue - Cost of Sales)", FormatCurr(_model.GrossProfit), $"Gross Margin: {_model.GrossProfitMarginPercent:N1}%", Color.FromArgb(39, 174, 96), () => DrillDown("SalesProfit")),
 
-                // 19. Actual Net Profit
-                CreateKpiCard("19. Actual Net Profit", "Bottom-line net earnings after deducting cost of sales and expenses", FormatCurr(_model.ActualNetProfit), $"Margin: {_model.OperatingProfitMarginPercent:N2}%", _model.ActualNetProfit >= 0 ? Color.FromArgb(39, 174, 96) : Color.FromArgb(192, 57, 43), () => DrillDown("SalesProfit")),
+                // 19. Total Business Expenses
+                CreateKpiCard("19. Business Expenses", "Combined operational overheads, utilities, and running costs", FormatCurr(_model.TotalBusinessExpenses), $"Dir: {FormatCurr(_model.DirectExpenses)} | Indir: {FormatCurr(_model.IndirectExpenses)}", Color.FromArgb(192, 57, 43), () => DrillDown("ProfitLoss")),
 
-                // 20. Operating Profit Margin %
-                CreateKpiCard("20. Profit Margin %", "Ratio of net profit generated from sales turnover", $"{_model.OperatingProfitMarginPercent:N2}%", "Net Profit / Sales", _model.OperatingProfitMarginPercent >= 0 ? Color.FromArgb(22, 160, 133) : Color.FromArgb(192, 57, 43), () => DrillDown("SalesProfit")),
+                // 20. Actual Net Profit
+                CreateKpiCard("20. Actual Net Profit", "Bottom-line net earnings after deducting cost of sales and expenses", FormatCurr(_model.ActualNetProfit), $"Margin: {_model.OperatingProfitMarginPercent:N2}%", _model.ActualNetProfit >= 0 ? Color.FromArgb(39, 174, 96) : Color.FromArgb(192, 57, 43), () => DrillDown("SalesProfit")),
 
-                // 21. GST / Net Tax Liability
-                CreateKpiCard("21. GST Tax Liability", "Net government GST liability (Output GST - Input GST credit)", FormatCurr(_model.NetTaxLiability), $"Out: {FormatCurr(_model.OutputGstAmount)} | In: {FormatCurr(_model.InputGstAmount)}", Color.FromArgb(52, 73, 94), () => DrillDown("GovtGSTReturnReport")),
+                // 21. Operating Profit Margin %
+                CreateKpiCard("21. Profit Margin %", "Ratio of net profit generated from sales turnover", $"{_model.OperatingProfitMarginPercent:N2}%", "Net Profit / Sales", _model.OperatingProfitMarginPercent >= 0 ? Color.FromArgb(22, 160, 133) : Color.FromArgb(192, 57, 43), () => DrillDown("SalesProfit")),
 
-                // 22. Cash in Hand
-                CreateKpiCard("22. Cash in Hand", "Total liquid cash in cash drawers, counter tills, and main safe", FormatCurr(_model.CashInHand), "Available Counter Cash", Color.FromArgb(46, 204, 113), () => DrillDown("CashBankBook")),
+                // 22. GST / Net Tax Liability
+                CreateKpiCard("22. GST Tax Liability", "Net government GST liability (Output GST - Input GST credit)", FormatCurr(_model.NetTaxLiability), $"Out: {FormatCurr(_model.OutputGstAmount)} | In: {FormatCurr(_model.InputGstAmount)}", Color.FromArgb(52, 73, 94), () => DrillDown("GovtGSTReturnReport")),
+
+                // 23. Cash in Hand
+                CreateKpiCard("23. Cash in Hand", "Total liquid cash in cash drawers, counter tills, and main safe", FormatCurr(_model.CashInHand), "Available Counter Cash", Color.FromArgb(46, 204, 113), () => DrillDown("CashBankBook")),
                 
-                // 23. Bank Balance
-                CreateKpiCard("23. Bank Balance", "Total combined active bank account balances", FormatCurr(_model.BankBalance), "Commercial Accounts", Color.FromArgb(52, 152, 219), () => DrillDown("BankStatement")),
+                // 24. Bank Balance
+                CreateKpiCard("24. Bank Balance", "Total combined active bank account balances", FormatCurr(_model.BankBalance), "Commercial Accounts", Color.FromArgb(52, 152, 219), () => DrillDown("BankStatement")),
                 
-                // 24. Vendor Outstanding
-                CreateKpiCard("24. Vendor Outstanding", "Total outstanding liabilities owed to vendors and suppliers", FormatCurr(_model.SupplierPayables), $"{_model.SupplierPayablesCount} Pending Bills", Color.FromArgb(231, 76, 60), () => DrillDown("VendorOutstanding")),
+                // 25. Vendor Outstanding
+                CreateKpiCard("25. Vendor Outstanding", "Total outstanding liabilities owed to vendors and suppliers", FormatCurr(_model.SupplierPayables), $"{_model.SupplierPayablesCount} Pending Bills", Color.FromArgb(231, 76, 60), () => DrillDown("VendorOutstanding")),
                 
-                // 25. Customer Outstanding
-                CreateKpiCard("25. Cust. Outstanding", "Total outstanding dues to collect from customers", FormatCurr(_model.CustomerReceivables), $"{_model.CustomerReceivablesCount} Unpaid Invoices", Color.FromArgb(241, 196, 15), () => DrillDown("CustomerOutstanding")),
+                // 26. Customer Outstanding
+                CreateKpiCard("26. Cust. Outstanding", "Total outstanding dues to collect from customers", FormatCurr(_model.CustomerReceivables), $"{_model.CustomerReceivablesCount} Unpaid Invoices", Color.FromArgb(241, 196, 15), () => DrillDown("CustomerOutstanding")),
 
-                // 26. Delayed Customer Receivables (>30D)
-                CreateKpiCard("26. Delayed Cust >30d", "Overdue customer receivables past 30 days credit period", FormatCurr(_model.DelayedCustomerReceivables30Days), $"{_model.DelayedCustomerCount30Days} High-Risk Bills", Color.FromArgb(231, 76, 60), () => DrillDown("CustomerOutstanding")),
+                // 27. Delayed Customer Receivables (>30D)
+                CreateKpiCard("27. Delayed Cust >30d", "Overdue customer receivables past 30 days credit period", FormatCurr(_model.DelayedCustomerReceivables30Days), $"{_model.DelayedCustomerCount30Days} High-Risk Bills", Color.FromArgb(231, 76, 60), () => DrillDown("CustomerOutstanding")),
                 
-                // 27. Delayed Supplier Payables (>30D)
-                CreateKpiCard("27. Delayed Supp >30d", "Overdue purchase invoices past 30 days credit period", FormatCurr(_model.DelayedSupplierPayables30Days), $"{_model.DelayedSupplierCount30Days} Overdue Bills", Color.FromArgb(230, 126, 34), () => DrillDown("VendorOutstanding")),
+                // 28. Delayed Supplier Payables (>30D)
+                CreateKpiCard("28. Delayed Supp >30d", "Overdue purchase invoices past 30 days credit period", FormatCurr(_model.DelayedSupplierPayables30Days), $"{_model.DelayedSupplierCount30Days} Overdue Bills", Color.FromArgb(230, 126, 34), () => DrillDown("VendorOutstanding")),
 
-                // 28. Net Business Asset (NBA)
-                CreateKpiCard("28. Net Asset (NBA)", "True net worth of the business (Total Assets minus Liabilities)", FormatCurr(_model.NetBusinessAsset), $"Assets: {FormatCurr(_model.TotalAssets)} | Liab: {FormatCurr(_model.TotalLiabilities)}", Color.FromArgb(16, 85, 154), () => DrillDown("BalanceSheet")),
+                // 29. Net Business Asset (NBA)
+                CreateKpiCard("29. Net Asset (NBA)", "True net worth of the business (Total Assets minus Liabilities)", FormatCurr(_model.NetBusinessAsset), $"Assets: {FormatCurr(_model.TotalAssets)} | Liab: {FormatCurr(_model.TotalLiabilities)}", Color.FromArgb(16, 85, 154), () => DrillDown("BalanceSheet")),
 
-                // 29. Owner Drawings
-                CreateKpiCard("29. Owner Drawings", "Capital withdrawals and personal drawings taken by proprietors", FormatCurr(_model.OwnerDrawings), "Capital Withdrawals", Color.FromArgb(155, 89, 182), () => DrillDown("DayBook")),
+                // 30. Owner Drawings
+                CreateKpiCard("30. Owner Drawings", "Capital withdrawals and personal drawings taken by proprietors", FormatCurr(_model.OwnerDrawings), "Capital Withdrawals", Color.FromArgb(155, 89, 182), () => DrillDown("DayBook")),
 
-                // 30. Customer Bad Debts
-                CreateKpiCard("30. Cust. Bad Debts", "Uncollectible customer credit balances written off", FormatCurr(_model.CustomerBadDebts), "Credit Loss Written Off", Color.FromArgb(149, 165, 166), () => DrillDown("CustomerOutstanding")),
+                // 31. Customer Bad Debts
+                CreateKpiCard("31. Cust. Bad Debts", "Uncollectible customer credit balances written off", FormatCurr(_model.CustomerBadDebts), "Credit Loss Written Off", Color.FromArgb(149, 165, 166), () => DrillDown("CustomerOutstanding")),
                 
-                // 31. Supplier Write-Offs
-                CreateKpiCard("31. Supp. Write-Offs", "Vendor invoice write-offs and negotiated settlement discounts", FormatCurr(_model.SupplierWriteOffs), "Discounts Settled", Color.FromArgb(127, 140, 141), () => DrillDown("VendorOutstanding")),
+                // 32. Supplier Write-Offs
+                CreateKpiCard("32. Supp. Write-Offs", "Vendor invoice write-offs and negotiated settlement discounts", FormatCurr(_model.SupplierWriteOffs), "Discounts Settled", Color.FromArgb(127, 140, 141), () => DrillDown("VendorOutstanding")),
 
-                // 32. Supplier Advance / Overpayment
-                CreateKpiCard("32. Supp. Advance", "Advance payments and debit balances with vendors", FormatCurr(_model.SupplierAdvanceBalance), "Advance Payments / Debit", Color.FromArgb(52, 73, 94), () => DrillDown("VendorPaymentReport")),
+                // 33. Supplier Advance / Overpayment
+                CreateKpiCard("33. Supp. Advance", "Advance payments and debit balances with vendors", FormatCurr(_model.SupplierAdvanceBalance), "Advance Payments / Debit", Color.FromArgb(52, 73, 94), () => DrillDown("VendorPaymentReport")),
                 
-                // 33. Customer Advance / Deposits
-                CreateKpiCard("33. Cust. Advance", "Customer advance payments and credit deposits received", FormatCurr(_model.CustomerAdvanceBalance), "Deposits / Credit", Color.FromArgb(127, 140, 141), () => DrillDown("CustomerReceiptReport")),
+                // 34. Customer Advance / Deposits
+                CreateKpiCard("34. Cust. Advance", "Customer advance payments and credit deposits received", FormatCurr(_model.CustomerAdvanceBalance), "Deposits / Credit", Color.FromArgb(127, 140, 141), () => DrillDown("CustomerReceiptReport")),
 
-                // 34. Deletion & Cancellation Logs
-                CreateKpiCard("34. Deletion Logs", "Track of deleted sales bills, purchase bills, and account vouchers", $"{_model.DeletionCount} Events", "Deleted Documents", Color.FromArgb(192, 57, 43), () => DrillDown("AuditDeletions")),
+                // 35. Deletion & Cancellation Logs
+                CreateKpiCard("35. Deletion Logs", "Track of deleted sales bills, purchase bills, and account vouchers", $"{_model.DeletionCount} Events", "Deleted Documents", Color.FromArgb(192, 57, 43), () => DrillDown("AuditDeletions")),
                 
-                // 35. Price Change Modifications
-                CreateKpiCard("35. Price Change Logs", "Track of item selling and cost price edits in Item Master", $"{_model.PriceChangeCount} Events", "Item Master Edits", Color.FromArgb(41, 128, 185), () => DrillDown("AuditPriceChanges")),
+                // 36. Price Change Modifications
+                CreateKpiCard("36. Price Change Logs", "Track of item selling and cost price edits in Item Master", $"{_model.PriceChangeCount} Events", "Item Master Edits", Color.FromArgb(41, 128, 185), () => DrillDown("AuditPriceChanges")),
                 
-                // 36. Physical Stock Discrepancy Logs
-                CreateKpiCard("36. Stock Adjustment", "Track of physical stock count reconciliations and adjustments", $"{_model.StockAdjustmentCount} Adjustments", "Stock Adjustment Report", Color.FromArgb(142, 68, 173), () => DrillDown("StockAdjustment")),
+                // 37. Physical Stock Discrepancy Logs
+                CreateKpiCard("37. Stock Adjustment", "Track of physical stock count reconciliations and adjustments", $"{_model.StockAdjustmentCount} Adjustments", "Stock Adjustment Report", Color.FromArgb(142, 68, 173), () => DrillDown("StockAdjustment")),
 
-                // 37. Manual Party Balance
-                CreateKpiCard("37. Manual Balance", "Total outstanding manual party balances (Customers & Vendors)", FormatCurr(_model.TotalManualBalance), $"Cust: {FormatCurr(_model.ManualCustomerBalance)} | Supp: {FormatCurr(_model.ManualVendorBalance)}", Color.FromArgb(123, 31, 162), () => DrillDown("ManualPartyBalanceReport"))
+                // 38. Manual Party Balance
+                CreateKpiCard("38. Manual Balance", "Total outstanding manual party balances (Customers & Vendors)", FormatCurr(_model.TotalManualBalance), $"Cust: {FormatCurr(_model.ManualCustomerBalance)} | Supp: {FormatCurr(_model.ManualVendorBalance)}", Color.FromArgb(123, 31, 162), () => DrillDown("ManualPartyBalanceReport"))
             };
 
             // Display in clean full-width responsive grid:

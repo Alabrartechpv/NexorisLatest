@@ -91,6 +91,10 @@ namespace Repository.ReportRepository
                                     subTotal = billAmount - taxAmt;
                                 }
 
+                                double costAmount = row.Table.Columns.Contains("CostAmount") && row["CostAmount"] != DBNull.Value
+                                    ? Convert.ToDouble(row["CostAmount"])
+                                    : (row.Table.Columns.Contains("BillCost") && row["BillCost"] != DBNull.Value ? Convert.ToDouble(row["BillCost"]) : Math.Max(0, billAmount - profit));
+
                                 double profitExclGst = row.Table.Columns.Contains("ProfitExclGst") && row["ProfitExclGst"] != DBNull.Value
                                     ? Convert.ToDouble(row["ProfitExclGst"])
                                     : (profit > taxAmt && billAmount > subTotal ? profit - taxAmt : profit);
@@ -102,6 +106,7 @@ namespace Repository.ReportRepository
                                     SubTotal = subTotal,
                                     TaxAmt = taxAmt,
                                     BillAmount = billAmount,
+                                    CostAmount = costAmount,
                                     Profit = profit,
                                     ProfitExclGst = profitExclGst,
                                     PayMode = row.Table.Columns.Contains("PayMode") ? (row["PayMode"]?.ToString() ?? "") : (row.Table.Columns.Contains("paymodename") ? (row["paymodename"]?.ToString() ?? "") : ""),

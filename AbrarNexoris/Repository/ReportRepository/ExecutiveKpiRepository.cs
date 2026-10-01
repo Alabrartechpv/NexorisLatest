@@ -106,6 +106,9 @@ namespace Repository.ReportRepository
                             model.HoldBillsValue = GetDecimal(r, "HoldBillsValue");
                             model.HoldBillsCount = GetInt(r, "HoldBillsCount");
                             model.HoldItemsCount = GetDecimal(r, "HoldItemsCount");
+                            model.CostOfGoodsSold = r.Table.Columns.Contains("CostOfGoodsSold") && r["CostOfGoodsSold"] != DBNull.Value
+                                ? GetDecimal(r, "CostOfGoodsSold")
+                                : Math.Max(0, model.TotalSalesRevenue - model.GrossProfit);
                             model.GrossProfit = GetDecimal(r, "GrossProfit");
                             model.GrossProfitMarginPercent = GetDecimal(r, "GrossProfitMarginPercent");
 

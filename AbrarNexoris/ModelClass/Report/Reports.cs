@@ -85,6 +85,7 @@ namespace ModelClass.Report
         public double SubTotal { get; set; }
         public double TaxAmt { get; set; }
         public double BillAmount { get; set; }
+        public double CostAmount { get; set; }
         public double Profit { get; set; }
         public double ProfitExclGst { get; set; }
         public string PayMode { get; set; }

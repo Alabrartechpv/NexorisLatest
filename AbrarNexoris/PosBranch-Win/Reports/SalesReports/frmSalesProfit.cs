@@ -50,6 +50,7 @@ namespace PosBranch_Win.Reports.SalesReports
         private readonly HashSet<string> numericSummaryColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "BillAmount",
+            "CostAmount",
             "Profit",
             "ProfitMarginPercent",
             "SubTotal",
@@ -86,6 +87,7 @@ namespace PosBranch_Win.Reports.SalesReports
             public int BillNo { get; set; }
             public DateTime BillDate { get; set; }
             public double BillAmount { get; set; }
+            public double CostAmount { get; set; }
             public double Profit { get; set; }
             public double ProfitMarginPercent { get; set; }
             public string PayMode { get; set; }
@@ -469,6 +471,7 @@ namespace PosBranch_Win.Reports.SalesReports
         private void InitializeSummaryFooter()
         {
             columnAggregations["BillAmount"] = "Sum";
+            columnAggregations["CostAmount"] = "Sum";
             columnAggregations["Profit"] = "Sum";
             columnAggregations["ProfitMarginPercent"] = "Weighted";
             columnAggregations["SubTotal"] = "Sum";
@@ -662,6 +665,7 @@ namespace PosBranch_Win.Reports.SalesReports
             switch (colKey)
             {
                 case "BillAmount": return _filteredData.Select(x => x.BillAmount).ToList();
+                case "CostAmount": return _filteredData.Select(x => x.CostAmount).ToList();
                 case "Profit": return _filteredData.Select(x => x.Profit).ToList();
                 case "ProfitMarginPercent": return _filteredData.Select(x => x.ProfitMarginPercent).ToList();
                 case "SubTotal": return _filteredData.Select(x => x.SubTotal).ToList();
@@ -1173,6 +1177,7 @@ namespace PosBranch_Win.Reports.SalesReports
                             BillNo = r.BillNo,
                             BillDate = r.BillDate,
                             BillAmount = r.BillAmount,
+                            CostAmount = r.CostAmount,
                             Profit = r.Profit,
                             ProfitMarginPercent = salesBase > 0 ? (r.Profit / salesBase) * 100 : 0,
                             PayMode = r.PayMode ?? string.Empty,
@@ -1215,6 +1220,7 @@ namespace PosBranch_Win.Reports.SalesReports
                     (!string.IsNullOrEmpty(x.PayMode) && x.PayMode.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0) ||
                     (!string.IsNullOrEmpty(x.CashMode) && x.CashMode.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0) ||
                     x.BillAmount.ToString("N2").Contains(query) ||
+                    x.CostAmount.ToString("N2").Contains(query) ||
                     x.Profit.ToString("N2").Contains(query) ||
                     x.ProfitMarginPercent.ToString("N2").Contains(query) ||
                     x.BillDate.ToString("dd-MM-yyyy").Contains(query)
@@ -1238,11 +1244,12 @@ namespace PosBranch_Win.Reports.SalesReports
             // Primary Sales Profit Columns (Visible by default)
             ConfigureColumn(band, "BillNo", "Bill No", 90, HAlign.Center);
             ConfigureDateColumn(band, "BillDate", "Bill Date", 110, HAlign.Center);
-            ConfigureMoneyColumn(band, "BillAmount", "Sales Amount (₹)", 150, Color.FromArgb(20, 50, 90));
-            ConfigureMoneyColumn(band, "Profit", "Gross Profit (₹)", 150, Color.FromArgb(27, 94, 32));
-            ConfigurePercentColumn(band, "ProfitMarginPercent", "Gross Margin %", 130);
-            ConfigureColumn(band, "PayMode", "Pay Mode", 120, HAlign.Left);
-            ConfigureColumn(band, "CashMode", "Cash Mode", 120, HAlign.Left);
+            ConfigureMoneyColumn(band, "BillAmount", "Sales Amount (₹)", 140, Color.FromArgb(20, 50, 90));
+            ConfigureMoneyColumn(band, "CostAmount", "Cost / COGS (₹)", 140, Color.FromArgb(100, 116, 139));
+            ConfigureMoneyColumn(band, "Profit", "Gross Profit (₹)", 140, Color.FromArgb(27, 94, 32));
+            ConfigurePercentColumn(band, "ProfitMarginPercent", "Gross Margin %", 120);
+            ConfigureColumn(band, "PayMode", "Pay Mode", 110, HAlign.Left);
+            ConfigureColumn(band, "CashMode", "Cash Mode", 110, HAlign.Left);
 
             // Optional Tax breakdown columns (Hidden by default, available in Column Chooser)
             if (band.Columns.Exists("SubTotal"))
@@ -1376,14 +1383,15 @@ namespace PosBranch_Win.Reports.SalesReports
                     try
                     {
                         StringBuilder sb = new StringBuilder();
-                        sb.AppendLine("Bill No,Bill Date,Sales Amount,Profit Amount,Profit Margin %,Pay Mode,Cash Mode");
+                        sb.AppendLine("Bill No,Bill Date,Sales Amount,Cost Amount (COGS),Profit Amount,Profit Margin %,Pay Mode,Cash Mode");
 
                         foreach (var item in _filteredData)
                         {
-                            sb.AppendLine(string.Format("{0},{1:dd-MM-yyyy},{2:F2},{3:F2},{4:F2}%,\"{5}\",\"{6}\"",
+                            sb.AppendLine(string.Format("{0},{1:dd-MM-yyyy},{2:F2},{3:F2},{4:F2},{5:F2}%,\"{6}\",\"{7}\"",
                                 item.BillNo,
                                 item.BillDate,
                                 item.BillAmount,
+                                item.CostAmount,
                                 item.Profit,
                                 item.ProfitMarginPercent,
                                 item.PayMode.Replace("\"", "\"\""),
@@ -1393,6 +1401,7 @@ namespace PosBranch_Win.Reports.SalesReports
                         sb.AppendLine();
                         sb.AppendLine($"Total Bills,{_filteredData.Count}");
                         sb.AppendLine($"Total Sales Amount,{_filteredData.Sum(x => x.BillAmount):F2}");
+                        sb.AppendLine($"Total Cost Amount (COGS),{_filteredData.Sum(x => x.CostAmount):F2}");
                         sb.AppendLine($"Total Profit Amount,{_filteredData.Sum(x => x.Profit):F2}");
                         double totalSales = _filteredData.Sum(x => x.SubTotal > 0 ? x.SubTotal : x.BillAmount);
                         double totalProfit = _filteredData.Sum(x => x.Profit);
