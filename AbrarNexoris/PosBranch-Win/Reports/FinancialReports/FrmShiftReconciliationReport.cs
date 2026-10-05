@@ -18,6 +18,25 @@ namespace PosBranch_Win.Reports.FinancialReports
     /// </summary>
     public partial class FrmShiftReconciliationReport : Form
     {
+        private static readonly Color FormBackColor        = Color.FromArgb(232, 246, 255);
+        private static readonly Color FilterPanelBackColor = Color.FromArgb(232, 246, 255);
+        private static readonly Color ActionPanelBackColor = Color.FromArgb(206, 223, 238);
+        private static readonly Color BorderBlue           = Color.FromArgb(118, 154, 198);
+        private static readonly Color ControlBackColor     = Color.White;
+        private static readonly Color ControlTextColor     = Color.FromArgb(18, 49, 102);
+        private static readonly Color GridHeaderBlue       = Color.FromArgb(93, 151, 214);
+        private static readonly Color GridHeaderBlueDark   = Color.FromArgb(67, 118, 184);
+        private static readonly Color GridSelectedBlue     = Color.FromArgb(126, 126, 245);
+        private static readonly Color GridRowLine          = Color.FromArgb(197, 217, 241);
+        private static readonly Color GridAltRow           = Color.FromArgb(246, 250, 255);
+        private static readonly Color GridFooterBorder     = Color.FromArgb(144, 181, 223);
+        private static readonly Color ButtonBlueTop        = Color.FromArgb(232, 241, 252);
+        private static readonly Color ButtonBlueBottom     = Color.FromArgb(145, 181, 224);
+        private static readonly Color ButtonBlueBorder     = Color.FromArgb(62, 104, 166);
+        private static readonly Color ButtonLightOutline   = Color.FromArgb(166, 183, 202);
+        private static readonly Color SkyBlueOutline       = Color.FromArgb(160, 210, 255);
+        private static readonly Color ButtonTextBlue       = Color.FromArgb(14, 47, 108);
+
         private readonly ClosingRepo _repository;
         private List<ClosingModel> _closingRecords;
         private bool _isLoading;
@@ -64,6 +83,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                 InitializeDateControls();
                 InitializeSearchControls();
                 InitializePanels();
+                StyleFilterControls();
                 StyleButtons();
                 SetupGrid();
                 
@@ -114,76 +134,172 @@ namespace PosBranch_Win.Reports.FinancialReports
 
         private void InitializePanels()
         {
-            ultraPanelMaster.BackColor = Color.FromArgb(250, 251, 252);
+            BackColor = FormBackColor;
+
+            ultraPanelMaster.Appearance.BackColor = FormBackColor;
+            ultraPanelMaster.Appearance.BorderColor = BorderBlue;
             ultraPanelMaster.BorderStyle = UIElementBorderStyle.Solid;
-            ultraPanelControls.BackColor = Color.FromArgb(236, 240, 245);
 
-            StyleSummaryLabel(lblSalesCaption, Color.FromArgb(25, 118, 210));
-            StyleSummaryLabel(lblExpectedCaption, Color.FromArgb(13, 71, 161));
-            StyleSummaryLabel(lblCountedCaption, Color.FromArgb(56, 142, 60));
-            StyleSummaryLabel(lblVarianceCaption, Color.FromArgb(191, 54, 12));
+            ultraPanelControls.Appearance.BackColor = FilterPanelBackColor;
+            ultraPanelControls.Appearance.BorderColor = BorderBlue;
+            ultraPanelControls.BorderStyle = UIElementBorderStyle.Solid;
 
-            StyleSummaryValueLabel(lblSales, Color.FromArgb(25, 118, 210), 14);
-            StyleSummaryValueLabel(lblExpected, Color.FromArgb(13, 71, 161), 14);
-            StyleSummaryValueLabel(lblCounted, Color.FromArgb(27, 94, 32), 14);
-            StyleSummaryValueLabel(lblVariance, Color.FromArgb(191, 54, 12), 16);
+            ultraPanelSummary.Appearance.BackColor = GridHeaderBlue;
+            ultraPanelSummary.Appearance.BackColor2 = GridHeaderBlue;
+            ultraPanelSummary.Appearance.BackGradientStyle = GradientStyle.None;
+            ultraPanelSummary.Appearance.BorderColor = GridFooterBorder;
+            ultraPanelSummary.BorderStyle = UIElementBorderStyle.Solid;
 
-            StyleSummaryLabel(lblTotalCashSaleCaption, Color.FromArgb(70, 70, 70));
-            StyleSummaryLabel(lblTotalCardSaleCaption, Color.FromArgb(70, 70, 70));
-            StyleSummaryLabel(lblTotalUpiSaleCaption, Color.FromArgb(70, 70, 70));
-            StyleSummaryLabel(lblTotalCreditSaleCaption, Color.FromArgb(70, 70, 70));
-            StyleSummaryLabel(lblTotalCustReceiptCaption, Color.FromArgb(70, 70, 70));
+            StyleSummaryLabel(lblSalesCaption);
+            StyleSummaryLabel(lblExpectedCaption);
+            StyleSummaryLabel(lblCountedCaption);
+            StyleSummaryLabel(lblVarianceCaption);
 
-            StyleSummaryValueLabel(lblTotalCashSale, Color.FromArgb(40, 40, 40), 12);
-            StyleSummaryValueLabel(lblTotalCardSale, Color.FromArgb(40, 40, 40), 12);
-            StyleSummaryValueLabel(lblTotalUpiSale, Color.FromArgb(40, 40, 40), 12);
-            StyleSummaryValueLabel(lblTotalCreditSale, Color.FromArgb(40, 40, 40), 12);
-            StyleSummaryValueLabel(lblTotalCustReceipt, Color.FromArgb(40, 40, 40), 12);
+            StyleSummaryValueLabel(lblSales, 14);
+            StyleSummaryValueLabel(lblExpected, 14);
+            StyleSummaryValueLabel(lblCounted, 14);
+            StyleSummaryValueLabel(lblVariance, 16);
+
+            StyleSummaryLabel(lblTotalCashSaleCaption);
+            StyleSummaryLabel(lblTotalCardSaleCaption);
+            StyleSummaryLabel(lblTotalUpiSaleCaption);
+            StyleSummaryLabel(lblTotalCreditSaleCaption);
+            StyleSummaryLabel(lblTotalCustReceiptCaption);
+
+            StyleSummaryValueLabel(lblTotalCashSale, 12);
+            StyleSummaryValueLabel(lblTotalCardSale, 12);
+            StyleSummaryValueLabel(lblTotalUpiSale, 12);
+            StyleSummaryValueLabel(lblTotalCreditSale, 12);
+            StyleSummaryValueLabel(lblTotalCustReceipt, 12);
         }
 
-        private static void StyleSummaryLabel(Infragistics.Win.Misc.UltraLabel label, Color foreColor)
+        private static void StyleSummaryLabel(Infragistics.Win.Misc.UltraLabel label)
         {
-            label.Appearance.ForeColor = foreColor;
+            if (label == null) return;
+            label.Appearance.BackColor = Color.Transparent;
+            label.Appearance.ForeColor = Color.White;
             label.Appearance.FontData.Bold = DefaultableBoolean.True;
-            label.Appearance.FontData.SizeInPoints = 10;
+            label.Appearance.FontData.Name = "Tahoma";
+            label.Appearance.FontData.SizeInPoints = 9.5F;
             label.Appearance.TextHAlign = HAlign.Left;
         }
 
-        private static void StyleSummaryValueLabel(Infragistics.Win.Misc.UltraLabel label, Color foreColor, float fontSize)
+        private static void StyleSummaryValueLabel(Infragistics.Win.Misc.UltraLabel label, float fontSize)
         {
-            label.Appearance.ForeColor = foreColor;
+            if (label == null) return;
+            label.Appearance.BackColor = Color.Transparent;
+            label.Appearance.ForeColor = Color.White;
             label.Appearance.FontData.Bold = DefaultableBoolean.True;
+            label.Appearance.FontData.Name = "Tahoma";
             label.Appearance.FontData.SizeInPoints = fontSize;
             label.Appearance.TextHAlign = HAlign.Left;
         }
 
-        private void StyleButtons()
+        private void StyleFilterControls()
         {
-            StyleButton(btnSearch, Color.FromArgb(25, 118, 210), Color.FromArgb(33, 150, 243), Color.FromArgb(21, 101, 192));
-            StyleButton(btnClearFilters, Color.FromArgb(245, 124, 0), Color.FromArgb(255, 152, 0), Color.FromArgb(230, 81, 0));
-            StyleButton(btnPrint, Color.FromArgb(106, 27, 154), Color.FromArgb(142, 36, 170), Color.FromArgb(74, 20, 140));
-            StyleButton(btnExport, Color.FromArgb(0, 121, 107), Color.FromArgb(0, 150, 136), Color.FromArgb(0, 105, 92));
-            StyleButton(btnClose, Color.FromArgb(96, 125, 139), Color.FromArgb(120, 144, 156), Color.FromArgb(69, 90, 100));
+            StyleFilterLabel(lblFromDate);
+            StyleFilterLabel(lblToDate);
+            StyleFilterLabel(lblCounterFilter);
+            StyleFilterLabel(lblSearch);
+            StyleFilterLabel(lblPreset);
 
-            btnSearch.HotTrackAppearance.BackColor = Color.FromArgb(66, 165, 245);
-            btnClearFilters.HotTrackAppearance.BackColor = Color.FromArgb(255, 167, 38);
-            btnPrint.HotTrackAppearance.BackColor = Color.FromArgb(171, 71, 188);
-            btnExport.HotTrackAppearance.BackColor = Color.FromArgb(38, 166, 154);
-            btnClose.HotTrackAppearance.BackColor = Color.FromArgb(144, 164, 174);
+            StyleDateEditor(dtFrom);
+            StyleDateEditor(dtTo);
+            StyleFilterCombo(ultraComboPreset);
+            StyleTextEditor(txtSearch);
+            StyleTextEditor(txtCounterFilter);
         }
 
-        private static void StyleButton(Infragistics.Win.Misc.UltraButton button, Color backColor1, Color backColor2, Color borderColor)
+        private static void StyleFilterLabel(Infragistics.Win.Misc.UltraLabel label)
         {
+            if (label == null) return;
+            label.Appearance.BackColor = Color.Transparent;
+            label.Appearance.ForeColor = Color.FromArgb(18, 47, 95);
+            label.Appearance.FontData.Name = "Tahoma";
+            label.Appearance.FontData.SizeInPoints = 9.5F;
+        }
+
+        private static void StyleFilterCombo(Infragistics.Win.UltraWinEditors.UltraComboEditor combo)
+        {
+            if (combo == null) return;
+            combo.UseAppStyling = false;
+            combo.UseOsThemes = DefaultableBoolean.False;
+            combo.DisplayStyle = EmbeddableElementDisplayStyle.Office2013;
+            combo.BorderStyle = UIElementBorderStyle.Solid;
+            combo.Appearance.BackColor = ControlBackColor;
+            combo.Appearance.BorderColor = SkyBlueOutline;
+            combo.Appearance.ForeColor = ControlTextColor;
+            combo.Appearance.FontData.Name = "Tahoma";
+            combo.Appearance.FontData.SizeInPoints = 9.5F;
+            combo.ButtonStyle = UIElementButtonStyle.Office2003ToolbarButton;
+            combo.AutoCompleteMode = Infragistics.Win.AutoCompleteMode.SuggestAppend;
+        }
+
+        private static void StyleDateEditor(Infragistics.Win.UltraWinEditors.UltraDateTimeEditor editor)
+        {
+            if (editor == null) return;
+            editor.UseAppStyling = false;
+            editor.UseOsThemes = DefaultableBoolean.False;
+            editor.DisplayStyle = EmbeddableElementDisplayStyle.Office2013;
+            editor.BorderStyle = UIElementBorderStyle.Solid;
+            editor.Appearance.BackColor = ControlBackColor;
+            editor.Appearance.BorderColor = SkyBlueOutline;
+            editor.Appearance.ForeColor = ControlTextColor;
+            editor.Appearance.FontData.Name = "Tahoma";
+            editor.Appearance.FontData.SizeInPoints = 9.5F;
+            editor.ButtonStyle = UIElementButtonStyle.Office2003ToolbarButton;
+        }
+
+        private static void StyleTextEditor(Infragistics.Win.UltraWinEditors.UltraTextEditor editor)
+        {
+            if (editor == null) return;
+            editor.UseAppStyling = false;
+            editor.UseOsThemes = DefaultableBoolean.False;
+            editor.DisplayStyle = EmbeddableElementDisplayStyle.Office2013;
+            editor.BorderStyle = UIElementBorderStyle.Solid;
+            editor.Appearance.BackColor = ControlBackColor;
+            editor.Appearance.BorderColor = SkyBlueOutline;
+            editor.Appearance.ForeColor = ControlTextColor;
+            editor.Appearance.FontData.Name = "Tahoma";
+            editor.Appearance.FontData.SizeInPoints = 9.5F;
+        }
+
+        private void StyleButtons()
+        {
+            StyleClassicButton(btnSearch);
+            StyleClassicButton(btnClearFilters);
+            StyleClassicButton(btnPrint);
+            StyleClassicButton(btnExport);
+            StyleClassicButton(btnClose);
+        }
+
+        private static void StyleClassicButton(Infragistics.Win.Misc.UltraButton button)
+        {
+            if (button == null) return;
             button.UseAppStyling = false;
             button.UseOsThemes = DefaultableBoolean.False;
-            button.Appearance.BackColor = backColor1;
-            button.Appearance.BackColor2 = backColor2;
+            button.ButtonStyle = UIElementButtonStyle.Flat;
+            button.UseFlatMode = DefaultableBoolean.False;
+            button.Appearance.BackColor = ButtonBlueTop;
+            button.Appearance.BackColor2 = ButtonBlueBottom;
             button.Appearance.BackGradientStyle = GradientStyle.Vertical;
-            button.Appearance.ForeColor = Color.White;
-            button.Appearance.FontData.Bold = DefaultableBoolean.True;
-            button.Appearance.FontData.SizeInPoints = 10;
-            button.Appearance.BorderColor = borderColor;
-            button.HotTrackAppearance.ForeColor = Color.White;
+            button.Appearance.ForeColor = ButtonTextBlue;
+            button.Appearance.BorderColor = ButtonLightOutline;
+            button.Appearance.TextHAlign = HAlign.Center;
+            button.Appearance.TextVAlign = VAlign.Middle;
+            button.Appearance.FontData.Bold = DefaultableBoolean.False;
+            button.Appearance.FontData.SizeInPoints = 9;
+            button.Font = new Font("Tahoma", 9F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            button.HotTrackAppearance.BackColor = Color.FromArgb(241, 247, 254);
+            button.HotTrackAppearance.BackColor2 = Color.FromArgb(166, 195, 231);
+            button.HotTrackAppearance.BackGradientStyle = GradientStyle.Vertical;
+            button.HotTrackAppearance.BorderColor = ButtonLightOutline;
+            button.HotTrackAppearance.ForeColor = ButtonTextBlue;
+            button.PressedAppearance.BackColor = Color.FromArgb(118, 161, 214);
+            button.PressedAppearance.BackColor2 = Color.FromArgb(217, 231, 247);
+            button.PressedAppearance.BackGradientStyle = GradientStyle.Vertical;
+            button.PressedAppearance.BorderColor = Color.FromArgb(148, 163, 182);
+            button.PressedAppearance.ForeColor = ButtonTextBlue;
         }
 
         private void SetupGrid()
@@ -204,36 +320,54 @@ namespace PosBranch_Win.Reports.FinancialReports
             layout.Override.HeaderClickAction = HeaderClickAction.SortSingle;
             layout.Override.SelectTypeRow = SelectType.Single;
             layout.Override.RowSelectors = DefaultableBoolean.True;
-            layout.Override.RowSelectorWidth = 40;
+            layout.Override.RowSelectorWidth = 30;
             layout.Override.RowSelectorNumberStyle = RowSelectorNumberStyle.RowIndex;
 
-            layout.Override.RowSelectorAppearance.BackColor = Color.FromArgb(69, 90, 100);
+            layout.Appearance.BackColor = FormBackColor;
+            layout.Appearance.BorderColor = BorderBlue;
+            layout.Appearance.BackColor2 = FormBackColor;
+            layout.Appearance.BackGradientStyle = GradientStyle.None;
+
+            layout.Override.RowSelectorAppearance.BackColor = GridHeaderBlueDark;
+            layout.Override.RowSelectorAppearance.BackColor2 = GridHeaderBlue;
+            layout.Override.RowSelectorAppearance.BackGradientStyle = GradientStyle.Vertical;
+            layout.Override.RowSelectorAppearance.BorderColor = BorderBlue;
             layout.Override.RowSelectorAppearance.ForeColor = Color.White;
             layout.Override.RowSelectorAppearance.FontData.Bold = DefaultableBoolean.True;
             layout.Override.RowSelectorAppearance.TextHAlign = HAlign.Center;
 
-            layout.Override.HeaderAppearance.BackColor = Color.FromArgb(55, 71, 79);
-            layout.Override.HeaderAppearance.BackColor2 = Color.FromArgb(69, 90, 100);
+            layout.Override.HeaderAppearance.BackColor = GridHeaderBlue;
+            layout.Override.HeaderAppearance.BackColor2 = GridHeaderBlueDark;
             layout.Override.HeaderAppearance.BackGradientStyle = GradientStyle.Vertical;
             layout.Override.HeaderAppearance.ForeColor = Color.White;
-            layout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.True;
-            layout.Override.HeaderAppearance.FontData.SizeInPoints = 9;
+            layout.Override.HeaderAppearance.BorderColor = BorderBlue;
+            layout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.False;
+            layout.Override.HeaderAppearance.FontData.Name = "Microsoft Sans Serif";
+            layout.Override.HeaderAppearance.FontData.SizeInPoints = 8.25F;
 
             layout.Override.RowAppearance.BackColor = Color.White;
-            layout.Override.RowAlternateAppearance.BackColor = Color.FromArgb(248, 250, 252);
-            layout.Override.ActiveRowAppearance.BackColor = Color.FromArgb(227, 242, 253);
-            layout.Override.ActiveRowAppearance.ForeColor = Color.FromArgb(33, 33, 33);
-            layout.Override.ActiveRowAppearance.BorderColor = Color.FromArgb(66, 165, 245);
-            layout.Override.SelectedRowAppearance.BackColor = Color.FromArgb(66, 165, 245);
+            layout.Override.RowAlternateAppearance.BackColor = GridAltRow;
+            layout.Override.RowAppearance.BorderColor = GridRowLine;
+            layout.Override.RowAlternateAppearance.BorderColor = GridRowLine;
+            layout.Override.ActiveRowAppearance.BackColor = GridSelectedBlue;
+            layout.Override.ActiveRowAppearance.ForeColor = Color.White;
+            layout.Override.ActiveRowAppearance.BorderColor = BorderBlue;
+            layout.Override.SelectedRowAppearance.BackColor = GridSelectedBlue;
             layout.Override.SelectedRowAppearance.ForeColor = Color.White;
-            layout.Override.SelectedRowAppearance.FontData.Bold = DefaultableBoolean.True;
-            layout.Override.MinRowHeight = 28;
-            layout.Override.DefaultRowHeight = 28;
+            layout.Override.CellAppearance.BorderColor = GridRowLine;
+            layout.Override.CellAppearance.ForeColor = Color.FromArgb(10, 31, 79);
+            layout.Override.CellAppearance.FontData.Name = "Microsoft Sans Serif";
+            layout.Override.CellAppearance.FontData.SizeInPoints = 8.25F;
+            layout.Override.BorderStyleHeader = UIElementBorderStyle.Solid;
             layout.Override.BorderStyleCell = UIElementBorderStyle.Solid;
             layout.Override.BorderStyleRow = UIElementBorderStyle.Solid;
+            layout.Override.MinRowHeight = 22;
+            layout.Override.DefaultRowHeight = 22;
             
             layout.ScrollBounds = ScrollBounds.ScrollToFill;
             layout.ScrollStyle = ScrollStyle.Immediate;
+
+            gridReport.BackColor = FormBackColor;
         }
 
         private void LoadReport()
@@ -312,15 +446,15 @@ namespace PosBranch_Win.Reports.FinancialReports
             lblVariance.Text = $"₹ {totalVariance:N2}";
             if (totalVariance > 0)
             {
-                lblVariance.Appearance.ForeColor = Color.Green;
+                lblVariance.Appearance.ForeColor = Color.LightGreen;
             }
             else if (totalVariance < 0)
             {
-                lblVariance.Appearance.ForeColor = Color.Red;
+                lblVariance.Appearance.ForeColor = Color.Pink;
             }
             else
             {
-                lblVariance.Appearance.ForeColor = Color.FromArgb(191, 54, 12);
+                lblVariance.Appearance.ForeColor = Color.White;
             }
         }
 
