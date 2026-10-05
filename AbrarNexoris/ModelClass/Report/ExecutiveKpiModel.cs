@@ -216,4 +216,33 @@ namespace ModelClass.Report
         public decimal NetProfitAmount { get; set; }
         public decimal NetProfitGrowthPercent { get; set; }
     }
+
+    public class ExpenseLedgerSummaryItem
+    {
+        public int SlNo { get; set; }
+        public int LedgerID { get; set; }
+        public string LedgerName { get; set; }
+        public string GroupName { get; set; }
+        public string ExpenseType { get; set; }
+        public decimal TotalDebit { get; set; }
+        public decimal TotalCredit { get; set; }
+        public decimal NetAmount { get; set; }
+        public int VoucherCount { get; set; }
+        public decimal PercentageOfTotal { get; set; }
+    }
+
+    public class ExpenseVoucherTransactionItem
+    {
+        public long VoucherID { get; set; }
+        public DateTime VoucherDate { get; set; }
+        public string VoucherNumber { get; set; }
+        public string VoucherType { get; set; }
+        public string LedgerName { get; set; }
+        public string GroupName { get; set; }
+        public string ExpenseType { get; set; }
+        public decimal Debit { get; set; }
+        public decimal Credit { get; set; }
+        public decimal NetAmount { get; set; }
+        public string Narration { get; set; }
+    }
 }

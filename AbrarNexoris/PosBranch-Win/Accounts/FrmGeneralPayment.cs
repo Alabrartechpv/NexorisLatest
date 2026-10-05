@@ -21,6 +21,7 @@ namespace PosBranch_Win.Accounts
         private readonly LedgerRepository ledgerRepository = new LedgerRepository();
         private readonly GeneralPaymentRepository paymentRepository = new GeneralPaymentRepository();
         private DataTable ledgerTable;
+        private DataTable cashBankTable;
         private DataTable journalLineTable;
         private UltraButton btnHistory;
         private long currentVoucherId;
@@ -67,17 +68,56 @@ namespace PosBranch_Win.Accounts
         private void BindLedgers()
         {
             int branchId = GetSelectedBranchId();
-            ledgerTable = ledgerRepository.GetAllLedgers(branchId);
+            DataTable allLedgers = ledgerRepository.GetAllLedgers(branchId);
+            ledgerTable = allLedgers;
+
+            cashBankTable = allLedgers.Clone();
+            foreach (DataRow row in allLedgers.Rows)
+            {
+                string groupName = Convert.ToString(row["GroupName"]) ?? string.Empty;
+                string ledgerName = Convert.ToString(row["LedgerName"]) ?? string.Empty;
+                if (IsCashOrBankLedger(groupName, ledgerName))
+                {
+                    cashBankTable.ImportRow(row);
+                }
+            }
+
+            CmboCashBank.DataSource = cashBankTable;
+            CmboCashBank.DisplayMember = "LedgerName";
+            CmboCashBank.ValueMember = "LedgerID";
+
+            if (cashBankTable.Rows.Count > 0 && (CmboCashBank.Value == null || Convert.ToInt64(CmboCashBank.Value) <= 0))
+            {
+                // Prefer Cash ledger first, else first item
+                DataRow defaultCashRow = cashBankTable.AsEnumerable()
+                    .FirstOrDefault(r => Convert.ToString(r["LedgerName"]).IndexOf("CASH", StringComparison.OrdinalIgnoreCase) >= 0);
+
+                if (defaultCashRow != null)
+                {
+                    CmboCashBank.Value = defaultCashRow["LedgerID"];
+                }
+                else
+                {
+                    CmboCashBank.Value = cashBankTable.Rows[0]["LedgerID"];
+                }
+            }
+
             ApplyLedgerValueList();
+        }
+
+        private bool IsCashOrBankLedger(string groupName, string ledgerName)
+        {
+            string value = $"{groupName} {ledgerName}".ToUpperInvariant();
+            return value.Contains("CASH") || value.Contains("BANK");
         }
 
         private void ConfigureGridDataSource()
         {
             journalLineTable = new DataTable();
-            journalLineTable.Columns.Add("LedgerID", typeof(int));
-            journalLineTable.Columns.Add("Debit", typeof(decimal));
-            journalLineTable.Columns.Add("Credit", typeof(decimal));
-            journalLineTable.Columns.Add("Narration", typeof(string));
+            var colLedger = journalLineTable.Columns.Add("LedgerID", typeof(int));
+            colLedger.Caption = "Paid To / Expense Ledger";
+            var colAmount = journalLineTable.Columns.Add("Amount", typeof(decimal));
+            colAmount.Caption = "Amount (₹)";
             journalLineTable.ColumnChanged += (sender, args) => UpdateTotals();
             journalLineTable.RowDeleted += (sender, args) => UpdateTotals();
             journalLineTable.RowChanged += (sender, args) => UpdateTotals();
@@ -93,6 +133,7 @@ namespace PosBranch_Win.Accounts
             txtVoucherNo.KeyDown += txtVoucherNo_KeyDown;
             dtpVoucherDate.KeyDown += dtpVoucherDate_KeyDown;
             CmboBranch.KeyDown += CmboBranch_KeyDown;
+            CmboCashBank.KeyDown += CmboCashBank_KeyDown;
             txtNarration.KeyDown += txtNarration_KeyDown;
             this.Load += FrmGeneralPayment_Load;
         }
@@ -149,109 +190,73 @@ namespace PosBranch_Win.Accounts
             Color navy = Color.FromArgb(8, 47, 73);
             Color headerBack = Color.FromArgb(205, 229, 236);
 
-            BackColor = pageBack;
-            Font = new Font("Segoe UI", 9.5F, FontStyle.Regular);
-
+            this.BackColor = pageBack;
             lblHeader.Appearance.BackColor = headerBack;
             lblHeader.Appearance.ForeColor = navy;
             lblHeader.Appearance.FontData.Bold = DefaultableBoolean.True;
             lblHeader.Appearance.FontData.SizeInPoints = 18F;
-            lblHeader.Appearance.TextVAlign = VAlign.Middle;
-            lblHeader.Appearance.TextHAlign = HAlign.Left;
-            lblHeader.Height = 50;
-            lblHeader.Padding = new Size(28, 0);
 
-            StylePanel(headerPanel, cardBack);
-            headerPanel.Height = 92;
-            StylePanel(narrationPanel, cardBack);
-            narrationPanel.Height = 100;
-            StylePanel(footerPanel, cardBack);
-            footerPanel.Height = 78;
+            headerPanel.Appearance.BackColor = cardBack;
+            headerPanel.Appearance.BorderColor = Color.FromArgb(215, 228, 233);
+            headerPanel.BorderStyle = UIElementBorderStyle.Solid;
 
-            StyleLabel(lblVocuherNo, muted);
-            StyleLabel(lblVoucherDate, muted);
-            StyleLabel(lblBranch, muted);
-            StyleLabel(lblNarration, muted);
-            StyleLabel(lblTotalDebit, muted);
-            StyleLabel(lblTotalCredit, muted);
-            StyleLabel(lblDifference, muted);
+            footerPanel.Appearance.BackColor = cardBack;
+            footerPanel.Appearance.BorderColor = Color.FromArgb(215, 228, 233);
+            footerPanel.BorderStyle = UIElementBorderStyle.Solid;
+
+            narrationPanel.Appearance.BackColor = cardBack;
+            narrationPanel.Appearance.BorderColor = Color.FromArgb(215, 228, 233);
+            narrationPanel.BorderStyle = UIElementBorderStyle.Solid;
+
+            StyleLabel(lblVocuherNo, navy);
+            StyleLabel(lblVoucherDate, navy);
+            StyleLabel(lblBranch, navy);
+            StyleLabel(lblCashBank, navy);
+            StyleLabel(lblNarration, navy);
 
             StyleInput(txtVoucherNo);
-            StyleInput(txtNarration);
-            StyleCombo(CmboBranch);
             StyleDate(dtpVoucherDate);
-            StyleTotalValue(lblTotalDebitValue);
-            StyleTotalValue(lblTotalCreditValue);
+            StyleCombo(CmboBranch);
+            StyleCombo(CmboCashBank);
+            StyleInput(txtNarration);
+
+            StyleLabel(lblDifference, navy);
             StyleTotalValue(lblDifferenceValue);
+
+            lblTotalDebit.Visible = false;
+            lblTotalDebitValue.Visible = false;
+            lblTotalCredit.Visible = false;
+            lblTotalCreditValue.Visible = false;
+
+            lblDifference.Text = "Total Amount";
+            lblDifferenceValue.Appearance.ForeColor = Color.FromArgb(183, 28, 28); // Crimson red for payments
+
+            lblDifference.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
+            lblDifferenceValue.Font = new Font("Segoe UI", 13.5F, FontStyle.Bold);
+
             StyleHistoryButton();
-
-            LayoutHeaderControls();
-            LayoutNarrationControls();
-            LayoutFooterControls();
             StyleGrid();
+            PositionSummaryCards();
 
-            Resize += (sender, args) =>
-            {
-                LayoutHeaderControls();
-                LayoutNarrationControls();
-                LayoutFooterControls();
-            };
+            this.Resize += (sender, args) => PositionSummaryCards();
         }
 
-        private void StylePanel(UltraPanel panel, Color backColor)
+        private void PositionSummaryCards()
         {
-            panel.Appearance.BackColor = backColor;
-            panel.BackColor = backColor;
-        }
-
-        private void LayoutHeaderControls()
-        {
-            int topLabel = 14;
-            int topInput = 39;
-            int left = 28;
-            int gap = 24;
-
-            lblVocuherNo.Location = new Point(left, topLabel);
-            txtVoucherNo.Location = new Point(left, topInput);
-            txtVoucherNo.Size = new Size(310, 30);
-
-            lblVoucherDate.Location = new Point(txtVoucherNo.Right + gap, topLabel);
-            dtpVoucherDate.Location = new Point(txtVoucherNo.Right + gap, topInput);
-            dtpVoucherDate.Size = new Size(150, 30);
-
-            lblBranch.Location = new Point(dtpVoucherDate.Right + gap, topLabel);
-            CmboBranch.Location = new Point(dtpVoucherDate.Right + gap, topInput);
-            CmboBranch.Size = new Size(260, 30);
-
-            btnHistory.Location = new Point(CmboBranch.Right + gap, topInput);
-            btnHistory.Size = new Size(110, 30);
-        }
-
-        private void LayoutNarrationControls()
-        {
-            lblNarration.Location = new Point(28, 10);
-            txtNarration.Location = new Point(28, 33);
-            txtNarration.Size = new Size(Math.Max(200, narrationPanel.ClientSize.Width - 56), 52);
-        }
-
-        private void LayoutFooterControls()
-        {
-            int right = footerPanel.ClientSize.Width - 28;
-            int cardWidth = 170;
-            int labelTop = 14;
+            int cardWidth = 260;
+            int rightMargin = 28;
+            int rightX = footerPanel.ClientArea.Width - cardWidth - rightMargin;
+            int labelTop = 16;
             int valueTop = 36;
 
-            lblDifferenceValue.Location = new Point(right - cardWidth, valueTop);
+            if (rightX < 20)
+            {
+                rightX = 20;
+            }
+
+            lblDifferenceValue.Location = new Point(rightX, valueTop);
             lblDifferenceValue.Size = new Size(cardWidth, 30);
-            lblDifference.Location = new Point(lblDifferenceValue.Left, labelTop);
-
-            lblTotalCreditValue.Location = new Point(lblDifferenceValue.Left - cardWidth - 34, valueTop);
-            lblTotalCreditValue.Size = new Size(cardWidth, 30);
-            lblTotalCredit.Location = new Point(lblTotalCreditValue.Left, labelTop);
-
-            lblTotalDebitValue.Location = new Point(lblTotalCreditValue.Left - cardWidth - 34, valueTop);
-            lblTotalDebitValue.Size = new Size(cardWidth, 30);
-            lblTotalDebit.Location = new Point(lblTotalDebitValue.Left, labelTop);
+            lblDifference.Location = new Point(rightX, labelTop);
         }
 
         private void StyleLabel(UltraLabel label, Color color)
@@ -334,7 +339,10 @@ namespace PosBranch_Win.Accounts
             btnHistory = new UltraButton
             {
                 Text = "History (F5)",
-                TabIndex = 4
+                TabIndex = 6,
+                Size = new Size(100, 24),
+                Location = new Point(1110, 38),
+                Anchor = AnchorStyles.Top | AnchorStyles.Right
             };
             btnHistory.Click += btnHistory_Click;
             headerPanel.ClientArea.Controls.Add(btnHistory);
@@ -353,25 +361,25 @@ namespace PosBranch_Win.Accounts
 
             UltraGridBand band = e.Layout.Bands[0];
             band.HeaderVisible = false;
-            band.Columns["LedgerID"].Header.Caption = "Ledger Name";
-            band.Columns["LedgerID"].Width = 420;
-            band.Columns["LedgerID"].MinWidth = 260;
-            band.Columns["Debit"].Width = 180;
-            band.Columns["Debit"].MinWidth = 130;
-            band.Columns["Credit"].Width = 180;
-            band.Columns["Credit"].MinWidth = 130;
-            band.Columns["Narration"].Header.Caption = "Line Narration";
-            band.Columns["Narration"].Width = 460;
-            band.Columns["Narration"].MinWidth = 260;
-            band.Columns["Debit"].Format = "N2";
-            band.Columns["Credit"].Format = "N2";
-            band.Columns["Debit"].CellAppearance.TextHAlign = HAlign.Right;
-            band.Columns["Credit"].CellAppearance.TextHAlign = HAlign.Right;
-            band.Columns["Narration"].CellMultiLine = DefaultableBoolean.True;
 
             if (band.Columns.Exists("LedgerID"))
             {
+                band.Columns["LedgerID"].Header.Caption = "Paid To / Expense Ledger";
+                band.Columns["LedgerID"].Width = 650;
+                band.Columns["LedgerID"].MinWidth = 300;
+                band.Columns["LedgerID"].Header.VisiblePosition = 0;
                 band.Columns["LedgerID"].AutoCompleteMode = Infragistics.Win.AutoCompleteMode.SuggestAppend;
+            }
+
+            if (band.Columns.Exists("Amount"))
+            {
+                band.Columns["Amount"].Header.Caption = "Amount (₹)";
+                band.Columns["Amount"].Width = 250;
+                band.Columns["Amount"].MinWidth = 150;
+                band.Columns["Amount"].Format = "N2";
+                band.Columns["Amount"].CellAppearance.TextHAlign = HAlign.Right;
+                band.Columns["Amount"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
+                band.Columns["Amount"].Header.VisiblePosition = 1;
             }
 
             ApplyLedgerValueList();
@@ -428,6 +436,21 @@ namespace PosBranch_Win.Accounts
             SavePayment(true);
         }
 
+        public void Clear()
+        {
+            ClearForm();
+        }
+
+        public void Delete()
+        {
+            DeletePayment();
+        }
+
+        public void LoadVoucher()
+        {
+            LoadPayment();
+        }
+
         public void ClearForm()
         {
             isBinding = true;
@@ -437,6 +460,22 @@ namespace PosBranch_Win.Accounts
             txtNarration.Text = string.Empty;
             journalLineTable.Clear();
             journalLineTable.Rows.Add(journalLineTable.NewRow());
+
+            if (cashBankTable != null && cashBankTable.Rows.Count > 0)
+            {
+                DataRow defaultCashRow = cashBankTable.AsEnumerable()
+                    .FirstOrDefault(r => Convert.ToString(r["LedgerName"]).IndexOf("CASH", StringComparison.OrdinalIgnoreCase) >= 0);
+
+                if (defaultCashRow != null)
+                {
+                    CmboCashBank.Value = defaultCashRow["LedgerID"];
+                }
+                else
+                {
+                    CmboCashBank.Value = cashBankTable.Rows[0]["LedgerID"];
+                }
+            }
+
             isBinding = false;
             UpdateTotals();
 
@@ -448,16 +487,22 @@ namespace PosBranch_Win.Accounts
 
         private JournalVoucher BuildPaymentFromGrid()
         {
+            long cashBankLedgerId = GetLongValue(CmboCashBank.Value);
+            string headerNarration = txtNarration.Text.Trim();
+
             var journal = new JournalVoucher
             {
                 VoucherID = currentVoucherId,
                 VoucherNumber = txtVoucherNo.Text.Trim(),
                 VoucherDate = GetVoucherDate(),
-                Narration = txtNarration.Text.Trim(),
+                Narration = headerNarration,
                 BranchID = GetSelectedBranchId()
             };
 
+            decimal totalAmount = 0;
             int slNo = 1;
+
+            // Debit Lines: Paid To / Expense Accounts from Grid (Debit = amount)
             foreach (DataRow row in journalLineTable.Rows)
             {
                 if (row.RowState == DataRowState.Deleted)
@@ -466,25 +511,37 @@ namespace PosBranch_Win.Accounts
                 }
 
                 long ledgerId = GetLongValue(row["LedgerID"]);
-                decimal debit = GetDecimalValue(row["Debit"]);
-                decimal credit = GetDecimalValue(row["Credit"]);
-                string narration = Convert.ToString(row["Narration"]) ?? string.Empty;
+                decimal amount = GetDecimalValue(row["Amount"]);
 
-                if (ledgerId <= 0 && debit == 0 && credit == 0 && string.IsNullOrWhiteSpace(narration))
+                if (ledgerId <= 0 && amount == 0)
                 {
                     continue;
                 }
+
+                totalAmount += amount;
 
                 journal.Lines.Add(new JournalVoucherLine
                 {
                     SlNo = slNo++,
                     LedgerID = ledgerId,
                     LedgerName = GetLedgerName(ledgerId),
-                    Debit = debit,
-                    Credit = credit,
-                    Narration = narration.Trim()
+                    Debit = amount,
+                    Credit = 0,
+                    Narration = headerNarration
                 });
             }
+
+            // Credit Line: Paid From Cash/Bank Account (Credit = totalAmount)
+            var cashBankLine = new JournalVoucherLine
+            {
+                SlNo = slNo++,
+                LedgerID = cashBankLedgerId,
+                LedgerName = GetLedgerName(cashBankLedgerId),
+                Debit = 0,
+                Credit = totalAmount,
+                Narration = headerNarration
+            };
+            journal.Lines.Add(cashBankLine);
 
             return journal;
         }
@@ -493,9 +550,20 @@ namespace PosBranch_Win.Accounts
         {
             ClearRowErrors();
 
-            if (journal.Lines.Count < 2)
+            if (CmboCashBank.Value == null || Convert.ToInt64(CmboCashBank.Value) <= 0)
             {
-                MessageBox.Show("Please enter at least two payment lines.", "Validation",
+                MessageBox.Show("Please select Paid From (Cash/Bank) account in header.", "Validation",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                CmboCashBank.Focus();
+                return false;
+            }
+
+            long cashBankId = Convert.ToInt64(CmboCashBank.Value);
+            var gridLines = journal.Lines.Where(l => l.Debit > 0).ToList();
+
+            if (gridLines.Count == 0)
+            {
+                MessageBox.Show("Please enter at least one payment line with ledger and amount.", "Validation",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return false;
             }
@@ -509,10 +577,9 @@ namespace PosBranch_Win.Accounts
                 }
 
                 long ledgerId = GetLongValue(row["LedgerID"]);
-                decimal debit = GetDecimalValue(row["Debit"]);
-                decimal credit = GetDecimalValue(row["Credit"]);
+                decimal amount = GetDecimalValue(row["Amount"]);
 
-                if (ledgerId <= 0 && debit == 0 && credit == 0)
+                if (ledgerId <= 0 && amount == 0)
                 {
                     continue;
                 }
@@ -522,12 +589,17 @@ namespace PosBranch_Win.Accounts
                     row.SetColumnError("LedgerID", "Select ledger.");
                     valid = false;
                 }
+                else if (ledgerId == cashBankId)
+                {
+                    row.SetColumnError("LedgerID", "Paid To Ledger cannot be the same as Paid From Cash/Bank account.");
+                    valid = false;
+                }
                 else
                 {
                     string accType = ledgerRepository.GetLedgerAccountType(ledgerId);
                     if (accType == "CUSTOMER")
                     {
-                        row.SetColumnError("LedgerID", "Please use Customer Receipt screen for customer payments.");
+                        row.SetColumnError("LedgerID", "Please use Customer Refund/Receipt screen for customer transactions.");
                         valid = false;
                     }
                     else if (accType == "SUPPLIER")
@@ -537,19 +609,18 @@ namespace PosBranch_Win.Accounts
                     }
                 }
 
-                if (debit <= 0 && credit <= 0)
+                if (amount <= 0)
                 {
-                    row.SetColumnError("Debit", "Enter debit or credit amount.");
+                    row.SetColumnError("Amount", "Enter amount.");
                     valid = false;
                 }
             }
 
-            decimal totalDebit = journal.Lines.Sum(l => l.Debit);
-            decimal totalCredit = journal.Lines.Sum(l => l.Credit);
-            if (Math.Round(totalDebit, 2) != Math.Round(totalCredit, 2))
+            decimal totalAmount = gridLines.Sum(l => l.Debit);
+            if (totalAmount <= 0)
             {
-                MessageBox.Show($"Debit ({totalDebit:N2}) and Credit ({totalCredit:N2}) totals must be equal.",
-                    "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show("Total payment amount must be greater than zero.", "Validation",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return false;
             }
 
@@ -636,15 +707,24 @@ namespace PosBranch_Win.Accounts
 
             txtNarration.Text = journal.Narration;
 
+            // Find Cash/Bank Credit line
+            var creditLine = journal.Lines.FirstOrDefault(l => l.Credit > 0);
+            if (creditLine != null)
+            {
+                CmboCashBank.Value = creditLine.LedgerID;
+            }
+
             journalLineTable.Clear();
             foreach (JournalVoucherLine line in journal.Lines)
             {
-                DataRow row = journalLineTable.NewRow();
-                row["LedgerID"] = line.LedgerID;
-                row["Debit"] = line.Debit;
-                row["Credit"] = line.Credit;
-                row["Narration"] = line.Narration;
-                journalLineTable.Rows.Add(row);
+                // Debit lines are the Paid To / Expense lines
+                if (line.Debit > 0)
+                {
+                    DataRow row = journalLineTable.NewRow();
+                    row["LedgerID"] = line.LedgerID;
+                    row["Amount"] = line.Debit;
+                    journalLineTable.Rows.Add(row);
+                }
             }
 
             if (journalLineTable.Rows.Count == 0)
@@ -665,8 +745,12 @@ namespace PosBranch_Win.Accounts
                 return;
             }
 
-            DialogResult result = MessageBox.Show("Delete this payment voucher?", "Confirm Delete",
-                MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+            DialogResult result = MessageBox.Show(
+                "Are you sure you want to delete this payment voucher?",
+                "Confirm Delete",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question);
+
             if (result != DialogResult.Yes)
             {
                 return;
@@ -693,9 +777,7 @@ namespace PosBranch_Win.Accounts
                 return;
             }
 
-            decimal totalDebit = 0;
-            decimal totalCredit = 0;
-
+            decimal totalAmount = 0;
             foreach (DataRow row in journalLineTable.Rows)
             {
                 if (row.RowState == DataRowState.Deleted)
@@ -703,113 +785,22 @@ namespace PosBranch_Win.Accounts
                     continue;
                 }
 
-                totalDebit += GetDecimalValue(row["Debit"]);
-                totalCredit += GetDecimalValue(row["Credit"]);
+                totalAmount += GetDecimalValue(row["Amount"]);
             }
 
-            lblTotalDebitValue.Text = totalDebit.ToString("N2");
-            lblTotalCreditValue.Text = totalCredit.ToString("N2");
-            lblDifferenceValue.Text = Math.Abs(totalDebit - totalCredit).ToString("N2");
-
-            bool balanced = Math.Round(totalDebit, 2) == Math.Round(totalCredit, 2);
-            Color statusColor = balanced ? Color.FromArgb(46, 125, 50) : Color.FromArgb(198, 40, 40);
-            lblTotalDebitValue.Appearance.ForeColor = statusColor;
-            lblTotalCreditValue.Appearance.ForeColor = statusColor;
-            lblDifferenceValue.Appearance.ForeColor = statusColor;
+            lblDifferenceValue.Text = totalAmount.ToString("N2");
         }
 
         private void ClearRowErrors()
         {
             foreach (DataRow row in journalLineTable.Rows)
             {
+                if (row.RowState == DataRowState.Deleted)
+                {
+                    continue;
+                }
                 row.ClearErrors();
                 row.RowError = string.Empty;
-            }
-        }
-
-        private int GetSelectedBranchId()
-        {
-            if (CmboBranch.Value != null && int.TryParse(CmboBranch.Value.ToString(), out int selectedBranchId))
-            {
-                return selectedBranchId;
-            }
-
-            if (SessionContext.BranchId > 0)
-            {
-                return SessionContext.BranchId;
-            }
-
-            return int.TryParse(DataBase.BranchId, out int branchId) ? branchId : 0;
-        }
-
-        private DateTime GetVoucherDate()
-        {
-            if (dtpVoucherDate.Value is DateTime date)
-            {
-                return date.Date;
-            }
-
-            return DateTime.Today;
-        }
-
-        private string GetLedgerName(long ledgerId)
-        {
-            if (ledgerTable == null || ledgerId <= 0)
-            {
-                return string.Empty;
-            }
-
-            DataRow[] rows = ledgerTable.Select($"LedgerID = {ledgerId}");
-            return rows.Length > 0 ? rows[0]["LedgerName"].ToString() : string.Empty;
-        }
-
-        private int GetIntValue(object value)
-        {
-            if (value == null || value == DBNull.Value)
-            {
-                return 0;
-            }
-
-            return int.TryParse(value.ToString(), out int result) ? result : 0;
-        }
-
-        private long GetLongValue(object value)
-        {
-            if (value == null || value == DBNull.Value)
-            {
-                return 0;
-            }
-
-            return long.TryParse(value.ToString(), out long result) ? result : 0;
-        }
-
-        private decimal GetDecimalValue(object value)
-        {
-            if (value == null || value == DBNull.Value)
-            {
-                return 0;
-            }
-
-            return decimal.TryParse(value.ToString(), out decimal result) ? result : 0;
-        }
-
-        private void CmboBranch_ValueChanged(object sender, EventArgs e)
-        {
-            if (!isBinding)
-            {
-                BindLedgers();
-            }
-        }
-
-        private void btnHistory_Click(object sender, EventArgs e)
-        {
-            using (var historyForm = new FrmGeneralVoucherHistory("GENPAY"))
-            {
-                if (historyForm.ShowDialog(this) == DialogResult.OK && historyForm.SelectedVoucherId > 0)
-                {
-                    txtVoucherNo.Text = historyForm.SelectedVoucherId.ToString();
-                    LoadPayment();
-                }
             }
         }
 
@@ -828,7 +819,7 @@ namespace PosBranch_Win.Accounts
                         string accType = ledgerRepository.GetLedgerAccountType(ledgerId);
                         if (accType == "CUSTOMER")
                         {
-                            MessageBox.Show("Please use Customer Receipt screen for customer payments.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            MessageBox.Show("Please use Customer Refund/Receipt screen for customer transactions.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                             isBinding = true;
                             e.Cell.Value = DBNull.Value;
                             isBinding = false;
@@ -847,7 +838,33 @@ namespace PosBranch_Win.Accounts
             UpdateTotals();
         }
 
-        // ── Keyboard Navigation & Helper Methods ─────────────────────────────────
+        private void DeleteActiveGridRow()
+        {
+            UltraGridRow activeRow = gridPayment.ActiveRow;
+            if (activeRow == null || !activeRow.IsDataRow)
+            {
+                return;
+            }
+
+            if (gridPayment.Rows.Count <= 1)
+            {
+                if (activeRow.ListObject is DataRowView singleRowView)
+                {
+                    singleRowView["LedgerID"] = DBNull.Value;
+                    singleRowView["Amount"] = DBNull.Value;
+                }
+                UpdateTotals();
+                return;
+            }
+
+            DataRowView rowView = activeRow.ListObject as DataRowView;
+            if (rowView != null)
+            {
+                rowView.Row.Delete();
+            }
+
+            UpdateTotals();
+        }
 
         private void ActivateGridCell(int rowIndex, string columnName)
         {
@@ -880,30 +897,114 @@ namespace PosBranch_Win.Accounts
                         int idx = gridPayment.ActiveRow.Index;
                         this.BeginInvoke(new Action(() =>
                         {
-                            ActivateGridCell(idx, "Debit");
+                            ActivateGridCell(idx, "Amount");
                         }));
                     }
                 }
             }
         }
 
-        private void DeleteActiveGridRow()
+        private DateTime GetVoucherDate()
         {
-            if (gridPayment.ActiveRow != null && gridPayment.ActiveRow.ListObject is DataRowView rowView)
+            if (dtpVoucherDate.Value is DateTime date)
             {
-                if (journalLineTable.Rows.Count > 1)
+                return date.Date;
+            }
+            return DateTime.Today;
+        }
+
+        private int GetSelectedBranchId()
+        {
+            if (CmboBranch.Value != null && int.TryParse(CmboBranch.Value.ToString(), out int branchId) && branchId > 0)
+            {
+                return branchId;
+            }
+            if (SessionContext.BranchId > 0)
+            {
+                return SessionContext.BranchId;
+            }
+            int.TryParse(DataBase.BranchId, out int fallback);
+            return fallback;
+        }
+
+        private string GetLedgerName(long ledgerId)
+        {
+            if (ledgerTable == null || ledgerId <= 0)
+            {
+                return string.Empty;
+            }
+            DataRow[] rows = ledgerTable.Select($"LedgerID = {ledgerId}");
+            return rows.Length > 0 ? rows[0]["LedgerName"].ToString() : string.Empty;
+        }
+
+        private long GetLongValue(object value)
+        {
+            if (value == null || value == DBNull.Value) return 0;
+            return long.TryParse(value.ToString(), out long result) ? result : 0;
+        }
+
+        private int GetIntValue(object value)
+        {
+            if (value == null || value == DBNull.Value) return 0;
+            return int.TryParse(value.ToString(), out int result) ? result : 0;
+        }
+
+        private decimal GetDecimalValue(object value)
+        {
+            if (value == null || value == DBNull.Value) return 0;
+            return decimal.TryParse(value.ToString(), out decimal result) ? result : 0;
+        }
+
+        #region Keyboard Navigation
+        private void dtpVoucherDate_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                e.Handled = true;
+                CmboCashBank.Focus();
+            }
+        }
+
+        private void CmboCashBank_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                e.Handled = true;
+                ActivateGridCell(0, "LedgerID");
+            }
+        }
+
+        private void CmboBranch_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                e.Handled = true;
+                CmboCashBank.Focus();
+            }
+        }
+
+        private void txtVoucherNo_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                e.Handled = true;
+                if (!string.IsNullOrWhiteSpace(txtVoucherNo.Text))
                 {
-                    rowView.Row.Delete();
-                    UpdateTotals();
+                    LoadPayment();
                 }
                 else
                 {
-                    rowView["LedgerID"] = DBNull.Value;
-                    rowView["Debit"] = 0;
-                    rowView["Credit"] = 0;
-                    rowView["Narration"] = string.Empty;
-                    UpdateTotals();
+                    dtpVoucherDate.Focus();
                 }
+            }
+        }
+
+        private void txtNarration_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter && (e.Control || !txtNarration.Text.Contains("\n")))
+            {
+                e.Handled = true;
+                Save();
             }
         }
 
@@ -931,64 +1032,16 @@ namespace PosBranch_Win.Accounts
                     long ledgerId = GetLongValue(gridPayment.ActiveCell.Value);
                     if (ledgerId <= 0)
                     {
-                        // If ledger is empty on last row, check if totals are balanced to finish to narration/save
-                        if (rowIndex == gridPayment.Rows.Count - 1 && journalLineTable.Rows.Count > 1)
-                        {
-                            decimal totalDebit = 0, totalCredit = 0;
-                            foreach (DataRow r in journalLineTable.Rows)
-                            {
-                                if (r.RowState != DataRowState.Deleted)
-                                {
-                                    totalDebit += GetDecimalValue(r["Debit"]);
-                                    totalCredit += GetDecimalValue(r["Credit"]);
-                                }
-                            }
-                            if (totalDebit > 0 && Math.Round(totalDebit, 2) == Math.Round(totalCredit, 2))
-                            {
-                                txtNarration.Focus();
-                                return;
-                            }
-                        }
                         OpenLedgerSearchForActiveRow();
                         return;
                     }
-                    ActivateGridCell(rowIndex, "Debit");
+                    ActivateGridCell(rowIndex, "Amount");
                 }
-                else if (colKey == "Debit")
+                else if (colKey == "Amount")
                 {
-                    decimal debit = GetDecimalValue(gridPayment.ActiveCell.Value);
-                    if (debit > 0)
-                    {
-                        if (gridPayment.ActiveRow.Cells.Exists("Credit"))
-                            gridPayment.ActiveRow.Cells["Credit"].Value = 0;
-                    }
-                    ActivateGridCell(rowIndex, "Credit");
-                }
-                else if (colKey == "Credit")
-                {
-                    decimal credit = GetDecimalValue(gridPayment.ActiveCell.Value);
-                    if (credit > 0)
-                    {
-                        if (gridPayment.ActiveRow.Cells.Exists("Debit"))
-                            gridPayment.ActiveRow.Cells["Debit"].Value = 0;
-                    }
-                    ActivateGridCell(rowIndex, "Narration");
-                }
-                else if (colKey == "Narration")
-                {
-                    long ledgerId = GetLongValue(gridPayment.ActiveRow.Cells["LedgerID"].Value);
                     if (rowIndex == gridPayment.Rows.Count - 1)
                     {
-                        if (ledgerId > 0)
-                        {
-                            DataRow newRow = journalLineTable.NewRow();
-                            journalLineTable.Rows.Add(newRow);
-                            ActivateGridCell(rowIndex + 1, "LedgerID");
-                        }
-                        else
-                        {
-                            txtNarration.Focus();
-                        }
+                        txtNarration.Focus();
                     }
                     else
                     {
@@ -1008,47 +1061,25 @@ namespace PosBranch_Win.Accounts
             }
         }
 
-        private void txtVoucherNo_KeyDown(object sender, KeyEventArgs e)
+        private void CmboBranch_ValueChanged(object sender, EventArgs e)
         {
-            if (e.KeyCode == Keys.Enter)
+            if (!isBinding)
             {
-                e.Handled = true;
-                if (!string.IsNullOrWhiteSpace(txtVoucherNo.Text))
+                BindLedgers();
+            }
+        }
+
+        private void btnHistory_Click(object sender, EventArgs e)
+        {
+            using (var historyForm = new FrmGeneralVoucherHistory("GENPAY"))
+            {
+                if (historyForm.ShowDialog(this) == DialogResult.OK && historyForm.SelectedVoucherId > 0)
                 {
+                    txtVoucherNo.Text = historyForm.SelectedVoucherId.ToString();
                     LoadPayment();
                 }
-                else
-                {
-                    dtpVoucherDate.Focus();
-                }
             }
         }
-
-        private void dtpVoucherDate_KeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.KeyCode == Keys.Enter)
-            {
-                e.Handled = true;
-                ActivateGridCell(0, "LedgerID");
-            }
-        }
-
-        private void CmboBranch_KeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.KeyCode == Keys.Enter)
-            {
-                e.Handled = true;
-                ActivateGridCell(0, "LedgerID");
-            }
-        }
-
-        private void txtNarration_KeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.KeyCode == Keys.Enter && (e.Control || !txtNarration.Text.Contains("\n")))
-            {
-                e.Handled = true;
-                Save();
-            }
-        }
+        #endregion
     }
 }

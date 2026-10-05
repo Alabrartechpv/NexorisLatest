@@ -421,7 +421,7 @@ namespace PosBranch_Win.Dashboard
                 CreateKpiCard("18. Gross Margin %", "Gross earnings on sold goods (Sales Revenue - Cost of Sales)", FormatCurr(_model.GrossProfit), $"Gross Margin: {_model.GrossProfitMarginPercent:N1}%", Color.FromArgb(39, 174, 96), () => DrillDown("SalesProfit")),
 
                 // 19. Total Business Expenses
-                CreateKpiCard("19. Business Expenses", "Combined operational overheads, utilities, and running costs", FormatCurr(_model.TotalBusinessExpenses), $"Dir: {FormatCurr(_model.DirectExpenses)} | Indir: {FormatCurr(_model.IndirectExpenses)}", Color.FromArgb(192, 57, 43), () => DrillDown("ProfitLoss")),
+                CreateKpiCard("19. Business Expenses", "Combined operational overheads, utilities, and running costs", FormatCurr(_model.TotalBusinessExpenses), $"Dir: {FormatCurr(_model.DirectExpenses)} | Indir: {FormatCurr(_model.IndirectExpenses)}", Color.FromArgb(192, 57, 43), () => DrillDown("BusinessExpenses")),
 
                 // 20. Actual Net Profit
                 CreateKpiCard("20. Actual Net Profit", "Bottom-line net earnings after deducting cost of sales and expenses", FormatCurr(_model.ActualNetProfit), $"Margin: {_model.OperatingProfitMarginPercent:N2}%", _model.ActualNetProfit >= 0 ? Color.FromArgb(39, 174, 96) : Color.FromArgb(192, 57, 43), () => DrillDown("SalesProfit")),
@@ -939,12 +939,18 @@ namespace PosBranch_Win.Dashboard
                         formToOpen = new Reports.SalesReports.FrmSalesHoldReport();
                         title = "Sales Hold Report";
                         break;
+                    case "BusinessExpenses":
+                    case "Expenses":
+                    case "ExpenseReport":
+                        formToOpen = new Reports.FinancialReports.FrmBusinessExpenseReport(_model.FromDate, _model.ToDate, SessionContext.BranchId);
+                        title = "Business Expenses Report";
+                        break;
                     case "ProfitLoss":
-                        formToOpen = new Reports.FinancialReports.FrmProfitLossAccount();
+                        formToOpen = new Reports.FinancialReports.FrmProfitLossAccount(_model.FromDate, _model.ToDate);
                         title = "Profit & Loss Account";
                         break;
                     case "TradingPL":
-                        formToOpen = new Reports.FinancialReports.FrmTradingPLAccount();
+                        formToOpen = new Reports.FinancialReports.FrmTradingPLAccount(_model.FromDate, _model.ToDate);
                         title = "Trading & P/L Account";
                         break;
                     case "SalesProfit":
@@ -999,6 +1005,413 @@ namespace PosBranch_Win.Dashboard
             catch (Exception ex)
             {
                 MessageBox.Show($"Could not open drilldown report: {ex.Message}", "Drilldown Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
+        private void ShowBusinessExpensesDrilldown()
+        {
+            try
+            {
+                this.Cursor = Cursors.WaitCursor;
+
+                var ledgerSummary = _repository.GetExpenseLedgerSummary(_model.FromDate, _model.ToDate, _model.BranchId, _model.CompanyId);
+                var voucherTransactions = _repository.GetExpenseVoucherTransactions(_model.FromDate, _model.ToDate, _model.BranchId, _model.CompanyId);
+
+                Form popup = new Form
+                {
+                    Text = "19. Business Expenses — Detailed Breakdown & Audit",
+                    StartPosition = FormStartPosition.CenterParent,
+                    Size = new Size(1000, 640),
+                    MinimizeBox = false,
+                    MaximizeBox = true,
+                    ShowIcon = false,
+                    BackColor = Color.FromArgb(236, 244, 247),
+                    Font = new Font("Segoe UI", 9F, FontStyle.Regular),
+                    Padding = new Padding(12)
+                };
+
+                // Top Panel
+                Panel pnlTop = new Panel
+                {
+                    Dock = DockStyle.Top,
+                    Height = 114,
+                    BackColor = Color.FromArgb(248, 251, 252),
+                    Padding = new Padding(14, 8, 14, 8)
+                };
+
+                Label lblHeaderTitle = new Label
+                {
+                    Text = "19. Business Expenses — Detailed Breakdown & Audit",
+                    Font = new Font("Segoe UI", 12.5F, FontStyle.Bold),
+                    ForeColor = Color.FromArgb(8, 47, 73),
+                    Location = new Point(14, 6),
+                    AutoSize = true
+                };
+                pnlTop.Controls.Add(lblHeaderTitle);
+
+                Label lblSub = new Label
+                {
+                    Text = $"Reporting Period: {_model.FromDate:dd-MM-yyyy} to {_model.ToDate:dd-MM-yyyy}   |   Branch: {_model.BranchName}",
+                    Font = new Font("Segoe UI", 8.5F, FontStyle.Regular),
+                    ForeColor = Color.FromArgb(91, 111, 127),
+                    Location = new Point(14, 32),
+                    AutoSize = true
+                };
+                pnlTop.Controls.Add(lblSub);
+
+                // Top KPI Summary Cards inside Top Panel
+                Panel pnlCards = new Panel
+                {
+                    Location = new Point(14, 54),
+                    Size = new Size(950, 52),
+                    BackColor = Color.Transparent
+                };
+
+                int cWidth = 220;
+                int cGap = 12;
+
+                pnlCards.Controls.Add(CreateMiniSummaryCard("Total Expenses", FormatCurr(_model.TotalBusinessExpenses), Color.FromArgb(192, 57, 43), 0, cWidth));
+                pnlCards.Controls.Add(CreateMiniSummaryCard("Direct Expenses", FormatCurr(_model.DirectExpenses), Color.FromArgb(211, 84, 0), cWidth + cGap, cWidth));
+                pnlCards.Controls.Add(CreateMiniSummaryCard("Indirect Expenses", FormatCurr(_model.IndirectExpenses), Color.FromArgb(41, 128, 185), (cWidth + cGap) * 2, cWidth));
+                pnlCards.Controls.Add(CreateMiniSummaryCard("Expense Ledgers", $"{ledgerSummary.Count} Accounts ({voucherTransactions.Count} Vouchers)", Color.FromArgb(22, 160, 133), (cWidth + cGap) * 3, cWidth));
+
+                pnlTop.Controls.Add(pnlCards);
+                popup.Controls.Add(pnlTop);
+
+                // Bottom Action Panel
+                Panel pnlBottom = new Panel
+                {
+                    Dock = DockStyle.Bottom,
+                    Height = 50,
+                    BackColor = Color.FromArgb(248, 251, 252),
+                    Padding = new Padding(14, 8, 14, 8)
+                };
+
+                Button btnOpenPL = new Button
+                {
+                    Text = "📊 Profit & Loss Account",
+                    Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                    Size = new Size(180, 32),
+                    Location = new Point(14, 9),
+                    BackColor = Color.FromArgb(18, 65, 89),
+                    ForeColor = Color.White,
+                    FlatStyle = FlatStyle.Flat,
+                    Cursor = Cursors.Hand
+                };
+                btnOpenPL.FlatAppearance.BorderSize = 0;
+                btnOpenPL.Click += (s, e) =>
+                {
+                    popup.Close();
+                    DrillDown("ProfitLoss");
+                };
+                pnlBottom.Controls.Add(btnOpenPL);
+
+                Button btnOpenTradingPL = new Button
+                {
+                    Text = "📈 Trading & P/L Account",
+                    Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                    Size = new Size(180, 32),
+                    Location = new Point(btnOpenPL.Right + 10, 9),
+                    BackColor = Color.FromArgb(30, 136, 229),
+                    ForeColor = Color.White,
+                    FlatStyle = FlatStyle.Flat,
+                    Cursor = Cursors.Hand
+                };
+                btnOpenTradingPL.FlatAppearance.BorderSize = 0;
+                btnOpenTradingPL.Click += (s, e) =>
+                {
+                    popup.Close();
+                    DrillDown("TradingPL");
+                };
+                pnlBottom.Controls.Add(btnOpenTradingPL);
+
+                Button btnExportCsv = new Button
+                {
+                    Text = "💾 Export CSV",
+                    Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                    Size = new Size(120, 32),
+                    Location = new Point(btnOpenTradingPL.Right + 10, 9),
+                    BackColor = Color.FromArgb(46, 125, 50),
+                    ForeColor = Color.White,
+                    FlatStyle = FlatStyle.Flat,
+                    Cursor = Cursors.Hand
+                };
+                btnExportCsv.FlatAppearance.BorderSize = 0;
+                btnExportCsv.Click += (s, e) =>
+                {
+                    ExportExpenseSummaryToCsv(ledgerSummary, voucherTransactions);
+                };
+                pnlBottom.Controls.Add(btnExportCsv);
+
+                Button btnClose = new Button
+                {
+                    Text = "Close",
+                    Font = new Font("Segoe UI", 9F, FontStyle.Regular),
+                    Size = new Size(90, 32),
+                    Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                    Location = new Point(pnlBottom.ClientSize.Width - 104, 9),
+                    BackColor = Color.FromArgb(220, 224, 230),
+                    ForeColor = Color.FromArgb(33, 37, 41),
+                    FlatStyle = FlatStyle.Flat,
+                    Cursor = Cursors.Hand
+                };
+                btnClose.FlatAppearance.BorderSize = 0;
+                btnClose.Click += (s, e) => popup.Close();
+                pnlBottom.Controls.Add(btnClose);
+
+                popup.Controls.Add(pnlBottom);
+
+                // Center Tab Control
+                TabControl tabControl = new TabControl
+                {
+                    Dock = DockStyle.Fill,
+                    Font = new Font("Segoe UI", 9F, FontStyle.Regular),
+                    Padding = new Point(12, 6)
+                };
+
+                // Tab 1: Ledger Summary
+                TabPage tabSummary = new TabPage("Ledger-Wise Expense Summary");
+                tabSummary.BackColor = Color.White;
+                tabSummary.Padding = new Padding(6);
+
+                DataGridView gridSummary = CreateStyledDrilldownGrid();
+                gridSummary.Columns.Add("SlNo", "#");
+                gridSummary.Columns.Add("LedgerName", "Expense Ledger Name");
+                gridSummary.Columns.Add("GroupName", "Account Group");
+                gridSummary.Columns.Add("ExpenseType", "Category");
+                gridSummary.Columns.Add("TotalDebit", "Debit Amount (₹)");
+                gridSummary.Columns.Add("TotalCredit", "Credit Amount (₹)");
+                gridSummary.Columns.Add("NetAmount", "Net Expense (₹)");
+                gridSummary.Columns.Add("PercentageOfTotal", "% Share");
+                gridSummary.Columns.Add("VoucherCount", "Vouchers");
+
+                gridSummary.Columns["SlNo"].Width = 45;
+                gridSummary.Columns["LedgerName"].FillWeight = 160;
+                gridSummary.Columns["GroupName"].FillWeight = 110;
+                gridSummary.Columns["ExpenseType"].FillWeight = 95;
+                gridSummary.Columns["TotalDebit"].FillWeight = 85;
+                gridSummary.Columns["TotalCredit"].FillWeight = 85;
+                gridSummary.Columns["NetAmount"].FillWeight = 95;
+                gridSummary.Columns["PercentageOfTotal"].FillWeight = 65;
+                gridSummary.Columns["VoucherCount"].FillWeight = 55;
+
+                gridSummary.Columns["TotalDebit"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+                gridSummary.Columns["TotalCredit"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+                gridSummary.Columns["NetAmount"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+                gridSummary.Columns["PercentageOfTotal"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+                gridSummary.Columns["VoucherCount"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+                gridSummary.Columns["SlNo"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+
+                if (ledgerSummary.Count > 0)
+                {
+                    foreach (var item in ledgerSummary)
+                    {
+                        int rIdx = gridSummary.Rows.Add(
+                            item.SlNo,
+                            item.LedgerName,
+                            item.GroupName,
+                            item.ExpenseType,
+                            item.TotalDebit.ToString("N2"),
+                            item.TotalCredit.ToString("N2"),
+                            item.NetAmount.ToString("N2"),
+                            $"{item.PercentageOfTotal:N1}%",
+                            item.VoucherCount
+                        );
+
+                        var netCell = gridSummary.Rows[rIdx].Cells["NetAmount"];
+                        netCell.Style.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
+                        netCell.Style.ForeColor = Color.FromArgb(192, 57, 43);
+                    }
+                }
+                else
+                {
+                    gridSummary.Rows.Add("-", "No expense transactions recorded in this period", "-", "-", "0.00", "0.00", "0.00", "0.0%", 0);
+                }
+
+                tabSummary.Controls.Add(gridSummary);
+                tabControl.TabPages.Add(tabSummary);
+
+                // Tab 2: Voucher Transactions
+                TabPage tabVouchers = new TabPage("Itemized Voucher Transactions");
+                tabVouchers.BackColor = Color.White;
+                tabVouchers.Padding = new Padding(6);
+
+                DataGridView gridVouchers = CreateStyledDrilldownGrid();
+                gridVouchers.Columns.Add("Date", "Date");
+                gridVouchers.Columns.Add("VoucherNo", "Voucher No.");
+                gridVouchers.Columns.Add("VoucherType", "Type");
+                gridVouchers.Columns.Add("LedgerName", "Expense Ledger");
+                gridVouchers.Columns.Add("Category", "Category");
+                gridVouchers.Columns.Add("Amount", "Expense Amount (₹)");
+                gridVouchers.Columns.Add("Narration", "Narration / Remarks");
+
+                gridVouchers.Columns["Date"].FillWeight = 75;
+                gridVouchers.Columns["VoucherNo"].FillWeight = 85;
+                gridVouchers.Columns["VoucherType"].FillWeight = 65;
+                gridVouchers.Columns["LedgerName"].FillWeight = 140;
+                gridVouchers.Columns["Category"].FillWeight = 85;
+                gridVouchers.Columns["Amount"].FillWeight = 85;
+                gridVouchers.Columns["Narration"].FillWeight = 180;
+
+                gridVouchers.Columns["Amount"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleRight;
+                gridVouchers.Columns["Date"].DefaultCellStyle.Alignment = DataGridViewContentAlignment.MiddleCenter;
+
+                if (voucherTransactions.Count > 0)
+                {
+                    foreach (var v in voucherTransactions)
+                    {
+                        int rIdx = gridVouchers.Rows.Add(
+                            v.VoucherDate.ToString("dd-MM-yyyy"),
+                            v.VoucherNumber,
+                            v.VoucherType,
+                            v.LedgerName,
+                            v.ExpenseType,
+                            v.NetAmount.ToString("N2"),
+                            v.Narration
+                        );
+
+                        var amtCell = gridVouchers.Rows[rIdx].Cells["Amount"];
+                        amtCell.Style.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
+                        amtCell.Style.ForeColor = Color.FromArgb(192, 57, 43);
+                    }
+                }
+                else
+                {
+                    gridVouchers.Rows.Add("-", "-", "-", "No expense vouchers found in this period", "-", "0.00", "-");
+                }
+
+                tabVouchers.Controls.Add(gridVouchers);
+                tabControl.TabPages.Add(tabVouchers);
+
+                popup.Controls.Add(tabControl);
+                tabControl.BringToFront();
+
+                popup.ShowDialog(this);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error generating Business Expenses breakdown: {ex.Message}", "Expenses Drilldown", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                this.Cursor = Cursors.Default;
+            }
+        }
+
+        private Panel CreateMiniSummaryCard(string title, string value, Color accentColor, int x, int width)
+        {
+            var pnl = new Panel
+            {
+                Location = new Point(x, 0),
+                Size = new Size(width, 48),
+                BackColor = Color.White,
+                BorderStyle = BorderStyle.FixedSingle
+            };
+
+            var bar = new Panel
+            {
+                Dock = DockStyle.Left,
+                Width = 4,
+                BackColor = accentColor
+            };
+            pnl.Controls.Add(bar);
+
+            var lblT = new Label
+            {
+                Text = title,
+                Font = new Font("Segoe UI", 7.5F, FontStyle.Regular),
+                ForeColor = Color.FromArgb(91, 111, 127),
+                Location = new Point(8, 4),
+                AutoSize = true
+            };
+            pnl.Controls.Add(lblT);
+
+            var lblV = new Label
+            {
+                Text = value,
+                Font = new Font("Segoe UI Semibold", 10F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(18, 49, 102),
+                Location = new Point(8, 20),
+                AutoSize = true
+            };
+            pnl.Controls.Add(lblV);
+
+            return pnl;
+        }
+
+        private DataGridView CreateStyledDrilldownGrid()
+        {
+            return new DataGridView
+            {
+                AllowUserToAddRows = false,
+                AllowUserToDeleteRows = false,
+                AutoGenerateColumns = false,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                AllowUserToResizeRows = false,
+                BackgroundColor = Color.White,
+                BorderStyle = BorderStyle.None,
+                Dock = DockStyle.Fill,
+                EnableHeadersVisualStyles = false,
+                GridColor = Color.FromArgb(220, 233, 246),
+                ReadOnly = true,
+                RowHeadersVisible = false,
+                SelectionMode = DataGridViewSelectionMode.FullRowSelect,
+                ColumnHeadersDefaultCellStyle = new DataGridViewCellStyle
+                {
+                    BackColor = Color.FromArgb(18, 65, 89),
+                    ForeColor = Color.White,
+                    Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold),
+                    Alignment = DataGridViewContentAlignment.MiddleLeft
+                },
+                ColumnHeadersHeight = 32,
+                DefaultCellStyle = new DataGridViewCellStyle
+                {
+                    Font = new Font("Segoe UI", 9F),
+                    ForeColor = Color.FromArgb(31, 42, 55),
+                    SelectionBackColor = Color.FromArgb(219, 234, 254),
+                    SelectionForeColor = Color.FromArgb(8, 47, 73)
+                },
+                RowTemplate = { Height = 28 }
+            };
+        }
+
+        private void ExportExpenseSummaryToCsv(List<ExpenseLedgerSummaryItem> ledgerSummary, List<ExpenseVoucherTransactionItem> voucherTransactions)
+        {
+            try
+            {
+                using (var sfd = new SaveFileDialog())
+                {
+                    sfd.Filter = "CSV File (*.csv)|*.csv";
+                    sfd.FileName = $"Business_Expenses_{_model.FromDate:yyyyMMdd}_{_model.ToDate:yyyyMMdd}.csv";
+                    if (sfd.ShowDialog(this) == DialogResult.OK)
+                    {
+                        var sb = new StringBuilder();
+                        sb.AppendLine("Business Expenses Breakdown Report");
+                        sb.AppendLine($"Period,{_model.FromDate:dd-MM-yyyy} to {_model.ToDate:dd-MM-yyyy}");
+                        sb.AppendLine($"Branch,{_model.BranchName}");
+                        sb.AppendLine($"Total Business Expenses,{_model.TotalBusinessExpenses}");
+                        sb.AppendLine($"Direct Expenses,{_model.DirectExpenses}");
+                        sb.AppendLine($"Indirect Expenses,{_model.IndirectExpenses}");
+                        sb.AppendLine();
+                        sb.AppendLine("Ledger Name,Account Group,Category,Debit Amount,Credit Amount,Net Expense Amount,% Share,Voucher Count");
+                        foreach (var item in ledgerSummary)
+                        {
+                            sb.AppendLine($"\"{item.LedgerName}\",\"{item.GroupName}\",\"{item.ExpenseType}\",{item.TotalDebit},{item.TotalCredit},{item.NetAmount},{item.PercentageOfTotal}%,{item.VoucherCount}");
+                        }
+                        sb.AppendLine();
+                        sb.AppendLine("Voucher Date,Voucher Number,Voucher Type,Expense Ledger,Category,Amount,Narration");
+                        foreach (var v in voucherTransactions)
+                        {
+                            sb.AppendLine($"{v.VoucherDate:dd-MM-yyyy},\"{v.VoucherNumber}\",\"{v.VoucherType}\",\"{v.LedgerName}\",\"{v.ExpenseType}\",{v.NetAmount},\"{v.Narration.Replace("\"", "\"\"")}\"");
+                        }
+                        File.WriteAllText(sfd.FileName, sb.ToString(), Encoding.UTF8);
+                        MessageBox.Show("Business Expenses breakdown exported successfully.", "Export Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Export failed: {ex.Message}", "Export Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 

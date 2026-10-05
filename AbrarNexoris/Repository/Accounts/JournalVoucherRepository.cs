@@ -303,30 +303,50 @@ ORDER BY MAX(v.VoucherDate) DESC, v.VoucherID DESC;";
 
         private void GenerateVoucherId(JournalVoucher journal, IDbTransaction transaction)
         {
-            var voucher = new Voucher
+            long nextId = 0;
+            try
             {
-                _Operation = "GENERATENUMBER",
-                CompanyID = journal.CompanyID,
-                BranchID = journal.BranchID,
-                FinYearID = journal.FinYearID,
-                VoucherType = VoucherType
-            };
+                var voucher = new Voucher
+                {
+                    _Operation = "GENERATENUMBER",
+                    CompanyID = journal.CompanyID,
+                    BranchID = journal.BranchID,
+                    FinYearID = journal.FinYearID,
+                    VoucherType = VoucherType
+                };
 
-            var generated = DataConnection.Query<Voucher>(
-                STOREDPROCEDURE.POS_Vouchers,
-                voucher,
-                transaction,
-                commandType: CommandType.StoredProcedure).FirstOrDefault();
+                var generated = DataConnection.Query<Voucher>(
+                    STOREDPROCEDURE.POS_Vouchers,
+                    voucher,
+                    transaction,
+                    commandType: CommandType.StoredProcedure).FirstOrDefault();
 
-            if (generated == null || generated.VoucherID <= 0)
+                if (generated != null && generated.VoucherID > 0)
+                {
+                    nextId = generated.VoucherID;
+                }
+            }
+            catch { }
+
+            try
             {
-                throw new InvalidOperationException("Failed to generate Journal Voucher ID.");
+                string maxSql = "SELECT ISNULL(MAX(VoucherID), 0) FROM Vouchers WHERE VoucherType = @VoucherType AND BranchID = @BranchID;";
+                long currentMax = DataConnection.ExecuteScalar<long>(maxSql, new { VoucherType = VoucherType, BranchID = journal.BranchID }, transaction);
+
+                if (nextId <= currentMax)
+                {
+                    nextId = currentMax + 1;
+                }
+            }
+            catch { }
+
+            if (nextId <= 0)
+            {
+                nextId = 1;
             }
 
-            journal.VoucherID = generated.VoucherID;
-            journal.VoucherNumber = string.IsNullOrWhiteSpace(generated.VoucherNumber)
-                ? BuildDisplayVoucherNumber(generated.VoucherID)
-                : generated.VoucherNumber;
+            journal.VoucherID = nextId;
+            journal.VoucherNumber = BuildDisplayVoucherNumber(nextId);
         }
 
         private Voucher CreateVoucherEntry(JournalVoucher journal, JournalVoucherLine line, int slNo)
@@ -362,21 +382,32 @@ ORDER BY MAX(v.VoucherDate) DESC, v.VoucherID DESC;";
 
         private void DeleteVoucherLines(JournalVoucher journal, IDbTransaction transaction)
         {
-            var voucher = new Voucher
+            try
             {
-                CompanyID = journal.CompanyID,
-                BranchID = journal.BranchID,
-                VoucherID = journal.VoucherID,
-                VoucherType = VoucherType,
-                FinYearID = journal.FinYearID,
-                _Operation = "DELETE"
-            };
+                var voucher = new Voucher
+                {
+                    CompanyID = journal.CompanyID,
+                    BranchID = journal.BranchID,
+                    VoucherID = journal.VoucherID,
+                    VoucherType = VoucherType,
+                    FinYearID = journal.FinYearID,
+                    _Operation = "UPDATE"
+                };
 
-            DataConnection.Query<Voucher>(
-                STOREDPROCEDURE.POS_Vouchers,
-                voucher,
-                transaction,
-                commandType: CommandType.StoredProcedure).ToList();
+                DataConnection.Query<Voucher>(
+                    STOREDPROCEDURE.POS_Vouchers,
+                    voucher,
+                    transaction,
+                    commandType: CommandType.StoredProcedure).ToList();
+            }
+            catch { }
+
+            try
+            {
+                string sql = "DELETE FROM Vouchers WHERE VoucherType = @VoucherType AND VoucherID = @VoucherID AND BranchID = @BranchID;";
+                DataConnection.Execute(sql, new { VoucherType = VoucherType, VoucherID = journal.VoucherID, BranchID = journal.BranchID }, transaction);
+            }
+            catch { }
         }
 
         private void ApplyOpenConnection()

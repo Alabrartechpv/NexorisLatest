@@ -42,6 +42,16 @@ namespace PosBranch_Win.Reports.FinancialReports
             InitializeComponent();
             InitializeForm();
         }
+
+        public FrmProfitLossAccount(DateTime fromDate, DateTime toDate) : this()
+        {
+            ultraComboPresetDates.Value = "DATE_RANGE";
+            ultraDateTimeFrom.Enabled = true;
+            ultraDateTimeTo.Enabled = true;
+            ultraDateTimeFrom.Value = fromDate;
+            ultraDateTimeTo.Value = toDate;
+            LoadReport();
+        }
         #endregion
 
         public void RibbonClear()

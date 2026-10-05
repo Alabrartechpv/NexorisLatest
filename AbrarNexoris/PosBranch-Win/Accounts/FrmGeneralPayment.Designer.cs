@@ -26,12 +26,15 @@ namespace PosBranch_Win.Accounts
             Infragistics.Win.Appearance appearance8 = new Infragistics.Win.Appearance();
             Infragistics.Win.Appearance appearance9 = new Infragistics.Win.Appearance();
             Infragistics.Win.Appearance appearance10 = new Infragistics.Win.Appearance();
+            Infragistics.Win.Appearance appearanceCashBank = new Infragistics.Win.Appearance();
             this.lblHeader = new Infragistics.Win.Misc.UltraLabel();
             this.headerPanel = new Infragistics.Win.Misc.UltraPanel();
             this.dtpVoucherDate = new Infragistics.Win.UltraWinEditors.UltraDateTimeEditor();
             this.lblBranch = new Infragistics.Win.Misc.UltraLabel();
             this.lblVoucherDate = new Infragistics.Win.Misc.UltraLabel();
             this.CmboBranch = new Infragistics.Win.UltraWinEditors.UltraComboEditor();
+            this.lblCashBank = new Infragistics.Win.Misc.UltraLabel();
+            this.CmboCashBank = new Infragistics.Win.UltraWinEditors.UltraComboEditor();
             this.lblVocuherNo = new Infragistics.Win.Misc.UltraLabel();
             this.txtVoucherNo = new Infragistics.Win.UltraWinEditors.UltraTextEditor();
             this.gridPayment = new Infragistics.Win.UltraWinGrid.UltraGrid();
@@ -49,6 +52,7 @@ namespace PosBranch_Win.Accounts
             this.headerPanel.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.dtpVoucherDate)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.CmboBranch)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.CmboCashBank)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.txtVoucherNo)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.gridPayment)).BeginInit();
             this.footerPanel.ClientArea.SuspendLayout();
@@ -82,6 +86,8 @@ namespace PosBranch_Win.Accounts
             // 
             // headerPanel.ClientArea
             // 
+            this.headerPanel.ClientArea.Controls.Add(this.CmboCashBank);
+            this.headerPanel.ClientArea.Controls.Add(this.lblCashBank);
             this.headerPanel.ClientArea.Controls.Add(this.dtpVoucherDate);
             this.headerPanel.ClientArea.Controls.Add(this.lblBranch);
             this.headerPanel.ClientArea.Controls.Add(this.lblVoucherDate);
@@ -135,6 +141,26 @@ namespace PosBranch_Win.Accounts
             this.CmboBranch.Size = new System.Drawing.Size(260, 21);
             this.CmboBranch.TabIndex = 4;
             this.CmboBranch.ValueChanged += new System.EventHandler(this.CmboBranch_ValueChanged);
+            // 
+            // lblCashBank
+            // 
+            this.lblCashBank.AutoSize = true;
+            this.lblCashBank.Location = new System.Drawing.Point(820, 14);
+            this.lblCashBank.Name = "lblCashBank";
+            this.lblCashBank.Size = new System.Drawing.Size(130, 15);
+            this.lblCashBank.TabIndex = 5;
+            this.lblCashBank.Text = "Paid From (Cash/Bank)";
+            // 
+            // CmboCashBank
+            // 
+            appearanceCashBank.BackColor = System.Drawing.Color.White;
+            appearanceCashBank.ForeColor = System.Drawing.Color.FromArgb(31, 42, 55);
+            this.CmboCashBank.Appearance = appearanceCashBank;
+            this.CmboCashBank.AutoCompleteMode = Infragistics.Win.AutoCompleteMode.SuggestAppend;
+            this.CmboCashBank.Location = new System.Drawing.Point(820, 39);
+            this.CmboCashBank.Name = "CmboCashBank";
+            this.CmboCashBank.Size = new System.Drawing.Size(280, 21);
+            this.CmboCashBank.TabIndex = 5;
             // 
             // lblVocuherNo
             // 
@@ -195,65 +221,71 @@ namespace PosBranch_Win.Accounts
             appearance8.FontData.SizeInPoints = 13F;
             appearance8.ForeColor = System.Drawing.Color.FromArgb(46, 125, 50);
             appearance8.TextHAlignAsString = "Right";
-            appearance8.TextVAlignAsString = "Middle";
             this.lblDifferenceValue.Appearance = appearance8;
-            this.lblDifferenceValue.Location = new System.Drawing.Point(1017, 36);
+            this.lblDifferenceValue.Location = new System.Drawing.Point(920, 36);
             this.lblDifferenceValue.Name = "lblDifferenceValue";
-            this.lblDifferenceValue.Size = new System.Drawing.Size(170, 30);
-            this.lblDifferenceValue.TabIndex = 10;
+            this.lblDifferenceValue.Size = new System.Drawing.Size(260, 30);
+            this.lblDifferenceValue.TabIndex = 5;
             this.lblDifferenceValue.Text = "0.00";
             // 
             // lblDifference
             // 
             this.lblDifference.AutoSize = true;
-            this.lblDifference.Location = new System.Drawing.Point(1017, 14);
+            this.lblDifference.Location = new System.Drawing.Point(920, 16);
             this.lblDifference.Name = "lblDifference";
-            this.lblDifference.Size = new System.Drawing.Size(60, 15);
-            this.lblDifference.TabIndex = 9;
-            this.lblDifference.Text = "Difference";
+            this.lblDifference.Size = new System.Drawing.Size(78, 15);
+            this.lblDifference.TabIndex = 4;
+            this.lblDifference.Text = "Total Amount";
             // 
             // lblTotalCreditValue
             // 
-            this.lblTotalCreditValue.Appearance = appearance8;
-            this.lblTotalCreditValue.Location = new System.Drawing.Point(813, 36);
+            appearance9.FontData.BoldAsString = "True";
+            appearance9.FontData.SizeInPoints = 13F;
+            appearance9.ForeColor = System.Drawing.Color.FromArgb(31, 42, 55);
+            appearance9.TextHAlignAsString = "Right";
+            this.lblTotalCreditValue.Appearance = appearance9;
+            this.lblTotalCreditValue.Location = new System.Drawing.Point(620, 36);
             this.lblTotalCreditValue.Name = "lblTotalCreditValue";
-            this.lblTotalCreditValue.Size = new System.Drawing.Size(170, 30);
-            this.lblTotalCreditValue.TabIndex = 7;
+            this.lblTotalCreditValue.Size = new System.Drawing.Size(260, 30);
+            this.lblTotalCreditValue.TabIndex = 3;
             this.lblTotalCreditValue.Text = "0.00";
+            this.lblTotalCreditValue.Visible = false;
             // 
             // lblTotalCredit
             // 
             this.lblTotalCredit.AutoSize = true;
-            this.lblTotalCredit.Location = new System.Drawing.Point(813, 14);
+            this.lblTotalCredit.Location = new System.Drawing.Point(620, 16);
             this.lblTotalCredit.Name = "lblTotalCredit";
-            this.lblTotalCredit.Size = new System.Drawing.Size(66, 15);
-            this.lblTotalCredit.TabIndex = 6;
+            this.lblTotalCredit.Size = new System.Drawing.Size(68, 15);
+            this.lblTotalCredit.TabIndex = 2;
             this.lblTotalCredit.Text = "Total Credit";
+            this.lblTotalCredit.Visible = false;
             // 
             // lblTotalDebitValue
             // 
-            this.lblTotalDebitValue.Appearance = appearance8;
-            this.lblTotalDebitValue.Location = new System.Drawing.Point(609, 36);
+            appearance10.FontData.BoldAsString = "True";
+            appearance10.FontData.SizeInPoints = 13F;
+            appearance10.ForeColor = System.Drawing.Color.FromArgb(31, 42, 55);
+            appearance10.TextHAlignAsString = "Right";
+            this.lblTotalDebitValue.Appearance = appearance10;
+            this.lblTotalDebitValue.Location = new System.Drawing.Point(320, 36);
             this.lblTotalDebitValue.Name = "lblTotalDebitValue";
-            this.lblTotalDebitValue.Size = new System.Drawing.Size(170, 30);
-            this.lblTotalDebitValue.TabIndex = 5;
+            this.lblTotalDebitValue.Size = new System.Drawing.Size(260, 30);
+            this.lblTotalDebitValue.TabIndex = 1;
             this.lblTotalDebitValue.Text = "0.00";
+            this.lblTotalDebitValue.Visible = false;
             // 
             // lblTotalDebit
             // 
             this.lblTotalDebit.AutoSize = true;
-            this.lblTotalDebit.Location = new System.Drawing.Point(609, 14);
+            this.lblTotalDebit.Location = new System.Drawing.Point(320, 16);
             this.lblTotalDebit.Name = "lblTotalDebit";
-            this.lblTotalDebit.Size = new System.Drawing.Size(65, 15);
-            this.lblTotalDebit.TabIndex = 4;
+            this.lblTotalDebit.Size = new System.Drawing.Size(64, 15);
+            this.lblTotalDebit.TabIndex = 0;
             this.lblTotalDebit.Text = "Total Debit";
+            this.lblTotalDebit.Visible = false;
             // 
             // narrationPanel
-            // 
-            appearance9.BackColor = System.Drawing.Color.FromArgb(248, 251, 252);
-            this.narrationPanel.Appearance = appearance9;
-            // 
-            // narrationPanel.ClientArea
             // 
             this.narrationPanel.ClientArea.Controls.Add(this.lblNarration);
             this.narrationPanel.ClientArea.Controls.Add(this.txtNarration);
@@ -268,33 +300,36 @@ namespace PosBranch_Win.Accounts
             this.lblNarration.AutoSize = true;
             this.lblNarration.Location = new System.Drawing.Point(28, 10);
             this.lblNarration.Name = "lblNarration";
-            this.lblNarration.Size = new System.Drawing.Size(80, 15);
+            this.lblNarration.Size = new System.Drawing.Size(71, 15);
             this.lblNarration.TabIndex = 0;
-            this.lblNarration.Text = "Main Narration";
+            this.lblNarration.Text = "Description";
             // 
             // txtNarration
             // 
-            appearance10.BackColor = System.Drawing.Color.White;
-            appearance10.ForeColor = System.Drawing.Color.FromArgb(31, 42, 55);
-            this.txtNarration.Appearance = appearance10;
-            this.txtNarration.Location = new System.Drawing.Point(28, 33);
+            this.txtNarration.AlwaysInEditMode = true;
+            this.txtNarration.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.txtNarration.Location = new System.Drawing.Point(28, 31);
             this.txtNarration.Multiline = true;
             this.txtNarration.Name = "txtNarration";
-            this.txtNarration.Size = new System.Drawing.Size(1159, 52);
-            this.txtNarration.TabIndex = 5;
+            this.txtNarration.Scrollbars = System.Windows.Forms.ScrollBars.Vertical;
+            this.txtNarration.Size = new System.Drawing.Size(1159, 58);
+            this.txtNarration.TabIndex = 1;
             // 
             // FrmGeneralPayment
             // 
-            this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
+            this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.BackColor = System.Drawing.Color.FromArgb(236, 244, 247);
+            this.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(236)))), ((int)(((byte)(244)))), ((int)(((byte)(247)))));
             this.ClientSize = new System.Drawing.Size(1215, 573);
             this.Controls.Add(this.gridPayment);
             this.Controls.Add(this.narrationPanel);
             this.Controls.Add(this.footerPanel);
             this.Controls.Add(this.headerPanel);
             this.Controls.Add(this.lblHeader);
+            this.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.Name = "FrmGeneralPayment";
+            this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "General Payment";
             this.WindowState = System.Windows.Forms.FormWindowState.Maximized;
             this.headerPanel.ClientArea.ResumeLayout(false);
@@ -302,6 +337,7 @@ namespace PosBranch_Win.Accounts
             this.headerPanel.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.dtpVoucherDate)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.CmboBranch)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.CmboCashBank)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.txtVoucherNo)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.gridPayment)).EndInit();
             this.footerPanel.ClientArea.ResumeLayout(false);
@@ -312,17 +348,20 @@ namespace PosBranch_Win.Accounts
             this.narrationPanel.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.txtNarration)).EndInit();
             this.ResumeLayout(false);
+
         }
         #endregion
 
         private Infragistics.Win.Misc.UltraLabel lblHeader;
         private Infragistics.Win.Misc.UltraPanel headerPanel;
-        public Infragistics.Win.UltraWinEditors.UltraDateTimeEditor dtpVoucherDate;
+        private Infragistics.Win.UltraWinEditors.UltraDateTimeEditor dtpVoucherDate;
         private Infragistics.Win.Misc.UltraLabel lblBranch;
         private Infragistics.Win.Misc.UltraLabel lblVoucherDate;
-        public Infragistics.Win.UltraWinEditors.UltraComboEditor CmboBranch;
+        private Infragistics.Win.UltraWinEditors.UltraComboEditor CmboBranch;
+        private Infragistics.Win.Misc.UltraLabel lblCashBank;
+        private Infragistics.Win.UltraWinEditors.UltraComboEditor CmboCashBank;
         private Infragistics.Win.Misc.UltraLabel lblVocuherNo;
-        public Infragistics.Win.UltraWinEditors.UltraTextEditor txtVoucherNo;
+        private Infragistics.Win.UltraWinEditors.UltraTextEditor txtVoucherNo;
         private Infragistics.Win.UltraWinGrid.UltraGrid gridPayment;
         private Infragistics.Win.Misc.UltraPanel footerPanel;
         private Infragistics.Win.Misc.UltraLabel lblDifferenceValue;

@@ -388,19 +388,15 @@ namespace Repository.ReportRepository
                             foreach (var item in entries)
                             {
                                 decimal rem = item.RemainingAmount;
-                                if (rem <= 0) continue;
-
                                 totalManual += rem;
                                 manualCount++;
 
                                 string pType = item.PartyType ?? "";
                                 string bType = item.BalanceType ?? "";
-
                                 bool isCustomer = pType.IndexOf("Customer", StringComparison.OrdinalIgnoreCase) >= 0 ||
                                                   pType.IndexOf("Debtor", StringComparison.OrdinalIgnoreCase) >= 0 ||
                                                   bType.IndexOf("Receivable", StringComparison.OrdinalIgnoreCase) >= 0 ||
                                                   bType.IndexOf("Debit", StringComparison.OrdinalIgnoreCase) >= 0;
-
                                 bool isVendor = pType.IndexOf("Vendor", StringComparison.OrdinalIgnoreCase) >= 0 ||
                                                 pType.IndexOf("Supplier", StringComparison.OrdinalIgnoreCase) >= 0 ||
                                                 pType.IndexOf("Creditor", StringComparison.OrdinalIgnoreCase) >= 0 ||
@@ -447,6 +443,175 @@ namespace Repository.ReportRepository
             }
 
             return model;
+        }
+
+        public List<ExpenseLedgerSummaryItem> GetExpenseLedgerSummary(DateTime fromDate, DateTime toDate, int branchId, int companyId = 0)
+        {
+            var list = new List<ExpenseLedgerSummaryItem>();
+            try
+            {
+                if (DataConnection.State != ConnectionState.Open)
+                    DataConnection.Open();
+
+                string sql = @"
+WITH CleanGroup AS (
+    SELECT GroupID, MIN(GroupName) AS GroupName
+    FROM AccountGroupMaster
+    GROUP BY GroupID
+)
+SELECT 
+    lm.LedgerID,
+    lm.LedgerName,
+    ag.GroupName,
+    CASE 
+        WHEN ag.GroupName LIKE '%Indirect%' THEN 'Indirect Expense'
+        WHEN ag.GroupName LIKE '%Direct%' THEN 'Direct Expense'
+        ELSE 'Indirect Expense'
+    END AS ExpenseType,
+    ISNULL(SUM(v.Debit), 0) AS TotalDebit,
+    ISNULL(SUM(v.Credit), 0) AS TotalCredit,
+    ISNULL(SUM(v.Debit), 0) - ISNULL(SUM(v.Credit), 0) AS NetAmount,
+    COUNT(DISTINCT v.VoucherID) AS VoucherCount
+FROM Vouchers v
+INNER JOIN LedgerMaster lm ON lm.LedgerID = v.LedgerID
+INNER JOIN CleanGroup ag ON ag.GroupID = lm.GroupID
+WHERE (ag.GroupID IN (10, 12) OR ag.GroupName LIKE '%Expense%')
+  AND v.VoucherDate >= @FromDate AND v.VoucherDate <= @ToDate
+  AND (@BranchId = 0 OR v.BranchID = @BranchId)
+  AND (@CompanyId = 0 OR v.CompanyID = @CompanyId)
+  AND ISNULL(v.CancelFlag, 0) = 0
+GROUP BY lm.LedgerID, lm.LedgerName, ag.GroupID, ag.GroupName
+HAVING (ISNULL(SUM(v.Debit), 0) - ISNULL(SUM(v.Credit), 0)) <> 0
+ORDER BY ExpenseType, NetAmount DESC, lm.LedgerName;";
+
+                using (SqlCommand cmd = new SqlCommand(sql, (SqlConnection)DataConnection))
+                {
+                    cmd.Parameters.AddWithValue("@FromDate", fromDate.Date);
+                    cmd.Parameters.AddWithValue("@ToDate", toDate.Date.AddDays(1).AddSeconds(-1));
+                    cmd.Parameters.AddWithValue("@BranchId", branchId);
+                    cmd.Parameters.AddWithValue("@CompanyId", companyId);
+
+                    using (SqlDataReader reader = cmd.ExecuteReader())
+                    {
+                        int slNo = 1;
+                        while (reader.Read())
+                        {
+                            list.Add(new ExpenseLedgerSummaryItem
+                            {
+                                SlNo = slNo++,
+                                LedgerID = reader["LedgerID"] != DBNull.Value ? Convert.ToInt32(reader["LedgerID"]) : 0,
+                                LedgerName = reader["LedgerName"]?.ToString() ?? "",
+                                GroupName = reader["GroupName"]?.ToString() ?? "",
+                                ExpenseType = reader["ExpenseType"]?.ToString() ?? "Indirect Expense",
+                                TotalDebit = reader["TotalDebit"] != DBNull.Value ? Convert.ToDecimal(reader["TotalDebit"]) : 0,
+                                TotalCredit = reader["TotalCredit"] != DBNull.Value ? Convert.ToDecimal(reader["TotalCredit"]) : 0,
+                                NetAmount = reader["NetAmount"] != DBNull.Value ? Convert.ToDecimal(reader["NetAmount"]) : 0,
+                                VoucherCount = reader["VoucherCount"] != DBNull.Value ? Convert.ToInt32(reader["VoucherCount"]) : 0
+                            });
+                        }
+                    }
+                }
+
+                decimal total = list.Sum(x => x.NetAmount);
+                if (total > 0)
+                {
+                    foreach (var item in list)
+                    {
+                        item.PercentageOfTotal = Math.Round((item.NetAmount / total) * 100, 1);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("GetExpenseLedgerSummary error: " + ex.Message);
+            }
+            finally
+            {
+                if (DataConnection != null && DataConnection.State == ConnectionState.Open)
+                    DataConnection.Close();
+            }
+            return list;
+        }
+
+        public List<ExpenseVoucherTransactionItem> GetExpenseVoucherTransactions(DateTime fromDate, DateTime toDate, int branchId, int companyId = 0)
+        {
+            var list = new List<ExpenseVoucherTransactionItem>();
+            try
+            {
+                if (DataConnection.State != ConnectionState.Open)
+                    DataConnection.Open();
+
+                string sql = @"
+WITH CleanGroup AS (
+    SELECT GroupID, MIN(GroupName) AS GroupName
+    FROM AccountGroupMaster
+    GROUP BY GroupID
+)
+SELECT 
+    v.VoucherID,
+    v.VoucherDate,
+    v.VoucherNumber,
+    v.VoucherType,
+    lm.LedgerName,
+    ag.GroupName,
+    CASE 
+        WHEN ag.GroupName LIKE '%Indirect%' THEN 'Indirect Expense'
+        WHEN ag.GroupName LIKE '%Direct%' THEN 'Direct Expense'
+        ELSE 'Indirect Expense'
+    END AS ExpenseType,
+    ISNULL(v.Debit, 0) AS Debit,
+    ISNULL(v.Credit, 0) AS Credit,
+    ISNULL(v.Debit, 0) - ISNULL(v.Credit, 0) AS NetAmount,
+    ISNULL(v.Narration, '') AS Narration
+FROM Vouchers v
+INNER JOIN LedgerMaster lm ON lm.LedgerID = v.LedgerID
+INNER JOIN CleanGroup ag ON ag.GroupID = lm.GroupID
+WHERE (ag.GroupID IN (10, 12) OR ag.GroupName LIKE '%Expense%')
+  AND v.VoucherDate >= @FromDate AND v.VoucherDate <= @ToDate
+  AND (@BranchId = 0 OR v.BranchID = @BranchId)
+  AND (@CompanyId = 0 OR v.CompanyID = @CompanyId)
+  AND ISNULL(v.CancelFlag, 0) = 0
+ORDER BY v.VoucherDate DESC, v.VoucherID DESC;";
+
+                using (SqlCommand cmd = new SqlCommand(sql, (SqlConnection)DataConnection))
+                {
+                    cmd.Parameters.AddWithValue("@FromDate", fromDate.Date);
+                    cmd.Parameters.AddWithValue("@ToDate", toDate.Date.AddDays(1).AddSeconds(-1));
+                    cmd.Parameters.AddWithValue("@BranchId", branchId);
+                    cmd.Parameters.AddWithValue("@CompanyId", companyId);
+
+                    using (SqlDataReader reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            list.Add(new ExpenseVoucherTransactionItem
+                            {
+                                VoucherID = reader["VoucherID"] != DBNull.Value ? Convert.ToInt64(reader["VoucherID"]) : 0,
+                                VoucherDate = reader["VoucherDate"] != DBNull.Value ? Convert.ToDateTime(reader["VoucherDate"]) : DateTime.MinValue,
+                                VoucherNumber = reader["VoucherNumber"]?.ToString() ?? "",
+                                VoucherType = reader["VoucherType"]?.ToString() ?? "",
+                                LedgerName = reader["LedgerName"]?.ToString() ?? "",
+                                GroupName = reader["GroupName"]?.ToString() ?? "",
+                                ExpenseType = reader["ExpenseType"]?.ToString() ?? "Indirect Expense",
+                                Debit = reader["Debit"] != DBNull.Value ? Convert.ToDecimal(reader["Debit"]) : 0,
+                                Credit = reader["Credit"] != DBNull.Value ? Convert.ToDecimal(reader["Credit"]) : 0,
+                                NetAmount = reader["NetAmount"] != DBNull.Value ? Convert.ToDecimal(reader["NetAmount"]) : 0,
+                                Narration = reader["Narration"]?.ToString() ?? ""
+                            });
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("GetExpenseVoucherTransactions error: " + ex.Message);
+            }
+            finally
+            {
+                if (DataConnection != null && DataConnection.State == ConnectionState.Open)
+                    DataConnection.Close();
+            }
+            return list;
         }
 
         private static decimal GetDecimal(DataRow row, string colName)

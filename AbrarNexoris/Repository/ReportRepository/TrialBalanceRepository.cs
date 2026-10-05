@@ -54,18 +54,29 @@ namespace Repository.ReportRepository
                         DataSet ds = new DataSet();
                         adapter.Fill(ds);
 
-                        // Result Set 1: Individual Ledger Line Items
+                        // Result Set 1: Individual Ledger Line Items (deduplicated by LedgerID)
+                        var seenLedgerIds = new HashSet<int>();
                         if (ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0)
                         {
                             foreach (DataRow row in ds.Tables[0].Rows)
                             {
+                                int ledgerId = row["LedgerID"] != DBNull.Value ? Convert.ToInt32(row["LedgerID"]) : 0;
+                                if (ledgerId > 0 && seenLedgerIds.Contains(ledgerId))
+                                {
+                                    continue; // Skip duplicate records returned by multi-branch SP join
+                                }
+                                if (ledgerId > 0)
+                                {
+                                    seenLedgerIds.Add(ledgerId);
+                                }
+
                                 report.LineItems.Add(new TrialBalanceLineItem
                                 {
-                                    LedgerID = Convert.ToInt32(row["LedgerID"]),
-                                    LedgerName = row["LedgerName"].ToString(),
-                                    GroupID = Convert.ToInt32(row["GroupID"]),
-                                    GroupName = row["GroupName"].ToString(),
-                                    GroupType = row["GroupType"].ToString(),
+                                    LedgerID = ledgerId,
+                                    LedgerName = row["LedgerName"] != DBNull.Value ? row["LedgerName"].ToString() : string.Empty,
+                                    GroupID = row["GroupID"] != DBNull.Value ? Convert.ToInt32(row["GroupID"]) : 0,
+                                    GroupName = row["GroupName"] != DBNull.Value ? row["GroupName"].ToString() : string.Empty,
+                                    GroupType = row["GroupType"] != DBNull.Value ? row["GroupType"].ToString() : string.Empty,
                                     OpeningDebit = row["OpeningDebit"] != DBNull.Value ? Convert.ToDecimal(row["OpeningDebit"]) : 0,
                                     OpeningCredit = row["OpeningCredit"] != DBNull.Value ? Convert.ToDecimal(row["OpeningCredit"]) : 0,
                                     TransactionDebit = row["TransactionDebit"] != DBNull.Value ? Convert.ToDecimal(row["TransactionDebit"]) : 0,
@@ -76,18 +87,25 @@ namespace Repository.ReportRepository
                             }
                         }
 
-                        // Result Set 2: Summary Totals
-                        if (ds.Tables.Count > 1 && ds.Tables[1].Rows.Count > 0)
+                        // Summary Totals: Calculate from clean, deduplicated line items
+                        decimal totalOpDr = 0, totalOpCr = 0, totalTxnDr = 0, totalTxnCr = 0, totalClDr = 0, totalClCr = 0;
+                        foreach (var item in report.LineItems)
                         {
-                            DataRow row = ds.Tables[1].Rows[0];
-                            report.Summary.TotalOpeningDebit = row["TotalOpeningDebit"] != DBNull.Value ? Convert.ToDecimal(row["TotalOpeningDebit"]) : 0;
-                            report.Summary.TotalOpeningCredit = row["TotalOpeningCredit"] != DBNull.Value ? Convert.ToDecimal(row["TotalOpeningCredit"]) : 0;
-                            report.Summary.TotalTransactionDebit = row["TotalTransactionDebit"] != DBNull.Value ? Convert.ToDecimal(row["TotalTransactionDebit"]) : 0;
-                            report.Summary.TotalTransactionCredit = row["TotalTransactionCredit"] != DBNull.Value ? Convert.ToDecimal(row["TotalTransactionCredit"]) : 0;
-                            report.Summary.TotalClosingDebit = row["TotalClosingDebit"] != DBNull.Value ? Convert.ToDecimal(row["TotalClosingDebit"]) : 0;
-                            report.Summary.TotalClosingCredit = row["TotalClosingCredit"] != DBNull.Value ? Convert.ToDecimal(row["TotalClosingCredit"]) : 0;
-                            report.Summary.Difference = row["Difference"] != DBNull.Value ? Convert.ToDecimal(row["Difference"]) : 0;
+                            totalOpDr += item.OpeningDebit;
+                            totalOpCr += item.OpeningCredit;
+                            totalTxnDr += item.TransactionDebit;
+                            totalTxnCr += item.TransactionCredit;
+                            totalClDr += item.ClosingDebit;
+                            totalClCr += item.ClosingCredit;
                         }
+
+                        report.Summary.TotalOpeningDebit = totalOpDr;
+                        report.Summary.TotalOpeningCredit = totalOpCr;
+                        report.Summary.TotalTransactionDebit = totalTxnDr;
+                        report.Summary.TotalTransactionCredit = totalTxnCr;
+                        report.Summary.TotalClosingDebit = totalClDr;
+                        report.Summary.TotalClosingCredit = totalClCr;
+                        report.Summary.Difference = totalClDr - totalClCr;
                     }
                 }
             }
