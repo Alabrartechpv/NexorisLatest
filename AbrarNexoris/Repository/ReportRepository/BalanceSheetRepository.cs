@@ -96,11 +96,13 @@ namespace Repository.ReportRepository
                         if (ds.Tables.Count > 2 && ds.Tables[2].Rows.Count > 0)
                         {
                             DataRow row = ds.Tables[2].Rows[0];
-                            report.Summary.TotalAssets = row["TotalAssets"] != DBNull.Value ? Convert.ToDecimal(row["TotalAssets"]) : 0;
-                            report.Summary.TotalLiabilities = row["TotalLiabilities"] != DBNull.Value ? Convert.ToDecimal(row["TotalLiabilities"]) : 0;
-                            report.Summary.TotalCapital = row["TotalCapital"] != DBNull.Value ? Convert.ToDecimal(row["TotalCapital"]) : 0;
-                            report.Summary.NetProfitLoss = row["NetProfitLoss"] != DBNull.Value ? Convert.ToDecimal(row["NetProfitLoss"]) : 0;
-                            report.Summary.Difference = row["Difference"] != DBNull.Value ? Convert.ToDecimal(row["Difference"]) : 0;
+                            report.Summary.TotalAssets = row.Table.Columns.Contains("TotalAssets") && row["TotalAssets"] != DBNull.Value ? Convert.ToDecimal(row["TotalAssets"]) : 0;
+                            report.Summary.TotalLiabilities = row.Table.Columns.Contains("TotalLiabilities") && row["TotalLiabilities"] != DBNull.Value ? Convert.ToDecimal(row["TotalLiabilities"]) : 0;
+                            report.Summary.TotalCapital = row.Table.Columns.Contains("TotalCapital") && row["TotalCapital"] != DBNull.Value ? Convert.ToDecimal(row["TotalCapital"]) : 0;
+                            report.Summary.NetProfitLoss = row.Table.Columns.Contains("NetProfitLoss") && row["NetProfitLoss"] != DBNull.Value
+                                ? Convert.ToDecimal(row["NetProfitLoss"])
+                                : (row.Table.Columns.Contains("NetProfit") && row["NetProfit"] != DBNull.Value ? Convert.ToDecimal(row["NetProfit"]) : 0);
+                            report.Summary.Difference = row.Table.Columns.Contains("Difference") && row["Difference"] != DBNull.Value ? Convert.ToDecimal(row["Difference"]) : 0;
                         }
                     }
                 }

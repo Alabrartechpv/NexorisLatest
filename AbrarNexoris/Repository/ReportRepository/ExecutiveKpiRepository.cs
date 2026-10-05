@@ -112,11 +112,11 @@ namespace Repository.ReportRepository
                             model.HoldBillsValue = GetDecimal(r, "HoldBillsValue");
                             model.HoldBillsCount = GetInt(r, "HoldBillsCount");
                             model.HoldItemsCount = GetDecimal(r, "HoldItemsCount");
+                            model.GrossProfit = GetDecimal(r, "GrossProfit");
+                            model.GrossProfitMarginPercent = GetDecimal(r, "GrossProfitMarginPercent");
                             model.CostOfGoodsSold = r.Table.Columns.Contains("CostOfGoodsSold") && r["CostOfGoodsSold"] != DBNull.Value
                                 ? GetDecimal(r, "CostOfGoodsSold")
                                 : Math.Max(0, model.TotalSalesRevenue - model.GrossProfit);
-                            model.GrossProfit = GetDecimal(r, "GrossProfit");
-                            model.GrossProfitMarginPercent = GetDecimal(r, "GrossProfitMarginPercent");
 
                             // 3. Tax / GST Liabilities
                             model.OutputGstAmount = GetDecimal(r, "OutputGstAmount");

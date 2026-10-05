@@ -507,7 +507,7 @@ namespace PosBranch_Win.Dashboard
             // ═══════════════════════════════════════════════════════════════════
             // 38. GROWTH PERFORMANCE MATRIX
             // ═══════════════════════════════════════════════════════════════════
-            var headerGrowth = CreateSectionHeader("38. Growth Performance Matrix", 0, containerWidth);
+            var headerGrowth = CreateSectionHeader("Growth Performance Matrix", 0, containerWidth);
             headerGrowth.Location = new Point(leftMargin, currentY);
             pnlScrollableContent.Controls.Add(headerGrowth);
             currentY += headerGrowth.Height + 3;
