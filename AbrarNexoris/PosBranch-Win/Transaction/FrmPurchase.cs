@@ -6127,12 +6127,12 @@ namespace PosBranch_Win.Transaction
                     // Clear fields after successful save (this will regenerate the next purchase number)
                     Clear();
 
-                    // Offer to preview the saved purchase invoice
+                    // Offer to print/preview the saved purchase invoice
                     if (savedPurchaseNo > 0)
                     {
                         DialogResult printChoice = MessageBox.Show(
-                            "Do you want to preview the Purchase Invoice?",
-                            "Print Preview",
+                            "Do you want to print purchase bill?",
+                            "Print Purchase Bill",
                             MessageBoxButtons.YesNo,
                             MessageBoxIcon.Question
                         );
