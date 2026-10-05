@@ -51,6 +51,7 @@ namespace Repository
         public static string _4GetLedgerIdByLedgerNameAndGroupId = "_4GetLedgerIdByLedgerNameAndGroupId";
         public static string POS = "_POS";
         public static string _POS_GetBill = "_POS_GetBill";
+        public static string _POS_GetPurchasePrint = "_POS_GetPurchasePrint";
         public static string POS_Purchase = "POS_Purchase";
         public static string POS_Purchase_Details = "POS_Purchase_Details";
         public static string POS_PurchaseOrder = "_PurchaseOrder";
