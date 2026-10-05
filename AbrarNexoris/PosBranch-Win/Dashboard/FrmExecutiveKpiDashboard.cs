@@ -1,5 +1,7 @@
 using ModelClass;
+using ModelClass.Master;
 using ModelClass.Report;
+using Repository;
 using Repository.ReportRepository;
 using System;
 using System.Collections.Generic;
@@ -23,10 +25,20 @@ namespace PosBranch_Win.Dashboard
         private static readonly Color SectionSubColor = Color.FromArgb(85, 105, 135);
 
         private readonly ExecutiveKpiRepository _repository = new ExecutiveKpiRepository();
+        private readonly Dropdowns _dropdowns = new Dropdowns();
+        private readonly List<ComboItem> _groupOptions = new List<ComboItem>();
+        private readonly List<ComboItem> _categoryOptions = new List<ComboItem>();
         private readonly Action<Form, string> _openFormInTab;
         private readonly CultureInfo _culture = new CultureInfo("en-IN");
         private ExecutiveKpiModel _model = new ExecutiveKpiModel();
         private BackgroundWorker _worker;
+
+        private class ComboItem
+        {
+            public string Text { get; set; }
+            public string Value { get; set; }
+            public string ParentValue { get; set; }
+        }
 
         public FrmExecutiveKpiDashboard() : this(null)
         {
@@ -46,10 +58,15 @@ namespace PosBranch_Win.Dashboard
             _worker = new BackgroundWorker();
             _worker.DoWork += (s, e) =>
             {
-                var args = (Tuple<DateTime, DateTime>)e.Argument;
+                var args = (Tuple<DateTime, DateTime, int?, int?, string, string>)e.Argument;
                 try
                 {
-                    e.Result = _repository.GetExecutiveKpiData(args.Item1, args.Item2);
+                    var result = _repository.GetExecutiveKpiData(args.Item1, args.Item2, groupId: args.Item3, categoryId: args.Item4);
+                    result.GroupId = args.Item3;
+                    result.CategoryId = args.Item4;
+                    result.GroupName = args.Item5;
+                    result.CategoryName = args.Item6;
+                    e.Result = result;
                 }
                 catch (Exception ex)
                 {
@@ -79,6 +96,7 @@ namespace PosBranch_Win.Dashboard
 
         private void FrmExecutiveKpiDashboard_Load(object sender, EventArgs e)
         {
+            InitGroupAndCategoryCombos();
             InitPeriodCombo();
             SetDefaultDates();
             LoadDashboardData();
@@ -90,6 +108,112 @@ namespace PosBranch_Win.Dashboard
             {
                 PopulateDashboardData();
             }
+        }
+
+        private void InitGroupAndCategoryCombos()
+        {
+            BindGroupCombo();
+            BindCategoryCombo();
+
+            comboGroup.ValueChanged += (s, e) =>
+            {
+                ApplyCategoryOptions();
+            };
+        }
+
+        private void BindGroupCombo()
+        {
+            _groupOptions.Clear();
+            _groupOptions.Add(new ComboItem { Text = "ALL", Value = "ALL" });
+
+            try
+            {
+                GroupDDlGrid groups = _dropdowns.getGroupDDl();
+                if (groups != null && groups.List != null)
+                {
+                    foreach (GroupDDL item in groups.List)
+                    {
+                        _groupOptions.Add(new ComboItem
+                        {
+                            Text = item.GroupName ?? string.Empty,
+                            Value = item.Id.ToString()
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error loading groups: {ex.Message}");
+            }
+
+            BindCombo(comboGroup, _groupOptions, "ALL");
+        }
+
+        private void BindCategoryCombo()
+        {
+            _categoryOptions.Clear();
+            _categoryOptions.Add(new ComboItem { Text = "ALL", Value = "ALL", ParentValue = "ALL" });
+
+            try
+            {
+                CategoryDDlGrid categories = _dropdowns.getCategoryDDl(string.Empty);
+                if (categories != null && categories.List != null)
+                {
+                    foreach (CategoryDDL item in categories.List)
+                    {
+                        _categoryOptions.Add(new ComboItem
+                        {
+                            Text = item.CategoryName ?? string.Empty,
+                            Value = item.Id.ToString(),
+                            ParentValue = item.GroupId > 0 ? item.GroupId.ToString() : "ALL"
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error loading categories: {ex.Message}");
+            }
+
+            ApplyCategoryOptions();
+        }
+
+        private void ApplyCategoryOptions()
+        {
+            string selectedGroup = GetSelectedValue(comboGroup);
+
+            List<ComboItem> items = _categoryOptions
+                .Where(x => x.Value == "ALL" || string.Equals(selectedGroup, "ALL", StringComparison.OrdinalIgnoreCase) || x.ParentValue == selectedGroup)
+                .ToList();
+
+            string existingValue = GetSelectedValue(comboCategory);
+            string selectedValue = items.Any(x => x.Value == existingValue) ? existingValue : "ALL";
+            BindCombo(comboCategory, items, selectedValue);
+        }
+
+        private void BindCombo(Infragistics.Win.UltraWinEditors.UltraComboEditor combo, List<ComboItem> items, string selectedValue)
+        {
+            combo.Items.Clear();
+            foreach (ComboItem item in items)
+            {
+                combo.Items.Add(item.Value, item.Text);
+            }
+            combo.Value = selectedValue;
+        }
+
+        private string GetSelectedValue(Infragistics.Win.UltraWinEditors.UltraComboEditor combo)
+        {
+            return combo.Value == null ? "ALL" : combo.Value.ToString();
+        }
+
+        private int? ToNullableInt(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value) || string.Equals(value, "ALL", StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+            int parsed;
+            return int.TryParse(value, out parsed) ? (int?)parsed : null;
         }
 
         private void InitPeriodCombo()
@@ -188,15 +312,26 @@ namespace PosBranch_Win.Dashboard
                 to = swap;
             }
 
+            int? groupId = ToNullableInt(GetSelectedValue(comboGroup));
+            int? categoryId = ToNullableInt(GetSelectedValue(comboCategory));
+            string groupName = comboGroup.SelectedItem != null && GetSelectedValue(comboGroup) != "ALL" ? comboGroup.SelectedItem.DisplayText : "";
+            string categoryName = comboCategory.SelectedItem != null && GetSelectedValue(comboCategory) != "ALL" ? comboCategory.SelectedItem.DisplayText : "";
+
+            var requestArgs = Tuple.Create(from, to, groupId, categoryId, groupName, categoryName);
+
             if (_worker != null && !_worker.IsBusy)
             {
-                _worker.RunWorkerAsync(Tuple.Create(from, to));
+                _worker.RunWorkerAsync(requestArgs);
             }
             else
             {
                 try
                 {
-                    _model = _repository.GetExecutiveKpiData(from, to);
+                    _model = _repository.GetExecutiveKpiData(from, to, groupId: groupId, categoryId: categoryId);
+                    _model.GroupId = groupId;
+                    _model.CategoryId = categoryId;
+                    _model.GroupName = groupName;
+                    _model.CategoryName = categoryName;
                 }
                 catch (Exception ex)
                 {
@@ -941,7 +1076,7 @@ namespace PosBranch_Win.Dashboard
             sb.AppendLine("  <Style ss:ID=\"NegativeGrowth\"><Font ss:FontName=\"Segoe UI\" ss:Size=\"10\" ss:Bold=\"1\" ss:Color=\"#B71C1C\"/><Alignment ss:Horizontal=\"Center\" ss:Vertical=\"Center\"/><Borders><Border ss:Position=\"Bottom\" ss:LineStyle=\"Continuous\" ss:Weight=\"1\" ss:Color=\"#E0E0E0\"/><Border ss:Position=\"Left\" ss:LineStyle=\"Continuous\" ss:Weight=\"1\" ss:Color=\"#E0E0E0\"/><Border ss:Position=\"Right\" ss:LineStyle=\"Continuous\" ss:Weight=\"1\" ss:Color=\"#E0E0E0\"/><Border ss:Position=\"Top\" ss:LineStyle=\"Continuous\" ss:Weight=\"1\" ss:Color=\"#E0E0E0\"/></Borders></Style>");
             sb.AppendLine(" </Styles>");
 
-            string periodLabel = _model.FromDate <= new DateTime(1990, 1, 1) ? $"All Time (Up to {_model.ToDate:dd-MMM-yyyy})" : $"{_model.FromDate:dd-MMM-yyyy} to {_model.ToDate:dd-MMM-yyyy}";
+            string filterLabel = GetFilterLabel();
 
             // ═══════════════════════════════════════════════════════════════════
             // WORKSHEET 1: GROWTH PERFORMANCE MATRIX
@@ -961,7 +1096,7 @@ namespace PosBranch_Win.Dashboard
             sb.AppendLine("    <Cell ss:StyleID=\"Title\"><Data ss:Type=\"String\">Executive Business KPI Dashboard — Growth Performance Matrix</Data></Cell>");
             sb.AppendLine("   </Row>");
             sb.AppendLine("   <Row ss:Height=\"18\">");
-            sb.AppendLine($"    <Cell ss:StyleID=\"Meta\"><Data ss:Type=\"String\">Selected Period: {EscapeXml(periodLabel)} | Generated: {_model.GeneratedAt:dd-MMM-yyyy hh:mm tt}</Data></Cell>");
+            sb.AppendLine($"    <Cell ss:StyleID=\"Meta\"><Data ss:Type=\"String\">{EscapeXml(filterLabel)} | Generated: {_model.GeneratedAt:dd-MMM-yyyy hh:mm tt}</Data></Cell>");
             sb.AppendLine("   </Row>");
             sb.AppendLine("   <Row ss:Height=\"6\"/>"); // Spacer
 
@@ -1096,7 +1231,7 @@ namespace PosBranch_Win.Dashboard
             sb.AppendLine("    <Cell ss:StyleID=\"Title\"><Data ss:Type=\"String\">Executive Business KPI Dashboard — Complete 37 Metrics Summary</Data></Cell>");
             sb.AppendLine("   </Row>");
             sb.AppendLine("   <Row ss:Height=\"18\">");
-            sb.AppendLine($"    <Cell ss:StyleID=\"Meta\"><Data ss:Type=\"String\">Period: {EscapeXml(periodLabel)} | Generated: {_model.GeneratedAt:dd-MMM-yyyy hh:mm tt}</Data></Cell>");
+            sb.AppendLine($"    <Cell ss:StyleID=\"Meta\"><Data ss:Type=\"String\">{EscapeXml(filterLabel)} | Generated: {_model.GeneratedAt:dd-MMM-yyyy hh:mm tt}</Data></Cell>");
             sb.AppendLine("   </Row>");
             sb.AppendLine("   <Row ss:Height=\"6\"/>");
 
@@ -1198,9 +1333,9 @@ namespace PosBranch_Win.Dashboard
             sb.AppendLine(".right { text-align: right; }");
             sb.AppendLine("</style></head><body><div class='container'>");
 
-            string periodLabel = _model.FromDate <= new DateTime(1990, 1, 1) ? $"All Time (Up to {_model.ToDate:dd-MMM-yyyy})" : $"{_model.FromDate:dd-MMM-yyyy} to {_model.ToDate:dd-MMM-yyyy}";
+            string filterLabel = GetFilterLabel();
             sb.AppendLine("<h1>Executive Business KPI Cockpit — 37 Key Metrics</h1>");
-            sb.AppendLine($"<div class='meta'>Period: <b>{periodLabel}</b> | Generated: <b>{_model.GeneratedAt:dd-MMM-yyyy hh:mm tt}</b></div>");
+            sb.AppendLine($"<div class='meta'>{EscapeXml(filterLabel)} | Generated: <b>{_model.GeneratedAt:dd-MMM-yyyy hh:mm tt}</b></div>");
 
             // 1. Growth Performance Matrix
             sb.AppendLine("<h2>1. Growth Performance Matrix</h2>");
@@ -1269,6 +1404,7 @@ namespace PosBranch_Win.Dashboard
         private void ExportCsv(string filePath)
         {
             var sb = new StringBuilder();
+            sb.AppendLine($"# Filter: {GetFilterLabel()} | Generated: {_model.GeneratedAt:dd-MMM-yyyy hh:mm tt}");
             sb.AppendLine("SI No,Metric Name,Value,Notes");
             sb.AppendLine($"1,Total Stock Value,\"{_model.TotalStockCostValue:N2}\",At Cost Price ({_model.TotalStockItemCount} Items, {_model.TotalStockQuantity} Units)");
             sb.AppendLine($"2,Stock Profit Potential,\"{_model.StockProfitPotential:N2}\",Retail Value: {_model.TotalStockRetailValue:N2}");
@@ -1322,6 +1458,21 @@ namespace PosBranch_Win.Dashboard
                 }
             }
             File.WriteAllText(filePath, sb.ToString(), Encoding.UTF8);
+        }
+
+        private string GetFilterLabel()
+        {
+            string periodLabel = _model.FromDate <= new DateTime(1990, 1, 1) ? $"All Time (Up to {_model.ToDate:dd-MMM-yyyy})" : $"{_model.FromDate:dd-MMM-yyyy} to {_model.ToDate:dd-MMM-yyyy}";
+            var filters = new List<string> { $"Period: {periodLabel}" };
+            if (!string.IsNullOrEmpty(_model.GroupName))
+            {
+                filters.Add($"Group: {_model.GroupName}");
+            }
+            if (!string.IsNullOrEmpty(_model.CategoryName))
+            {
+                filters.Add($"Category: {_model.CategoryName}");
+            }
+            return string.Join(" | ", filters);
         }
 
         private string FormatCurr(decimal val)

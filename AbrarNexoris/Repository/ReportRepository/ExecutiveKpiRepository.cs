@@ -1,6 +1,7 @@
 using Dapper;
 using ModelClass;
 using ModelClass.Report;
+using Repository.Accounts;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -12,7 +13,7 @@ namespace Repository.ReportRepository
 {
     public class ExecutiveKpiRepository : BaseRepostitory
     {
-        public ExecutiveKpiModel GetExecutiveKpiData(DateTime fromDate, DateTime toDate, int branchId = 0, int companyId = 0, int finYearId = 0)
+        public ExecutiveKpiModel GetExecutiveKpiData(DateTime fromDate, DateTime toDate, int branchId = 0, int companyId = 0, int finYearId = 0, int? groupId = null, int? categoryId = null)
         {
             var model = new ExecutiveKpiModel();
 
@@ -44,12 +45,17 @@ namespace Repository.ReportRepository
                 model.BranchId = effectiveBranch;
                 model.CompanyId = effectiveCompany;
                 model.FinYearId = effectiveFinYear;
+                model.GroupId = groupId;
+                model.CategoryId = categoryId;
                 model.BranchName = !string.IsNullOrWhiteSpace(SessionContext.BranchName) ? SessionContext.BranchName : DataBase.Branch;
 
+                // ═══════════════════════════════════════════════════════════════════
+                // EXECUTE STORED PROCEDURE: _POS_ExecutiveDashboardKPIs
+                // ═══════════════════════════════════════════════════════════════════
                 using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._POS_ExecutiveDashboardKPIs, (SqlConnection)DataConnection))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.CommandTimeout = 90;
+                    cmd.CommandTimeout = 120;
                     cmd.Parameters.AddWithValue("@CompanyId", effectiveCompany);
                     cmd.Parameters.AddWithValue("@BranchId", effectiveBranch);
                     cmd.Parameters.AddWithValue("@FinYearId", effectiveFinYear);
@@ -150,6 +156,12 @@ namespace Repository.ReportRepository
                             model.DeletionCount = GetInt(r, "DeletionCount");
                             model.PriceChangeCount = GetInt(r, "PriceChangeCount");
                             model.StockAdjustmentCount = GetInt(r, "StockAdjustmentCount");
+
+                            // 8. Manual Party Balances
+                            model.TotalManualBalance = GetDecimal(r, "TotalManualBalance");
+                            model.ManualCustomerBalance = GetDecimal(r, "ManualCustomerBalance");
+                            model.ManualVendorBalance = GetDecimal(r, "ManualVendorBalance");
+                            model.ManualBalanceCount = GetInt(r, "ManualBalanceCount");
                         }
 
                         // Result Set 2: Monthly Growth Matrix
@@ -201,214 +213,224 @@ namespace Repository.ReportRepository
                 }
 
                 // ═══════════════════════════════════════════════════════════════════
-                // RECONCILE: Override stock metrics using the same SP as the
-                // Stock Valuation Report (_Test16 / _POS_StockReportAdvanced)
-                // so that the dashboard and the report always match exactly.
+                // GROUP / CATEGORY STOCK RECONCILIATION VIA STORED PROCEDURE
+                // Execute _POS_StockReportAdvanced (_Test16) stored procedure directly
                 // ═══════════════════════════════════════════════════════════════════
-                try
+                if ((groupId.HasValue && groupId.Value > 0) || (categoryId.HasValue && categoryId.Value > 0))
                 {
-                    if (DataConnection.State != ConnectionState.Open)
-                        DataConnection.Open();
-
-                    using (SqlCommand cmdStock = new SqlCommand(STOREDPROCEDURE._POS_StockReportAdvanced, (SqlConnection)DataConnection))
+                    try
                     {
-                        cmdStock.CommandType = CommandType.StoredProcedure;
-                        cmdStock.CommandTimeout = 180;
-                        cmdStock.Parameters.AddWithValue("@FromDate", new DateTime(1753, 1, 1));
-                        cmdStock.Parameters.AddWithValue("@ToDate", DateTime.Today.AddDays(1).AddSeconds(-1));
-                        cmdStock.Parameters.AddWithValue("@CompanyId", effectiveCompany);
-                        cmdStock.Parameters.AddWithValue("@BranchId", effectiveBranch);
-                        cmdStock.Parameters.AddWithValue("@FinYearId", effectiveFinYear);
-                        cmdStock.Parameters.AddWithValue("@BarcodeContains", DBNull.Value);
-                        cmdStock.Parameters.AddWithValue("@GroupId", DBNull.Value);
-                        cmdStock.Parameters.AddWithValue("@CategoryId", DBNull.Value);
-                        cmdStock.Parameters.AddWithValue("@SubCategoryId", DBNull.Value);
-                        cmdStock.Parameters.AddWithValue("@LedgerId", DBNull.Value);
+                        if (DataConnection.State != ConnectionState.Open)
+                            DataConnection.Open();
 
-                        using (SqlDataAdapter adaptStock = new SqlDataAdapter(cmdStock))
+                        using (SqlCommand cmdStock = new SqlCommand(STOREDPROCEDURE._POS_StockReportAdvanced, (SqlConnection)DataConnection))
                         {
-                            DataTable dtStock = new DataTable();
-                            adaptStock.Fill(dtStock);
+                            cmdStock.CommandType = CommandType.StoredProcedure;
+                            cmdStock.CommandTimeout = 180;
+                            cmdStock.Parameters.AddWithValue("@FromDate", rangeFrom);
+                            cmdStock.Parameters.AddWithValue("@ToDate", rangeTo.AddDays(1).AddSeconds(-1));
+                            cmdStock.Parameters.AddWithValue("@CompanyId", effectiveCompany);
+                            cmdStock.Parameters.AddWithValue("@BranchId", effectiveBranch);
+                            cmdStock.Parameters.AddWithValue("@FinYearId", effectiveFinYear);
+                            cmdStock.Parameters.AddWithValue("@BarcodeContains", DBNull.Value);
+                            cmdStock.Parameters.AddWithValue("@GroupId", (groupId.HasValue && groupId.Value > 0) ? (object)groupId.Value : DBNull.Value);
+                            cmdStock.Parameters.AddWithValue("@CategoryId", (categoryId.HasValue && categoryId.Value > 0) ? (object)categoryId.Value : DBNull.Value);
+                            cmdStock.Parameters.AddWithValue("@SubCategoryId", DBNull.Value);
+                            cmdStock.Parameters.AddWithValue("@LedgerId", DBNull.Value);
 
-                            if (dtStock != null && dtStock.Rows.Count > 0)
+                            using (SqlDataAdapter adaptStock = new SqlDataAdapter(cmdStock))
                             {
-                                decimal totalRetailValueAll = 0;
-                                decimal totalQtyAll = 0;
-                                int itemCountAll = 0;
+                                DataTable dtStock = new DataTable();
+                                adaptStock.Fill(dtStock);
 
-                                decimal negImpactValue = 0;
-                                decimal negTotalQty = 0;
-                                int negItemCount = 0;
-
-                                foreach (DataRow sr in dtStock.Rows)
+                                if (dtStock != null && dtStock.Rows.Count > 0)
                                 {
-                                    decimal closingStock = sr["ClosingStock"] != DBNull.Value ? Convert.ToDecimal(sr["ClosingStock"]) : 0;
-                                    decimal cost = sr["Cost"] != DBNull.Value ? Convert.ToDecimal(sr["Cost"]) : 0;
-                                    decimal retail = sr["RetailPrice"] != DBNull.Value ? Convert.ToDecimal(sr["RetailPrice"]) : 0;
+                                    decimal totalCostAll = 0;
+                                    decimal totalRetailValueAll = 0;
+                                    decimal totalQtyAll = 0;
+                                    int itemCountAll = 0;
 
-                                    totalRetailValueAll += Math.Round(closingStock * retail, 2);
-                                    totalQtyAll += closingStock;
-                                    itemCountAll++;
+                                    decimal negImpactValue = 0;
+                                    decimal negTotalQty = 0;
+                                    int negItemCount = 0;
 
-                                    if (closingStock < 0)
+                                    decimal filteredSales = 0;
+                                    decimal filteredProfit = 0;
+                                    decimal filteredPurchases = 0;
+                                    decimal filteredSalesReturn = 0;
+                                    decimal filteredPurchaseReturn = 0;
+                                    decimal filteredLossStockVal = 0;
+                                    decimal filteredLossStockQty = 0;
+                                    int filteredLossItemCount = 0;
+                                    decimal filteredExtraStockVal = 0;
+                                    decimal filteredExtraStockQty = 0;
+                                    int filteredExtraItemCount = 0;
+                                    decimal filteredHoldVal = 0;
+                                    decimal filteredHoldQty = 0;
+                                    int filteredDeadItemCount = 0;
+                                    decimal filteredDeadStockVal = 0;
+
+                                    foreach (DataRow sr in dtStock.Rows)
                                     {
-                                        negImpactValue += Math.Round(Math.Abs(closingStock) * cost, 2);
-                                        negTotalQty += closingStock; // negative
-                                        negItemCount++;
+                                        decimal closingStock = sr["ClosingStock"] != DBNull.Value ? Convert.ToDecimal(sr["ClosingStock"]) : 0;
+                                        decimal cost = sr["Cost"] != DBNull.Value ? Convert.ToDecimal(sr["Cost"]) : 0;
+                                        decimal retail = sr["RetailPrice"] != DBNull.Value ? Convert.ToDecimal(sr["RetailPrice"]) : 0;
+                                        decimal saleAmt = sr["SaleAmount"] != DBNull.Value ? Convert.ToDecimal(sr["SaleAmount"]) : 0;
+                                        decimal profit = sr["Profit"] != DBNull.Value ? Convert.ToDecimal(sr["Profit"]) : 0;
+                                        decimal purchQty = sr["Purchase"] != DBNull.Value ? Convert.ToDecimal(sr["Purchase"]) : 0;
+                                        decimal sRetQty = sr["SalesReturn"] != DBNull.Value ? Convert.ToDecimal(sr["SalesReturn"]) : 0;
+                                        decimal pRetQty = sr["PurchaseReturn"] != DBNull.Value ? Convert.ToDecimal(sr["PurchaseReturn"]) : 0;
+                                        decimal adjOut = sr["StockAdjustmentOut"] != DBNull.Value ? Convert.ToDecimal(sr["StockAdjustmentOut"]) : 0;
+                                        decimal adjIn = sr["StockAdjustmentIn"] != DBNull.Value ? Convert.ToDecimal(sr["StockAdjustmentIn"]) : 0;
+                                        decimal hold = sr.Table.Columns.Contains("HoldQty") && sr["HoldQty"] != DBNull.Value ? Convert.ToDecimal(sr["HoldQty"]) : 0;
+                                        decimal salesQty = sr["Sales"] != DBNull.Value ? Convert.ToDecimal(sr["Sales"]) : 0;
+
+                                        totalCostAll += Math.Round(closingStock * cost, 2);
+                                        totalRetailValueAll += Math.Round(closingStock * retail, 2);
+                                        totalQtyAll += closingStock;
+                                        itemCountAll++;
+
+                                        if (closingStock < 0)
+                                        {
+                                            negImpactValue += Math.Round(Math.Abs(closingStock) * cost, 2);
+                                            negTotalQty += closingStock;
+                                            negItemCount++;
+                                        }
+
+                                        filteredSales += saleAmt;
+                                        filteredProfit += profit;
+                                        filteredPurchases += Math.Round(purchQty * cost, 2);
+                                        filteredSalesReturn += Math.Round(sRetQty * retail, 2);
+                                        filteredPurchaseReturn += Math.Round(pRetQty * cost, 2);
+
+                                        if (adjOut > 0)
+                                        {
+                                            filteredLossStockVal += Math.Round(adjOut * cost, 2);
+                                            filteredLossStockQty += adjOut;
+                                            filteredLossItemCount++;
+                                        }
+                                        if (adjIn > 0)
+                                        {
+                                            filteredExtraStockVal += Math.Round(adjIn * cost, 2);
+                                            filteredExtraStockQty += adjIn;
+                                            filteredExtraItemCount++;
+                                        }
+                                        if (hold > 0)
+                                        {
+                                            filteredHoldVal += Math.Round(hold * retail, 2);
+                                            filteredHoldQty += hold;
+                                        }
+                                        if (salesQty == 0 && closingStock > 0)
+                                        {
+                                            filteredDeadStockVal += Math.Round(closingStock * cost, 2);
+                                            filteredDeadItemCount++;
+                                        }
                                     }
+
+                                    model.TotalStockCostValue = totalCostAll;
+                                    model.TotalStockRetailValue = totalRetailValueAll;
+                                    model.TotalStockItemCount = itemCountAll;
+                                    model.TotalStockQuantity = totalQtyAll;
+                                    model.StockProfitPotential = Math.Max(0, totalRetailValueAll - totalCostAll);
+
+                                    model.NegativeStockImpactValue = negImpactValue;
+                                    model.NegativeStockItemCount = negItemCount;
+                                    model.NegativeStockTotalQty = negTotalQty;
+
+                                    model.TotalSalesRevenue = filteredSales;
+                                    model.GrossProfit = filteredProfit;
+                                    model.CostOfGoodsSold = Math.Max(0, filteredSales - filteredProfit);
+                                    model.GrossProfitMarginPercent = filteredSales > 0 ? Math.Round((filteredProfit / filteredSales) * 100m, 1) : 0;
+                                    model.TotalPurchases = filteredPurchases;
+                                    model.TotalSalesReturn = filteredSalesReturn;
+                                    model.TotalPurchaseReturn = filteredPurchaseReturn;
+                                    model.LossStockValue = filteredLossStockVal;
+                                    model.LossStockQty = filteredLossStockQty;
+                                    model.LossStockItemCount = filteredLossItemCount;
+                                    model.ExtraStockValue = filteredExtraStockVal;
+                                    model.ExtraStockQty = filteredExtraStockQty;
+                                    model.ExtraStockItemCount = filteredExtraItemCount;
+                                    model.NetStockAdjustmentValue = filteredExtraStockVal - filteredLossStockVal;
+                                    model.HoldBillsValue = filteredHoldVal;
+                                    model.HoldItemsCount = filteredHoldQty;
+                                    model.DeadStockValue = filteredDeadStockVal;
+                                    model.DeadStockItemCount = filteredDeadItemCount;
+
+                                    model.ActualNetProfit = filteredProfit;
+                                    model.OperatingProfitMarginPercent = filteredSales > 0 ? Math.Round((filteredProfit / filteredSales) * 100m, 2) : 0;
                                 }
-
-                                model.TotalStockRetailValue = totalRetailValueAll;
-                                model.TotalStockItemCount = itemCountAll;
-                                model.TotalStockQuantity = totalQtyAll;
-
-                                model.NegativeStockImpactValue = negImpactValue;
-                                model.NegativeStockItemCount = negItemCount;
-                                model.NegativeStockTotalQty = negTotalQty;
                             }
                         }
                     }
-
-                    // Get TotalStockCostValue using SQL-side SUM to match Balance Sheet / Trading P&L SP precision
-                    string sqlStockSum = @"
-                        CREATE TABLE #DashStockVal (
-                            ItemId INT, GroupName NVARCHAR(500), CategoryName NVARCHAR(500), SubCategoryName NVARCHAR(500),
-                            Barcode NVARCHAR(100), ItemName NVARCHAR(500), OpeningStock DECIMAL(18,5), Purchase DECIMAL(18,5),
-                            PurchaseReturn DECIMAL(18,5), StockAdjustmentIn DECIMAL(18,5), StockAdjustmentOut DECIMAL(18,5),
-                            StockTransferIn DECIMAL(18,5), StockTransferOut DECIMAL(18,5), Sales DECIMAL(18,5), Profit DECIMAL(18,5),
-                            SaleAmount DECIMAL(18,5), SalesReturn DECIMAL(18,5), ClosingStock DECIMAL(18,5), OrderedStock DECIMAL(18,5),
-                            HoldQty DECIMAL(18,5), Cost DECIMAL(18,5), RetailPrice DECIMAL(18,5), WholeSalePrice DECIMAL(18,5),
-                            CreditPrice DECIMAL(18,5), BaseUnitName NVARCHAR(100)
-                        );
-                        INSERT INTO #DashStockVal
-                        EXEC [dbo].[_Test16] 
-                            @FromDate = '1753-01-01', @ToDate = @p_ToDate, 
-                            @CompanyId = @p_CompanyId, @BranchId = @p_BranchId, @FinYearId = @p_FinYearId;
-                        SELECT ISNULL(SUM(ClosingStock * Cost), 0) AS StockValuation FROM #DashStockVal;
-                        DROP TABLE #DashStockVal;";
-
-                    using (SqlCommand cmdSum = new SqlCommand(sqlStockSum, (SqlConnection)DataConnection))
+                    catch (Exception exStock)
                     {
-                        cmdSum.CommandTimeout = 180;
-                        cmdSum.Parameters.AddWithValue("@p_ToDate", DateTime.Today.AddDays(1).AddSeconds(-1));
-                        cmdSum.Parameters.AddWithValue("@p_CompanyId", effectiveCompany);
-                        cmdSum.Parameters.AddWithValue("@p_BranchId", effectiveBranch);
-                        cmdSum.Parameters.AddWithValue("@p_FinYearId", effectiveFinYear);
-
-                        object sumResult = cmdSum.ExecuteScalar();
-                        if (sumResult != null && sumResult != DBNull.Value)
-                        {
-                            model.TotalStockCostValue = Convert.ToDecimal(sumResult);
-                        }
+                        System.Diagnostics.Debug.WriteLine($"Stock filter SP execution info: {exStock.Message}");
                     }
-
-                    model.StockProfitPotential = model.TotalStockRetailValue - model.TotalStockCostValue;
-                }
-                catch (Exception exStock)
-                {
-                    // If the reconciliation query fails, keep the original dashboard values
-                    System.Diagnostics.Debug.WriteLine($"Stock reconciliation fallback: {exStock.Message}");
                 }
 
                 // ═══════════════════════════════════════════════════════════════════
-                // MANUAL PARTY BALANCE INTEGRATION
-                // Fetch active manual customer and vendor balances
+                // MANUAL PARTY BALANCE INTEGRATION VIA STORED PROCEDURE
+                // If not populated by dashboard SP, query via ManualPartyBalanceRepository
                 // ═══════════════════════════════════════════════════════════════════
-                try
+                if (model.TotalManualBalance == 0 && model.ManualBalanceCount == 0)
                 {
-                    if (DataConnection.State != ConnectionState.Open)
-                        DataConnection.Open();
-
-                    const string sqlManual = @"
-IF OBJECT_ID('dbo.ManualPartyBalance', 'U') IS NOT NULL
-BEGIN
-    SELECT 
-        b.Id,
-        b.PartyType,
-        b.BalanceType,
-        b.Amount,
-        ISNULL(s.SettledAmount, 0) AS SettledAmount,
-        (b.Amount - ISNULL(s.SettledAmount, 0)) AS RemainingAmount
-    FROM dbo.ManualPartyBalance b
-    OUTER APPLY (
-        SELECT SUM(SettlementAmount) AS SettledAmount
-        FROM dbo.ManualPartyBalanceSettlement
-        WHERE ManualPartyBalanceId = b.Id AND IsDeleted = 0
-    ) s
-    WHERE b.IsDeleted = 0
-      AND b.Status <> 'Settled'
-      AND (@CompanyId = 0 OR b.CompanyId = @CompanyId)
-      AND (@BranchId = 0 OR b.BranchId = @BranchId)
-      AND (b.EntryDate <= @ToDate);
-END";
-
-                    using (SqlCommand cmdManual = new SqlCommand(sqlManual, (SqlConnection)DataConnection))
+                    try
                     {
-                        cmdManual.CommandType = CommandType.Text;
-                        cmdManual.CommandTimeout = 60;
-                        cmdManual.Parameters.AddWithValue("@CompanyId", effectiveCompany);
-                        cmdManual.Parameters.AddWithValue("@BranchId", effectiveBranch);
-                        cmdManual.Parameters.AddWithValue("@ToDate", rangeTo.AddDays(1).AddTicks(-1));
-
-                        using (SqlDataAdapter adaptManual = new SqlDataAdapter(cmdManual))
+                        var manualRepo = new ManualPartyBalanceRepository();
+                        var entries = manualRepo.GetEntries(openOnly: true, toDate: rangeTo);
+                        if (entries != null && entries.Count > 0)
                         {
-                            DataTable dtManual = new DataTable();
-                            adaptManual.Fill(dtManual);
+                            decimal totalManual = 0;
+                            decimal manualCust = 0;
+                            decimal manualVend = 0;
+                            int manualCount = 0;
 
-                            if (dtManual != null && dtManual.Rows.Count > 0)
+                            foreach (var item in entries)
                             {
-                                decimal totalManual = 0;
-                                decimal manualCust = 0;
-                                decimal manualVend = 0;
-                                int manualCount = 0;
+                                decimal rem = item.RemainingAmount;
+                                if (rem <= 0) continue;
 
-                                foreach (DataRow mr in dtManual.Rows)
+                                totalManual += rem;
+                                manualCount++;
+
+                                string pType = item.PartyType ?? "";
+                                string bType = item.BalanceType ?? "";
+
+                                bool isCustomer = pType.IndexOf("Customer", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                                  pType.IndexOf("Debtor", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                                  bType.IndexOf("Receivable", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                                  bType.IndexOf("Debit", StringComparison.OrdinalIgnoreCase) >= 0;
+
+                                bool isVendor = pType.IndexOf("Vendor", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                                pType.IndexOf("Supplier", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                                pType.IndexOf("Creditor", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                                bType.IndexOf("Payable", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                                bType.IndexOf("Credit", StringComparison.OrdinalIgnoreCase) >= 0;
+
+                                if (isCustomer && !isVendor)
                                 {
-                                    decimal rem = mr["RemainingAmount"] != DBNull.Value ? Convert.ToDecimal(mr["RemainingAmount"]) : 0;
-                                    if (rem <= 0) continue;
-
-                                    string pType = mr["PartyType"]?.ToString() ?? "";
-                                    string bType = mr["BalanceType"]?.ToString() ?? "";
-
-                                    totalManual += rem;
-                                    manualCount++;
-
-                                    bool isCustomer = pType.IndexOf("Customer", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                                      pType.IndexOf("Debtor", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                                      bType.IndexOf("Receivable", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                                      bType.IndexOf("Debit", StringComparison.OrdinalIgnoreCase) >= 0;
-
-                                    bool isVendor = pType.IndexOf("Vendor", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                                    pType.IndexOf("Supplier", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                                    pType.IndexOf("Creditor", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                                    bType.IndexOf("Payable", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                                                    bType.IndexOf("Credit", StringComparison.OrdinalIgnoreCase) >= 0;
-
-                                    if (isCustomer && !isVendor)
-                                    {
-                                        manualCust += rem;
-                                    }
-                                    else if (isVendor)
-                                    {
-                                        manualVend += rem;
-                                    }
-                                    else
-                                    {
-                                        manualCust += rem;
-                                    }
+                                    manualCust += rem;
                                 }
-
-                                model.TotalManualBalance = totalManual;
-                                model.ManualCustomerBalance = manualCust;
-                                model.ManualVendorBalance = manualVend;
-                                model.ManualBalanceCount = manualCount;
+                                else if (isVendor)
+                                {
+                                    manualVend += rem;
+                                }
+                                else
+                                {
+                                    manualCust += rem;
+                                }
                             }
+
+                            model.TotalManualBalance = totalManual;
+                            model.ManualCustomerBalance = manualCust;
+                            model.ManualVendorBalance = manualVend;
+                            model.ManualBalanceCount = manualCount;
                         }
                     }
-                }
-                catch (Exception exManual)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Manual balance calculation fallback: {exManual.Message}");
+                    catch (Exception exManual)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Manual balance SP integration info: {exManual.Message}");
+                    }
                 }
             }
             catch (Exception ex)
@@ -448,4 +470,3 @@ END";
         }
     }
 }
-

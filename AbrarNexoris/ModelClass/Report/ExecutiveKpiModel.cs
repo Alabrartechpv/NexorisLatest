@@ -5,13 +5,22 @@ namespace ModelClass.Report
 {
     public class ExecutiveKpiModel
     {
+        public ExecutiveKpiModel()
+        {
+            GeneratedAt = DateTime.Now;
+        }
+
         public DateTime FromDate { get; set; }
         public DateTime ToDate { get; set; }
         public int BranchId { get; set; }
         public string BranchName { get; set; }
         public int CompanyId { get; set; }
         public int FinYearId { get; set; }
-        public DateTime GeneratedAt { get; set; } = DateTime.Now;
+        public int? GroupId { get; set; }
+        public string GroupName { get; set; }
+        public int? CategoryId { get; set; }
+        public string CategoryName { get; set; }
+        public DateTime GeneratedAt { get; set; }
 
         // ═══════════════════════════════════════════════════════════════════
         // SECTION 1: INVENTORY & VALUATION (Metrics 1, 2, 5, 6, 14, 15, 16, 20, 21, 22)

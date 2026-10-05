@@ -28,6 +28,10 @@ namespace PosBranch_Win.Dashboard
             this.lblFrom = new System.Windows.Forms.Label();
             this.comboPeriod = new Infragistics.Win.UltraWinEditors.UltraComboEditor();
             this.lblDateRange = new System.Windows.Forms.Label();
+            this.comboCategory = new Infragistics.Win.UltraWinEditors.UltraComboEditor();
+            this.lblCategory = new System.Windows.Forms.Label();
+            this.comboGroup = new Infragistics.Win.UltraWinEditors.UltraComboEditor();
+            this.lblGroup = new System.Windows.Forms.Label();
             this.lblDashboardSubtitle = new System.Windows.Forms.Label();
             this.lblDashboardTitle = new System.Windows.Forms.Label();
             this.pnlScrollableContent = new System.Windows.Forms.Panel();
@@ -36,6 +40,8 @@ namespace PosBranch_Win.Dashboard
             ((System.ComponentModel.ISupportInitialize)(this.dtTo)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.dtFrom)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.comboPeriod)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.comboCategory)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.comboGroup)).BeginInit();
             this.SuspendLayout();
             // 
             // pnlTopHeader
@@ -63,9 +69,13 @@ namespace PosBranch_Win.Dashboard
             this.pnlFilters.Controls.Add(this.lblFrom);
             this.pnlFilters.Controls.Add(this.comboPeriod);
             this.pnlFilters.Controls.Add(this.lblDateRange);
-            this.pnlFilters.Location = new System.Drawing.Point(544, 4);
+            this.pnlFilters.Controls.Add(this.comboCategory);
+            this.pnlFilters.Controls.Add(this.lblCategory);
+            this.pnlFilters.Controls.Add(this.comboGroup);
+            this.pnlFilters.Controls.Add(this.lblGroup);
+            this.pnlFilters.Location = new System.Drawing.Point(296, 4);
             this.pnlFilters.Name = "pnlFilters";
-            this.pnlFilters.Size = new System.Drawing.Size(704, 38);
+            this.pnlFilters.Size = new System.Drawing.Size(958, 38);
             this.pnlFilters.TabIndex = 2;
             // 
             // btnPrint
@@ -76,10 +86,10 @@ namespace PosBranch_Win.Dashboard
             this.btnPrint.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnPrint.Font = new System.Drawing.Font("Segoe UI", 8F);
             this.btnPrint.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(49)))), ((int)(((byte)(102)))));
-            this.btnPrint.Location = new System.Drawing.Point(616, 6);
+            this.btnPrint.Location = new System.Drawing.Point(874, 6);
             this.btnPrint.Name = "btnPrint";
-            this.btnPrint.Size = new System.Drawing.Size(82, 26);
-            this.btnPrint.TabIndex = 8;
+            this.btnPrint.Size = new System.Drawing.Size(78, 26);
+            this.btnPrint.TabIndex = 12;
             this.btnPrint.Text = "🖨️ Export";
             this.btnPrint.UseVisualStyleBackColor = false;
             // 
@@ -91,10 +101,10 @@ namespace PosBranch_Win.Dashboard
             this.btnRefresh.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnRefresh.Font = new System.Drawing.Font("Segoe UI", 8F);
             this.btnRefresh.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(49)))), ((int)(((byte)(102)))));
-            this.btnRefresh.Location = new System.Drawing.Point(534, 6);
+            this.btnRefresh.Location = new System.Drawing.Point(796, 6);
             this.btnRefresh.Name = "btnRefresh";
-            this.btnRefresh.Size = new System.Drawing.Size(76, 26);
-            this.btnRefresh.TabIndex = 7;
+            this.btnRefresh.Size = new System.Drawing.Size(74, 26);
+            this.btnRefresh.TabIndex = 11;
             this.btnRefresh.Text = "🔄 Refresh";
             this.btnRefresh.UseVisualStyleBackColor = false;
             // 
@@ -106,10 +116,10 @@ namespace PosBranch_Win.Dashboard
             this.btnApply.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnApply.Font = new System.Drawing.Font("Segoe UI Semibold", 8F, System.Drawing.FontStyle.Bold);
             this.btnApply.ForeColor = System.Drawing.Color.White;
-            this.btnApply.Location = new System.Drawing.Point(456, 6);
+            this.btnApply.Location = new System.Drawing.Point(730, 6);
             this.btnApply.Name = "btnApply";
-            this.btnApply.Size = new System.Drawing.Size(72, 26);
-            this.btnApply.TabIndex = 6;
+            this.btnApply.Size = new System.Drawing.Size(62, 26);
+            this.btnApply.TabIndex = 10;
             this.btnApply.Text = "Apply";
             this.btnApply.UseVisualStyleBackColor = false;
             // 
@@ -117,40 +127,40 @@ namespace PosBranch_Win.Dashboard
             // 
             this.dtTo.DisplayStyle = Infragistics.Win.EmbeddableElementDisplayStyle.Office2013;
             this.dtTo.Font = new System.Drawing.Font("Segoe UI", 8.5F);
-            this.dtTo.Location = new System.Drawing.Point(346, 7);
+            this.dtTo.Location = new System.Drawing.Point(632, 7);
             this.dtTo.Name = "dtTo";
-            this.dtTo.Size = new System.Drawing.Size(102, 24);
-            this.dtTo.TabIndex = 5;
+            this.dtTo.Size = new System.Drawing.Size(92, 24);
+            this.dtTo.TabIndex = 9;
             // 
             // lblTo
             // 
             this.lblTo.AutoSize = true;
             this.lblTo.Font = new System.Drawing.Font("Segoe UI Semibold", 8F);
             this.lblTo.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(49)))), ((int)(((byte)(102)))));
-            this.lblTo.Location = new System.Drawing.Point(320, 11);
+            this.lblTo.Location = new System.Drawing.Point(608, 11);
             this.lblTo.Name = "lblTo";
             this.lblTo.Size = new System.Drawing.Size(22, 13);
-            this.lblTo.TabIndex = 4;
+            this.lblTo.TabIndex = 8;
             this.lblTo.Text = "To:";
             // 
             // dtFrom
             // 
             this.dtFrom.DisplayStyle = Infragistics.Win.EmbeddableElementDisplayStyle.Office2013;
             this.dtFrom.Font = new System.Drawing.Font("Segoe UI", 8.5F);
-            this.dtFrom.Location = new System.Drawing.Point(212, 7);
+            this.dtFrom.Location = new System.Drawing.Point(512, 7);
             this.dtFrom.Name = "dtFrom";
-            this.dtFrom.Size = new System.Drawing.Size(102, 24);
-            this.dtFrom.TabIndex = 3;
+            this.dtFrom.Size = new System.Drawing.Size(92, 24);
+            this.dtFrom.TabIndex = 7;
             // 
             // lblFrom
             // 
             this.lblFrom.AutoSize = true;
             this.lblFrom.Font = new System.Drawing.Font("Segoe UI Semibold", 8F);
             this.lblFrom.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(49)))), ((int)(((byte)(102)))));
-            this.lblFrom.Location = new System.Drawing.Point(171, 11);
+            this.lblFrom.Location = new System.Drawing.Point(475, 11);
             this.lblFrom.Name = "lblFrom";
             this.lblFrom.Size = new System.Drawing.Size(36, 13);
-            this.lblFrom.TabIndex = 2;
+            this.lblFrom.TabIndex = 6;
             this.lblFrom.Text = "From:";
             // 
             // comboPeriod
@@ -158,21 +168,63 @@ namespace PosBranch_Win.Dashboard
             this.comboPeriod.DisplayStyle = Infragistics.Win.EmbeddableElementDisplayStyle.Office2013;
             this.comboPeriod.DropDownStyle = Infragistics.Win.DropDownStyle.DropDownList;
             this.comboPeriod.Font = new System.Drawing.Font("Segoe UI", 8.5F);
-            this.comboPeriod.Location = new System.Drawing.Point(53, 7);
+            this.comboPeriod.Location = new System.Drawing.Point(376, 7);
             this.comboPeriod.Name = "comboPeriod";
-            this.comboPeriod.Size = new System.Drawing.Size(110, 24);
-            this.comboPeriod.TabIndex = 1;
+            this.comboPeriod.Size = new System.Drawing.Size(95, 24);
+            this.comboPeriod.TabIndex = 5;
             // 
             // lblDateRange
             // 
             this.lblDateRange.AutoSize = true;
             this.lblDateRange.Font = new System.Drawing.Font("Segoe UI Semibold", 8F);
             this.lblDateRange.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(49)))), ((int)(((byte)(102)))));
-            this.lblDateRange.Location = new System.Drawing.Point(6, 11);
+            this.lblDateRange.Location = new System.Drawing.Point(332, 11);
             this.lblDateRange.Name = "lblDateRange";
             this.lblDateRange.Size = new System.Drawing.Size(43, 13);
-            this.lblDateRange.TabIndex = 0;
+            this.lblDateRange.TabIndex = 4;
             this.lblDateRange.Text = "Period:";
+            // 
+            // comboCategory
+            // 
+            this.comboCategory.DisplayStyle = Infragistics.Win.EmbeddableElementDisplayStyle.Office2013;
+            this.comboCategory.DropDownStyle = Infragistics.Win.DropDownStyle.DropDownList;
+            this.comboCategory.Font = new System.Drawing.Font("Segoe UI", 8.5F);
+            this.comboCategory.Location = new System.Drawing.Point(216, 7);
+            this.comboCategory.Name = "comboCategory";
+            this.comboCategory.Size = new System.Drawing.Size(112, 24);
+            this.comboCategory.TabIndex = 3;
+            // 
+            // lblCategory
+            // 
+            this.lblCategory.AutoSize = true;
+            this.lblCategory.Font = new System.Drawing.Font("Segoe UI Semibold", 8F);
+            this.lblCategory.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(49)))), ((int)(((byte)(102)))));
+            this.lblCategory.Location = new System.Drawing.Point(158, 11);
+            this.lblCategory.Name = "lblCategory";
+            this.lblCategory.Size = new System.Drawing.Size(56, 13);
+            this.lblCategory.TabIndex = 2;
+            this.lblCategory.Text = "Category:";
+            // 
+            // comboGroup
+            // 
+            this.comboGroup.DisplayStyle = Infragistics.Win.EmbeddableElementDisplayStyle.Office2013;
+            this.comboGroup.DropDownStyle = Infragistics.Win.DropDownStyle.DropDownList;
+            this.comboGroup.Font = new System.Drawing.Font("Segoe UI", 8.5F);
+            this.comboGroup.Location = new System.Drawing.Point(46, 7);
+            this.comboGroup.Name = "comboGroup";
+            this.comboGroup.Size = new System.Drawing.Size(108, 24);
+            this.comboGroup.TabIndex = 1;
+            // 
+            // lblGroup
+            // 
+            this.lblGroup.AutoSize = true;
+            this.lblGroup.Font = new System.Drawing.Font("Segoe UI Semibold", 8F);
+            this.lblGroup.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(18)))), ((int)(((byte)(49)))), ((int)(((byte)(102)))));
+            this.lblGroup.Location = new System.Drawing.Point(4, 11);
+            this.lblGroup.Name = "lblGroup";
+            this.lblGroup.Size = new System.Drawing.Size(41, 13);
+            this.lblGroup.TabIndex = 0;
+            this.lblGroup.Text = "Group:";
             // 
             // lblDashboardSubtitle
             // 
@@ -181,9 +233,9 @@ namespace PosBranch_Win.Dashboard
             this.lblDashboardSubtitle.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(80)))), ((int)(((byte)(110)))), ((int)(((byte)(150)))));
             this.lblDashboardSubtitle.Location = new System.Drawing.Point(14, 27);
             this.lblDashboardSubtitle.Name = "lblDashboardSubtitle";
-            this.lblDashboardSubtitle.Size = new System.Drawing.Size(306, 12);
+            this.lblDashboardSubtitle.Size = new System.Drawing.Size(275, 12);
             this.lblDashboardSubtitle.TabIndex = 1;
-            this.lblDashboardSubtitle.Text = "36 Key Business Metrics, Financial Health, Inventory Valuation & Growth Matrix";
+            this.lblDashboardSubtitle.Text = "36 Key Business Metrics, Valuation & Performance Matrix";
             // 
             // lblDashboardTitle
             // 
@@ -224,6 +276,8 @@ namespace PosBranch_Win.Dashboard
             ((System.ComponentModel.ISupportInitialize)(this.dtTo)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.dtFrom)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.comboPeriod)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.comboCategory)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.comboGroup)).EndInit();
             this.ResumeLayout(false);
 
         }
@@ -234,6 +288,10 @@ namespace PosBranch_Win.Dashboard
         private System.Windows.Forms.Label lblDashboardTitle;
         private System.Windows.Forms.Label lblDashboardSubtitle;
         private System.Windows.Forms.Panel pnlFilters;
+        private System.Windows.Forms.Label lblGroup;
+        private Infragistics.Win.UltraWinEditors.UltraComboEditor comboGroup;
+        private System.Windows.Forms.Label lblCategory;
+        private Infragistics.Win.UltraWinEditors.UltraComboEditor comboCategory;
         private System.Windows.Forms.Label lblDateRange;
         private Infragistics.Win.UltraWinEditors.UltraComboEditor comboPeriod;
         private System.Windows.Forms.Label lblFrom;
