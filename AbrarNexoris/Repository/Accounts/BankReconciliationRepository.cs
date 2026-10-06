@@ -16,9 +16,9 @@ namespace Repository.Accounts
         {
             var result = new BankReconciliationResult();
 
-            int companyId = SessionContext.CompanyId > 0 ? SessionContext.CompanyId : Convert.ToInt32(DataBase.CompanyId);
-            int branchId = SessionContext.BranchId > 0 ? SessionContext.BranchId : Convert.ToInt32(DataBase.BranchId);
-            int finYearId = SessionContext.FinYearId > 0 ? SessionContext.FinYearId : Convert.ToInt32(DataBase.FinyearId);
+            int companyId = GetContextValue(SessionContext.CompanyId, DataBase.CompanyId);
+            int branchId = GetContextValue(SessionContext.BranchId, DataBase.BranchId);
+            int finYearId = GetContextValue(SessionContext.FinYearId, DataBase.FinyearId);
 
             if (DataConnection.State == ConnectionState.Open)
                 DataConnection.Close();
@@ -95,9 +95,9 @@ namespace Repository.Accounts
         /// </summary>
         public int ReconcileBatch(List<BankReconciliationItem> items, int ledgerId)
         {
-            int companyId = SessionContext.CompanyId > 0 ? SessionContext.CompanyId : Convert.ToInt32(DataBase.CompanyId);
-            int branchId = SessionContext.BranchId > 0 ? SessionContext.BranchId : Convert.ToInt32(DataBase.BranchId);
-            int finYearId = SessionContext.FinYearId > 0 ? SessionContext.FinYearId : Convert.ToInt32(DataBase.FinyearId);
+            int companyId = GetContextValue(SessionContext.CompanyId, DataBase.CompanyId);
+            int branchId = GetContextValue(SessionContext.BranchId, DataBase.BranchId);
+            int finYearId = GetContextValue(SessionContext.FinYearId, DataBase.FinyearId);
 
             if (DataConnection.State == ConnectionState.Open)
                 DataConnection.Close();

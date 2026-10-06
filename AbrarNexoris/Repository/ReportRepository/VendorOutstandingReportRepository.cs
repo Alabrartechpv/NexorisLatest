@@ -25,9 +25,13 @@ namespace Repository.ReportRepository
                 using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_VendorOutstandingListing, (SqlConnection)DataConnection))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.Add("@CompanyId", SqlDbType.Int).Value = filter.CompanyId > 0 ? (object)filter.CompanyId : DBNull.Value;
-                    cmd.Parameters.Add("@BranchId", SqlDbType.Int).Value = filter.BranchId > 0 ? (object)filter.BranchId : DBNull.Value;
-                    cmd.Parameters.Add("@FinYearId", SqlDbType.Int).Value = filter.FinYearId > 0 ? (object)filter.FinYearId : DBNull.Value;
+                    int companyId = filter.CompanyId > 0 ? filter.CompanyId : GetContextValue(SessionContext.CompanyId, DataBase.CompanyId);
+                    int branchId = filter.BranchId > 0 ? filter.BranchId : GetContextValue(SessionContext.BranchId, DataBase.BranchId);
+                    int finYearId = filter.FinYearId > 0 ? filter.FinYearId : GetContextValue(SessionContext.FinYearId, DataBase.FinyearId);
+
+                    cmd.Parameters.Add("@CompanyId", SqlDbType.Int).Value = companyId > 0 ? (object)companyId : DBNull.Value;
+                    cmd.Parameters.Add("@BranchId", SqlDbType.Int).Value = branchId > 0 ? (object)branchId : DBNull.Value;
+                    cmd.Parameters.Add("@FinYearId", SqlDbType.Int).Value = finYearId > 0 ? (object)finYearId : DBNull.Value;
                     cmd.Parameters.Add("@LedgerId", SqlDbType.Int).Value = filter.LedgerId > 0 ? (object)filter.LedgerId : DBNull.Value;
                     cmd.Parameters.Add("@FromLedgerId", SqlDbType.Int).Value = filter.FromLedgerId > 0 ? (object)filter.FromLedgerId : DBNull.Value;
                     cmd.Parameters.Add("@ToLedgerId", SqlDbType.Int).Value = filter.ToLedgerId > 0 ? (object)filter.ToLedgerId : DBNull.Value;

@@ -25,10 +25,13 @@ namespace Repository.ReportRepository
                 using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._POS_CashBankBook, (SqlConnection)DataConnection))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.CommandTimeout = 60;
-                    cmd.Parameters.AddWithValue("@CompanyId", SessionContext.CompanyId);
-                    cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
-                    cmd.Parameters.AddWithValue("@FinYearId", SessionContext.FinYearId);
+                    int companyId = GetContextValue(SessionContext.CompanyId, DataBase.CompanyId);
+                    int branchId = GetContextValue(SessionContext.BranchId, DataBase.BranchId);
+                    int finYearId = GetContextValue(SessionContext.FinYearId, DataBase.FinyearId);
+
+                    cmd.Parameters.AddWithValue("@CompanyId", companyId);
+                    cmd.Parameters.AddWithValue("@BranchId", branchId);
+                    cmd.Parameters.AddWithValue("@FinYearId", finYearId);
                     cmd.Parameters.AddWithValue("@LedgerId", ledgerId);
                     cmd.Parameters.AddWithValue("@FromDate", fromDate);
                     cmd.Parameters.AddWithValue("@ToDate", toDate);

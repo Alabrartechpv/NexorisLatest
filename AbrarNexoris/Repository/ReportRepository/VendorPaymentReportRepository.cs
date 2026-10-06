@@ -32,9 +32,12 @@ namespace Repository.ReportRepository
 
                 using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._VendorPaymentReport, (SqlConnection)DataConnection))
                 {
+                    int companyId = filter.CompanyId > 0 ? filter.CompanyId : GetContextValue(SessionContext.CompanyId, DataBase.CompanyId);
+                    int branchId = filter.BranchId > 0 ? filter.BranchId : GetContextValue(SessionContext.BranchId, DataBase.BranchId);
+
                     cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.Add("@CompanyId", SqlDbType.Int).Value = filter.CompanyId;
-                    cmd.Parameters.Add("@BranchId", SqlDbType.Int).Value = filter.BranchId;
+                    cmd.Parameters.Add("@CompanyId", SqlDbType.Int).Value = companyId;
+                    cmd.Parameters.Add("@BranchId", SqlDbType.Int).Value = branchId;
                     cmd.Parameters.Add("@FromDate", SqlDbType.Date).Value = filter.FromDate.Date;
                     cmd.Parameters.Add("@ToDate", SqlDbType.Date).Value = filter.ToDate.Date;
                     cmd.Parameters.Add("@VendorLedgerId", SqlDbType.Int).Value = filter.VendorLedgerId;

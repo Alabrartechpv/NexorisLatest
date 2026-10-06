@@ -13,8 +13,6 @@ using Repository;
 using Repository.Accounts;
 using ModelClass;
 using ModelClass.Accounts;
-
-using ModelClass.Accounts;
 using PosBranch_Win.DialogBox;
 
 namespace PosBranch_Win.Accounts
@@ -32,6 +30,11 @@ namespace PosBranch_Win.Accounts
         private bool isLoadingData = false;  // Prevents event loops during programmatic loads
         private int selectionOrderCounter = 0;
         private int currentDebitNoteId = 0; // Tracks the currently loaded Debit Note record ID
+
+        private int GetCompanyId() => SessionContext.CompanyId > 0 ? SessionContext.CompanyId : (int.TryParse(DataBase.CompanyId, out int cid) && cid > 0 ? cid : 1);
+        private int GetBranchId() => SessionContext.BranchId > 0 ? SessionContext.BranchId : (int.TryParse(DataBase.BranchId, out int bid) && bid > 0 ? bid : 1);
+        private int GetUserId() => SessionContext.UserId > 0 ? SessionContext.UserId : (int.TryParse(DataBase.UserId, out int uid) && uid > 0 ? uid : 1);
+        private int GetFinYearId() => SessionContext.FinYearId > 0 ? SessionContext.FinYearId : (int.TryParse(DataBase.FinyearId, out int fid) && fid > 0 ? fid : 1);
 
         public FrmDebitNote()
         {
@@ -69,7 +72,7 @@ namespace PosBranch_Win.Accounts
         private void InitializeForm()
         {
             debitNoteRepo = new DebitNoteRepository();
-            currentBranchId = Convert.ToInt32(DataBase.BranchId);
+            currentBranchId = GetBranchId();
 
             // Initialize date
             dtpPurchaseDate.Value = DateTime.Now;
@@ -493,9 +496,9 @@ namespace PosBranch_Win.Accounts
 
                 DebitNoteMaster master = new DebitNoteMaster
                 {
-                    CompanyId = Convert.ToInt32(DataBase.CompanyId),
-                    BranchId = currentBranchId,
-                    FinYearId = SessionContext.FinYearId,
+                    CompanyId = GetCompanyId(),
+                    BranchId = GetBranchId(),
+                    FinYearId = GetFinYearId(),
                     VoucherDate = (DateTime)dtpPurchaseDate.Value,
                     VendorLedgerId = currentVendorLedgerId,
                     PReturnNo = _pReturnNo,
@@ -503,7 +506,7 @@ namespace PosBranch_Win.Accounts
                     DebitAmount = (double)totalDebitAmount,
                     PaymentMethodLedgerId = purchaseReturnLedgerId,
                     Narration = richTextBox2.Text,
-                    UserId = Convert.ToInt32(DataBase.UserId)
+                    UserId = GetUserId()
                 };
 
                 // Create detail records from grid

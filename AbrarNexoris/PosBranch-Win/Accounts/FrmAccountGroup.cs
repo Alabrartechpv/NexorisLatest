@@ -208,7 +208,7 @@ namespace PosBranch_Win.Accounts
 
             // Duplicate Validation
             string groupName = ultratxtAccName.Text.Trim();
-            int branchId = SessionContext.BranchId;
+            int branchId = SessionContext.BranchId > 0 ? SessionContext.BranchId : (int.TryParse(DataBase.BranchId, out int bId) && bId > 0 ? bId : 1);
             int excludeId = ultratxtAccCode.Tag != null ? Convert.ToInt32(ultratxtAccCode.Tag) : 0;
 
             if (accountGroupRepo.IsAccountGroupNameExists(groupName, branchId, excludeId))
@@ -230,7 +230,7 @@ namespace PosBranch_Win.Accounts
                 int accountCode = Convert.ToInt32(ultratxtAccCode.Text.Trim());
                 string accountName = ultratxtAccName.Text.Trim();
                 string description = ultratxtAccDescription.Text.Trim();
-                int branchID = SessionContext.BranchId; // Secured branch fetch
+                int branchID = SessionContext.BranchId > 0 ? SessionContext.BranchId : (int.TryParse(DataBase.BranchId, out int bId) && bId > 0 ? bId : 1); // Secured branch fetch
 
                 int parentGroupID = Convert.ToInt32(ultraDrpParentGroup.Value);
                 int accountCategoryID = Convert.ToInt32(ultraDrpAccCategory.Value);

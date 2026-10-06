@@ -29,19 +29,24 @@ namespace PosBranch_Win.Accounts
         private bool isSaving = false;
         private CustomerReceiptInfoRepository receiptRepo;
         private int currentCustomerLedgerId = 0;
-        private int currentBranchId = 0; // Will be set from DataBase.BranchId in constructor
+        private int currentBranchId = 0;
         private int selectionOrderCounter = 0; // Added for tracking selection order
         private int currentReceiptId = 0; // Tracks the currently loaded Receipt record ID
         private const string ReceiptStatusActive = "Active";
         private const string ReceiptStatusCancel = "Cancel";
+
+        private int GetCompanyId() => SessionContext.CompanyId > 0 ? SessionContext.CompanyId : (int.TryParse(DataBase.CompanyId, out int cid) && cid > 0 ? cid : 1);
+        private int GetBranchId() => SessionContext.BranchId > 0 ? SessionContext.BranchId : (int.TryParse(DataBase.BranchId, out int bid) && bid > 0 ? bid : 1);
+        private int GetUserId() => SessionContext.UserId > 0 ? SessionContext.UserId : (int.TryParse(DataBase.UserId, out int uid) && uid > 0 ? uid : 1);
+        private int GetFinYearId() => SessionContext.FinYearId > 0 ? SessionContext.FinYearId : (int.TryParse(DataBase.FinyearId, out int fid) && fid > 0 ? fid : 1);
 
         public FrmReceipt()
         {
             InitializeComponent();
             dtpPurchaseDate.Value = DateTime.Now;
 
-            // Initialize branch ID from application context
-            currentBranchId = SessionContext.BranchId;
+            // Initialize branch ID from application context with fallback
+            currentBranchId = GetBranchId();
 
             ultraGrid1.DataSource = CreateEmptyInvoiceTable(); // Bind empty table for consistent headers
             ConfigureGrid();

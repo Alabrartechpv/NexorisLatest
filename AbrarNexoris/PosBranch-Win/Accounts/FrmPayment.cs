@@ -7,14 +7,15 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
-using Repository;
+using Infragistics.Win;
+using Infragistics.Win.UltraWinGrid;
+using ModelClass;
+using ModelClass.Accounts;
 using ModelClass.Master;
 using PosBranch_Win.DialogBox;
-using Infragistics.Win.UltraWinGrid;
-using Infragistics.Win;
-using ModelClass.Accounts;
-using Repository.Accounts;
 using PosBranch_Win.Transaction;
+using Repository;
+using Repository.Accounts;
 using Repository.TransactionRepository;
 
 namespace PosBranch_Win.Accounts
@@ -27,12 +28,18 @@ namespace PosBranch_Win.Accounts
         private bool isSaving = false;
         private VendorPaymentRepository paymentRepo;
         private int currentVendorLedgerId = 0;
-        private int currentCompanyId = ModelClass.SessionContext.CompanyId;
-        private int currentBranchId = ModelClass.SessionContext.BranchId; // Use SessionContext instead of hardcoded value
-        private int currentUserId = ModelClass.SessionContext.UserId; // Use SessionContext instead of hardcoded value
         private int currentPaymentMasterId = 0;
         private const string PaymentStatusActive  = "Active";
         private const string PaymentStatusCancel  = "Cancel";
+
+        private int currentCompanyId => GetCompanyId();
+        private int currentBranchId => GetBranchId();
+        private int currentUserId => GetUserId();
+
+        private int GetCompanyId() => SessionContext.CompanyId > 0 ? SessionContext.CompanyId : (int.TryParse(DataBase.CompanyId, out int cid) && cid > 0 ? cid : 1);
+        private int GetBranchId() => SessionContext.BranchId > 0 ? SessionContext.BranchId : (int.TryParse(DataBase.BranchId, out int bid) && bid > 0 ? bid : 1);
+        private int GetUserId() => SessionContext.UserId > 0 ? SessionContext.UserId : (int.TryParse(DataBase.UserId, out int uid) && uid > 0 ? uid : 1);
+        private int GetFinYearId() => SessionContext.FinYearId > 0 ? SessionContext.FinYearId : (int.TryParse(DataBase.FinyearId, out int fid) && fid > 0 ? fid : 1);
         private const string MsgSelectVendorFirst  = "Please select a vendor first before cancelling GRN payments.";
         private const string MsgSelectVendorTitle  = "Vendor Required";
         private const string GrnCancelledPrefix    = "Cancelled: ";
@@ -961,10 +968,14 @@ namespace PosBranch_Win.Accounts
                 DateTime voucherDate = Convert.ToDateTime(dtpPurchaseDate.Value).Date;
                 int vendorLedgerId = currentVendorLedgerId > 0 ? currentVendorLedgerId : Convert.ToInt32(textBox4.Text);
 
+                int companyId = GetCompanyId();
+                int branchId = GetBranchId();
+                int userId = GetUserId();
+
                 // Create payment master
                 var master = new VendorPaymentMaster
                 {
-                    CompanyId = currentCompanyId,
+                    CompanyId = companyId,
                     VendorLedgerId = vendorLedgerId,
                     VendorName = txtVendorName.Text,
                     PaymentMethod = CmboPayment.Text,
@@ -975,8 +986,8 @@ namespace PosBranch_Win.Accounts
                     PaymentDate = voucherDate,
                     VoucherNo = voucherNo,
                     Remarks = richTextBox2.Text,
-                    BranchId = currentBranchId,
-                    CreatedBy = currentUserId
+                    BranchId = branchId,
+                    CreatedBy = userId
                 };
 
                 // Create payment details
@@ -997,7 +1008,7 @@ namespace PosBranch_Win.Accounts
                             BillDate = row.Cells.Exists("BillDate") && row.Cells["BillDate"].Value != null && row.Cells["BillDate"].Value != DBNull.Value
                                 ? SafeToDateTime(row.Cells["BillDate"].Value)
                                 : Convert.ToDateTime(dtpPurchaseDate.Value),
-                            CreatedBy = currentUserId
+                            CreatedBy = userId
                         };
                         details.Add(detail);
                     }
@@ -1032,8 +1043,8 @@ namespace PosBranch_Win.Accounts
                     CreditAmount = 0,
                     VoucherDate = voucherDate,
                     Narration = $"Payment to {txtVendorName.Text}",
-                    BranchId = currentBranchId,
-                    CreatedBy = currentUserId
+                    BranchId = branchId,
+                    CreatedBy = userId
                 });
 
                 // Credit entry (Cash/Bank account)
@@ -1046,8 +1057,8 @@ namespace PosBranch_Win.Accounts
                     CreditAmount = totalPaymentAmount,
                     VoucherDate = voucherDate,
                     Narration = $"Payment to {txtVendorName.Text}",
-                    BranchId = currentBranchId,
-                    CreatedBy = currentUserId
+                    BranchId = branchId,
+                    CreatedBy = userId
                 });
 
                 // Save to database using stored procedures
