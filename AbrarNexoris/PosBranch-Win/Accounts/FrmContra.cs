@@ -329,10 +329,14 @@ namespace PosBranch_Win.Accounts
             SaveContra(true);
         }
 
-        public void Clear()
-        {
-            ClearForm();
-        }
+        public void RibbonClear() => ClearForm();
+        public void Clear() => ClearForm();
+        public void ClearFields() => ClearForm();
+        public void ClearRecord() => ClearForm();
+        public void Reset() => ClearForm();
+        public void ResetForm() => ClearForm();
+        public void btnClear_Click(object sender, EventArgs e) => ClearForm();
+        public void btnReset_Click(object sender, EventArgs e) => ClearForm();
 
         public void Delete()
         {
@@ -344,15 +348,31 @@ namespace PosBranch_Win.Accounts
             LoadContra();
         }
 
-        private void ClearForm()
+        public void ClearForm()
         {
+            try
+            {
+                if (gridContra != null)
+                {
+                    gridContra.PerformAction(UltraGridAction.ExitEditMode);
+                    gridContra.ActiveCell = null;
+                    gridContra.ActiveRow = null;
+                }
+            }
+            catch { }
+
+            ClearRowErrors();
+
             isBinding = true;
             currentVoucherId = 0;
             txtVoucherNo.Text = string.Empty;
             dtpVoucherDate.Value = DateTime.Today;
             txtNarration.Text = string.Empty;
-            contraLineTable.Clear();
-            contraLineTable.Rows.Add(contraLineTable.NewRow());
+            if (contraLineTable != null)
+            {
+                contraLineTable.Clear();
+                contraLineTable.Rows.Add(contraLineTable.NewRow());
+            }
             isBinding = false;
             UpdateTotals();
         }

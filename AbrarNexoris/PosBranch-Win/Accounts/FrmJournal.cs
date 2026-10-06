@@ -374,10 +374,14 @@ namespace PosBranch_Win.Accounts
             SaveJournal(true);
         }
 
-        public void Clear()
-        {
-            ClearForm();
-        }
+        public void RibbonClear() => ClearForm();
+        public void Clear() => ClearForm();
+        public void ClearFields() => ClearForm();
+        public void ClearRecord() => ClearForm();
+        public void Reset() => ClearForm();
+        public void ResetForm() => ClearForm();
+        public void btnClear_Click(object sender, EventArgs e) => ClearForm();
+        public void btnReset_Click(object sender, EventArgs e) => ClearForm();
 
         public void Delete()
         {
@@ -389,15 +393,31 @@ namespace PosBranch_Win.Accounts
             LoadJournal();
         }
 
-        private void ClearForm()
+        public void ClearForm()
         {
+            try
+            {
+                if (dgvJournal != null)
+                {
+                    dgvJournal.PerformAction(UltraGridAction.ExitEditMode);
+                    dgvJournal.ActiveCell = null;
+                    dgvJournal.ActiveRow = null;
+                }
+            }
+            catch { }
+
+            ClearRowErrors();
+
             isBinding = true;
             currentVoucherId = 0;
             txtVoucherNo.Text = string.Empty;
             dtpVoucherDate.Value = DateTime.Today;
             txtNarration.Text = string.Empty;
-            journalLineTable.Clear();
-            journalLineTable.Rows.Add(journalLineTable.NewRow());
+            if (journalLineTable != null)
+            {
+                journalLineTable.Clear();
+                journalLineTable.Rows.Add(journalLineTable.NewRow());
+            }
             isBinding = false;
             UpdateTotals();
         }

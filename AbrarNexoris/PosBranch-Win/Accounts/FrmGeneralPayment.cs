@@ -436,10 +436,14 @@ namespace PosBranch_Win.Accounts
             SavePayment(true);
         }
 
-        public void Clear()
-        {
-            ClearForm();
-        }
+        public void RibbonClear() => ClearForm();
+        public void Clear() => ClearForm();
+        public void ClearFields() => ClearForm();
+        public void ClearRecord() => ClearForm();
+        public void Reset() => ClearForm();
+        public void ResetForm() => ClearForm();
+        public void btnClear_Click(object sender, EventArgs e) => ClearForm();
+        public void btnReset_Click(object sender, EventArgs e) => ClearForm();
 
         public void Delete()
         {
@@ -453,13 +457,30 @@ namespace PosBranch_Win.Accounts
 
         public void ClearForm()
         {
+            try
+            {
+                if (gridPayment != null)
+                {
+                    gridPayment.PerformAction(UltraGridAction.ExitEditMode);
+                    gridPayment.ActiveCell = null;
+                    gridPayment.ActiveRow = null;
+                }
+            }
+            catch { }
+
+            ClearRowErrors();
+
             isBinding = true;
             currentVoucherId = 0;
             txtVoucherNo.Text = string.Empty;
             dtpVoucherDate.Value = DateTime.Today;
             txtNarration.Text = string.Empty;
-            journalLineTable.Clear();
-            journalLineTable.Rows.Add(journalLineTable.NewRow());
+
+            if (journalLineTable != null)
+            {
+                journalLineTable.Clear();
+                journalLineTable.Rows.Add(journalLineTable.NewRow());
+            }
 
             if (cashBankTable != null && cashBankTable.Rows.Count > 0)
             {
