@@ -115,6 +115,9 @@ namespace PosBranch_Win
         {
             InitializeComponent();
 
+            // Ensure "SEARCH" button exists in Home ribbon
+            EnsureSearchRibbonButton();
+
             // Ribbon tools are now serialized in the designer (Home.Designer.cs)
 
             // UltraTabControl doesn't need DrawItem handler as it has built-in styling
@@ -1048,11 +1051,6 @@ namespace PosBranch_Win
         private void Home_Load(object sender, EventArgs e)
         {
             this.KeyPreview = true;
-            try
-            {
-                Application.AddMessageFilter(new FormSearchShortcutMessageFilter());
-            }
-            catch { }
 
             toolStripStatusLabel1.Text = DataBase.Branch;
             toolStripStatusUserValLabel3.Text = DataBase.UserName;
@@ -1273,6 +1271,9 @@ namespace PosBranch_Win
             // Ensure "Item Type" button exists in the Utilities ribbon
             EnsureItemTypeRibbonButton();
 
+            // Ensure "SEARCH" button exists in the Home ribbon
+            EnsureSearchRibbonButton();
+
             // Apply active persistent language to Home and all controls
             ApplyLanguageToAllForms();
         }
@@ -1372,6 +1373,217 @@ namespace PosBranch_Win
             {
                 System.Diagnostics.Debug.WriteLine($"EnsureItemTypeRibbonButton error: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Programmatically ensures the "SEARCH" button (Ctrl+S) exists in the Home ribbon tab.
+        /// When clicked or triggered by Ctrl+S, opens the Form Search dialog (FrmFormSearch).
+        /// </summary>
+        private void EnsureSearchRibbonButton()
+        {
+            try
+            {
+                const string TOOL_KEY = "Search";
+                const string GROUP_KEY = "ribbonGroupSearch";
+
+                // 1. Ensure the shared ButtonTool exists in the manager
+                Infragistics.Win.UltraWinToolbars.ButtonTool btnTool;
+                if (!ultraToolbarsManager1.Tools.Exists(TOOL_KEY))
+                {
+                    btnTool = new Infragistics.Win.UltraWinToolbars.ButtonTool(TOOL_KEY);
+                    btnTool.SharedProps.Caption = "SEARCH";
+                    btnTool.SharedProps.ToolTipText = "Search All Forms & Menus (Ctrl+S)";
+                    btnTool.SharedProps.DisplayStyle = Infragistics.Win.UltraWinToolbars.ToolDisplayStyle.ImageAndText;
+                    btnTool.SharedProps.Enabled = true;
+                    btnTool.SharedProps.Visible = true;
+
+                    // Apply high-res custom search icon
+                    btnTool.SharedProps.AppearancesLarge.Appearance.Image = CreateSearchRibbonIcon(32);
+                    btnTool.SharedProps.AppearancesSmall.Appearance.Image = CreateSearchRibbonIcon(16);
+
+                    ultraToolbarsManager1.Tools.Add(btnTool);
+                }
+                else
+                {
+                    btnTool = ultraToolbarsManager1.Tools[TOOL_KEY] as Infragistics.Win.UltraWinToolbars.ButtonTool;
+                    if (btnTool != null)
+                    {
+                        btnTool.SharedProps.Caption = "SEARCH";
+                        btnTool.SharedProps.ToolTipText = "Search All Forms & Menus (Ctrl+S)";
+                        btnTool.SharedProps.DisplayStyle = Infragistics.Win.UltraWinToolbars.ToolDisplayStyle.ImageAndText;
+                        btnTool.SharedProps.Enabled = true;
+                        btnTool.SharedProps.Visible = true;
+                        if (btnTool.SharedProps.AppearancesLarge.Appearance.Image == null)
+                        {
+                            btnTool.SharedProps.AppearancesLarge.Appearance.Image = CreateSearchRibbonIcon(32);
+                            btnTool.SharedProps.AppearancesSmall.Appearance.Image = CreateSearchRibbonIcon(16);
+                        }
+                    }
+                }
+
+                // 2. Find Home ribbon tab
+                Infragistics.Win.UltraWinToolbars.RibbonTab homeTab = null;
+                if (ultraToolbarsManager1.Ribbon != null && ultraToolbarsManager1.Ribbon.Tabs != null)
+                {
+                    if (ultraToolbarsManager1.Ribbon.Tabs.Exists("Home"))
+                    {
+                        homeTab = ultraToolbarsManager1.Ribbon.Tabs["Home"];
+                    }
+                    else
+                    {
+                        foreach (Infragistics.Win.UltraWinToolbars.RibbonTab tab in ultraToolbarsManager1.Ribbon.Tabs)
+                        {
+                            if (tab.Caption != null && tab.Caption.Equals("Home", StringComparison.OrdinalIgnoreCase))
+                            {
+                                homeTab = tab;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (homeTab == null) return;
+
+                // 3. Ensure ribbon group exists in Home tab
+                Infragistics.Win.UltraWinToolbars.RibbonGroup searchGroup = null;
+                if (homeTab.Groups.Exists(GROUP_KEY))
+                {
+                    searchGroup = homeTab.Groups[GROUP_KEY];
+                }
+                else
+                {
+                    foreach (Infragistics.Win.UltraWinToolbars.RibbonGroup grp in homeTab.Groups)
+                    {
+                        if (grp.Caption != null && grp.Caption.Equals("Ctrl+S", StringComparison.OrdinalIgnoreCase))
+                        {
+                            searchGroup = grp;
+                            break;
+                        }
+                    }
+                }
+
+                if (searchGroup == null)
+                {
+                    searchGroup = new Infragistics.Win.UltraWinToolbars.RibbonGroup(GROUP_KEY, "Ctrl+S");
+
+                    // Insert before Dashboard / Hold / LastBill if present so it sits cleanly alongside Log Off
+                    int insertIdx = -1;
+                    for (int i = 0; i < homeTab.Groups.Count; i++)
+                    {
+                        if (homeTab.Groups[i].Key == "Dashboard" || homeTab.Groups[i].Caption == "Dashboard" ||
+                            homeTab.Groups[i].Key == "ribbonGroupHold" || homeTab.Groups[i].Key == "ribbonGroupLastBill")
+                        {
+                            insertIdx = i;
+                            break;
+                        }
+                    }
+
+                    if (insertIdx >= 0)
+                    {
+                        homeTab.Groups.Insert(insertIdx, searchGroup);
+                    }
+                    else
+                    {
+                        homeTab.Groups.Add(searchGroup);
+                    }
+                }
+
+                // 4. Ensure tool instance in group with Large size
+                if (!searchGroup.Tools.Exists(TOOL_KEY))
+                {
+                    var instanceTool = searchGroup.Tools.AddTool(TOOL_KEY);
+                    if (instanceTool != null)
+                    {
+                        instanceTool.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
+                        instanceTool.InstanceProps.MinimumSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
+                    }
+                }
+                else
+                {
+                    var instanceTool = searchGroup.Tools[TOOL_KEY];
+                    if (instanceTool != null)
+                    {
+                        instanceTool.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
+                        instanceTool.InstanceProps.MinimumSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
+                    }
+                }
+
+                if (ultraToolbarsManager1.Tools.Exists(TOOL_KEY))
+                {
+                    ultraToolbarsManager1.Tools[TOOL_KEY].SharedProps.Enabled = true;
+                    ultraToolbarsManager1.Tools[TOOL_KEY].SharedProps.Visible = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"EnsureSearchRibbonButton error: {ex.Message}");
+            }
+        }
+
+        private static Image CreateSearchRibbonIcon(int size)
+        {
+            Bitmap bmp = new Bitmap(size, size);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                g.Clear(Color.Transparent);
+
+                float s = size / 32f;
+
+                // Magnifying glass lens
+                float cx = 4f * s;
+                float cy = 4f * s;
+                float d = 17f * s;
+
+                // Glass lens gradient fill
+                using (LinearGradientBrush brush = new LinearGradientBrush(
+                    new RectangleF(cx, cy, d, d),
+                    Color.FromArgb(225, 243, 255),
+                    Color.FromArgb(145, 200, 248),
+                    LinearGradientMode.ForwardDiagonal))
+                {
+                    g.FillEllipse(brush, cx, cy, d, d);
+                }
+
+                // Glass lens rim
+                using (Pen rimPen = new Pen(Color.FromArgb(0, 114, 206), 2.8f * s))
+                {
+                    g.DrawEllipse(rimPen, cx + 0.5f, cy + 0.5f, d - 1f, d - 1f);
+                }
+
+                // Lens reflection / highlight arc
+                using (Pen glarePen = new Pen(Color.FromArgb(200, 255, 255, 255), 1.6f * s))
+                {
+                    g.DrawArc(glarePen, cx + 3f * s, cy + 3f * s, d - 6f * s, d - 6f * s, 190, 80);
+                }
+
+                // Handle shadow
+                using (Pen shadowPen = new Pen(Color.FromArgb(50, 0, 0, 0), 4.2f * s))
+                {
+                    shadowPen.StartCap = LineCap.Round;
+                    shadowPen.EndCap = LineCap.Round;
+                    g.DrawLine(shadowPen, 18.5f * s, 18.5f * s, 27.5f * s, 27.5f * s);
+                }
+
+                // Handle body
+                using (Pen handlePen = new Pen(Color.FromArgb(0, 85, 160), 3.4f * s))
+                {
+                    handlePen.StartCap = LineCap.Round;
+                    handlePen.EndCap = LineCap.Round;
+                    g.DrawLine(handlePen, 17.5f * s, 17.5f * s, 26.5f * s, 26.5f * s);
+                }
+
+                // Handle inner highlight
+                using (Pen handleGlow = new Pen(Color.FromArgb(100, 190, 255), 1.5f * s))
+                {
+                    handleGlow.StartCap = LineCap.Round;
+                    handleGlow.EndCap = LineCap.Round;
+                    g.DrawLine(handleGlow, 18.5f * s, 18.5f * s, 25.5f * s, 25.5f * s);
+                }
+            }
+            return bmp;
         }
 
         private void ApplyWatermark()
@@ -1730,7 +1942,11 @@ namespace PosBranch_Win
                                              toolKey == "Overview" ||
                                              toolKey == "Hold" ||
                                              toolKey == "LastBill" ||
-                                             toolKey == "Database";
+                                             toolKey == "Database" ||
+                                             toolKey == "Search" ||
+                                             toolKey == "SEARCH" ||
+                                             toolKey == "StockLookup" ||
+                                             toolKey == "FrmFormSearch";
 
                         bool hasPermission = isAdmin || isGlobalAction || SessionContext.CanView(toolKey) || SessionContext.CanView(tool.Key);
                         
@@ -1770,7 +1986,8 @@ namespace PosBranch_Win
                                                                  toolKey == "Remove" || toolKey == "Exit" || toolKey == "Report" ||
                                                                  toolKey == "LogOff" || toolKey == "LogIn" || toolKey == "ReOrder" ||
                                                                  toolKey == "Overview" || toolKey == "Hold" || toolKey == "LastBill" ||
-                                                                 toolKey == "Database";
+                                                                 toolKey == "Database" || toolKey == "Search" || toolKey == "SEARCH" ||
+                                                                 toolKey == "StockLookup" || toolKey == "FrmFormSearch";
 
                                             bool hasPermission = isAdmin || isGlobalAction || SessionContext.CanView(toolKey) || SessionContext.CanView(tool.Key);
                                             
@@ -1928,6 +2145,16 @@ namespace PosBranch_Win
                 return;
             }
 
+            if (toolKey.Equals("Search", StringComparison.OrdinalIgnoreCase) ||
+                toolKey.Equals("SEARCH", StringComparison.OrdinalIgnoreCase) ||
+                toolKey.Equals("FrmFormSearch", StringComparison.OrdinalIgnoreCase) ||
+                toolKey.Equals("FormSearch", StringComparison.OrdinalIgnoreCase) ||
+                toolKey.Equals("StockLookup", StringComparison.OrdinalIgnoreCase))
+            {
+                PosBranch_Win.DialogBox.FrmFormSearch.ShowFormSearch(this);
+                return;
+            }
+
             if (toolKey == "ExcelImport")
             {
                 Utilities.FrmExcelImport importForm = new Utilities.FrmExcelImport();
@@ -1952,7 +2179,11 @@ namespace PosBranch_Win
                                  toolKey == "Overview" ||
                                  toolKey == "ExecutiveDashboard" ||
                                  toolKey == "Hold" ||
-                                 toolKey == "LastBill";
+                                 toolKey == "LastBill" ||
+                                 toolKey == "Search" ||
+                                 toolKey == "SEARCH" ||
+                                 toolKey == "StockLookup" ||
+                                 toolKey == "FrmFormSearch";
 
             if (!isGlobalAction)
             {
@@ -3031,10 +3262,25 @@ namespace PosBranch_Win
             bool ctrl = (keyData & Keys.Control) == Keys.Control;
             bool alt = (keyData & Keys.Alt) == Keys.Alt;
 
+            // If user is currently typing in ANY text/grid/numeric input control, never intercept!
+            if (IsTextInputControlFocused())
+            {
+                return base.ProcessCmdKey(ref msg, keyData);
+            }
+
             if (ctrl && keyCode == Keys.S)
             {
-                PosBranch_Win.DialogBox.FrmFormSearch.ShowFormSearch(this);
-                return true;
+                // Only open Form Search if Home tab/dashboard is active and not inside an open child form tab
+                bool isHomeActive = tabControlMain == null || tabControlMain.SelectedTab == null ||
+                                   string.Equals(tabControlMain.SelectedTab.Key, "Home", StringComparison.OrdinalIgnoreCase) ||
+                                   string.Equals(tabControlMain.SelectedTab.Text, "Home", StringComparison.OrdinalIgnoreCase);
+
+                if (isHomeActive)
+                {
+                    PosBranch_Win.DialogBox.FrmFormSearch.ShowFormSearch(this);
+                    return true;
+                }
+                return base.ProcessCmdKey(ref msg, keyData);
             }
 
             if (ctrl && keyCode == Keys.I)
@@ -3072,7 +3318,7 @@ namespace PosBranch_Win
             }
 
             // Shortcuts to open forms: I (Item Master), P (Purchase), S (Sales Invoice), A (Stock Adjustment), R (Sales Return), E (Purchase Return)
-            // Should ONLY run when NO text input field is focused AND when the active tab is Home / Dashboard
+            // Should ONLY run when NO tab is open or Home tab is active, AND no text control is focused!
             if (!ctrl && !alt)
             {
                 bool isHomeTabActive = (tabControlMain == null || tabControlMain.SelectedTab == null ||
@@ -3170,7 +3416,9 @@ namespace PosBranch_Win
             {
                 if (current is TextBoxBase ||
                     current is DateTimePicker ||
-                    current is ComboBox)
+                    current is ComboBox ||
+                    current is ListControl ||
+                    current is UpDownBase)
                 {
                     return true;
                 }
@@ -3185,14 +3433,19 @@ namespace PosBranch_Win
                     typeName.Contains("DateTimeEditor") ||
                     typeName.Contains("NumericEditor") ||
                     typeName.Contains("MaskedEdit") ||
+                    typeName.Contains("Editor") ||
                     typeName.Contains("Edit") ||
+                    typeName.Contains("Text") ||
+                    typeName.Contains("Grid") ||
+                    typeName.Contains("Cell") ||
                     fullName.Contains("UltraWinEditors") ||
+                    fullName.Contains("UltraWinGrid") ||
                     fullName.Contains("Embeddable"))
                 {
                     return true;
                 }
 
-                if (current is Infragistics.Win.UltraWinGrid.UltraGrid grid && grid.ActiveCell != null && grid.ActiveCell.IsInEditMode)
+                if (current is Infragistics.Win.UltraWinGrid.UltraGrid grid && (grid.Focused || (grid.ActiveCell != null && grid.ActiveCell.IsInEditMode)))
                 {
                     return true;
                 }
@@ -5646,29 +5899,6 @@ namespace PosBranch_Win
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error in Home.ApplyLanguageToAllForms: {ex.Message}");
-            }
-        }
-
-        private class FormSearchShortcutMessageFilter : IMessageFilter
-        {
-            private const int WM_KEYDOWN = 0x0100;
-
-            public bool PreFilterMessage(ref Message m)
-            {
-                if (m.Msg == WM_KEYDOWN)
-                {
-                    Keys key = (Keys)m.WParam | Control.ModifierKeys;
-                    if (key == (Keys.Control | Keys.S))
-                    {
-                        Home home = Application.OpenForms.OfType<Home>().FirstOrDefault();
-                        if (home != null && !home.IsDisposed)
-                        {
-                            PosBranch_Win.DialogBox.FrmFormSearch.ShowFormSearch(home);
-                            return true;
-                        }
-                    }
-                }
-                return false;
             }
         }
     }
