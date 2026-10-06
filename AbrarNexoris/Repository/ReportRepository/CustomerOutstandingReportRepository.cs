@@ -32,7 +32,8 @@ namespace Repository.ReportRepository
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.Add("@FromDate", SqlDbType.DateTime).Value = (filter.UseDateFilter && filter.FromDate.HasValue) ? (object)filter.FromDate.Value.Date : DBNull.Value;
                     cmd.Parameters.Add("@ToDate", SqlDbType.DateTime).Value = (filter.UseDateFilter && filter.ToDate.HasValue) ? (object)filter.ToDate.Value.Date : DBNull.Value;
-                    cmd.Parameters.Add("@BranchId", SqlDbType.Int).Value = filter.BranchId > 0 ? filter.BranchId : SessionContext.BranchId;
+                    int branchId = filter.BranchId > 0 ? filter.BranchId : GetContextValue(SessionContext.BranchId, DataBase.BranchId);
+                    cmd.Parameters.Add("@BranchId", SqlDbType.Int).Value = branchId;
                     cmd.Parameters.Add("@LedgerId", SqlDbType.Int).Value = filter.LedgerId;
                     cmd.Parameters.Add("@_Operation", SqlDbType.VarChar, 50).Value = "GETOUTSTANDING";
 

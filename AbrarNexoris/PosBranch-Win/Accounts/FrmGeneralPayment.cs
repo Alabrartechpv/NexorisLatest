@@ -517,7 +517,11 @@ namespace PosBranch_Win.Accounts
                 VoucherNumber = txtVoucherNo.Text.Trim(),
                 VoucherDate = GetVoucherDate(),
                 Narration = headerNarration,
-                BranchID = GetSelectedBranchId()
+                BranchID = GetSelectedBranchId(),
+                CompanyID = GetCompanyId(),
+                FinYearID = GetFinYearId(),
+                UserID = SessionContext.UserId > 0 ? SessionContext.UserId : (int.TryParse(DataBase.UserId, out int uId) ? uId : 1),
+                UserName = !string.IsNullOrWhiteSpace(SessionContext.UserName) ? SessionContext.UserName : (DataBase.UserName ?? string.Empty)
             };
 
             decimal totalAmount = 0;
@@ -944,8 +948,33 @@ namespace PosBranch_Win.Accounts
             {
                 return SessionContext.BranchId;
             }
-            int.TryParse(DataBase.BranchId, out int fallback);
-            return fallback;
+            return int.TryParse(DataBase.BranchId, out int fallback) && fallback > 0 ? fallback : 1;
+        }
+
+        private int GetCompanyId()
+        {
+            if (SessionContext.CompanyId > 0)
+            {
+                return SessionContext.CompanyId;
+            }
+            if (int.TryParse(DataBase.CompanyId, out int compId) && compId > 0)
+            {
+                return compId;
+            }
+            return 1;
+        }
+
+        private int GetFinYearId()
+        {
+            if (SessionContext.FinYearId > 0)
+            {
+                return SessionContext.FinYearId;
+            }
+            if (int.TryParse(DataBase.FinyearId, out int fyId) && fyId > 0)
+            {
+                return fyId;
+            }
+            return 1;
         }
 
         private string GetLedgerName(long ledgerId)

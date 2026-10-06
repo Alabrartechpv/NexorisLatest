@@ -29,12 +29,15 @@ namespace Repository.Accounts
             {
                 EnsureConnectionOpen(conn);
 
+                int companyId = GetContextValue(SessionContext.CompanyId, DataBase.CompanyId);
+                int branchId = GetContextValue(SessionContext.BranchId, DataBase.BranchId);
+
                 return conn.Query<ManualPartyBalanceEntry>(
                     "_ManualPartyBalanceMaster",
                     new
                     {
-                        CompanyId = SessionContext.CompanyId,
-                        BranchId = SessionContext.BranchId,
+                        CompanyId = companyId,
+                        BranchId = branchId,
                         PartyType = string.IsNullOrWhiteSpace(partyType) ? null : partyType,
                         BalanceType = string.IsNullOrWhiteSpace(balanceType) ? null : balanceType,
                         SearchText = string.IsNullOrWhiteSpace(searchText) ? null : searchText.Trim(),
@@ -60,13 +63,16 @@ namespace Repository.Accounts
             {
                 EnsureConnectionOpen(conn);
 
+                int companyId = GetContextValue(SessionContext.CompanyId, DataBase.CompanyId);
+                int branchId = GetContextValue(SessionContext.BranchId, DataBase.BranchId);
+
                 return conn.QueryFirstOrDefault<ManualPartyBalanceEntry>(
                     "_ManualPartyBalanceMaster",
                     new
                     {
                         Id = id,
-                        CompanyId = SessionContext.CompanyId,
-                        BranchId = SessionContext.BranchId,
+                        CompanyId = companyId,
+                        BranchId = branchId,
                         _Operation = "GETBYID"
                     },
                     commandType: CommandType.StoredProcedure
@@ -88,18 +94,23 @@ namespace Repository.Accounts
             {
                 EnsureConnectionOpen(conn);
 
+                int companyId = GetContextValue(SessionContext.CompanyId, DataBase.CompanyId);
+                int branchId = GetContextValue(SessionContext.BranchId, DataBase.BranchId);
+                int finYearId = GetContextValue(SessionContext.FinYearId, DataBase.FinyearId);
+                int userId = GetContextValue(SessionContext.UserId, DataBase.UserId);
+
                 var param = new DynamicParameters();
                 param.Add("@Id", entry.Id);
-                param.Add("@CompanyId", SessionContext.CompanyId);
-                param.Add("@BranchId", SessionContext.BranchId);
-                param.Add("@FinYearId", SessionContext.FinYearId);
+                param.Add("@CompanyId", companyId);
+                param.Add("@BranchId", branchId);
+                param.Add("@FinYearId", finYearId);
                 param.Add("@PartyType", entry.PartyType.Trim());
                 param.Add("@PartyName", entry.PartyName.Trim());
                 param.Add("@BalanceType", entry.BalanceType.Trim());
                 param.Add("@Amount", entry.Amount);
                 param.Add("@EntryDate", entry.EntryDate);
                 param.Add("@Remarks", NormalizeRemarks(entry.Remarks));
-                param.Add("@UserId", SessionContext.UserId);
+                param.Add("@UserId", userId);
                 param.Add("@_Operation", entry.Id <= 0 ? "CREATE" : "UPDATE");
 
                 var result = conn.QueryFirstOrDefault<dynamic>(
@@ -132,14 +143,18 @@ namespace Repository.Accounts
             {
                 EnsureConnectionOpen(conn);
 
+                int companyId = GetContextValue(SessionContext.CompanyId, DataBase.CompanyId);
+                int branchId = GetContextValue(SessionContext.BranchId, DataBase.BranchId);
+                int userId = GetContextValue(SessionContext.UserId, DataBase.UserId);
+
                 conn.Execute(
                     "_ManualPartyBalanceMaster",
                     new
                     {
                         Id = id,
-                        CompanyId = SessionContext.CompanyId,
-                        BranchId = SessionContext.BranchId,
-                        UserId = SessionContext.UserId,
+                        CompanyId = companyId,
+                        BranchId = branchId,
+                        UserId = userId,
                         _Operation = "DELETE"
                     },
                     commandType: CommandType.StoredProcedure

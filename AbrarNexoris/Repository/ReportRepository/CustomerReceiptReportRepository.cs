@@ -27,6 +27,8 @@ namespace Repository.ReportRepository
 
             DataTable receiptTable = new DataTable();
 
+            int branchId = filter.BranchId > 0 ? filter.BranchId : GetContextValue(SessionContext.BranchId, DataBase.BranchId);
+
             try
             {
                 if (DataConnection.State != ConnectionState.Open)
@@ -35,7 +37,7 @@ namespace Repository.ReportRepository
                 using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._CustomerReceiptReport, (SqlConnection)DataConnection))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.Add("@BranchId", SqlDbType.Int).Value = filter.BranchId;
+                    cmd.Parameters.Add("@BranchId", SqlDbType.Int).Value = branchId;
                     cmd.Parameters.Add("@FromDate", SqlDbType.Date).Value = (filter.UseDateFilter && filter.FromDate.HasValue) ? (object)filter.FromDate.Value.Date : DBNull.Value;
                     cmd.Parameters.Add("@ToDate", SqlDbType.Date).Value = (filter.UseDateFilter && filter.ToDate.HasValue) ? (object)filter.ToDate.Value.Date : DBNull.Value;
                     cmd.Parameters.Add("@CustomerLedgerId", SqlDbType.Int).Value = filter.CustomerLedgerId;
@@ -57,7 +59,7 @@ namespace Repository.ReportRepository
                 .ThenByDescending(x => x.VoucherId)
                 .ToList();
 
-            EnrichRows(rows, filter.BranchId);
+            EnrichRows(rows, branchId);
             return rows;
         }
 

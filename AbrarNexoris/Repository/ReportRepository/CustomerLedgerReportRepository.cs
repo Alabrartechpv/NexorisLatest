@@ -31,9 +31,13 @@ namespace Repository.ReportRepository
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.CommandTimeout = 60;
-                    cmd.Parameters.AddWithValue("@CompanyId", filter.CompanyId);
-                    cmd.Parameters.AddWithValue("@BranchId", filter.BranchId);
-                    cmd.Parameters.AddWithValue("@FinYearId", filter.FinYearId);
+                    int companyId = filter.CompanyId > 0 ? filter.CompanyId : GetContextValue(SessionContext.CompanyId, DataBase.CompanyId);
+                    int branchId = filter.BranchId > 0 ? filter.BranchId : GetContextValue(SessionContext.BranchId, DataBase.BranchId);
+                    int finYearId = filter.FinYearId > 0 ? filter.FinYearId : GetContextValue(SessionContext.FinYearId, DataBase.FinyearId);
+
+                    cmd.Parameters.AddWithValue("@CompanyId", companyId);
+                    cmd.Parameters.AddWithValue("@BranchId", branchId);
+                    cmd.Parameters.AddWithValue("@FinYearId", finYearId);
                     cmd.Parameters.AddWithValue("@LedgerId", filter.LedgerId);
                     cmd.Parameters.AddWithValue("@FromDate", filter.FromDate);
                     cmd.Parameters.AddWithValue("@ToDate", filter.ToDate);

@@ -152,7 +152,31 @@ namespace PosBranch_Win.Accounts
             {
                 System.Diagnostics.Debug.WriteLine($"Error getting BranchId: {ex.Message}");
             }
-            return SessionContext.BranchId > 0 ? SessionContext.BranchId : 0;
+            return SessionContext.BranchId > 0 ? SessionContext.BranchId : (int.TryParse(DataBase.BranchId, out int fallback) && fallback > 0 ? fallback : 1);
+        }
+
+        private int GetCompanyId()
+        {
+            try
+            {
+                if (SessionContext.IsInitialized && SessionContext.CompanyId > 0)
+                {
+                    return SessionContext.CompanyId;
+                }
+                else if (SessionContext.CompanyId > 0)
+                {
+                    return SessionContext.CompanyId;
+                }
+                else if (!string.IsNullOrEmpty(DataBase.CompanyId) && int.TryParse(DataBase.CompanyId, out int companyId) && companyId > 0)
+                {
+                    return companyId;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error getting CompanyId: {ex.Message}");
+            }
+            return SessionContext.CompanyId > 0 ? SessionContext.CompanyId : (int.TryParse(DataBase.CompanyId, out int fallback) && fallback > 0 ? fallback : 1);
         }
 
         private void LoadInitialData()
@@ -627,7 +651,7 @@ namespace PosBranch_Win.Accounts
         {
             return new ClsCustomers
             {
-                CompanyId = SessionContext.CompanyId,
+                CompanyId = GetCompanyId(),
                 BranchId = GetBranchId(),
                 LedgerId = Ledgerid,
                 LedgerName = ultraTextCustomer.Text.Trim(),

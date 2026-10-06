@@ -15,6 +15,10 @@ namespace Repository.ReportRepository
             if (filter == null) throw new ArgumentNullException(nameof(filter));
             List<PurchaseGSTRegisterRow> list = new List<PurchaseGSTRegisterRow>();
 
+            int companyId = filter.CompanyId > 0 ? filter.CompanyId : GetContextValue(SessionContext.CompanyId, DataBase.CompanyId);
+            int branchId = filter.BranchId > 0 ? filter.BranchId : GetContextValue(SessionContext.BranchId, DataBase.BranchId);
+            int finYearId = filter.FinYearId > 0 ? filter.FinYearId : GetContextValue(SessionContext.FinYearId, DataBase.FinyearId);
+
             try
             {
                 if (DataConnection.State != ConnectionState.Open)
@@ -27,9 +31,9 @@ namespace Repository.ReportRepository
                     {
                         cmd.CommandType = CommandType.StoredProcedure;
                         cmd.Parameters.AddWithValue("@ReportType", "REGISTER");
-                        cmd.Parameters.AddWithValue("@CompanyId", filter.CompanyId > 0 ? (object)filter.CompanyId : DBNull.Value);
-                        cmd.Parameters.AddWithValue("@BranchId", filter.BranchId > 0 ? (object)filter.BranchId : DBNull.Value);
-                        cmd.Parameters.AddWithValue("@FinYearId", filter.FinYearId > 0 ? (object)filter.FinYearId : DBNull.Value);
+                        cmd.Parameters.AddWithValue("@CompanyId", companyId > 0 ? (object)companyId : DBNull.Value);
+                        cmd.Parameters.AddWithValue("@BranchId", branchId > 0 ? (object)branchId : DBNull.Value);
+                        cmd.Parameters.AddWithValue("@FinYearId", finYearId > 0 ? (object)finYearId : DBNull.Value);
                         cmd.Parameters.AddWithValue("@FromDate", filter.FromDate.Date);
                         cmd.Parameters.AddWithValue("@ToDate", filter.ToDate.Date);
                         cmd.Parameters.AddWithValue("@SupplierLedgerId", filter.SupplierLedgerId > 0 ? (object)filter.SupplierLedgerId : DBNull.Value);
@@ -229,9 +233,9 @@ namespace Repository.ReportRepository
 
                     using (SqlCommand cmd = new SqlCommand(sql, (SqlConnection)DataConnection))
                     {
-                        cmd.Parameters.AddWithValue("@CompanyId", filter.CompanyId);
-                        cmd.Parameters.AddWithValue("@BranchId", filter.BranchId);
-                        cmd.Parameters.AddWithValue("@FinYearId", filter.FinYearId);
+                        cmd.Parameters.AddWithValue("@CompanyId", companyId);
+                        cmd.Parameters.AddWithValue("@BranchId", branchId);
+                        cmd.Parameters.AddWithValue("@FinYearId", finYearId);
                         cmd.Parameters.AddWithValue("@FromDate", filter.FromDate.Date);
                         cmd.Parameters.AddWithValue("@ExclusiveTo", exclusiveTo);
                         cmd.Parameters.AddWithValue("@SupplierLedgerId", filter.SupplierLedgerId);

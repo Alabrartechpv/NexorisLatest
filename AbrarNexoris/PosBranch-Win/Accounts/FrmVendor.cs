@@ -35,26 +35,24 @@ namespace PosBranch_Win.Accounts
             }
         }
 
-        // Helper method to get dynamic CompanyId
-        // Prefer SessionContext, fallback to DataBase for backward compatibility
+        // Helper methods to get dynamic CompanyId and BranchId
+        // Prefer SessionContext, fallback to DataBase, then default 1
         private int GetCompanyId()
         {
-            try
-            {
-                if (SessionContext.IsInitialized && SessionContext.CompanyId > 0)
-                {
-                    return SessionContext.CompanyId;
-                }
-                else if (!string.IsNullOrEmpty(DataBase.CompanyId) && int.TryParse(DataBase.CompanyId, out int companyId) && companyId > 0)
-                {
-                    return companyId;
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error getting CompanyId: {ex.Message}");
-            }
-            throw new InvalidOperationException("CompanyId is not set. Please ensure session is initialized.");
+            if (SessionContext.CompanyId > 0)
+                return SessionContext.CompanyId;
+            if (int.TryParse(DataBase.CompanyId, out int companyId) && companyId > 0)
+                return companyId;
+            return 1;
+        }
+
+        private int GetBranchId()
+        {
+            if (SessionContext.BranchId > 0)
+                return SessionContext.BranchId;
+            if (int.TryParse(DataBase.BranchId, out int branchId) && branchId > 0)
+                return branchId;
+            return 1;
         }
 
         public int LedgerId;
@@ -154,30 +152,6 @@ namespace PosBranch_Win.Accounts
             toolTip.SetToolTip(ultraTextCompanyTIN, "Enter the vendor's company TIN number");
             toolTip.SetToolTip(ultraTextCompanyMSIC, "Enter the vendor's company MSIC code");
             toolTip.SetToolTip(ultraTextCompanyEmail, "Enter the vendor's company email address");
-        }
-
-        private int GetBranchId()
-        {
-            try
-            {
-                if (SessionContext.IsInitialized && SessionContext.BranchId > 0)
-                {
-                    return SessionContext.BranchId;
-                }
-                else if (SessionContext.BranchId > 0)
-                {
-                    return SessionContext.BranchId;
-                }
-                else if (!string.IsNullOrEmpty(DataBase.BranchId) && int.TryParse(DataBase.BranchId, out int branchId) && branchId > 0)
-                {
-                    return branchId;
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error getting BranchId: {ex.Message}");
-            }
-            return SessionContext.BranchId > 0 ? SessionContext.BranchId : 0;
         }
 
         private void LoadInitialData()

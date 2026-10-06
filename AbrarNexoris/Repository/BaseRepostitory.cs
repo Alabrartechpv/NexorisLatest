@@ -90,6 +90,22 @@ namespace Repository
         }
          
 
+        protected int GetContextValue(int sessionValue, string legacyValue, int defaultValue = 1)
+        {
+            if (sessionValue > 0)
+            {
+                return sessionValue;
+            }
+
+            int parsedValue;
+            if (int.TryParse(legacyValue, out parsedValue) && parsedValue > 0)
+            {
+                return parsedValue;
+            }
+
+            return defaultValue;
+        }
+
         ~BaseRepostitory()
         {
             Dispose(false);

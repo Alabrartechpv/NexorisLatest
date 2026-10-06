@@ -255,7 +255,7 @@ namespace PosBranch_Win.Accounts
                 if (ultraDropDownBranch.Value != null)
                     branchId = Convert.ToInt32(ultraDropDownBranch.Value);
                 if (branchId == 0)
-                    branchId = SessionContext.BranchId;
+                    branchId = SessionContext.BranchId > 0 ? SessionContext.BranchId : (int.TryParse(DataBase.BranchId, out int bId) && bId > 0 ? bId : 1);
 
                 int groupId = 0;
                 if (ultraDrpParentGroup.Value != null)
@@ -298,7 +298,7 @@ namespace PosBranch_Win.Accounts
                     MaintainBillWiseDetails = false,
                     PriceLevelApplicable = false,
                     ActivateInterestCalculations = false,
-                    CompanyID = SessionContext.CompanyId
+                    CompanyID = SessionContext.CompanyId > 0 ? SessionContext.CompanyId : (int.TryParse(DataBase.CompanyId, out int cId) && cId > 0 ? cId : 1)
                 };
 
                 // Check if we're updating or creating
