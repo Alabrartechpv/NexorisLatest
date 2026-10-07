@@ -867,6 +867,11 @@ namespace PosBranch_Win.Accounts
         {
             foreach (DataRow row in journalLineTable.Rows)
             {
+                if (row.RowState == DataRowState.Deleted)
+                {
+                    continue;
+                }
+
                 row.ClearErrors();
                 row.RowError = string.Empty;
             }

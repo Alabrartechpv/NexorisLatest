@@ -289,6 +289,7 @@ namespace PosBranch_Win.Accounts
             Color headerBack = Color.FromArgb(205, 229, 236);
 
             this.BackColor = pageBack;
+            this.Font = new Font("Segoe UI", 9.5F, FontStyle.Regular);
             lblHeader.Appearance.BackColor = headerBack;
             lblHeader.Appearance.ForeColor = navy;
             lblHeader.Appearance.FontData.Bold = DefaultableBoolean.True;
@@ -327,11 +328,16 @@ namespace PosBranch_Win.Accounts
             lblTotalCredit.Visible = false;
             lblTotalCreditValue.Visible = false;
 
-            lblDifference.Text = "Total Amount";
-            lblDifferenceValue.Appearance.ForeColor = Color.FromArgb(183, 28, 28); // Crimson red for payments
+            lblDifference.Text = "Total Amount:";
+            lblDifference.Appearance.ForeColor = navy;
+            lblDifference.Appearance.FontData.Bold = DefaultableBoolean.True;
+            lblDifference.Appearance.FontData.SizeInPoints = 10.5F;
+            lblDifference.Appearance.TextHAlign = HAlign.Right;
 
-            lblDifference.Font = new Font("Segoe UI", 9.5F, FontStyle.Bold);
-            lblDifferenceValue.Font = new Font("Segoe UI", 13.5F, FontStyle.Bold);
+            lblDifferenceValue.Appearance.ForeColor = Color.FromArgb(183, 28, 28); // Crimson red for payments
+            lblDifferenceValue.Appearance.FontData.Bold = DefaultableBoolean.True;
+            lblDifferenceValue.Appearance.FontData.SizeInPoints = 15F;
+            lblDifferenceValue.Appearance.TextHAlign = HAlign.Right;
 
             StyleHistoryButton();
             StyleGrid();
@@ -388,10 +394,10 @@ namespace PosBranch_Win.Accounts
 
         private void PositionSummaryCards()
         {
-            int cardWidth = 260;
+            int cardWidth = 240;
             int rightMargin = 28;
             int rightX = footerPanel.ClientArea.Width - cardWidth - rightMargin;
-            int labelTop = 16;
+            int labelTop = 14;
             int valueTop = 36;
 
             if (rightX < 20)
@@ -399,9 +405,14 @@ namespace PosBranch_Win.Accounts
                 rightX = 20;
             }
 
-            lblDifferenceValue.Location = new Point(rightX, valueTop);
-            lblDifferenceValue.Size = new Size(cardWidth, 30);
             lblDifference.Location = new Point(rightX, labelTop);
+            lblDifference.Size = new Size(cardWidth, 20);
+            lblDifference.AutoSize = false;
+            lblDifference.Appearance.TextHAlign = HAlign.Right;
+
+            lblDifferenceValue.Location = new Point(rightX, valueTop);
+            lblDifferenceValue.Size = new Size(cardWidth, 32);
+            lblDifferenceValue.Appearance.TextHAlign = HAlign.Right;
         }
 
         private void StyleLabel(UltraLabel label, Color color)

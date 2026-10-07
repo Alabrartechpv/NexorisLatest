@@ -391,21 +391,29 @@ namespace PosBranch_Win.Accounts
 
         private void LayoutFooterControls()
         {
+            int cardWidth = 240;
             int right = footerPanel.ClientSize.Width - 28;
-            int cardWidth = 200;
             int labelTop = 14;
             int valueTop = 36;
+            int rightX = right - cardWidth;
 
-            lblTotalDebitValue.Location = new Point(right - cardWidth, valueTop);
-            lblTotalDebitValue.Size = new Size(cardWidth, 30);
-            lblTotalDebit.Location = new Point(lblTotalDebitValue.Left, labelTop);
+            if (rightX < 20) rightX = 20;
+
+            lblTotalDebit.Location = new Point(rightX, labelTop);
+            lblTotalDebit.Size = new Size(cardWidth, 20);
+            lblTotalDebit.AutoSize = false;
+            lblTotalDebit.Appearance.TextHAlign = HAlign.Right;
+
+            lblTotalDebitValue.Location = new Point(rightX, valueTop);
+            lblTotalDebitValue.Size = new Size(cardWidth, 32);
+            lblTotalDebitValue.Appearance.TextHAlign = HAlign.Right;
         }
 
         private void StyleLabel(UltraLabel label, Color color)
         {
             label.Appearance.ForeColor = color;
             label.Appearance.FontData.Bold = DefaultableBoolean.True;
-            label.Appearance.FontData.SizeInPoints = 9.25F;
+            label.Appearance.FontData.SizeInPoints = 10.5F;
             label.AutoSize = true;
         }
 
@@ -436,7 +444,8 @@ namespace PosBranch_Win.Accounts
         private void StyleTotalValue(UltraLabel label)
         {
             label.Appearance.FontData.Bold = DefaultableBoolean.True;
-            label.Appearance.FontData.SizeInPoints = 13F;
+            label.Appearance.FontData.SizeInPoints = 15F;
+            label.Appearance.ForeColor = Color.FromArgb(22, 101, 52); // Forest green for receipts
             label.Appearance.TextHAlign = HAlign.Right;
             label.Appearance.TextVAlign = VAlign.Middle;
         }

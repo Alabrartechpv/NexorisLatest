@@ -827,6 +827,11 @@ namespace PosBranch_Win.Accounts
         {
             foreach (DataRow row in contraLineTable.Rows)
             {
+                if (row.RowState == DataRowState.Deleted)
+                {
+                    continue;
+                }
+
                 row.ClearErrors();
                 row.RowError = string.Empty;
             }
