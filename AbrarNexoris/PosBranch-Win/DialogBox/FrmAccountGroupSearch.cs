@@ -73,6 +73,30 @@ namespace PosBranch_Win.DialogBox
 
                 dtData = repo.GetAllAccountGroups(branchId);
 
+                // Ensure unique rows by GroupID
+                if (dtData != null && dtData.Rows.Count > 0 && dtData.Columns.Contains("GroupID"))
+                {
+                    var seenGroupIds = new HashSet<int>();
+                    var uniqueRows = new List<DataRow>();
+                    foreach (DataRow row in dtData.Rows)
+                    {
+                        if (row["GroupID"] != DBNull.Value && int.TryParse(row["GroupID"].ToString(), out int gid))
+                        {
+                            if (seenGroupIds.Add(gid))
+                                uniqueRows.Add(row);
+                        }
+                        else
+                        {
+                            uniqueRows.Add(row);
+                        }
+                    }
+
+                    if (uniqueRows.Count < dtData.Rows.Count)
+                    {
+                        dtData = uniqueRows.CopyToDataTable();
+                    }
+                }
+
                 ultraGrid1.DataSource = dtData;
 
                 // Apply initial column widths after layout is ready

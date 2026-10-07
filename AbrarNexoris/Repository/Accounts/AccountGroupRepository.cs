@@ -44,7 +44,15 @@ namespace Repository.Accounts
 
                         if ((ds != null) && (ds.Tables.Count > 0) && (ds.Tables[0] != null) && (ds.Tables[0].Rows.Count > 0))
                         {
-                            AccGrpDDL.List = ds.Tables[0].ToListOfObject<AccountGroupHead>();
+                            var list = ds.Tables[0].ToListOfObject<AccountGroupHead>();
+                            if (list != null && list.Any())
+                            {
+                                if (branchId > 0 && list.Any(x => x.BranchID == branchId))
+                                {
+                                    list = list.Where(x => x.BranchID == branchId).ToList();
+                                }
+                                AccGrpDDL.List = list.GroupBy(x => x.GroupID).Select(g => g.First()).ToList();
+                            }
                         }
                     }
                 }
@@ -270,16 +278,54 @@ namespace Repository.Accounts
 
             try
             {
+                int effectiveBranch = branchId > 0 ? branchId : GetContextValue(SessionContext.BranchId, DataBase.BranchId);
+
                 using (SqlCommand cmd = new SqlCommand("POS_AccountGroups", (SqlConnection)DataConnection))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@_Operation", "GETALL");
                     // Always pass branch ID — SP filters when value > 0, returns all when NULL/0
-                    cmd.Parameters.AddWithValue("@_BranchID", branchId > 0 ? (object)branchId : DBNull.Value);
+                    cmd.Parameters.AddWithValue("@_BranchID", effectiveBranch > 0 ? (object)effectiveBranch : DBNull.Value);
 
                     using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
                     {
                         adapt.Fill(dtResult);
+                    }
+                }
+
+                // 1. If multiple branches returned and BranchID column exists, filter by current branch
+                if (dtResult != null && dtResult.Rows.Count > 0 && dtResult.Columns.Contains("BranchID") && effectiveBranch > 0)
+                {
+                    DataRow[] branchRows = dtResult.Select($"BranchID = {effectiveBranch}");
+                    if (branchRows.Length > 0)
+                    {
+                        dtResult = branchRows.CopyToDataTable();
+                    }
+                }
+
+                // 2. Guarantee that each GroupID is unique across the returned results
+                if (dtResult != null && dtResult.Rows.Count > 0 && dtResult.Columns.Contains("GroupID"))
+                {
+                    var seenGroupIds = new HashSet<int>();
+                    var uniqueRows = new List<DataRow>();
+                    foreach (DataRow row in dtResult.Rows)
+                    {
+                        if (row["GroupID"] != DBNull.Value && int.TryParse(row["GroupID"].ToString(), out int gid))
+                        {
+                            if (seenGroupIds.Add(gid))
+                            {
+                                uniqueRows.Add(row);
+                            }
+                        }
+                        else
+                        {
+                            uniqueRows.Add(row);
+                        }
+                    }
+
+                    if (uniqueRows.Count < dtResult.Rows.Count)
+                    {
+                        dtResult = uniqueRows.CopyToDataTable();
                     }
                 }
             }
