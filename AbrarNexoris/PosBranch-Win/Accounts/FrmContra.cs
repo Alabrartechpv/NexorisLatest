@@ -23,16 +23,42 @@ namespace PosBranch_Win.Accounts
         private DataTable ledgerTable;
         private DataTable contraLineTable;
         private UltraButton btnHistory;
+        private UltraButton btnAddLedger;
         private long currentVoucherId;
         private bool isBinding;
 
         public FrmContra()
         {
             InitializeComponent();
-            ConfigureGridDataSource();
             ConfigureHistoryButton();
             ConfigureGridEvents();
+            ConfigureGridDataSource();
             ApplyModernTheme();
+
+            FrmLedgers.LedgerSaved += OnExternalLedgerSaved;
+            this.Disposed += (s, e) => { FrmLedgers.LedgerSaved -= OnExternalLedgerSaved; };
+            this.VisibleChanged += (s, e) => { if (this.Visible && !isBinding) { BindLedgers(); } };
+            this.Enter += (s, e) => { if (!isBinding) { BindLedgers(); } };
+        }
+
+        private void OnExternalLedgerSaved(object sender, EventArgs e)
+        {
+            if (this.IsDisposed) return;
+            try
+            {
+                if (this.InvokeRequired)
+                {
+                    this.BeginInvoke(new Action(() =>
+                    {
+                        if (!this.IsDisposed) BindLedgers();
+                    }));
+                }
+                else
+                {
+                    BindLedgers();
+                }
+            }
+            catch { }
         }
 
         private void FrmContra_Load(object sender, EventArgs e)
@@ -66,40 +92,60 @@ namespace PosBranch_Win.Accounts
 
         private void BindLedgers()
         {
-            int branchId = GetSelectedBranchId();
-            DataTable allLedgers = ledgerRepository.GetAllLedgers(branchId);
-            ledgerTable = allLedgers.Clone();
-
-            foreach (DataRow row in allLedgers.Rows)
+            try
             {
-                string groupName = Convert.ToString(row["GroupName"]) ?? string.Empty;
-                string ledgerName = Convert.ToString(row["LedgerName"]) ?? string.Empty;
-                if (IsCashOrBankLedger(groupName, ledgerName))
-                {
-                    ledgerTable.ImportRow(row);
-                }
+                int branchId = GetSelectedBranchId();
+                DataTable allLedgers = ledgerRepository.GetAllLedgers(branchId);
+                ledgerTable = allLedgers;
+                ApplyLedgerValueList();
             }
-
-            ApplyLedgerValueList();
-        }
-
-        private bool IsCashOrBankLedger(string groupName, string ledgerName)
-        {
-            string value = $"{groupName} {ledgerName}".ToUpperInvariant();
-            return value.Contains("CASH") || value.Contains("BANK");
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error in BindLedgers: {ex.Message}");
+            }
         }
 
         private void ConfigureGridDataSource()
         {
             contraLineTable = new DataTable();
-            contraLineTable.Columns.Add("LedgerID", typeof(int));
-            contraLineTable.Columns.Add("Debit", typeof(decimal));
-            contraLineTable.Columns.Add("Credit", typeof(decimal));
-            contraLineTable.Columns.Add("Narration", typeof(string));
+            var colLedger = contraLineTable.Columns.Add("LedgerID", typeof(int));
+            colLedger.Caption = "Cash / Bank Ledger";
+            var colDebit = contraLineTable.Columns.Add("Debit", typeof(decimal));
+            colDebit.Caption = "Debit (₹)";
+            var colCredit = contraLineTable.Columns.Add("Credit", typeof(decimal));
+            colCredit.Caption = "Credit (₹)";
+            var colNarration = contraLineTable.Columns.Add("Narration", typeof(string));
+            colNarration.Caption = "Line Narration";
             contraLineTable.ColumnChanged += (sender, args) => UpdateTotals();
             contraLineTable.RowChanged += (sender, args) => UpdateTotals();
             contraLineTable.RowDeleted += (sender, args) => UpdateTotals();
             gridContra.DataSource = contraLineTable;
+
+            if (gridContra.DisplayLayout.Bands.Count > 0)
+            {
+                var band = gridContra.DisplayLayout.Bands[0];
+                if (band.Columns.Exists("LedgerID"))
+                {
+                    band.Columns["LedgerID"].Header.Caption = "Cash / Bank Ledger";
+                    band.Columns["LedgerID"].AutoCompleteMode = Infragistics.Win.AutoCompleteMode.SuggestAppend;
+                }
+                if (band.Columns.Exists("Debit"))
+                {
+                    band.Columns["Debit"].Header.Caption = "Debit (₹)";
+                    band.Columns["Debit"].Format = "N2";
+                    band.Columns["Debit"].CellAppearance.TextHAlign = HAlign.Right;
+                }
+                if (band.Columns.Exists("Credit"))
+                {
+                    band.Columns["Credit"].Header.Caption = "Credit (₹)";
+                    band.Columns["Credit"].Format = "N2";
+                    band.Columns["Credit"].CellAppearance.TextHAlign = HAlign.Right;
+                }
+                if (band.Columns.Exists("Narration"))
+                {
+                    band.Columns["Narration"].Header.Caption = "Line Narration";
+                }
+            }
         }
 
         private void ConfigureGridEvents()
@@ -107,7 +153,46 @@ namespace PosBranch_Win.Accounts
             gridContra.InitializeLayout += gridContra_InitializeLayout;
             gridContra.AfterCellUpdate += gridContra_AfterCellUpdate;
             gridContra.KeyDown += gridContra_KeyDown;
+            gridContra.BeforeCellListDropDown += (s, e) => { if (!isBinding) BindLedgers(); };
+            gridContra.Enter += (s, e) => { if (!isBinding) BindLedgers(); };
             txtVoucherNo.KeyDown += txtVoucherNo_KeyDown;
+        }
+
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            if (keyData == Keys.F8 || keyData == (Keys.Control | Keys.S) || keyData == Keys.F12)
+            {
+                Save();
+                return true;
+            }
+            if (keyData == Keys.F1 || keyData == (Keys.Control | Keys.N))
+            {
+                ClearForm();
+                return true;
+            }
+            if (keyData == Keys.F2)
+            {
+                OpenQuickLedgerCreation();
+                return true;
+            }
+            if (keyData == Keys.F4)
+            {
+                this.Close();
+                return true;
+            }
+            if (keyData == Keys.F5 || keyData == (Keys.Control | Keys.H))
+            {
+                btnHistory_Click(this, EventArgs.Empty);
+                return true;
+            }
+            // Jump to Description / Narration hotkey: F6 / Alt+N / Alt+D / Ctrl+Enter
+            if (keyData == Keys.F6 || keyData == (Keys.Alt | Keys.N) || keyData == (Keys.Alt | Keys.D) || keyData == (Keys.Control | Keys.Enter))
+            {
+                txtNarration.Focus();
+                txtNarration.SelectAll();
+                return true;
+            }
+            return base.ProcessCmdKey(ref msg, keyData);
         }
 
         private void ApplyModernTheme()
@@ -198,10 +283,62 @@ namespace PosBranch_Win.Accounts
         {
             btnHistory = new UltraButton
             {
-                Text = "History"
+                Text = "History (F5)"
             };
             btnHistory.Click += btnHistory_Click;
             headerPanel.ClientArea.Controls.Add(btnHistory);
+
+            btnAddLedger = new UltraButton
+            {
+                Text = "+ Ledger (F2)"
+            };
+            btnAddLedger.Appearance.BackColor = Color.FromArgb(16, 110, 80);
+            btnAddLedger.Appearance.ForeColor = Color.White;
+            btnAddLedger.Appearance.FontData.Bold = DefaultableBoolean.True;
+            btnAddLedger.ButtonStyle = UIElementButtonStyle.FlatBorderless;
+            btnAddLedger.UseOsThemes = DefaultableBoolean.False;
+            btnAddLedger.Click += (s, e) => OpenQuickLedgerCreation();
+            headerPanel.ClientArea.Controls.Add(btnAddLedger);
+        }
+
+        private void OpenQuickLedgerCreation()
+        {
+            try
+            {
+                var homeForm = Application.OpenForms.OfType<Home>().FirstOrDefault();
+                if (homeForm != null)
+                {
+                    var openFormInTabMethod = homeForm.GetType().GetMethod("OpenFormInTabSafe",
+                        System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+                        ?? homeForm.GetType().GetMethod("OpenFormInTab",
+                        System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+                    if (openFormInTabMethod != null)
+                    {
+                        var frm = new FrmLedgers();
+                        frm.FormClosed += (s, e) =>
+                        {
+                            try
+                            {
+                                BindLedgers();
+                            }
+                            catch { }
+                        };
+                        openFormInTabMethod.Invoke(homeForm, new object[] { frm, "Ledger" });
+                        return;
+                    }
+                }
+
+                using (var frm = new FrmLedgers())
+                {
+                    frm.ShowDialog(this);
+                }
+                BindLedgers();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error opening Ledger screen: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void LayoutControls()
@@ -219,7 +356,10 @@ namespace PosBranch_Win.Accounts
             CmboBranch.Size = new Size(260, 30);
 
             btnHistory.Location = new Point(CmboBranch.Right + 24, 39);
-            btnHistory.Size = new Size(110, 30);
+            btnHistory.Size = new Size(100, 30);
+
+            btnAddLedger.Location = new Point(btnHistory.Right + 12, 39);
+            btnAddLedger.Size = new Size(100, 30);
 
             lblNarration.Location = new Point(28, 10);
             txtNarration.Location = new Point(28, 33);
@@ -374,10 +514,66 @@ namespace PosBranch_Win.Accounts
             if (contraLineTable != null)
             {
                 contraLineTable.Clear();
+                DataRow firstRow = contraLineTable.NewRow();
+                int defaultCashId = GetDefaultCashLedgerId();
+                if (defaultCashId > 0)
+                {
+                    firstRow["LedgerID"] = defaultCashId;
+                }
+                contraLineTable.Rows.Add(firstRow);
                 contraLineTable.Rows.Add(contraLineTable.NewRow());
             }
             isBinding = false;
             UpdateTotals();
+        }
+
+        private int GetDefaultCashLedgerId()
+        {
+            if (ledgerTable == null || ledgerTable.Rows.Count == 0) return 0;
+
+            // 1. Strictly look for "CASH IN HAND" / "CASH-IN-HAND"
+            DataRow defaultCashRow = ledgerTable.AsEnumerable()
+                .FirstOrDefault(r => {
+                    string name = (Convert.ToString(r["LedgerName"]) ?? string.Empty).Replace("-", " ").Trim();
+                    return name.IndexOf("CASH IN HAND", StringComparison.OrdinalIgnoreCase) >= 0;
+                });
+
+            // 2. Look for exact "CASH", "CASH A/C", "CASH ACCOUNT", "MAIN CASH", "PETTY CASH"
+            if (defaultCashRow == null)
+            {
+                defaultCashRow = ledgerTable.AsEnumerable()
+                    .FirstOrDefault(r => {
+                        string name = (Convert.ToString(r["LedgerName"]) ?? string.Empty).Trim().ToUpperInvariant();
+                        if (name.Contains("EXCESS") || name.Contains("SHORTAGE") || name.Contains("DISCOUNT")) return false;
+                        return name == "CASH" || name == "CASH A/C" || name == "CASH A/C." ||
+                               name == "CASH ACCOUNT" || name == "MAIN CASH" || name == "COUNTER CASH" ||
+                               name == "PETTY CASH";
+                    });
+            }
+
+            // 3. Look for ledger under "CASH-IN-HAND" group that is not excess/shortage/discount
+            if (defaultCashRow == null)
+            {
+                defaultCashRow = ledgerTable.AsEnumerable()
+                    .FirstOrDefault(r => {
+                        string gName = (Convert.ToString(r["GroupName"]) ?? string.Empty).ToUpperInvariant();
+                        string lName = (Convert.ToString(r["LedgerName"]) ?? string.Empty).ToUpperInvariant();
+                        if (lName.Contains("EXCESS") || lName.Contains("SHORTAGE") || lName.Contains("DISCOUNT")) return false;
+                        return gName.Contains("CASH");
+                    });
+            }
+
+            // 4. Any other non-excess cash ledger
+            if (defaultCashRow == null)
+            {
+                defaultCashRow = ledgerTable.AsEnumerable()
+                    .FirstOrDefault(r => {
+                        string name = (Convert.ToString(r["LedgerName"]) ?? string.Empty).ToUpperInvariant();
+                        return name.Contains("CASH") && !name.Contains("EXCESS") && !name.Contains("SHORTAGE") && !name.Contains("DISCOUNT");
+                    });
+            }
+
+            return defaultCashRow != null ? GetIntValue(defaultCashRow["LedgerID"]) : 0;
         }
 
         private JournalVoucher BuildContraFromGrid()
@@ -501,6 +697,18 @@ namespace PosBranch_Win.Accounts
                 if (!ValidateContra(contra))
                 {
                     UpdateTotals();
+                    return;
+                }
+
+                string actionText = (requireExisting || currentVoucherId > 0) ? "update" : "save";
+                DialogResult confirm = MessageBox.Show(
+                    $"Do you want to {actionText} this contra voucher?",
+                    "Confirm Save",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question);
+
+                if (confirm != DialogResult.Yes)
+                {
                     return;
                 }
 
@@ -735,8 +943,37 @@ namespace PosBranch_Win.Accounts
         {
             if (e.KeyCode == Keys.Enter)
             {
+                if (gridContra.ActiveCell != null && gridContra.ActiveRow != null)
+                {
+                    int rowIndex = gridContra.ActiveRow.Index;
+                    string colKey = gridContra.ActiveCell.Column.Key;
+                    if (colKey == "Narration" && rowIndex == gridContra.Rows.Count - 1)
+                    {
+                        long ledgerId = gridContra.ActiveRow.Cells.Exists("LedgerID") ? GetLongValue(gridContra.ActiveRow.Cells["LedgerID"].Value) : 0;
+                        decimal dr = gridContra.ActiveRow.Cells.Exists("Debit") ? GetDecimalValue(gridContra.ActiveRow.Cells["Debit"].Value) : 0;
+                        decimal cr = gridContra.ActiveRow.Cells.Exists("Credit") ? GetDecimalValue(gridContra.ActiveRow.Cells["Credit"].Value) : 0;
+                        if (ledgerId > 0 && (dr > 0 || cr > 0))
+                        {
+                            contraLineTable.Rows.Add(contraLineTable.NewRow());
+                        }
+                    }
+                }
                 gridContra.PerformAction(UltraGridAction.NextCellByTab);
                 e.Handled = true;
+            }
+            else if (e.KeyCode == Keys.Down && (gridContra.ActiveCell == null || !gridContra.ActiveCell.IsInEditMode))
+            {
+                if (gridContra.ActiveRow != null && gridContra.ActiveRow.Index == gridContra.Rows.Count - 1)
+                {
+                    long ledgerId = gridContra.ActiveRow.Cells.Exists("LedgerID") ? GetLongValue(gridContra.ActiveRow.Cells["LedgerID"].Value) : 0;
+                    decimal dr = gridContra.ActiveRow.Cells.Exists("Debit") ? GetDecimalValue(gridContra.ActiveRow.Cells["Debit"].Value) : 0;
+                    decimal cr = gridContra.ActiveRow.Cells.Exists("Credit") ? GetDecimalValue(gridContra.ActiveRow.Cells["Credit"].Value) : 0;
+                    if (ledgerId > 0 && (dr > 0 || cr > 0))
+                    {
+                        contraLineTable.Rows.Add(contraLineTable.NewRow());
+                        e.Handled = true;
+                    }
+                }
             }
         }
 

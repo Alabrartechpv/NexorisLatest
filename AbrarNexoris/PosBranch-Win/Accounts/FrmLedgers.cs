@@ -19,6 +19,8 @@ namespace PosBranch_Win.Accounts
 {
     public partial class FrmLedgers : Form
     {
+        public static event EventHandler LedgerSaved;
+
         // Repository instances for database operations
         private Dropdowns drop = new Dropdowns();
         private AccountGroupRepository accountGroupRepo;
@@ -313,7 +315,10 @@ namespace PosBranch_Win.Accounts
                     bool success = ledgerRepo.UpdateLedger(ledger);
 
                     if (success)
+                    {
+                        LedgerSaved?.Invoke(this, EventArgs.Empty);
                         MessageBox.Show("Ledger updated successfully.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
                     else
                         MessageBox.Show("Failed to update ledger.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
@@ -328,7 +333,10 @@ namespace PosBranch_Win.Accounts
                     bool success = ledgerRepo.CreateLedger(ledger);
 
                     if (success)
+                    {
+                        LedgerSaved?.Invoke(this, EventArgs.Empty);
                         MessageBox.Show("Ledger created successfully.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
                     else
                         MessageBox.Show("Failed to create ledger.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
@@ -371,6 +379,7 @@ namespace PosBranch_Win.Accounts
 
                 if (success)
                 {
+                    LedgerSaved?.Invoke(this, EventArgs.Empty);
                     MessageBox.Show("Ledger deleted successfully.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
                     // Clear the form
@@ -454,23 +463,23 @@ namespace PosBranch_Win.Accounts
             var sectionBackColor = Color.FromArgb(199, 225, 242);
             var sectionForeColor = Color.FromArgb(15, 77, 128);
 
-            StyleCombo(ultraDrpParentGroup);
+            StyleCombo(ultraDrpParentGroup, isMandatory: true);
 
-            StyleEditor(ultraTxtLedgerName);
+            StyleEditor(ultraTxtLedgerName, isMandatory: true);
             StyleEditor(ultratxtAliasName);
             StyleEditor(ultratxtDescription);
             StyleEditor(ultratxtOpnBalance);
             StyleEditor(ultratxtNotes);
-            StyleEditor(ultraTxtLedgerId, true);
-            StyleEditor(ultratxtBalance, true);
+            StyleEditor(ultraTxtLedgerId, readOnly: true);
+            StyleEditor(ultratxtBalance, readOnly: true);
 
             StyleSectionLabel(lblSectionLedger, sectionBackColor, sectionForeColor);
             StyleSectionLabel(lblSectionFinancial, sectionBackColor, sectionForeColor);
             StyleSectionLabel(lblSectionNotes, sectionBackColor, sectionForeColor);
 
             StyleFieldLabel(ultraLblLedgerId);
-            StyleFieldLabel(ultralblLedgerName);
-            StyleFieldLabel(ultraLblAccGroup);
+            StyleFieldLabel(ultralblLedgerName, isMandatory: true, customText: "Ledger Name *");
+            StyleFieldLabel(ultraLblAccGroup, isMandatory: true, customText: "Account Group *");
             StyleFieldLabel(ultralblAlias);
             StyleFieldLabel(ultraLblDescription);
             StyleFieldLabel(ultraLblOpnBalance);
@@ -497,37 +506,53 @@ namespace PosBranch_Win.Accounts
             label.Padding = new Size(12, 0);
         }
 
-        private void StyleFieldLabel(Infragistics.Win.Misc.UltraLabel label)
+        private void StyleFieldLabel(Infragistics.Win.Misc.UltraLabel label, bool isMandatory = false, string customText = null)
         {
+            if (!string.IsNullOrEmpty(customText))
+            {
+                label.Text = customText;
+            }
+
             label.Appearance = new Infragistics.Win.Appearance();
             label.Appearance.BackColor = tblMain.BackColor;
-            label.Appearance.ForeColor = Color.FromArgb(40, 62, 89);
+            label.Appearance.ForeColor = isMandatory ? Color.FromArgb(180, 40, 20) : Color.FromArgb(40, 62, 89);
+            if (isMandatory)
+            {
+                label.Appearance.FontData.Bold = Infragistics.Win.DefaultableBoolean.True;
+            }
             label.Appearance.TextVAlignAsString = "Middle";
         }
 
-        private void StyleCombo(Infragistics.Win.UltraWinEditors.UltraComboEditor combo)
+        private void StyleCombo(Infragistics.Win.UltraWinEditors.UltraComboEditor combo, bool isMandatory = false)
         {
-            combo.BackColor = Color.White;
+            Color comboBackColor = isMandatory ? Color.FromArgb(255, 253, 230) : Color.White;
+            Color borderColor = isMandatory ? Color.FromArgb(217, 119, 6) : Color.FromArgb(110, 170, 210);
+
+            combo.BackColor = comboBackColor;
             combo.ForeColor = Color.FromArgb(40, 62, 89);
-            combo.Appearance.BackColor = Color.White;
+            combo.Appearance.BackColor = comboBackColor;
             combo.Appearance.ForeColor = combo.ForeColor;
-            combo.Appearance.BorderColor = Color.FromArgb(110, 170, 210);
+            combo.Appearance.BorderColor = borderColor;
             combo.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
             combo.DisplayStyle = Infragistics.Win.EmbeddableElementDisplayStyle.Office2010;
             combo.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
         }
 
-        private void StyleEditor(Infragistics.Win.UltraWinEditors.UltraTextEditor editor, bool readOnly = false)
+        private void StyleEditor(Infragistics.Win.UltraWinEditors.UltraTextEditor editor, bool readOnly = false, bool isMandatory = false)
         {
             Color editorBackColor = readOnly
                 ? Color.FromArgb(239, 245, 250)
-                : Color.White;
+                : (isMandatory ? Color.FromArgb(255, 253, 230) : Color.White);
+
+            Color borderColor = isMandatory
+                ? Color.FromArgb(217, 119, 6)
+                : Color.FromArgb(110, 170, 210);
 
             editor.BackColor = editorBackColor;
             editor.ForeColor = Color.FromArgb(40, 62, 89);
             editor.Appearance.BackColor = editorBackColor;
             editor.Appearance.ForeColor = editor.ForeColor;
-            editor.Appearance.BorderColor = Color.FromArgb(110, 170, 210);
+            editor.Appearance.BorderColor = borderColor;
             editor.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
             editor.DisplayStyle = Infragistics.Win.EmbeddableElementDisplayStyle.Office2010;
             editor.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;

@@ -307,7 +307,12 @@ namespace Repository.Accounts
                     {
                         try
                         {
-                            int finYearId = SessionContext.FinYearId;
+                            int finYearId = master.FinYearId > 0 ? master.FinYearId : GetContextValue(SessionContext.FinYearId, DataBase.FinyearId);
+                            int companyId = master.CompanyId > 0 ? master.CompanyId : GetContextValue(SessionContext.CompanyId, DataBase.CompanyId);
+                            int branchId = master.BranchId > 0 ? master.BranchId : GetContextValue(SessionContext.BranchId, DataBase.BranchId);
+                            master.CompanyId = companyId;
+                            master.BranchId = branchId;
+                            master.FinYearId = finYearId;
 
                             // 1. Generate Voucher Number if not provided
                             if (master.VoucherId <= 0)
