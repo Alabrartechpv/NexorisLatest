@@ -208,7 +208,6 @@ namespace PosBranch_Win.Accounts
                 if (band.Columns.Exists("LedgerID"))
                 {
                     band.Columns["LedgerID"].Header.Caption = "Particulars / Paid To";
-                    band.Columns["LedgerID"].AutoCompleteMode = Infragistics.Win.AutoCompleteMode.SuggestAppend;
                 }
                 if (band.Columns.Exists("Amount"))
                 {
@@ -224,8 +223,6 @@ namespace PosBranch_Win.Accounts
             gridPayment.InitializeLayout += gridPayment_InitializeLayout;
             gridPayment.AfterCellUpdate += gridPayment_AfterCellUpdate;
             gridPayment.KeyDown += gridPayment_KeyDown;
-            gridPayment.BeforeCellListDropDown += (s, e) => { if (!isBinding) BindLedgers(); };
-            gridPayment.Enter += (s, e) => { if (!isBinding) BindLedgers(); };
             CmboCashBank.BeforeDropDown += (s, e) => { if (!isBinding) BindLedgers(); };
             txtVoucherNo.KeyDown += txtVoucherNo_KeyDown;
             dtpVoucherDate.KeyDown += dtpVoucherDate_KeyDown;
@@ -638,11 +635,10 @@ namespace PosBranch_Win.Accounts
 
             if (band.Columns.Exists("LedgerID"))
             {
-                band.Columns["LedgerID"].Header.Caption = "Paid To / Expense Ledger";
+                band.Columns["LedgerID"].Header.Caption = "Particulars / Paid To";
                 band.Columns["LedgerID"].Width = 650;
                 band.Columns["LedgerID"].MinWidth = 300;
                 band.Columns["LedgerID"].Header.VisiblePosition = 0;
-                band.Columns["LedgerID"].AutoCompleteMode = Infragistics.Win.AutoCompleteMode.SuggestAppend;
             }
 
             if (band.Columns.Exists("Amount"))
@@ -666,22 +662,17 @@ namespace PosBranch_Win.Accounts
                 return;
             }
 
-            ValueList existingList = null;
-            foreach (ValueList valueList in gridPayment.DisplayLayout.ValueLists)
+            ValueList ledgerList;
+            if (gridPayment.DisplayLayout.ValueLists.Exists("LedgerList"))
             {
-                if (string.Equals(valueList.Key, "LedgerList", StringComparison.OrdinalIgnoreCase))
-                {
-                    existingList = valueList;
-                    break;
-                }
+                ledgerList = gridPayment.DisplayLayout.ValueLists["LedgerList"];
+                ledgerList.ValueListItems.Clear();
+            }
+            else
+            {
+                ledgerList = gridPayment.DisplayLayout.ValueLists.Add("LedgerList");
             }
 
-            if (existingList != null)
-            {
-                gridPayment.DisplayLayout.ValueLists.Remove(existingList);
-            }
-
-            ValueList ledgerList = gridPayment.DisplayLayout.ValueLists.Add("LedgerList");
             foreach (DataRow row in ledgerTable.Rows)
             {
                 int ledgerId = GetIntValue(row["LedgerID"]);

@@ -127,7 +127,6 @@ namespace PosBranch_Win.Accounts
                 if (band.Columns.Exists("LedgerID"))
                 {
                     band.Columns["LedgerID"].Header.Caption = "Ledger Name";
-                    band.Columns["LedgerID"].AutoCompleteMode = Infragistics.Win.AutoCompleteMode.SuggestAppend;
                 }
                 if (band.Columns.Exists("Debit"))
                 {
@@ -153,8 +152,6 @@ namespace PosBranch_Win.Accounts
             dgvJournal.InitializeLayout += dgvJournal_InitializeLayout;
             dgvJournal.AfterCellUpdate += dgvJournal_AfterCellUpdate;
             dgvJournal.KeyDown += dgvJournal_KeyDown;
-            dgvJournal.BeforeCellListDropDown += (s, e) => { if (!isBinding) BindLedgers(); };
-            dgvJournal.Enter += (s, e) => { if (!isBinding) BindLedgers(); };
             txtVoucherNo.KeyDown += txtVoucherNo_KeyDown;
         }
 
@@ -490,22 +487,17 @@ namespace PosBranch_Win.Accounts
                 return;
             }
 
-            ValueList existingList = null;
-            foreach (ValueList valueList in dgvJournal.DisplayLayout.ValueLists)
+            ValueList ledgerList;
+            if (dgvJournal.DisplayLayout.ValueLists.Exists("LedgerList"))
             {
-                if (string.Equals(valueList.Key, "LedgerList", StringComparison.OrdinalIgnoreCase))
-                {
-                    existingList = valueList;
-                    break;
-                }
+                ledgerList = dgvJournal.DisplayLayout.ValueLists["LedgerList"];
+                ledgerList.ValueListItems.Clear();
+            }
+            else
+            {
+                ledgerList = dgvJournal.DisplayLayout.ValueLists.Add("LedgerList");
             }
 
-            if (existingList != null)
-            {
-                dgvJournal.DisplayLayout.ValueLists.Remove(existingList);
-            }
-
-            ValueList ledgerList = dgvJournal.DisplayLayout.ValueLists.Add("LedgerList");
             foreach (DataRow row in ledgerTable.Rows)
             {
                 int ledgerId = GetIntValue(row["LedgerID"]);

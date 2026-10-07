@@ -127,7 +127,6 @@ namespace PosBranch_Win.Accounts
                 if (band.Columns.Exists("LedgerID"))
                 {
                     band.Columns["LedgerID"].Header.Caption = "Cash / Bank Ledger";
-                    band.Columns["LedgerID"].AutoCompleteMode = Infragistics.Win.AutoCompleteMode.SuggestAppend;
                 }
                 if (band.Columns.Exists("Debit"))
                 {
@@ -153,8 +152,6 @@ namespace PosBranch_Win.Accounts
             gridContra.InitializeLayout += gridContra_InitializeLayout;
             gridContra.AfterCellUpdate += gridContra_AfterCellUpdate;
             gridContra.KeyDown += gridContra_KeyDown;
-            gridContra.BeforeCellListDropDown += (s, e) => { if (!isBinding) BindLedgers(); };
-            gridContra.Enter += (s, e) => { if (!isBinding) BindLedgers(); };
             txtVoucherNo.KeyDown += txtVoucherNo_KeyDown;
         }
 
@@ -428,22 +425,17 @@ namespace PosBranch_Win.Accounts
                 return;
             }
 
-            ValueList existingList = null;
-            foreach (ValueList valueList in gridContra.DisplayLayout.ValueLists)
+            ValueList ledgerList;
+            if (gridContra.DisplayLayout.ValueLists.Exists("ContraLedgerList"))
             {
-                if (string.Equals(valueList.Key, "ContraLedgerList", StringComparison.OrdinalIgnoreCase))
-                {
-                    existingList = valueList;
-                    break;
-                }
+                ledgerList = gridContra.DisplayLayout.ValueLists["ContraLedgerList"];
+                ledgerList.ValueListItems.Clear();
+            }
+            else
+            {
+                ledgerList = gridContra.DisplayLayout.ValueLists.Add("ContraLedgerList");
             }
 
-            if (existingList != null)
-            {
-                gridContra.DisplayLayout.ValueLists.Remove(existingList);
-            }
-
-            ValueList ledgerList = gridContra.DisplayLayout.ValueLists.Add("ContraLedgerList");
             foreach (DataRow row in ledgerTable.Rows)
             {
                 int ledgerId = GetIntValue(row["LedgerID"]);

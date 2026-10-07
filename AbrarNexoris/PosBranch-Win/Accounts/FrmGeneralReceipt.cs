@@ -208,7 +208,6 @@ namespace PosBranch_Win.Accounts
                 if (band.Columns.Exists("LedgerID"))
                 {
                     band.Columns["LedgerID"].Header.Caption = "Received From / Ledger Name";
-                    band.Columns["LedgerID"].AutoCompleteMode = Infragistics.Win.AutoCompleteMode.SuggestAppend;
                 }
                 if (band.Columns.Exists("Amount"))
                 {
@@ -224,8 +223,6 @@ namespace PosBranch_Win.Accounts
             gridReceipt.InitializeLayout += gridReceipt_InitializeLayout;
             gridReceipt.AfterCellUpdate += gridReceipt_AfterCellUpdate;
             gridReceipt.KeyDown += gridReceipt_KeyDown;
-            gridReceipt.BeforeCellListDropDown += (s, e) => { if (!isBinding) BindLedgers(); };
-            gridReceipt.Enter += (s, e) => { if (!isBinding) BindLedgers(); };
             CmboCashBank.BeforeDropDown += (s, e) => { if (!isBinding) BindLedgers(); };
             txtVoucherNo.KeyDown += txtVoucherNo_KeyDown;
             dtpVoucherDate.KeyDown += dtpVoucherDate_KeyDown;
@@ -649,11 +646,6 @@ namespace PosBranch_Win.Accounts
             band.Columns["Amount"].Format = "N2";
             band.Columns["Amount"].CellAppearance.TextHAlign = HAlign.Right;
 
-            if (band.Columns.Exists("LedgerID"))
-            {
-                band.Columns["LedgerID"].AutoCompleteMode = Infragistics.Win.AutoCompleteMode.SuggestAppend;
-            }
-
             ApplyLedgerValueList();
         }
 
@@ -664,22 +656,17 @@ namespace PosBranch_Win.Accounts
                 return;
             }
 
-            ValueList existingList = null;
-            foreach (ValueList valueList in gridReceipt.DisplayLayout.ValueLists)
+            ValueList ledgerList;
+            if (gridReceipt.DisplayLayout.ValueLists.Exists("LedgerList"))
             {
-                if (string.Equals(valueList.Key, "LedgerList", StringComparison.OrdinalIgnoreCase))
-                {
-                    existingList = valueList;
-                    break;
-                }
+                ledgerList = gridReceipt.DisplayLayout.ValueLists["LedgerList"];
+                ledgerList.ValueListItems.Clear();
+            }
+            else
+            {
+                ledgerList = gridReceipt.DisplayLayout.ValueLists.Add("LedgerList");
             }
 
-            if (existingList != null)
-            {
-                gridReceipt.DisplayLayout.ValueLists.Remove(existingList);
-            }
-
-            ValueList ledgerList = gridReceipt.DisplayLayout.ValueLists.Add("LedgerList");
             foreach (DataRow row in ledgerTable.Rows)
             {
                 int ledgerId = GetIntValue(row["LedgerID"]);
