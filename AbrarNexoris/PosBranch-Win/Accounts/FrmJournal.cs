@@ -801,6 +801,15 @@ namespace PosBranch_Win.Accounts
             }
         }
 
+        public void LoadVoucherByNumber(string voucherNumber)
+        {
+            if (!string.IsNullOrWhiteSpace(voucherNumber))
+            {
+                txtVoucherNo.Text = voucherNumber.Trim();
+                LoadJournal();
+            }
+        }
+
         private void DeleteJournal()
         {
             if (currentVoucherId <= 0)

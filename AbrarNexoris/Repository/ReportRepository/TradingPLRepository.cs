@@ -15,20 +15,22 @@ namespace Repository.ReportRepository
         /// <param name="fromDate">Start date of the reporting period</param>
         /// <param name="toDate">End date of the reporting period</param>
         /// <returns>TradingPLReport with all line items and summary</returns>
-        public TradingPLReport GetTradingPLReport(DateTime fromDate, DateTime toDate)
+        public TradingPLReport GetTradingPLReport(DateTime fromDate, DateTime toDate, int branchId = 0, int companyId = 0, int finYearId = 0)
         {
             TradingPLReport report = new TradingPLReport();
             report.FromDate = fromDate;
             report.ToDate = toDate;
-            int companyId = GetContextValue(SessionContext.CompanyId, DataBase.CompanyId);
-            int branchId = GetContextValue(SessionContext.BranchId, DataBase.BranchId);
-            int finYearId = GetContextValue(SessionContext.FinYearId, DataBase.FinyearId);
+            int effCompanyId = companyId > 0 ? companyId : GetContextValue(SessionContext.CompanyId, DataBase.CompanyId);
+            int effBranchId = branchId > 0 ? branchId : GetContextValue(SessionContext.BranchId, DataBase.BranchId);
+            int effFinYearId = finYearId > 0 ? finYearId : GetContextValue(SessionContext.FinYearId, DataBase.FinyearId);
 
-            if (companyId <= 0 || branchId <= 0 || finYearId <= 0)
-            {
-                throw new InvalidOperationException(
-                    $"Trading & P/L cannot be loaded because session values are missing. CompanyId={companyId}, BranchId={branchId}, FinYearId={finYearId}.");
-            }
+            if (effCompanyId <= 0) int.TryParse(DataBase.CompanyId, out effCompanyId);
+            if (effBranchId <= 0) int.TryParse(DataBase.BranchId, out effBranchId);
+            if (effFinYearId <= 0) int.TryParse(DataBase.FinyearId, out effFinYearId);
+
+            if (effCompanyId <= 0) effCompanyId = 1;
+            if (effBranchId <= 0) effBranchId = 1;
+            if (effFinYearId <= 0) effFinYearId = 1;
 
             if (DataConnection.State == ConnectionState.Open)
             {
@@ -43,9 +45,9 @@ namespace Repository.ReportRepository
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.CommandTimeout = 60;
-                    cmd.Parameters.AddWithValue("@CompanyId", companyId);
-                    cmd.Parameters.AddWithValue("@BranchId", branchId);
-                    cmd.Parameters.AddWithValue("@FinYearId", finYearId);
+                    cmd.Parameters.AddWithValue("@CompanyId", effCompanyId);
+                    cmd.Parameters.AddWithValue("@BranchId", effBranchId);
+                    cmd.Parameters.AddWithValue("@FinYearId", effFinYearId);
                     cmd.Parameters.AddWithValue("@FromDate", fromDate);
                     cmd.Parameters.AddWithValue("@ToDate", toDate);
 

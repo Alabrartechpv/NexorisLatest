@@ -1023,6 +1023,15 @@ namespace PosBranch_Win.Accounts
             }
         }
 
+        public void LoadVoucherByNumber(string voucherNumber)
+        {
+            if (!string.IsNullOrWhiteSpace(voucherNumber))
+            {
+                txtVoucherNo.Text = voucherNumber.Trim();
+                LoadReceipt();
+            }
+        }
+
         private void DeleteReceipt()
         {
             if (currentVoucherId <= 0)

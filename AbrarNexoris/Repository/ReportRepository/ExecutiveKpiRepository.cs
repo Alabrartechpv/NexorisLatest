@@ -428,6 +428,41 @@ namespace Repository.ReportRepository
                         System.Diagnostics.Debug.WriteLine($"Manual balance SP integration info: {exManual.Message}");
                     }
                 }
+
+                // ═══════════════════════════════════════════════════════════════════
+                // 9. EXPENSES & NET PROFIT RECONCILIATION
+                // Guarantee exact parity with Business Expenses Report (Net = Debit - Credit)
+                // ═══════════════════════════════════════════════════════════════════
+                try
+                {
+                    var expenseSummaries = GetExpenseLedgerSummary(rangeFrom, rangeTo, effectiveBranch, effectiveCompany);
+                    if (expenseSummaries != null)
+                    {
+                        decimal direct = expenseSummaries
+                            .Where(x => string.Equals(x.ExpenseType, "Direct Expense", StringComparison.OrdinalIgnoreCase) ||
+                                        (x.ExpenseType != null && x.ExpenseType.IndexOf("Direct", StringComparison.OrdinalIgnoreCase) >= 0 && x.ExpenseType.IndexOf("Indirect", StringComparison.OrdinalIgnoreCase) < 0))
+                            .Sum(x => x.NetAmount);
+
+                        decimal indirect = expenseSummaries
+                            .Where(x => string.Equals(x.ExpenseType, "Indirect Expense", StringComparison.OrdinalIgnoreCase) ||
+                                        (x.ExpenseType != null && x.ExpenseType.IndexOf("Indirect", StringComparison.OrdinalIgnoreCase) >= 0))
+                            .Sum(x => x.NetAmount);
+
+                        model.DirectExpenses = direct;
+                        model.IndirectExpenses = indirect;
+                        model.TotalBusinessExpenses = direct + indirect;
+
+                        // Recompute Actual Net Profit & Operating Margin using net expenses
+                        model.ActualNetProfit = model.GrossProfit - model.TotalBusinessExpenses;
+                        model.OperatingProfitMarginPercent = model.TotalSalesRevenue > 0
+                            ? Math.Round((model.ActualNetProfit / model.TotalSalesRevenue) * 100m, 2)
+                            : 0;
+                    }
+                }
+                catch (Exception exExp)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Expense reconciliation info: {exExp.Message}");
+                }
             }
             catch (Exception ex)
             {

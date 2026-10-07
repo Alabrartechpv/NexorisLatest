@@ -1003,6 +1003,13 @@ namespace PosBranch_Win.Accounts
                 MessageBox.Show($"Error loading payment voucher: {ex.Message}", "Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
+        }        public void LoadVoucherByNumber(string voucherNumber)
+        {
+            if (!string.IsNullOrWhiteSpace(voucherNumber))
+            {
+                txtVoucherNo.Text = voucherNumber.Trim();
+                LoadPayment();
+            }
         }
 
         private void LoadPaymentToForm(JournalVoucher journal)

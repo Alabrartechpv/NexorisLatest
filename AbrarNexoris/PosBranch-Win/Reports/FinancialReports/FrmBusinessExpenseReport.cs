@@ -15,6 +15,7 @@ using ModelClass;
 using ModelClass.Report;
 using Repository;
 using Repository.ReportRepository;
+using PosBranch_Win.Accounts;
 
 namespace PosBranch_Win.Reports.FinancialReports
 {
@@ -519,6 +520,15 @@ namespace PosBranch_Win.Reports.FinancialReports
             var band = e.Layout.Bands[0];
             string viewMode = cmbViewMode.Value?.ToString() ?? "SUMMARY";
 
+            // Configure Pinned Summary Footer
+            e.Layout.Override.SummaryDisplayArea = SummaryDisplayAreas.BottomFixed | SummaryDisplayAreas.InGroupByRows;
+            e.Layout.Override.SummaryFooterAppearance.BackColor = Color.FromArgb(240, 248, 255);
+            e.Layout.Override.SummaryFooterAppearance.ForeColor = Color.FromArgb(18, 49, 102);
+            e.Layout.Override.SummaryFooterAppearance.FontData.Bold = DefaultableBoolean.True;
+            e.Layout.Override.SummaryFooterCaptionVisible = DefaultableBoolean.True;
+            band.SummaryFooterCaption = "Totals:";
+            band.Summaries.Clear();
+
             if (viewMode == "SUMMARY")
             {
                 // Summary Mode Columns: SlNo, ExpenseType, GroupName, LedgerName, VoucherCount, TotalDebit, TotalCredit, NetAmount, PercentageOfTotal
@@ -562,6 +572,11 @@ namespace PosBranch_Win.Reports.FinancialReports
                     band.Columns["VoucherCount"].CellAppearance.TextHAlign = HAlign.Right;
                     band.Columns["VoucherCount"].Format = "#,##0";
                     band.Columns["VoucherCount"].Header.VisiblePosition = 4;
+
+                    var sumVouchers = band.Summaries.Add("SumVouchers", SummaryType.Sum, band.Columns["VoucherCount"], SummaryPosition.UseSummaryPositionColumn);
+                    sumVouchers.DisplayFormat = "{0:N0}";
+                    sumVouchers.Appearance.TextHAlign = HAlign.Right;
+                    sumVouchers.Appearance.FontData.Bold = DefaultableBoolean.True;
                 }
 
                 if (band.Columns.Exists("TotalDebit"))
@@ -571,6 +586,11 @@ namespace PosBranch_Win.Reports.FinancialReports
                     band.Columns["TotalDebit"].CellAppearance.TextHAlign = HAlign.Right;
                     band.Columns["TotalDebit"].Format = "N2";
                     band.Columns["TotalDebit"].Header.VisiblePosition = 5;
+
+                    var sumDebit = band.Summaries.Add("SumTotalDebit", SummaryType.Sum, band.Columns["TotalDebit"], SummaryPosition.UseSummaryPositionColumn);
+                    sumDebit.DisplayFormat = "₹ {0:N2}";
+                    sumDebit.Appearance.TextHAlign = HAlign.Right;
+                    sumDebit.Appearance.FontData.Bold = DefaultableBoolean.True;
                 }
 
                 if (band.Columns.Exists("TotalCredit"))
@@ -580,6 +600,11 @@ namespace PosBranch_Win.Reports.FinancialReports
                     band.Columns["TotalCredit"].CellAppearance.TextHAlign = HAlign.Right;
                     band.Columns["TotalCredit"].Format = "N2";
                     band.Columns["TotalCredit"].Header.VisiblePosition = 6;
+
+                    var sumCredit = band.Summaries.Add("SumTotalCredit", SummaryType.Sum, band.Columns["TotalCredit"], SummaryPosition.UseSummaryPositionColumn);
+                    sumCredit.DisplayFormat = "₹ {0:N2}";
+                    sumCredit.Appearance.TextHAlign = HAlign.Right;
+                    sumCredit.Appearance.FontData.Bold = DefaultableBoolean.True;
                 }
 
                 if (band.Columns.Exists("NetAmount"))
@@ -591,6 +616,12 @@ namespace PosBranch_Win.Reports.FinancialReports
                     band.Columns["NetAmount"].CellAppearance.ForeColor = NetAmountColor;
                     band.Columns["NetAmount"].Format = "N2";
                     band.Columns["NetAmount"].Header.VisiblePosition = 7;
+
+                    var sumNet = band.Summaries.Add("SumNetAmount", SummaryType.Sum, band.Columns["NetAmount"], SummaryPosition.UseSummaryPositionColumn);
+                    sumNet.DisplayFormat = "₹ {0:N2}";
+                    sumNet.Appearance.TextHAlign = HAlign.Right;
+                    sumNet.Appearance.FontData.Bold = DefaultableBoolean.True;
+                    sumNet.Appearance.ForeColor = NetAmountColor;
                 }
 
                 if (band.Columns.Exists("PercentageOfTotal"))
@@ -661,6 +692,11 @@ namespace PosBranch_Win.Reports.FinancialReports
                     band.Columns["Debit"].CellAppearance.TextHAlign = HAlign.Right;
                     band.Columns["Debit"].Format = "N2";
                     band.Columns["Debit"].Header.VisiblePosition = 6;
+
+                    var sumDebit = band.Summaries.Add("SumDebit", SummaryType.Sum, band.Columns["Debit"], SummaryPosition.UseSummaryPositionColumn);
+                    sumDebit.DisplayFormat = "₹ {0:N2}";
+                    sumDebit.Appearance.TextHAlign = HAlign.Right;
+                    sumDebit.Appearance.FontData.Bold = DefaultableBoolean.True;
                 }
 
                 if (band.Columns.Exists("Credit"))
@@ -670,6 +706,11 @@ namespace PosBranch_Win.Reports.FinancialReports
                     band.Columns["Credit"].CellAppearance.TextHAlign = HAlign.Right;
                     band.Columns["Credit"].Format = "N2";
                     band.Columns["Credit"].Header.VisiblePosition = 7;
+
+                    var sumCredit = band.Summaries.Add("SumCredit", SummaryType.Sum, band.Columns["Credit"], SummaryPosition.UseSummaryPositionColumn);
+                    sumCredit.DisplayFormat = "₹ {0:N2}";
+                    sumCredit.Appearance.TextHAlign = HAlign.Right;
+                    sumCredit.Appearance.FontData.Bold = DefaultableBoolean.True;
                 }
 
                 if (band.Columns.Exists("NetAmount"))
@@ -681,6 +722,12 @@ namespace PosBranch_Win.Reports.FinancialReports
                     band.Columns["NetAmount"].CellAppearance.ForeColor = NetAmountColor;
                     band.Columns["NetAmount"].Format = "N2";
                     band.Columns["NetAmount"].Header.VisiblePosition = 8;
+
+                    var sumNet = band.Summaries.Add("SumDetailNet", SummaryType.Sum, band.Columns["NetAmount"], SummaryPosition.UseSummaryPositionColumn);
+                    sumNet.DisplayFormat = "₹ {0:N2}";
+                    sumNet.Appearance.TextHAlign = HAlign.Right;
+                    sumNet.Appearance.FontData.Bold = DefaultableBoolean.True;
+                    sumNet.Appearance.ForeColor = NetAmountColor;
                 }
 
                 if (band.Columns.Exists("Narration"))
@@ -706,6 +753,18 @@ namespace PosBranch_Win.Reports.FinancialReports
                     e.Row.Cells["ExpenseType"].Appearance.ForeColor = IndirectExpenseColor;
                 }
             }
+
+            // Visual Alert for Credit Balances / Refunds / Reversals
+            if (e.Row.Cells.Exists("NetAmount"))
+            {
+                object netVal = e.Row.Cells["NetAmount"].Value;
+                if (netVal != null && decimal.TryParse(netVal.ToString(), out decimal net) && net < 0)
+                {
+                    e.Row.Appearance.BackColor = Color.FromArgb(254, 243, 199); // Soft amber alert
+                    e.Row.Cells["NetAmount"].Appearance.ForeColor = Color.FromArgb(180, 83, 9);
+                    e.Row.ToolTipText = "Credit Balance / Refund / Reversal entry";
+                }
+            }
         }
 
         private void UltraGridExpenses_DoubleClickRow(object sender, DoubleClickRowEventArgs e)
@@ -722,6 +781,89 @@ namespace PosBranch_Win.Reports.FinancialReports
                     cmbViewMode.Value = "DETAIL";
                     txtSearch.Text = ledgerName;
                 }
+            }
+            else
+            {
+                // Detail Mode: Drill down to open the voucher document
+                DrillDownToVoucher(e.Row);
+            }
+        }
+
+        private void DrillDownToVoucher(UltraGridRow row)
+        {
+            try
+            {
+                string voucherNo = row.Cells.Exists("VoucherNumber") ? row.Cells["VoucherNumber"].Value?.ToString() ?? "" : "";
+                string voucherType = row.Cells.Exists("VoucherType") ? row.Cells["VoucherType"].Value?.ToString() ?? "" : "";
+                long voucherId = row.Cells.Exists("VoucherID") ? Convert.ToInt64(row.Cells["VoucherID"].Value ?? 0) : 0;
+
+                if (string.IsNullOrWhiteSpace(voucherNo) && voucherId <= 0)
+                {
+                    return;
+                }
+
+                // Identify voucher category and open appropriate entry form
+                if (voucherType.IndexOf("Payment", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    voucherType.IndexOf("GENPAY", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    var paymentForm = new FrmGeneralPayment();
+                    paymentForm.LoadVoucherByNumber(voucherNo);
+                    OpenFormInTabOrModal(paymentForm, $"Payment #{voucherNo}");
+                }
+                else if (voucherType.IndexOf("Journal", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    var journalForm = new FrmJournal();
+                    journalForm.LoadVoucherByNumber(voucherNo);
+                    OpenFormInTabOrModal(journalForm, $"Journal #{voucherNo}");
+                }
+                else if (voucherType.IndexOf("Receipt", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                         voucherType.IndexOf("GENREC", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    var receiptForm = new FrmGeneralReceipt();
+                    receiptForm.LoadVoucherByNumber(voucherNo);
+                    OpenFormInTabOrModal(receiptForm, $"Receipt #{voucherNo}");
+                }
+                else
+                {
+                    // For Contra, Sales, or custom system vouchers, show voucher info
+                    MessageBox.Show(
+                        $"Voucher Type: {voucherType}\nVoucher No: {voucherNo}\n\nThis voucher was generated by the '{voucherType}' module.",
+                        "Voucher Information",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Information);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error opening voucher: {ex.Message}", "Drill-Down Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void OpenFormInTabOrModal(Form form, string title)
+        {
+            try
+            {
+                var homeForm = Application.OpenForms.OfType<Home>().FirstOrDefault();
+                if (homeForm != null)
+                {
+                    var openFormInTabMethod = homeForm.GetType().GetMethod("OpenFormInTabSafe",
+                        System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+                        ?? homeForm.GetType().GetMethod("OpenFormInTab",
+                        System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+
+                    if (openFormInTabMethod != null)
+                    {
+                        openFormInTabMethod.Invoke(homeForm, new object[] { form, title });
+                        return;
+                    }
+                }
+                form.Show();
+                form.BringToFront();
+            }
+            catch
+            {
+                form.Show();
+                form.BringToFront();
             }
         }
         #endregion
