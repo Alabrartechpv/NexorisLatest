@@ -371,18 +371,15 @@ namespace PosBranch_Win.Reports.FinancialReports
             // 
             // ultraPanelGridFooter
             // 
-            this.ultraPanelGridFooter.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.ultraPanelGridFooter.Location = new System.Drawing.Point(0, 493);
+            this.ultraPanelGridFooter.Dock = System.Windows.Forms.DockStyle.Bottom;
+            this.ultraPanelGridFooter.Location = new System.Drawing.Point(0, 494);
             this.ultraPanelGridFooter.Name = "ultraPanelGridFooter";
             this.ultraPanelGridFooter.Size = new System.Drawing.Size(1364, 26);
             this.ultraPanelGridFooter.TabIndex = 19;
             // 
             // gridReport
             // 
-            this.gridReport.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
-            | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
+            this.gridReport.Dock = System.Windows.Forms.DockStyle.Fill;
             appearance1.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(232)))), ((int)(((byte)(246)))), ((int)(((byte)(255)))));
             this.gridReport.DisplayLayout.Appearance = appearance1;
             this.gridReport.DisplayLayout.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
@@ -392,9 +389,9 @@ namespace PosBranch_Win.Reports.FinancialReports
             appearance3.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(126)))), ((int)(((byte)(126)))), ((int)(((byte)(245)))));
             appearance3.ForeColor = System.Drawing.Color.White;
             this.gridReport.DisplayLayout.Override.SelectedRowAppearance = appearance3;
-            this.gridReport.Location = new System.Drawing.Point(3, 0);
+            this.gridReport.Location = new System.Drawing.Point(0, 0);
             this.gridReport.Name = "gridReport";
-            this.gridReport.Size = new System.Drawing.Size(1358, 493);
+            this.gridReport.Size = new System.Drawing.Size(1364, 494);
             this.gridReport.TabIndex = 0;
             this.gridReport.Text = "Vendor Outstanding Listing";
             // 
@@ -402,6 +399,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.AutoScroll = false;
             this.ClientSize = new System.Drawing.Size(1364, 701);
             this.Controls.Add(this.ultraPanelMaster);
             this.Controls.Add(this.ultraPanelAction);

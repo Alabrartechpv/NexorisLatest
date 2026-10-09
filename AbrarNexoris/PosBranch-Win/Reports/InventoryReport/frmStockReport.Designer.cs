@@ -547,7 +547,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             this.gridReport.DisplayLayout.Override.HeaderAppearance = appearance2;
             this.gridReport.Location = new System.Drawing.Point(3, 3);
             this.gridReport.Name = "gridReport";
-            this.gridReport.Size = new System.Drawing.Size(1358, 426);
+            this.gridReport.Size = new System.Drawing.Size(1358, 416);
             this.gridReport.TabIndex = 0;
             this.gridReport.Text = "Stock Listing";
             // 
