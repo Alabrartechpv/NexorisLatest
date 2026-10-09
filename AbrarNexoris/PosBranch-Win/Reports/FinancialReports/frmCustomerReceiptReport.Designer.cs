@@ -228,7 +228,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             // 
             this.ultraPanelGridFooter.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Bottom | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.ultraPanelGridFooter.Location = new System.Drawing.Point(3, 351);
+            this.ultraPanelGridFooter.Location = new System.Drawing.Point(3, 442);
             this.ultraPanelGridFooter.Name = "ultraPanelGridFooter";
             this.ultraPanelGridFooter.Size = new System.Drawing.Size(1343, 26);
             this.ultraPanelGridFooter.TabIndex = 18;
@@ -240,7 +240,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             | System.Windows.Forms.AnchorStyles.Right)));
             this.gridReport.Location = new System.Drawing.Point(3, 42);
             this.gridReport.Name = "gridReport";
-            this.gridReport.Size = new System.Drawing.Size(1343, 335);
+            this.gridReport.Size = new System.Drawing.Size(1343, 397);
             this.gridReport.TabIndex = 0;
             this.gridReport.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
             // 
@@ -248,12 +248,12 @@ namespace PosBranch_Win.Reports.FinancialReports
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(7F, 15F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.AutoScroll = false;
             this.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(214)))), ((int)(((byte)(230)))), ((int)(((byte)(240)))));
             this.ClientSize = new System.Drawing.Size(1349, 561);
             this.Controls.Add(this.ultraPanelMaster);
             this.Controls.Add(this.ultraPanelControls);
             this.Font = new System.Drawing.Font("Segoe UI", 9F);
-            this.MinimumSize = new System.Drawing.Size(1024, 600);
             this.Name = "frmCustomerReceiptReport";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "Customer Receipt Report";

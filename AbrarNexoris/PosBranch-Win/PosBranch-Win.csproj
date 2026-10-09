@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -999,7 +999,6 @@
     <Compile Include="Master\FrmCountry.Designer.cs">
       <DependentUpon>FrmCountry.cs</DependentUpon>
     </Compile>
-
     <Compile Include="Master\FrmGroup.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -1337,7 +1336,6 @@
     <Compile Include="Reports\FinancialReports\FrmShiftReconciliationReport.Designer.cs">
       <DependentUpon>FrmShiftReconciliationReport.cs</DependentUpon>
     </Compile>
-
     <Compile Include="ReportViewer.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -1898,6 +1896,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Reports\SalesReports\frmCounterReport.resx">
       <DependentUpon>frmCounterReport.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Reports\SalesReports\SalesReturnReport.resx">
+      <DependentUpon>SalesReturnReport.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="ReportViewer.resx">
       <DependentUpon>ReportViewer.cs</DependentUpon>
