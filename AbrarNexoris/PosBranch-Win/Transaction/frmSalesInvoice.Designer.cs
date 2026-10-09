@@ -24,6 +24,12 @@ namespace PosBranch_Win.Transaction
                     barcodeFocusTimer.Stop();
                     barcodeFocusTimer.Dispose();
                 }
+                if (_nexorisLogoBanner != null)
+                {
+                    _nexorisLogoBanner.StopAnimation();
+                    _nexorisLogoBanner.Dispose();
+                    _nexorisLogoBanner = null;
+                }
             }
             base.Dispose(disposing);
         }

@@ -98,6 +98,68 @@ namespace PosBranch_Win.Accounts
             CmboBranch.TabStop = false;
         }
 
+        private bool IsCashOrBankLedger(DataRow row)
+        {
+            if (row == null) return false;
+
+            if (row.Table.Columns.Contains("GroupID") && row["GroupID"] != DBNull.Value)
+            {
+                if (int.TryParse(row["GroupID"].ToString(), out int gid))
+                {
+                    if (gid == (int)AccountGroup.CASH_IN_HAND ||
+                        gid == (int)AccountGroup.BANK_ACCOUNTS ||
+                        gid == (int)AccountGroup.BANK_OD_AC)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            string groupName = (Convert.ToString(row["GroupName"]) ?? string.Empty).ToUpperInvariant();
+            string ledgerName = (Convert.ToString(row["LedgerName"]) ?? string.Empty).ToUpperInvariant();
+
+            if (groupName.Contains("CASH") || groupName.Contains("BANK"))
+            {
+                return true;
+            }
+
+            if (ledgerName.Contains("CASH") || ledgerName.Contains("BANK"))
+            {
+                if (!ledgerName.Contains("DISCOUNT") && !ledgerName.Contains("EXCESS") && !ledgerName.Contains("SHORT"))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private void EnsureCashBankLedgerPresent(long ledgerId)
+        {
+            if (ledgerId <= 0 || cashBankTable == null || ledgerTable == null) return;
+            bool exists = cashBankTable.AsEnumerable().Any(r => GetLongValue(r["LedgerID"]) == ledgerId);
+            if (!exists)
+            {
+                var row = ledgerTable.AsEnumerable().FirstOrDefault(r => GetLongValue(r["LedgerID"]) == ledgerId);
+                if (row != null)
+                {
+                    cashBankTable.ImportRow(row);
+                }
+            }
+        }
+
+        private void EnsureGridLedgerValueListContains(int ledgerId, string ledgerName)
+        {
+            if (gridPayment.DisplayLayout.ValueLists.Exists("LedgerList"))
+            {
+                var vl = gridPayment.DisplayLayout.ValueLists["LedgerList"];
+                if (!vl.ValueListItems.Cast<ValueListItem>().Any(item => Convert.ToInt32(item.DataValue) == ledgerId))
+                {
+                    vl.ValueListItems.Add(ledgerId, ledgerName);
+                }
+            }
+        }
+
         private void BindLedgers()
         {
             try
@@ -106,12 +168,36 @@ namespace PosBranch_Win.Accounts
                 DataTable allLedgers = ledgerRepository.GetAllLedgers(branchId);
                 ledgerTable = allLedgers;
 
+                // Build dedicated Cash/Bank table for header dropdown
+                cashBankTable = allLedgers != null ? allLedgers.Clone() : new DataTable();
+                if (allLedgers != null && allLedgers.Rows.Count > 0)
+                {
+                    foreach (DataRow row in allLedgers.Rows)
+                    {
+                        if (IsCashOrBankLedger(row))
+                        {
+                            cashBankTable.ImportRow(row);
+                        }
+                    }
+                }
+
+                // Fallback to allLedgers only if no cash/bank accounts exist in database
+                if (cashBankTable.Rows.Count == 0 && allLedgers != null && allLedgers.Rows.Count > 0)
+                {
+                    cashBankTable = allLedgers.Copy();
+                }
+
                 long currentVal = GetLongValue(CmboCashBank.Value);
-                CmboCashBank.DataSource = allLedgers;
+                if (currentVal > 0)
+                {
+                    EnsureCashBankLedgerPresent(currentVal);
+                }
+
+                CmboCashBank.DataSource = cashBankTable;
                 CmboCashBank.DisplayMember = "LedgerName";
                 CmboCashBank.ValueMember = "LedgerID";
 
-                if (currentVal > 0 && allLedgers.AsEnumerable().Any(r => GetLongValue(r["LedgerID"]) == currentVal))
+                if (currentVal > 0 && cashBankTable.AsEnumerable().Any(r => GetLongValue(r["LedgerID"]) == currentVal))
                 {
                     CmboCashBank.Value = currentVal;
                 }
@@ -130,13 +216,14 @@ namespace PosBranch_Win.Accounts
 
         private void SetDefaultCashLedger()
         {
-            if (ledgerTable == null || ledgerTable.Rows.Count == 0)
+            var sourceTable = cashBankTable != null && cashBankTable.Rows.Count > 0 ? cashBankTable : ledgerTable;
+            if (sourceTable == null || sourceTable.Rows.Count == 0)
             {
                 return;
             }
 
             // 1. Strictly look for "CASH IN HAND" / "CASH-IN-HAND"
-            DataRow defaultCashRow = ledgerTable.AsEnumerable()
+            DataRow defaultCashRow = sourceTable.AsEnumerable()
                 .FirstOrDefault(r => {
                     string name = (Convert.ToString(r["LedgerName"]) ?? string.Empty).Replace("-", " ").Trim();
                     return name.IndexOf("CASH IN HAND", StringComparison.OrdinalIgnoreCase) >= 0;
@@ -145,7 +232,7 @@ namespace PosBranch_Win.Accounts
             // 2. Look for exact "CASH", "CASH A/C", "CASH ACCOUNT", "MAIN CASH", "PETTY CASH"
             if (defaultCashRow == null)
             {
-                defaultCashRow = ledgerTable.AsEnumerable()
+                defaultCashRow = sourceTable.AsEnumerable()
                     .FirstOrDefault(r => {
                         string name = (Convert.ToString(r["LedgerName"]) ?? string.Empty).Trim().ToUpperInvariant();
                         if (name.Contains("EXCESS") || name.Contains("SHORTAGE") || name.Contains("DISCOUNT")) return false;
@@ -158,7 +245,7 @@ namespace PosBranch_Win.Accounts
             // 3. Look for ledger under "CASH-IN-HAND" group that is not excess/shortage/discount
             if (defaultCashRow == null)
             {
-                defaultCashRow = ledgerTable.AsEnumerable()
+                defaultCashRow = sourceTable.AsEnumerable()
                     .FirstOrDefault(r => {
                         string gName = (Convert.ToString(r["GroupName"]) ?? string.Empty).ToUpperInvariant();
                         string lName = (Convert.ToString(r["LedgerName"]) ?? string.Empty).ToUpperInvariant();
@@ -170,7 +257,7 @@ namespace PosBranch_Win.Accounts
             // 4. Any other non-excess cash ledger
             if (defaultCashRow == null)
             {
-                defaultCashRow = ledgerTable.AsEnumerable()
+                defaultCashRow = sourceTable.AsEnumerable()
                     .FirstOrDefault(r => {
                         string name = (Convert.ToString(r["LedgerName"]) ?? string.Empty).ToUpperInvariant();
                         return name.Contains("CASH") && !name.Contains("EXCESS") && !name.Contains("SHORTAGE") && !name.Contains("DISCOUNT");
@@ -180,7 +267,7 @@ namespace PosBranch_Win.Accounts
             // 5. Fallback to first row
             if (defaultCashRow == null)
             {
-                defaultCashRow = ledgerTable.Rows[0];
+                defaultCashRow = sourceTable.Rows[0];
             }
 
             if (defaultCashRow != null)
@@ -689,6 +776,15 @@ namespace PosBranch_Win.Accounts
                 int ledgerId = GetIntValue(row["LedgerID"]);
                 if (ledgerId > 0)
                 {
+                    bool isInExistingLines = journalLineTable != null && journalLineTable.AsEnumerable()
+                        .Any(r => r.RowState != DataRowState.Deleted && GetIntValue(r["LedgerID"]) == ledgerId);
+
+                    // Exclude Cash/Bank accounts from grid lines unless already present in an existing line
+                    if (!isInExistingLines && IsCashOrBankLedger(row))
+                    {
+                        continue;
+                    }
+
                     ledgerList.ValueListItems.Add(ledgerId, Convert.ToString(row["LedgerName"]));
                 }
             }
@@ -1032,8 +1128,9 @@ namespace PosBranch_Win.Accounts
 
             // Find Cash/Bank Credit line
             var creditLine = journal.Lines.FirstOrDefault(l => l.Credit > 0);
-            if (creditLine != null)
+            if (creditLine != null && creditLine.LedgerID > 0)
             {
+                EnsureCashBankLedgerPresent(creditLine.LedgerID);
                 CmboCashBank.Value = creditLine.LedgerID;
             }
 
@@ -1216,6 +1313,7 @@ namespace PosBranch_Win.Accounts
                 {
                     if (gridPayment.ActiveRow.ListObject is DataRowView rowView)
                     {
+                        EnsureGridLedgerValueListContains(searchForm.SelectedLedgerId, searchForm.SelectedLedgerName);
                         rowView["LedgerID"] = searchForm.SelectedLedgerId;
                         gridPayment.UpdateData();
                         int idx = gridPayment.ActiveRow.Index;

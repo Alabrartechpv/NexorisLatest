@@ -43,6 +43,14 @@ namespace PosBranch_Win.Transaction
         // Add custom tooltip for barcode field
         private System.Windows.Forms.ToolTip barcodeToolTip = new System.Windows.Forms.ToolTip();
 
+        // Customer-facing fading branding logo banner (IRS POS Malaysia style)
+        private NexorisFadingLogoControl _nexorisLogoBanner;
+
+        // State tracking for post-sale receipt balance display panel (ultraPanel7)
+        private bool _isDisplayingReceiptPanel = false;
+        private DateTime _receiptPanelShowTime = DateTime.MinValue;
+        private const int RECEIPT_PANEL_GRACE_PERIOD_MS = 1500;
+
         // Add this private field at the class level - after other private fields
         private bool isItemDialogOpen = false;
         private System.Windows.Forms.Timer dialogTimer = new System.Windows.Forms.Timer();
@@ -562,9 +570,91 @@ namespace PosBranch_Win.Transaction
         // Override form closing to save grid layout
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
+            _nexorisLogoBanner?.StopAnimation();
             SaveGridLayout();
             base.OnFormClosing(e);
         }
+
+        #region Customer Facing Nexoris Logo Banner (IRS POS Malaysia Style)
+
+        /// <summary>
+        /// Initializes the smooth fading Nexoris logo banner in the top-right header area.
+        /// Seamlessly yields to ultraPanel7 when a bill is saved and balance is displayed.
+        /// </summary>
+        private void InitializeNexorisFadingLogo()
+        {
+            try
+            {
+                if (_nexorisLogoBanner != null) return;
+
+                _nexorisLogoBanner = new NexorisFadingLogoControl();
+                _nexorisLogoBanner.Name = "pnlNexorisLogo";
+                _nexorisLogoBanner.Anchor = AnchorStyles.Top | AnchorStyles.Right;
+
+                // Match ultraPanel7's location & size in ultraPanel1 (anchored to top right)
+                if (ultraPanel7 != null)
+                {
+                    _nexorisLogoBanner.Location = ultraPanel7.Location;
+                    _nexorisLogoBanner.Size = ultraPanel7.Size;
+
+                    // Hook into ultraPanel7.VisibleChanged to automatically pause/resume
+                    ultraPanel7.VisibleChanged -= UltraPanel7_VisibleChangedForLogo;
+                    ultraPanel7.VisibleChanged += UltraPanel7_VisibleChangedForLogo;
+
+                    // Ensure receipt panel is always on top of logo banner
+                    ultraPanel7.BringToFront();
+                }
+
+                if (ultraPanel1 != null && ultraPanel1.ClientArea != null)
+                {
+                    ultraPanel1.ClientArea.Controls.Add(_nexorisLogoBanner);
+                    _nexorisLogoBanner.SendToBack();
+
+                    if (ultraPanel7 != null)
+                    {
+                        ultraPanel7.BringToFront();
+                    }
+
+                    // If ultraPanel7 is currently visible (balance being shown), hide logo;
+                    // Otherwise play the intro animation (shown when opening the form newly, then fades out into invisible)
+                    if (ultraPanel7 != null && ultraPanel7.Visible)
+                    {
+                        _nexorisLogoBanner.PauseAndHide();
+                        ultraPanel7.BringToFront();
+                    }
+                    else
+                    {
+                        _nexorisLogoBanner.StartIntroAnimation();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error initializing Nexoris fading logo: {ex.Message}");
+            }
+        }
+
+        private void UltraPanel7_VisibleChangedForLogo(object sender, EventArgs e)
+        {
+            try
+            {
+                if (ultraPanel7 != null && ultraPanel7.Visible)
+                {
+                    if (_nexorisLogoBanner != null)
+                    {
+                        _nexorisLogoBanner.PauseAndHide();
+                        _nexorisLogoBanner.SendToBack();
+                    }
+                    ultraPanel7.BringToFront();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error coordinating ultraPanel7 with logo banner: {ex.Message}");
+            }
+        }
+
+        #endregion
 
         private void SetupBarcodeTooltip()
         {
@@ -765,7 +855,11 @@ namespace PosBranch_Win.Transaction
             }
             if (e.KeyCode == Keys.Escape)
             {
-                // Escape key handling - no longer needed for payment panel
+                if (ultraPanel7 != null && ultraPanel7.Visible)
+                {
+                    HideReceiptPanel(force: true);
+                    e.Handled = true;
+                }
             }
             if (e.KeyCode == Keys.Space)
             {
@@ -854,7 +948,7 @@ namespace PosBranch_Win.Transaction
             {
                 // F1 key - same functionality as clicking ultraPictureBox1 (Clear button)
                 // Always hide the receipt panel when F1 is pressed
-                ultraPanel7.Visible = false;
+                HideReceiptPanel(force: true);
 
                 // Call the Clear method to reset the entire form
                 Clear();
@@ -931,6 +1025,9 @@ namespace PosBranch_Win.Transaction
 
                 // Hide ultraPanel7 when form is first loaded
                 ultraPanel7.Visible = false;
+
+                // Initialize customer facing Nexoris logo banner (IRS POS Malaysia style)
+                InitializeNexorisFadingLogo();
 
                 // Initialize form
                 KeyPreview = true;
@@ -1060,13 +1157,12 @@ namespace PosBranch_Win.Transaction
                 BarcodeFocuse();
 
                 // Add event handlers for controls that should hide the receipt panel
-                button1.Click += (s, args) => HideReceiptPanel(); // F11 key
-                txtBarcode.TextChanged += (s, args) => HideReceiptPanel();
-                button5.Click += (s, args) => HideReceiptPanel();
-                button2.Click += (s, args) => HideReceiptPanel(); // F6
+                button1.Click += (s, args) => HideReceiptPanel(force: true); // F11 key
+                button5.Click += (s, args) => HideReceiptPanel(force: true);
+                button2.Click += (s, args) => HideReceiptPanel(force: true); // F6
                 cmbPaymt.ValueChanged += (s, args) => HideReceiptPanel();
                 button3.Click += (s, args) => HideReceiptPanel();
-                button4.Click += (s, args) => HideReceiptPanel();
+                button4.Click += (s, args) => HideReceiptPanel(force: true);
                 cmpPrice.ValueChanged += (s, args) => HideReceiptPanel();
 
                 // Add event handler for textBox8 (rounding) - now just for UI consistency
@@ -1867,7 +1963,10 @@ namespace PosBranch_Win.Transaction
 
         private void txtBarcode_KeyDown(object sender, KeyEventArgs e)
         {
-            HideReceiptPanel();
+            if (!string.IsNullOrEmpty(txtBarcode.Text))
+            {
+                HideReceiptPanel();
+            }
 
             if (HandleArrowKeyNavigation(e))
                 return;
@@ -3609,16 +3708,18 @@ namespace PosBranch_Win.Transaction
                     }
                 }
 
-                label19.Text = txtNetTotal.Text;
-                label20.Text = txtNetTotal.Text;
-                label21.Text = DEFAULT_CHANGE_AMOUNT;
+                string savedTotal = !string.IsNullOrEmpty(txtNetTotal.Text) && txtNetTotal.Text != "0"
+                    ? txtNetTotal.Text
+                    : (sales != null ? sales.NetAmount.ToString("F2") : "0.00");
 
                 if (!(isUpdate && (wasHoldBill || isEditingHoldBill) && !completedHeldBill))
                 {
-                    ultraPanel7.Visible = true;
+                    ShowReceiptPanel(savedTotal, savedTotal, DEFAULT_CHANGE_AMOUNT);
                 }
-
-                this.Clear();
+                else
+                {
+                    this.Clear();
+                }
             }
             else
             {
@@ -4283,7 +4384,7 @@ namespace PosBranch_Win.Transaction
         private void ultraPictureBox1_Click(object sender, EventArgs e)
         {
             // Always hide the receipt panel when the clear button is clicked
-            ultraPanel7.Visible = false;
+            HideReceiptPanel(force: true);
 
             // Call the Clear method to reset the entire form
             Clear();
@@ -4707,7 +4808,7 @@ namespace PosBranch_Win.Transaction
         private void button4_Click(object sender, EventArgs e)
         {
             // Hide receipt panel when button4 is clicked
-            HideReceiptPanel();
+            HideReceiptPanel(force: true);
 
             try
             {
@@ -4753,7 +4854,7 @@ namespace PosBranch_Win.Transaction
         private void button5_Click(object sender, EventArgs e)
         {
             // Hide receipt panel when barcode search button is clicked
-            HideReceiptPanel();
+            HideReceiptPanel(force: true);
 
             // This is the F7 button click handler - open the item selection dialog
             if (!isItemDialogOpen && canOpenDialog &&
@@ -4837,7 +4938,7 @@ namespace PosBranch_Win.Transaction
         private void button1_Click(object sender, EventArgs e)
         {
             // Hide receipt panel when customer button is clicked
-            HideReceiptPanel();
+            HideReceiptPanel(force: true);
 
             try
             {
@@ -5688,6 +5789,17 @@ namespace PosBranch_Win.Transaction
                             }
                         }
 
+                        // Capture formatted total before print prompt or form clear
+                        string finalTotal = !string.IsNullOrEmpty(txtNetTotal.Text) && txtNetTotal.Text != "0"
+                            ? txtNetTotal.Text
+                            : (sales != null ? sales.NetAmount.ToString("F2") : "0.00");
+                        string finalPayment = !string.IsNullOrEmpty(paymentResult.TenderedAmount)
+                            ? paymentResult.TenderedAmount
+                            : finalTotal;
+                        string finalChange = !string.IsNullOrEmpty(paymentResult.ChangeAmount)
+                            ? paymentResult.ChangeAmount
+                            : DEFAULT_CHANGE_AMOUNT;
+
                         // Show success message and offer to print
                         DialogResult printPrompt = MessageBox.Show("Invoice processed successfully. Do you want to print?", "Success", MessageBoxButtons.YesNo, MessageBoxIcon.Information);
                         if (printPrompt == DialogResult.Yes)
@@ -5696,7 +5808,7 @@ namespace PosBranch_Win.Transaction
                         }
 
                         // Show receipt panel with payment summary
-                        ShowReceiptPanel(txtNetTotal.Text, paymentResult.TenderedAmount, paymentResult.ChangeAmount);
+                        ShowReceiptPanel(finalTotal, finalPayment, finalChange);
                     }
                     else
                     {
@@ -5716,27 +5828,45 @@ namespace PosBranch_Win.Transaction
         // Consolidated method to show receipt panel and handle completion
         private void ShowReceiptPanel(string total, string payment, string change)
         {
-            // Show receipt panel (payment panel is now handled by modal dialog)
-            ultraPanel7.Visible = true;
-            ultraPanel7.BringToFront();
-
-            // Allow clicking anywhere on ultraPanel7 or its child labels to dismiss it
-            ultraPanel7.Click -= UltraPanel7_Click;
-            ultraPanel7.Click += UltraPanel7_Click;
+            // Clear the form and grid first for next transaction so TextChanged events don't close receipt panel
+            Clear();
+            ResetGrid();
 
             // Update receipt panel labels
             label19.Text = total;
             label20.Text = payment;
             label21.Text = change;
 
-            // Clear the form and grid
-            Clear();
-            ResetGrid();
+            // Ensure logo banner is hidden and sent to back
+            if (_nexorisLogoBanner != null)
+            {
+                _nexorisLogoBanner.PauseAndHide();
+                _nexorisLogoBanner.SendToBack();
+            }
+
+            // Mark display state and show receipt panel
+            _isDisplayingReceiptPanel = true;
+            _receiptPanelShowTime = DateTime.Now;
+
+            // Show receipt panel and bring to very front
+            ultraPanel7.Visible = true;
+            ultraPanel7.BringToFront();
+            ultraPanel7.Refresh();
+
+            // Allow clicking anywhere on ultraPanel7 or its child labels to dismiss it
+            ultraPanel7.Click -= UltraPanel7_Click;
+            ultraPanel7.Click += UltraPanel7_Click;
+            label16.Click -= UltraPanel7_Click; label16.Click += UltraPanel7_Click;
+            label17.Click -= UltraPanel7_Click; label17.Click += UltraPanel7_Click;
+            label18.Click -= UltraPanel7_Click; label18.Click += UltraPanel7_Click;
+            label19.Click -= UltraPanel7_Click; label19.Click += UltraPanel7_Click;
+            label20.Click -= UltraPanel7_Click; label20.Click += UltraPanel7_Click;
+            label21.Click -= UltraPanel7_Click; label21.Click += UltraPanel7_Click;
         }
 
         private void UltraPanel7_Click(object sender, EventArgs e)
         {
-            HideReceiptPanel();
+            HideReceiptPanel(force: true);
         }
 
 
@@ -6659,13 +6789,45 @@ namespace PosBranch_Win.Transaction
             return decimal.TryParse(value, out parsed) ? parsed : 0m;
         }
 
-        // Add this method to hide the receipt panel (ultraPanel7) when user interacts with controls
-        private void HideReceiptPanel()
+        // Method to hide the receipt panel (ultraPanel7) when user interacts with controls
+        private void HideReceiptPanel(bool force = false)
         {
-            // Always hide the receipt panel if it's visible
-            if (ultraPanel7 != null && ultraPanel7.Visible)
+            try
             {
+                if (ultraPanel7 == null || !ultraPanel7.Visible) return;
+
+                if (force)
+                {
+                    _isDisplayingReceiptPanel = false;
+                    ultraPanel7.Visible = false;
+                    return;
+                }
+
+                // If receipt panel was recently shown after saving, guard against passive events
+                if (_isDisplayingReceiptPanel)
+                {
+                    // During grace period, only hide if user has typed/scanned a non-empty barcode
+                    if ((DateTime.Now - _receiptPanelShowTime).TotalMilliseconds < RECEIPT_PANEL_GRACE_PERIOD_MS)
+                    {
+                        if (string.IsNullOrWhiteSpace(txtBarcode.Text))
+                        {
+                            return;
+                        }
+                    }
+
+                    // Beyond grace period, also only hide if user has typed/scanned a new barcode
+                    if (string.IsNullOrWhiteSpace(txtBarcode.Text))
+                    {
+                        return;
+                    }
+                }
+
+                _isDisplayingReceiptPanel = false;
                 ultraPanel7.Visible = false;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error hiding receipt panel: {ex.Message}");
             }
         }
 
@@ -6868,7 +7030,7 @@ namespace PosBranch_Win.Transaction
         private void button2_Click(object sender, EventArgs e)
         {
             // Hide receipt panel when F6 button is clicked
-            HideReceiptPanel();
+            HideReceiptPanel(force: true);
 
             // Open the sales person dialog
             ShowSalesPersonDialog();

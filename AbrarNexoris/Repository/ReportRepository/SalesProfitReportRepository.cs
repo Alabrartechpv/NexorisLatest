@@ -183,13 +183,18 @@ END";
                     DataConnection.Open();
 
                 string sql = @"
+WITH CleanGroup AS (
+    SELECT GroupID, MIN(GroupName) AS GroupName
+    FROM AccountGroupMaster
+    GROUP BY GroupID
+)
 SELECT 
     lm.LedgerName,
     ag.GroupName,
     ISNULL(SUM(v.Debit), 0) AS Amount
 FROM Vouchers v
 INNER JOIN LedgerMaster lm ON lm.LedgerID = v.LedgerID
-INNER JOIN AccountGroupMaster ag ON ag.GroupID = lm.GroupID
+INNER JOIN CleanGroup ag ON ag.GroupID = lm.GroupID
 WHERE (ag.GroupID IN (10, 12) OR ag.GroupName LIKE '%Expense%')
   AND v.VoucherDate >= @FromDate AND v.VoucherDate <= @ToDate
   AND (@BranchId = 0 OR v.BranchID = @BranchId)

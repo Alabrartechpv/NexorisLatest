@@ -1404,6 +1404,9 @@
     <Compile Include="Transaction\frmSalesInvoice.Designer.cs">
       <DependentUpon>frmSalesInvoice.cs</DependentUpon>
     </Compile>
+    <Compile Include="Transaction\NexorisFadingLogoControl.cs">
+      <SubType>Component</SubType>
+    </Compile>
     <Compile Include="Transaction\frmSalesReturn.cs">
       <SubType>Form</SubType>
     </Compile>
