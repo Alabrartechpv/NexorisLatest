@@ -478,7 +478,10 @@ namespace PosBranch_Win.Dashboard
                 CreateKpiCard("37. Stock Adjustment", "Track of physical stock count reconciliations and adjustments", $"{_model.StockAdjustmentCount} Adjustments", "Stock Adjustment Report", Color.FromArgb(142, 68, 173), () => DrillDown("StockAdjustment")),
 
                 // 38. Manual Party Balance
-                CreateKpiCard("38. Manual Balance", "Total outstanding manual party balances (Customers & Vendors)", FormatCurr(_model.TotalManualBalance), $"Cust: {FormatCurr(_model.ManualCustomerBalance)} | Supp: {FormatCurr(_model.ManualVendorBalance)}", Color.FromArgb(123, 31, 162), () => DrillDown("ManualPartyBalanceReport"))
+                CreateKpiCard("38. Manual Balance", "Total outstanding manual party balances (Customers & Vendors)", FormatCurr(_model.TotalManualBalance), $"Cust: {FormatCurr(_model.ManualCustomerBalance)} | Supp: {FormatCurr(_model.ManualVendorBalance)}", Color.FromArgb(123, 31, 162), () => DrillDown("ManualPartyBalanceReport")),
+
+                // 39. Cash In / Cash Out Flow
+                CreateKpiCard("39. Cash In / Out", "Total cash movement: Money In vs Money Out", FormatCurr(_model.NetCashFlow), $"In: {FormatCurr(_model.TotalCashIn)} | Out: {FormatCurr(_model.TotalCashOut)}", _model.NetCashFlow >= 0 ? Color.FromArgb(46, 125, 50) : Color.FromArgb(198, 40, 40), () => DrillDown("CashInOutReport"))
             };
 
             // Display in clean full-width responsive grid:
@@ -898,6 +901,11 @@ namespace PosBranch_Win.Dashboard
                     case "CashBankBook":
                         formToOpen = new Reports.FinancialReports.FrmCashBankBook();
                         title = "Cash & Bank Book";
+                        break;
+                    case "CashInOutReport":
+                    case "CashInOut":
+                        formToOpen = new Reports.FinancialReports.FrmCashInOutReport(_model.FromDate, _model.ToDate);
+                        title = "Cash In / Cash Out Flow Report";
                         break;
                     case "BankStatement":
                         formToOpen = new Reports.FinancialReports.FrmBankStatementReport();
@@ -1693,7 +1701,8 @@ namespace PosBranch_Win.Dashboard
                 Tuple.Create(34, "Deletion & Cancellation Logs", $"{_model.DeletionCount} Events", "Cancelled bills, deleted receipts & vouchers"),
                 Tuple.Create(35, "Price Change Modifications", $"{_model.PriceChangeCount} Events", "Item Master price updates"),
                 Tuple.Create(36, "Physical Stock Discrepancy Logs", $"{_model.StockAdjustmentCount} Adjustments", "Stock reconciliation entries"),
-                Tuple.Create(37, "Manual Party Balance", FormatCurr(_model.TotalManualBalance), $"Cust: {FormatCurr(_model.ManualCustomerBalance)} | Supp: {FormatCurr(_model.ManualVendorBalance)} ({_model.ManualBalanceCount} Open Entries)")
+                Tuple.Create(37, "Manual Party Balance", FormatCurr(_model.TotalManualBalance), $"Cust: {FormatCurr(_model.ManualCustomerBalance)} | Supp: {FormatCurr(_model.ManualVendorBalance)} ({_model.ManualBalanceCount} Open Entries)"),
+                Tuple.Create(38, "Cash In / Cash Out Flow", FormatCurr(_model.NetCashFlow), $"In: {FormatCurr(_model.TotalCashIn)} | Out: {FormatCurr(_model.TotalCashOut)} (Net)")
             };
 
             foreach (var item in summaryList)
@@ -1808,6 +1817,7 @@ namespace PosBranch_Win.Dashboard
             sb.AppendLine($"<tr><td>35</td><td>Price Change Modifications</td><td class='value'>{_model.PriceChangeCount} Events</td><td>Item Master price updates</td></tr>");
             sb.AppendLine($"<tr><td>36</td><td>Physical Stock Discrepancy Logs</td><td class='value'>{_model.StockAdjustmentCount} Adjustments</td><td>Stock reconciliation entries</td></tr>");
             sb.AppendLine($"<tr><td>37</td><td>Manual Party Balance</td><td class='value'>{FormatCurr(_model.TotalManualBalance)}</td><td>Cust: {FormatCurr(_model.ManualCustomerBalance)} | Supp: {FormatCurr(_model.ManualVendorBalance)} ({_model.ManualBalanceCount} Open Entries)</td></tr>");
+            sb.AppendLine($"<tr><td>38</td><td>Cash In / Cash Out Flow</td><td class='value'>{FormatCurr(_model.NetCashFlow)}</td><td>In: {FormatCurr(_model.TotalCashIn)} | Out: {FormatCurr(_model.TotalCashOut)} (Net)</td></tr>");
             sb.AppendLine("</table>");
 
             sb.AppendLine("</div></body></html>");
@@ -1856,6 +1866,7 @@ namespace PosBranch_Win.Dashboard
             sb.AppendLine($"35,Price Change Modifications,\"{_model.PriceChangeCount}\",Item Master Edits");
             sb.AppendLine($"36,Physical Stock Discrepancy Logs,\"{_model.StockAdjustmentCount}\",Stock Adjustments");
             sb.AppendLine($"37,Manual Party Balance,\"{_model.TotalManualBalance:N2}\",Cust: {_model.ManualCustomerBalance:N2} | Supp: {_model.ManualVendorBalance:N2} (Entries: {_model.ManualBalanceCount})");
+            sb.AppendLine($"38,Cash In / Cash Out Flow,\"{_model.NetCashFlow:N2}\",In: {_model.TotalCashIn:N2} | Out: {_model.TotalCashOut:N2} (Net)");
 
             // Growth Matrix in CSV
             sb.AppendLine();

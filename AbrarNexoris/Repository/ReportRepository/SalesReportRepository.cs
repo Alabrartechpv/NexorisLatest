@@ -1,4 +1,4 @@
-﻿using ModelClass;
+using ModelClass;
 using ModelClass.Report;
 using System;
 using System.Collections.Generic;
@@ -21,8 +21,9 @@ namespace Repository.ReportRepository
                 using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._POS_SALES_REPORT, (SqlConnection)DataConnection))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
+                    DateTime effectiveToDate = request.ToDate.TimeOfDay == TimeSpan.Zero ? request.ToDate.Date.AddDays(1).AddMilliseconds(-3) : request.ToDate;
                     cmd.Parameters.AddWithValue("@FromDate", request.FromDate);
-                    cmd.Parameters.AddWithValue("@ToDate", request.ToDate);
+                    cmd.Parameters.AddWithValue("@ToDate", effectiveToDate);
                     cmd.Parameters.AddWithValue("@BranchId", request.BranchId);
                     cmd.Parameters.AddWithValue("@_Operation", "DAILYSALES");
                     using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
@@ -64,8 +65,9 @@ namespace Repository.ReportRepository
                 using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._POS_Sales_Details_for_Report, (SqlConnection)DataConnection))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
+                    DateTime effectiveToDate = toDate.TimeOfDay == TimeSpan.Zero ? toDate.Date.AddDays(1).AddMilliseconds(-3) : toDate;
                     cmd.Parameters.AddWithValue("@FromDate", fromDate);
-                    cmd.Parameters.AddWithValue("@ToDate", toDate);
+                    cmd.Parameters.AddWithValue("@ToDate", effectiveToDate);
                     cmd.Parameters.AddWithValue("@BillNo", billNo);
 
                     using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
@@ -160,8 +162,9 @@ namespace Repository.ReportRepository
                 using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._POS_Sales_Master_for_Report, (SqlConnection)DataConnection))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
+                    DateTime effectiveToDate = toDate.TimeOfDay == TimeSpan.Zero ? toDate.Date.AddDays(1).AddMilliseconds(-3) : toDate;
                     cmd.Parameters.AddWithValue("@FromDate", fromDate);
-                    cmd.Parameters.AddWithValue("@ToDate", toDate);
+                    cmd.Parameters.AddWithValue("@ToDate", effectiveToDate);
 
                     if (branchId > 0)
                     {

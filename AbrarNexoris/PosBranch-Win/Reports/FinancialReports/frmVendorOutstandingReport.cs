@@ -112,6 +112,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                 InitializeGridFooter();
                 ResetReportView();
                 InitializeWarningPanel();
+                LoadReport();
             }
             finally
             {
@@ -678,7 +679,17 @@ namespace PosBranch_Win.Reports.FinancialReports
                 _footerLabels[column.Key] = footerLabel;
 
                 if (!_columnAggregations.ContainsKey(column.Key))
-                    _columnAggregations[column.Key] = "None";
+                {
+                    if (string.Equals(column.Key, "DocAmt", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(column.Key, "Balance", StringComparison.OrdinalIgnoreCase))
+                    {
+                        _columnAggregations[column.Key] = "Sum";
+                    }
+                    else
+                    {
+                        _columnAggregations[column.Key] = "None";
+                    }
+                }
 
                 xOffset += column.Width;
             }
@@ -1134,10 +1145,10 @@ namespace PosBranch_Win.Reports.FinancialReports
             bool paymentDue = chkPaymentDueOnly.Checked;
             dtFrom.Enabled = dateRange;
             dtTo.Enabled = dateRange;
-            lblFromDate.Visible = dateRange;
-            lblToDate.Visible = dateRange;
-            dtFrom.Visible = dateRange;
-            dtTo.Visible = dateRange;
+            lblFromDate.Visible = true;
+            lblToDate.Visible = true;
+            dtFrom.Visible = true;
+            dtTo.Visible = true;
            
             ultraLabel1.Visible = paymentDue;
             ultraLabel2.Visible = paymentDue;

@@ -368,6 +368,7 @@ namespace PosBranch_Win.Reports.SalesReports
             ultraComboDateMode.Items.Add("THIS_MONTH", "This Month");
             ultraComboDateMode.Items.Add("THIS_YEAR", "This Year");
             ultraComboDateMode.Items.Add("RANGE", "Custom Range");
+            ultraComboDateMode.Items.Add("ALL", "All Dates");
             ultraComboDateMode.Value = "THIS_MONTH";
 
             dtFromDate.DateTime = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
@@ -501,6 +502,10 @@ namespace PosBranch_Win.Reports.SalesReports
                     dtFromDate.DateTime = new DateTime(today.Year, 1, 1);
                     dtToDate.DateTime = today;
                     break;
+                case "ALL":
+                    dtFromDate.DateTime = new DateTime(1900, 1, 1);
+                    dtToDate.DateTime = new DateTime(2099, 12, 31);
+                    break;
             }
 
             UpdateDateControlsVisibility();
@@ -518,7 +523,7 @@ namespace PosBranch_Win.Reports.SalesReports
                 this.Cursor = Cursors.WaitCursor;
 
                 DateTime fromDate = dtFromDate.DateTime.Date;
-                DateTime toDate = dtToDate.DateTime.Date;
+                DateTime toDate = dtToDate.DateTime.Date.AddDays(1).AddMilliseconds(-3);
                 string customerFilter = cmbCustomer.Text?.Trim() ?? "";
                 if (string.Equals(customerFilter, "ALL", StringComparison.OrdinalIgnoreCase)) customerFilter = "";
                 string paymentFilter = cmbPaymentMode.Value?.ToString() ?? "ALL";
@@ -543,7 +548,9 @@ namespace PosBranch_Win.Reports.SalesReports
 
                 if (!string.Equals(salesTypeFilter, "ALL", StringComparison.OrdinalIgnoreCase))
                 {
-                    filteredBills = filteredBills.Where(b => (b.PaymodeName ?? "").IndexOf(salesTypeFilter, StringComparison.OrdinalIgnoreCase) >= 0);
+                    filteredBills = filteredBills.Where(b => 
+                        salesTypeFilter.IndexOf(b.PaymodeName ?? "", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        (b.PaymodeName ?? "").IndexOf(salesTypeFilter, StringComparison.OrdinalIgnoreCase) >= 0);
                 }
 
                 var finalBills = filteredBills.ToList();

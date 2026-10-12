@@ -86,7 +86,7 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             try
             {
-                Text = "Vendor DN/Payment Report";
+                Text = "Vendor Payment Report";
                 WindowState = FormWindowState.Maximized;
                 StartPosition = FormStartPosition.CenterScreen;
 
@@ -110,7 +110,7 @@ namespace PosBranch_Win.Reports.FinancialReports
         private void InitializeDateControls()
         {
             DateTime today = DateTime.Today;
-            dtFrom.Value = new DateTime(today.Year, today.Month, 1);
+            dtFrom.Value = new DateTime(2000, 1, 1);
             dtTo.Value = today;
 
             dtFrom.MaskInput = "{date}";
@@ -132,9 +132,10 @@ namespace PosBranch_Win.Reports.FinancialReports
             comboBox1.Value = "ALL";
 
             ultraComboPreset.Items.Clear();
-            ultraComboPreset.Items.Add("DebitNote", "Debit Note");
+            ultraComboPreset.Items.Add("ALL", "All");
             ultraComboPreset.Items.Add("VendorPayment", "Vendor Payment");
-            ultraComboPreset.Value = "DebitNote";
+            ultraComboPreset.Items.Add("DebitNote", "Debit Note");
+            ultraComboPreset.Value = "ALL";
 
             txtSearch.Text = string.Empty;
         }
@@ -142,7 +143,6 @@ namespace PosBranch_Win.Reports.FinancialReports
         private void ApplyQuickDateSelection()
         {
             string preset = Convert.ToString(comboBox1.Value);
-            bool isAll = string.IsNullOrWhiteSpace(preset) || string.Equals(preset, "ALL", StringComparison.OrdinalIgnoreCase);
             bool isRange = string.Equals(preset, "ByRange", StringComparison.OrdinalIgnoreCase);
             DateTime today = DateTime.Today;
             DateTime fromDate = Convert.ToDateTime(dtFrom.Value).Date;
@@ -151,7 +151,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             switch (preset)
             {
                 case "ALL":
-                    fromDate = new DateTime(1753, 1, 1);
+                    fromDate = new DateTime(2000, 1, 1);
                     toDate = today;
                     break;
                 case "Today":
@@ -178,7 +178,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                     break;
             }
 
-            if (!isRange && !isAll)
+            if (!isRange)
             {
                 dtFrom.Value = fromDate;
                 dtTo.Value = toDate;
@@ -190,15 +190,14 @@ namespace PosBranch_Win.Reports.FinancialReports
         private void UpdateDateControlState()
         {
             string preset = Convert.ToString(comboBox1.Value);
-            bool isAll = string.IsNullOrWhiteSpace(preset) || string.Equals(preset, "ALL", StringComparison.OrdinalIgnoreCase);
             bool isRange = string.Equals(preset, "ByRange", StringComparison.OrdinalIgnoreCase);
 
-            lblFromDate.Visible = !isAll;
-            dtFrom.Visible = !isAll;
+            lblFromDate.Visible = true;
+            dtFrom.Visible = true;
             dtFrom.Enabled = isRange;
 
-            lblToDate.Visible = !isAll;
-            dtTo.Visible = !isAll;
+            lblToDate.Visible = true;
+            dtTo.Visible = true;
             dtTo.Enabled = isRange;
         }
 
@@ -472,12 +471,13 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             try
             {
-                bool isAll = string.Equals(Convert.ToString(comboBox1.Value), "ALL", StringComparison.OrdinalIgnoreCase);
+                bool isAll = string.IsNullOrWhiteSpace(Convert.ToString(comboBox1.Value)) ||
+                             string.Equals(Convert.ToString(comboBox1.Value), "ALL", StringComparison.OrdinalIgnoreCase);
 
                 VendorPaymentReportFilter filter = new VendorPaymentReportFilter
                 {
-                    FromDate = isAll ? new DateTime(1753, 1, 1) : Convert.ToDateTime(dtFrom.Value).Date,
-                    ToDate = isAll ? DateTime.Today : Convert.ToDateTime(dtTo.Value).Date,
+                    FromDate = isAll ? new DateTime(1900, 1, 1) : Convert.ToDateTime(dtFrom.Value).Date,
+                    ToDate = isAll ? new DateTime(2099, 12, 31) : Convert.ToDateTime(dtTo.Value).Date,
                     CompanyId = SessionContext.CompanyId,
                     BranchId = SessionContext.BranchId,
                     VendorLedgerId = GetSelectedLedgerId()
@@ -488,7 +488,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Unable to load vendor DN/payment report.\n" + ex.Message, "Report Error",
+                MessageBox.Show("Unable to load vendor payment report.\n" + ex.Message, "Report Error",
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
             finally
@@ -501,6 +501,19 @@ namespace PosBranch_Win.Reports.FinancialReports
         {
             IEnumerable<VendorPaymentReportRow> filteredRows = _reportRows ?? Enumerable.Empty<VendorPaymentReportRow>();
             string searchText = GetSearchText();
+            string optionPreset = Convert.ToString(ultraComboPreset?.Value);
+
+            if (!string.IsNullOrWhiteSpace(optionPreset) && !string.Equals(optionPreset, "ALL", StringComparison.OrdinalIgnoreCase))
+            {
+                if (string.Equals(optionPreset, "DebitNote", StringComparison.OrdinalIgnoreCase))
+                {
+                    filteredRows = filteredRows.Where(x => !string.IsNullOrWhiteSpace(x.DocumentNo) && x.DocumentNo.StartsWith("DN", StringComparison.OrdinalIgnoreCase));
+                }
+                else if (string.Equals(optionPreset, "VendorPayment", StringComparison.OrdinalIgnoreCase))
+                {
+                    filteredRows = filteredRows.Where(x => string.IsNullOrWhiteSpace(x.DocumentNo) || !x.DocumentNo.StartsWith("DN", StringComparison.OrdinalIgnoreCase));
+                }
+            }
 
             if (!string.IsNullOrWhiteSpace(searchText))
             {
@@ -533,9 +546,9 @@ namespace PosBranch_Win.Reports.FinancialReports
             {
                 DateTime today = DateTime.Today;
                 comboBox1.Value = "ALL";
-                dtFrom.Value = new DateTime(today.Year, today.Month, 1);
+                dtFrom.Value = new DateTime(2000, 1, 1);
                 dtTo.Value = today;
-                ultraComboPreset.Value = "DebitNote";
+                ultraComboPreset.Value = "ALL";
                 ultraComboVendor.Value = 0;
                 txtSearch.Text = string.Empty;
                 _reportRows = new List<VendorPaymentReportRow>();
@@ -556,7 +569,8 @@ namespace PosBranch_Win.Reports.FinancialReports
 
         private bool ValidateDateRange()
         {
-            if (string.Equals(Convert.ToString(comboBox1.Value), "ALL", StringComparison.OrdinalIgnoreCase))
+            string preset = Convert.ToString(comboBox1.Value);
+            if (string.IsNullOrWhiteSpace(preset) || string.Equals(preset, "ALL", StringComparison.OrdinalIgnoreCase))
                 return true;
 
             DateTime fromDate = Convert.ToDateTime(dtFrom.Value).Date;
@@ -680,21 +694,10 @@ namespace PosBranch_Win.Reports.FinancialReports
 
         private void ultraComboPreset_ValueChanged(object sender, EventArgs e)
         {
-            if (_isLoading || ultraComboPreset.Value == null)
+            if (_isLoading)
                 return;
 
-            string preset = ultraComboPreset.Value.ToString();
-            DateTime today = DateTime.Today;
-
-            switch (preset)
-            {
-                case "DebitNote":
-                case "VendorPayment":
-                    comboBox1.Value = "ByRange";
-                    dtFrom.Value = new DateTime(today.Year, today.Month, 1);
-                    dtTo.Value = today;
-                    break;
-            }
+            ApplyClientFilters();
         }
 
         private void comboBox1_ValueChanged(object sender, EventArgs e)
@@ -732,16 +735,17 @@ namespace PosBranch_Win.Reports.FinancialReports
                 column.Hidden = true;
             }
 
-            ConfigureGridColumn(band, "VoucherDate", "Date", 108, "dd-MMM-yyyy", HAlign.Left, 0);
-            ConfigureGridColumn(band, "DocumentNo", "Doc No", 82, null, HAlign.Left, 1);
-            ConfigureGridColumn(band, "VendorLedgerId", "Vendor", 73, null, HAlign.Right, 2);
-            ConfigureGridColumn(band, "VendorName", "Company", 188, null, HAlign.Left, 3);
-            ConfigureGridColumn(band, "Amount", "Amount", 64, "#,##0.00", HAlign.Right, 4);
-            ConfigureGridColumn(band, "Balance", "Balance", 64, "#,##0.00", HAlign.Right, 5);
-            ConfigureGridColumn(band, "PaymentMode", "Mode", 48, null, HAlign.Left, 6);
-            ConfigureGridColumn(band, "Remark", "Remark", 142, null, HAlign.Left, 7);
-            ConfigureGridColumn(band, "Status", "Status", 56, null, HAlign.Left, 8);
-            ConfigureGridColumn(band, "PaymentReference", "Payment Ref", 94, null, HAlign.Left, 9);
+            ConfigureGridColumn(band, "VoucherDate", "Payment Date", 108, "dd-MMM-yyyy", HAlign.Left, 0);
+            ConfigureGridColumn(band, "VoucherId", "Voucher No", 85, null, HAlign.Left, 1);
+            ConfigureGridColumn(band, "PurchaseNo", "Bill No", 80, null, HAlign.Left, 2);
+            ConfigureGridColumn(band, "VendorLedgerId", "Vendor Code", 73, null, HAlign.Right, 3);
+            ConfigureGridColumn(band, "VendorName", "Vendor Name", 190, null, HAlign.Left, 4);
+            ConfigureGridColumn(band, "Amount", "Paid Amount", 75, "#,##0.00", HAlign.Right, 5);
+            ConfigureGridColumn(band, "Balance", "Balance", 75, "#,##0.00", HAlign.Right, 6);
+            ConfigureGridColumn(band, "PaymentMode", "Payment Mode", 70, null, HAlign.Left, 7);
+            ConfigureGridColumn(band, "Remark", "Remarks", 140, null, HAlign.Left, 8);
+            ConfigureGridColumn(band, "Status", "Status", 60, null, HAlign.Center, 9);
+            ConfigureGridColumn(band, "PaymentReference", "Payment Ref", 95, null, HAlign.Left, 10);
 
             if (band.Columns.Exists("VendorName"))
             {
