@@ -21,7 +21,7 @@ namespace ModelClass.Report
 
         public string DocumentNo
         {
-            get { return PurchaseNo > 0 ? "DN" + PurchaseNo : string.Empty; }
+            get { return VoucherId > 0 ? "VP-" + VoucherId : (PurchaseNo > 0 ? PurchaseNo.ToString() : string.Empty); }
         }
     }
 

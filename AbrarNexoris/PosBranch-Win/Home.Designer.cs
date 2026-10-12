@@ -1482,6 +1482,7 @@ namespace PosBranch_Win
             this.tabControlMain.Size = new System.Drawing.Size(1128, 375);
             this.tabControlMain.TabIndex = 10;
             this.tabControlMain.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
+            this.tabControlMain.AllowTabMoving = true;
             // 
             // tabContextMenuStrip
             // 

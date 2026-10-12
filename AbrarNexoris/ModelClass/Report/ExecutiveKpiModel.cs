@@ -115,6 +115,30 @@ namespace ModelClass.Report
         /// <summary>Manual Balance Entries Count</summary>
         public int ManualBalanceCount { get; set; }
 
+        /// <summary>Metric 39: Total Cash In (ആകെ വന്ന പണം - Sales, Collections, Incomes)</summary>
+        public decimal TotalCashIn { get; set; }
+
+        /// <summary>Total Cash Out (ആകെ പോയ പണം - Vendor Payments, Cash Purchases, Expenses, Drawings)</summary>
+        public decimal TotalCashOut { get; set; }
+
+        /// <summary>Net Cash Flow (അറ്റ പണമിടപാട് ബാലൻസ് = Total Cash In - Total Cash Out)</summary>
+        public decimal NetCashFlow { get; set; }
+
+        /// <summary>Vendor Payments Completed (സപ്ലൈയർമാർക്ക് കൊടുത്തു തീർത്ത പണം)</summary>
+        public decimal VendorPaymentsCompleted { get; set; }
+
+        /// <summary>Customer Receipts Collected (കസ്റ്റമേഴ്സിൽ നിന്ന് പിരിഞ്ഞു കിട്ടിയ പണം)</summary>
+        public decimal CustomerReceiptsCollected { get; set; }
+
+        /// <summary>Counter Cash Sales Collected</summary>
+        public decimal CounterCashSales { get; set; }
+
+        /// <summary>Digital / Card / UPI Sales Collected</summary>
+        public decimal DigitalSales { get; set; }
+
+        /// <summary>Cash Purchases Paid</summary>
+        public decimal CashPurchasesPaid { get; set; }
+
         // ═══════════════════════════════════════════════════════════════════
         // SECTION 3: REVENUE, PURCHASES, PROFITABILITY & TAX
         // ═══════════════════════════════════════════════════════════════════

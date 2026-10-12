@@ -88,7 +88,7 @@ namespace PosBranch_Win
             new ReportNavigatorDefinition("Customer", "Customer Receipt Report", "CustomerReceiptReport"),
             new ReportNavigatorDefinition("Customer", "Customer Ledger Statement", "CustomerLedgerReport"),
             new ReportNavigatorDefinition("Vendor", "Vendor Outstanding Listing", "VendorOutstandingReport"),
-            new ReportNavigatorDefinition("Vendor", "DN/payment", "VendorDNPaymentReport"),
+            new ReportNavigatorDefinition("Vendor", "Vendor Payment Report", "VendorPaymentReport"),
             new ReportNavigatorDefinition("Vendor", "Unallocated Purchase Returns", "UnallocatedPurchaseReturns"),
             new ReportNavigatorDefinition("Analysis", "Executive Dashboard (30 KPIs)", "ExecutiveDashboard"),
             new ReportNavigatorDefinition("Analysis", "Trading Account", "TradingAccount"),
@@ -108,7 +108,8 @@ namespace PosBranch_Win
 
         private static readonly Dictionary<string, string> ReportNavigatorActionAliases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            { "StockReportAdv", "StockReport" }
+            { "StockReportAdv", "StockReport" },
+            { "VendorDNPaymentReport", "VendorPaymentReport" }
         };
 
         public Home()
@@ -117,6 +118,9 @@ namespace PosBranch_Win
 
             // Ensure "SEARCH" button exists in Home ribbon
             EnsureSearchRibbonButton();
+
+            // Ensure "Vendor Payment Report" button exists in Vendor ribbon
+            EnsureVendorPaymentReportRibbonButton();
 
             // Ribbon tools are now serialized in the designer (Home.Designer.cs)
 
@@ -130,6 +134,12 @@ namespace PosBranch_Win
             tabControlMain.MouseDown += tabControlMain_MouseDown;
             tabControlMain.MouseLeave += tabControlMain_MouseLeave;
             tabControlMain.MouseWheel += tabControlMain_MouseWheel;
+            tabControlMain.DoubleClick += tabControlMain_DoubleClick;
+
+            // Enable drag-and-drop tab moving and repositioning
+            tabControlMain.AllowTabMoving = true;
+            tabControlMain.TabMoving += TabControlMain_TabMoving;
+            tabControlMain.TabMoved += TabControlMain_TabMoved;
 
             // Wire up mouse events for auto-focusing the Home ribbon tab
             tabControlMain.MouseEnter += MainWorkspace_MouseEnter;
@@ -145,9 +155,6 @@ namespace PosBranch_Win
 
             closingAlertTimer.Interval = 60000;
             closingAlertTimer.Tick += ClosingAlertTimer_Tick;
-
-            // Disable tab context menu (Close Tab / Close All Tabs)
-            tabControlMain.ContextMenuStrip = null;
 
             // Track tab changes for POS-only ribbon actions
             tabControlMain.SelectedTabChanged += TabControlMain_SelectedTabChanged;
@@ -343,46 +350,84 @@ namespace PosBranch_Win
             scrollTimer.Stop();
         }
 
-        // Process mouse down events including middle-click for close
+        // Process mouse down events including middle-click for close and right-click for tab options
         private void tabControlMain_MouseDown(object sender, MouseEventArgs e)
         {
+            var tab = tabControlMain.TabFromPoint(e.Location);
+            if (tab == null) return;
+
             if (e.Button == MouseButtons.Middle)
             {
-                // Middle click to close tab
-                // Find the tab under the mouse cursor and close it
-                for (int i = 0; i < tabControlMain.Tabs.Count; i++)
-                {
-                    var tab = tabControlMain.Tabs[i];
-                    if (tab.TabPage.Controls.Count > 0 && tab.TabPage.Controls[0] is Form)
-                    {
-                        Form form = (Form)tab.TabPage.Controls[0];
-                        form.Close();
-                        break;
-                    }
-                }
+                // Middle-click to close the clicked tab
+                CloseSpecificTab(tab);
+            }
+            else if (e.Button == MouseButtons.Right)
+            {
+                // Right-click to show rich tab options (Move Left/Right/Start/End, Float/Detach, Close)
+                tabControlMain.SelectedTab = tab;
+                ShowTabContextMenu(tab, tabControlMain.PointToScreen(e.Location));
             }
         }
 
-        // (removed unused UpdateCloseButtonRects)
+        private void tabControlMain_DoubleClick(object sender, EventArgs e)
+        {
+            // Double-click on a tab header detaches/floats the tab into a separate window to place somewhere
+            var mousePos = tabControlMain.PointToClient(Cursor.Position);
+            var tab = tabControlMain.TabFromPoint(mousePos);
+            if (tab != null)
+            {
+                FloatTab(tab);
+            }
+        }
 
-        // UltraTabControl handles custom drawing automatically - no need for custom DrawItem code
+        // Handles Infragistics native drag-and-drop tab moving
+        private void TabControlMain_TabMoving(object sender, Infragistics.Win.UltraWinTabControl.TabMovingEventArgs e)
+        {
+            // Protect permanent Home tab from being moved if present
+            if (e.Tab != null && (string.Equals(e.Tab.Key, "Home", StringComparison.OrdinalIgnoreCase) ||
+                                  string.Equals(e.Tab.Text, "Home", StringComparison.OrdinalIgnoreCase)))
+            {
+                e.Cancel = true;
+            }
+        }
+
+        private void TabControlMain_TabMoved(object sender, Infragistics.Win.UltraWinTabControl.TabMovedEventArgs e)
+        {
+            try
+            {
+                if (e.Tab != null)
+                {
+                    tabControlMain.SelectedTab = e.Tab;
+                    ApplyTabStyling(e.Tab, true);
+                }
+                foreach (Infragistics.Win.UltraWinTabControl.UltraTab tab in tabControlMain.Tabs)
+                {
+                    if (tab != tabControlMain.SelectedTab)
+                    {
+                        ApplyTabStyling(tab, false);
+                    }
+                }
+                EnsureAllTabFormsAreProperlySized();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"TabMoved error: {ex.Message}");
+            }
+        }
 
         private void tabControlMain_MouseMove(object sender, MouseEventArgs e)
         {
             // UltraTabControl handles mouse movement automatically
-            // No need for custom mouse tracking with UltraTabControl
         }
 
         private void tabControlMain_MouseClick(object sender, MouseEventArgs e)
         {
             // UltraTabControl handles tab clicking automatically
-            // No need for custom click handling with UltraTabControl
         }
 
         private void tabControlMain_MouseUp(object sender, MouseEventArgs e)
         {
-            // UltraTabControl handles context menu automatically
-            // No need for custom right-click handling with UltraTabControl
+            // UltraTabControl handles mouse up automatically
         }
 
         private void tabControlMain_Resize(object sender, EventArgs e)
@@ -424,6 +469,247 @@ namespace PosBranch_Win
             }
         }
 
+        #region Tab Reordering and Moving Methods
+
+        private void MoveTabByOffset(Infragistics.Win.UltraWinTabControl.UltraTab tab, int offset)
+        {
+            try
+            {
+                if (tab == null || tabControlMain.Tabs.Count <= 1) return;
+
+                var orderedTabs = tabControlMain.Tabs.Cast<Infragistics.Win.UltraWinTabControl.UltraTab>()
+                                    .OrderBy(t => t.VisibleIndex).ToList();
+                int currentPos = orderedTabs.IndexOf(tab);
+                if (currentPos < 0) return;
+
+                int targetPos = currentPos + offset;
+                if (targetPos < 0 || targetPos >= orderedTabs.Count) return;
+
+                var targetTab = orderedTabs[targetPos];
+                if (offset < 0)
+                {
+                    tab.Reposition(targetTab, Infragistics.Win.RelativePosition.Before);
+                }
+                else
+                {
+                    tab.Reposition(targetTab, Infragistics.Win.RelativePosition.After);
+                }
+
+                tabControlMain.SelectedTab = tab;
+                ApplyTabStyling(tab, true);
+                EnsureAllTabFormsAreProperlySized();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error moving tab: {ex.Message}");
+            }
+        }
+
+        private void MoveTabToExtreme(Infragistics.Win.UltraWinTabControl.UltraTab tab, bool toBeginning)
+        {
+            try
+            {
+                if (tab == null || tabControlMain.Tabs.Count <= 1) return;
+
+                var orderedTabs = tabControlMain.Tabs.Cast<Infragistics.Win.UltraWinTabControl.UltraTab>()
+                                    .OrderBy(t => t.VisibleIndex).ToList();
+                if (toBeginning)
+                {
+                    var firstTab = orderedTabs.First();
+                    if (firstTab != tab)
+                    {
+                        tab.Reposition(firstTab, Infragistics.Win.RelativePosition.Before);
+                    }
+                }
+                else
+                {
+                    var lastTab = orderedTabs.Last();
+                    if (lastTab != tab)
+                    {
+                        tab.Reposition(lastTab, Infragistics.Win.RelativePosition.After);
+                    }
+                }
+
+                tabControlMain.SelectedTab = tab;
+                ApplyTabStyling(tab, true);
+                EnsureAllTabFormsAreProperlySized();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error moving tab to extreme: {ex.Message}");
+            }
+        }
+
+        private void ShowTabContextMenu(Infragistics.Win.UltraWinTabControl.UltraTab tab, Point screenPoint)
+        {
+            if (tab == null) return;
+
+            var menu = new ContextMenuStrip();
+
+            var orderedTabs = tabControlMain.Tabs.Cast<Infragistics.Win.UltraWinTabControl.UltraTab>()
+                                .OrderBy(t => t.VisibleIndex).ToList();
+            int currentPos = orderedTabs.IndexOf(tab);
+            bool canMoveLeft = currentPos > 0;
+            bool canMoveRight = currentPos < orderedTabs.Count - 1;
+
+            var itemMoveLeft = new ToolStripMenuItem("⬅️ Move Tab Left", null, (s, e) => MoveTabByOffset(tab, -1))
+            {
+                Enabled = canMoveLeft
+            };
+            var itemMoveRight = new ToolStripMenuItem("➡️ Move Tab Right", null, (s, e) => MoveTabByOffset(tab, 1))
+            {
+                Enabled = canMoveRight
+            };
+            var itemMoveStart = new ToolStripMenuItem("⏪ Move to Beginning", null, (s, e) => MoveTabToExtreme(tab, true))
+            {
+                Enabled = canMoveLeft
+            };
+            var itemMoveEnd = new ToolStripMenuItem("⏩ Move to End", null, (s, e) => MoveTabToExtreme(tab, false))
+            {
+                Enabled = canMoveRight
+            };
+
+            var itemFloat = new ToolStripMenuItem("🪟 Float / Detach Window", null, (s, e) => FloatTab(tab))
+            {
+                ToolTipText = "Open in separate window so you can place it anywhere on screen or another monitor"
+            };
+
+            var itemClose = new ToolStripMenuItem("❌ Close Tab", null, (s, e) => CloseSpecificTab(tab));
+            var itemCloseOthers = new ToolStripMenuItem("❌ Close Other Tabs", null, (s, e) => CloseOtherTabs(tab))
+            {
+                Enabled = tabControlMain.Tabs.Count > 1
+            };
+            var itemCloseAll = new ToolStripMenuItem("❌ Close All Tabs", null, (s, e) => CloseAllTabs())
+            {
+                Enabled = tabControlMain.Tabs.Count > 0
+            };
+
+            menu.Items.Add(itemMoveLeft);
+            menu.Items.Add(itemMoveRight);
+            menu.Items.Add(itemMoveStart);
+            menu.Items.Add(itemMoveEnd);
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add(itemFloat);
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add(itemClose);
+            menu.Items.Add(itemCloseOthers);
+            menu.Items.Add(itemCloseAll);
+
+            menu.Show(screenPoint);
+        }
+
+        #endregion
+
+        #region Floating Tab Windows (Tear-off & Multi-Monitor Support)
+
+        private readonly List<FloatingTabHostForm> _floatingHosts = new List<FloatingTabHostForm>();
+
+        private void FloatTab(Infragistics.Win.UltraWinTabControl.UltraTab tab)
+        {
+            try
+            {
+                if (tab == null || tab.TabPage.Controls.Count == 0) return;
+                if (!(tab.TabPage.Controls[0] is Form form)) return;
+
+                if (string.Equals(tab.Key, "Home", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(tab.Text, "Home", StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+
+                string tabText = tab.Text;
+                string tabKey = tab.Key;
+                object tag = tab.Tag;
+
+                // Remove form from tab control
+                tab.TabPage.Controls.Remove(form);
+                tabControlMain.Tabs.Remove(tab);
+
+                // Select adjacent tab if any
+                if (tabControlMain.Tabs.Count > 0)
+                {
+                    tabControlMain.SelectedTab = tabControlMain.Tabs[0];
+                }
+
+                // Show floating host
+                var host = new FloatingTabHostForm(this, form, tabText, tabKey, tag);
+                _floatingHosts.Add(host);
+                host.Show();
+                host.BringToFront();
+                host.Focus();
+                SyncReportNavigatorActiveItemWithOpenTabs();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error floating tab: {ex.Message}");
+            }
+        }
+
+        public void DockFormBack(Form form, string tabText, string tabKey, object tag)
+        {
+            try
+            {
+                if (form == null || form.IsDisposed) return;
+
+                string uniqueKey = string.IsNullOrEmpty(tabKey) ? $"Tab_{DateTime.Now.Ticks}_{tabText}" : tabKey;
+                var newTab = tabControlMain.Tabs.Add(uniqueKey, tabText);
+                newTab.Tag = tag;
+
+                form.TopLevel = false;
+                form.FormBorderStyle = FormBorderStyle.None;
+                form.Dock = DockStyle.Fill;
+                form.Visible = true;
+
+                newTab.TabPage.Controls.Add(form);
+                tabControlMain.SelectedTab = newTab;
+                ApplyTabStyling(newTab, true);
+                EnsureAllTabFormsAreProperlySized();
+
+                form.BringToFront();
+                form.Focus();
+                UpdateHoldToolVisibility();
+
+                // Wire up form closed
+                form.FormClosed += (sender, e) =>
+                {
+                    try
+                    {
+                        if (newTab != null && tabControlMain.Tabs.Contains(newTab))
+                        {
+                            int prevIndex = Math.Max(0, newTab.Index - 1);
+                            tabControlMain.Tabs.Remove(newTab);
+                            if (tabControlMain.Tabs.Count > 0)
+                            {
+                                if (prevIndex >= 0 && prevIndex < tabControlMain.Tabs.Count)
+                                    tabControlMain.SelectedTab = tabControlMain.Tabs[prevIndex];
+                                else
+                                    tabControlMain.SelectedTab = tabControlMain.Tabs[0];
+                            }
+                        }
+                        SyncReportNavigatorActiveItemWithOpenTabs();
+                    }
+                    catch { }
+                };
+
+                SyncReportNavigatorActiveItemWithOpenTabs();
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error docking form back: {ex.Message}");
+            }
+        }
+
+        public void RemoveFloatingHost(FloatingTabHostForm host)
+        {
+            if (host != null)
+            {
+                _floatingHosts.Remove(host);
+                SyncReportNavigatorActiveItemWithOpenTabs();
+            }
+        }
+
+        #endregion
+
         private void closeTabToolStripMenuItem_Click(object sender, EventArgs e)
         {
             CloseCurrentTab();
@@ -438,58 +724,73 @@ namespace PosBranch_Win
         {
             if (tabControlMain.ActiveTab != null && tabControlMain.Tabs.Count > 0)
             {
-                var activeTab = tabControlMain.ActiveTab;
+                CloseSpecificTab(tabControlMain.ActiveTab);
+            }
+            else if (tabControlMain.SelectedTab != null && tabControlMain.Tabs.Count > 0)
+            {
+                CloseSpecificTab(tabControlMain.SelectedTab);
+            }
+        }
 
-                // Never close the main Home tab
-                if (string.Equals(activeTab.Key, "Home", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(activeTab.Text, "Home", StringComparison.OrdinalIgnoreCase))
+        private void CloseSpecificTab(Infragistics.Win.UltraWinTabControl.UltraTab tabToClose)
+        {
+            if (tabToClose == null || !tabControlMain.Tabs.Contains(tabToClose)) return;
+
+            // Never close the main Home tab
+            if (string.Equals(tabToClose.Key, "Home", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(tabToClose.Text, "Home", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            int prevIndex = Math.Max(0, tabToClose.Index - 1);
+
+            // Close the form in the tab
+            if (tabToClose.TabPage.Controls.Count > 0 && tabToClose.TabPage.Controls[0] is Form form)
+            {
+                try
                 {
-                    return;
+                    form.Close();
+                    form.Dispose();
                 }
-
-                int prevIndex = Math.Max(0, activeTab.Index - 1);
-
-                // Close the form in the tab
-                if (activeTab.TabPage.Controls.Count > 0 && activeTab.TabPage.Controls[0] is Form)
+                catch (Exception ex)
                 {
-                    Form form = (Form)activeTab.TabPage.Controls[0];
-
-                    // CRITICAL FIX: Properly dispose form to prevent memory leaks
-                    try
-                    {
-                        // Unsubscribe from events first
-                        form.FormClosed -= null; // Remove any event handlers
-
-                        // Close the form properly
-                        form.Close();
-
-                        // Force disposal
-                        form.Dispose();
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Error disposing form: {ex.Message}");
-                    }
+                    System.Diagnostics.Debug.WriteLine($"Error disposing form: {ex.Message}");
                 }
+            }
 
-                // Remove the tab if it wasn't already removed by FormClosed handler
-                if (tabControlMain.Tabs.Contains(activeTab))
+            // Remove the tab if it wasn't already removed by FormClosed handler
+            if (tabControlMain.Tabs.Contains(tabToClose))
+            {
+                tabControlMain.Tabs.Remove(tabToClose);
+            }
+
+            // Always ensure SelectedTab is valid so UltraTabControl never disappears
+            if (tabControlMain.Tabs.Count > 0)
+            {
+                if (prevIndex >= 0 && prevIndex < tabControlMain.Tabs.Count)
                 {
-                    tabControlMain.Tabs.Remove(activeTab);
+                    tabControlMain.SelectedTab = tabControlMain.Tabs[prevIndex];
                 }
-
-                // CRITICAL FIX: Always ensure SelectedTab is valid so UltraTabControl never disappears
-                if (tabControlMain.Tabs.Count > 0)
+                else
                 {
-                    if (prevIndex >= 0 && prevIndex < tabControlMain.Tabs.Count)
-                    {
-                        tabControlMain.SelectedTab = tabControlMain.Tabs[prevIndex];
-                    }
-                    else
-                    {
-                        tabControlMain.SelectedTab = tabControlMain.Tabs[0];
-                    }
+                    tabControlMain.SelectedTab = tabControlMain.Tabs[0];
                 }
+            }
+            SyncReportNavigatorActiveItemWithOpenTabs();
+        }
+
+        private void CloseOtherTabs(Infragistics.Win.UltraWinTabControl.UltraTab keepTab)
+        {
+            var tabsToClose = tabControlMain.Tabs.Cast<Infragistics.Win.UltraWinTabControl.UltraTab>()
+                                .Where(t => t != keepTab &&
+                                            !string.Equals(t.Key, "Home", StringComparison.OrdinalIgnoreCase) &&
+                                            !string.Equals(t.Text, "Home", StringComparison.OrdinalIgnoreCase))
+                                .ToList();
+
+            foreach (var tab in tabsToClose)
+            {
+                CloseSpecificTab(tab);
             }
         }
 
@@ -499,31 +800,9 @@ namespace PosBranch_Win
             for (int i = tabControlMain.Tabs.Count - 1; i >= 0; i--)
             {
                 var tab = tabControlMain.Tabs[i];
-                if (tab.TabPage.Controls.Count > 0 && tab.TabPage.Controls[0] is Form)
-                {
-                    Form form = (Form)tab.TabPage.Controls[0];
-
-                    // CRITICAL FIX: Properly dispose each form
-                    try
-                    {
-                        // Unsubscribe from events first
-                        form.FormClosed -= null; // Remove any event handlers
-
-                        // Close the form properly
-                        form.Close();
-
-                        // Force disposal
-                        form.Dispose();
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Error disposing form in CloseAllTabs: {ex.Message}");
-                    }
-                }
+                CloseSpecificTab(tab);
             }
 
-            // UltraTabControl will handle tab removal automatically
-            // Clear all close button rectangles
             closeButtonRects.Clear();
         }
 
@@ -590,6 +869,13 @@ namespace PosBranch_Win
                 LogLogout("User closed application");
             }
             SessionContext.Clear();
+            if (!e.Cancel)
+            {
+                foreach (var host in _floatingHosts.ToList())
+                {
+                    try { host.Close(); } catch { }
+                }
+            }
             base.OnFormClosing(e);
         }
 
@@ -1274,6 +1560,9 @@ namespace PosBranch_Win
             // Ensure "SEARCH" button exists in the Home ribbon
             EnsureSearchRibbonButton();
 
+            // Ensure "Vendor Payment Report" button exists in the Vendor ribbon
+            EnsureVendorPaymentReportRibbonButton();
+
             // Apply active persistent language to Home and all controls
             ApplyLanguageToAllForms();
         }
@@ -1586,6 +1875,121 @@ namespace PosBranch_Win
             return bmp;
         }
 
+        /// <summary>
+        /// Programmatically ensures the "Vendor Payment Report" button exists in the Vendor ribbon tab.
+        /// Places it directly in the Report group so users can easily launch it from the ribbon.
+        /// Safe to call multiple times.
+        /// </summary>
+        private void EnsureVendorPaymentReportRibbonButton()
+        {
+            try
+            {
+                const string TOOL_KEY = "VendorPaymentReport";
+
+                // 1. Ensure shared ButtonTool exists in ultraToolbarsManager1
+                Infragistics.Win.UltraWinToolbars.ButtonTool btnTool;
+                if (!ultraToolbarsManager1.Tools.Exists(TOOL_KEY))
+                {
+                    btnTool = new Infragistics.Win.UltraWinToolbars.ButtonTool(TOOL_KEY);
+                    btnTool.SharedProps.Caption = "Payment Report";
+                    btnTool.SharedProps.ToolTipText = "Vendor Payment Report";
+                    btnTool.SharedProps.DisplayStyle = Infragistics.Win.UltraWinToolbars.ToolDisplayStyle.ImageAndText;
+                    btnTool.SharedProps.Enabled = true;
+                    btnTool.SharedProps.Visible = true;
+
+                    if (ultraToolbarsManager1.Tools.Exists("Payment"))
+                    {
+                        var payTool = ultraToolbarsManager1.Tools["Payment"] as Infragistics.Win.UltraWinToolbars.ButtonTool;
+                        if (payTool?.SharedProps?.AppearancesLarge?.Appearance?.Image != null)
+                        {
+                            btnTool.SharedProps.AppearancesLarge.Appearance.Image = payTool.SharedProps.AppearancesLarge.Appearance.Image;
+                        }
+                    }
+
+                    ultraToolbarsManager1.Tools.Add(btnTool);
+                }
+                else
+                {
+                    btnTool = ultraToolbarsManager1.Tools[TOOL_KEY] as Infragistics.Win.UltraWinToolbars.ButtonTool;
+                    if (btnTool != null)
+                    {
+                        btnTool.SharedProps.Caption = "Payment Report";
+                        btnTool.SharedProps.ToolTipText = "Vendor Payment Report";
+                        btnTool.SharedProps.DisplayStyle = Infragistics.Win.UltraWinToolbars.ToolDisplayStyle.ImageAndText;
+                        btnTool.SharedProps.Enabled = true;
+                        btnTool.SharedProps.Visible = true;
+
+                        if (btnTool.SharedProps.AppearancesLarge.Appearance.Image == null && ultraToolbarsManager1.Tools.Exists("Payment"))
+                        {
+                            var payTool = ultraToolbarsManager1.Tools["Payment"] as Infragistics.Win.UltraWinToolbars.ButtonTool;
+                            if (payTool?.SharedProps?.AppearancesLarge?.Appearance?.Image != null)
+                            {
+                                btnTool.SharedProps.AppearancesLarge.Appearance.Image = payTool.SharedProps.AppearancesLarge.Appearance.Image;
+                            }
+                        }
+                    }
+                }
+
+                // 2. Find Vendor ribbon tab (key 'ribbon4' or caption 'Vendor')
+                Infragistics.Win.UltraWinToolbars.RibbonTab vendorTab = null;
+                if (ultraToolbarsManager1.Ribbon != null && ultraToolbarsManager1.Ribbon.Tabs != null)
+                {
+                    if (ultraToolbarsManager1.Ribbon.Tabs.Exists("ribbon4"))
+                    {
+                        vendorTab = ultraToolbarsManager1.Ribbon.Tabs["ribbon4"];
+                    }
+                    else
+                    {
+                        foreach (Infragistics.Win.UltraWinToolbars.RibbonTab tab in ultraToolbarsManager1.Ribbon.Tabs)
+                        {
+                            if (tab.Caption != null && tab.Caption.Equals("Vendor", StringComparison.OrdinalIgnoreCase))
+                            {
+                                vendorTab = tab;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (vendorTab == null) return;
+
+                // 3. Find Report group in Vendor tab (key 'ribbonGroup2' or caption 'Report')
+                Infragistics.Win.UltraWinToolbars.RibbonGroup reportGroup = null;
+                if (vendorTab.Groups.Exists("ribbonGroup2"))
+                {
+                    reportGroup = vendorTab.Groups["ribbonGroup2"];
+                }
+                else
+                {
+                    foreach (Infragistics.Win.UltraWinToolbars.RibbonGroup grp in vendorTab.Groups)
+                    {
+                        if (grp.Caption != null && grp.Caption.Equals("Report", StringComparison.OrdinalIgnoreCase))
+                        {
+                            reportGroup = grp;
+                            break;
+                        }
+                    }
+                }
+
+                if (reportGroup != null)
+                {
+                    if (!reportGroup.Tools.Exists(TOOL_KEY))
+                    {
+                        var instanceTool = reportGroup.Tools.InsertTool(0, TOOL_KEY);
+                        if (instanceTool != null)
+                        {
+                            instanceTool.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
+                            instanceTool.InstanceProps.MinimumSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"EnsureVendorPaymentReportRibbonButton error: {ex.Message}");
+            }
+        }
+
         private void ApplyWatermark()
         {
             try
@@ -1643,6 +2047,7 @@ namespace PosBranch_Win
             {
                 // Disable OS themes for custom styling
                 tabControlMain.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
+                tabControlMain.AllowTabMoving = true;
 
                 // Set matching light blue background
                 tabControlMain.BackColor = System.Drawing.Color.FromArgb(240, 248, 255);
@@ -2691,6 +3096,11 @@ namespace PosBranch_Win
                 PosBranch_Win.Reports.FinancialReports.FrmDayBook dbBook = new PosBranch_Win.Reports.FinancialReports.FrmDayBook();
                 OpenFormInTabSafe(dbBook, "Day Book");
             }
+            if (e.Tool.Key == "CashInOut" || e.Tool.Key == "CashInOutReport")
+            {
+                PosBranch_Win.Reports.FinancialReports.FrmCashInOutReport cioReport = new PosBranch_Win.Reports.FinancialReports.FrmCashInOutReport();
+                OpenFormInTabSafe(cioReport, "Cash In / Cash Out");
+            }
             if (e.Tool.Key == "Payment")
             {
                 Accounts.FrmPayment payment = new FrmPayment();
@@ -3028,10 +3438,10 @@ namespace PosBranch_Win
                 PosBranch_Win.Reports.FinancialReports.frmVendorOutstandingReport vendorOutstandingReport = new PosBranch_Win.Reports.FinancialReports.frmVendorOutstandingReport();
                 OpenFormInTab(vendorOutstandingReport, "Vendor Outstanding Report");
             }
-            if (e.Tool.Key == "VendorDNPaymentReport")
+            if (e.Tool.Key == "VendorPaymentReport" || e.Tool.Key == "VendorDNPaymentReport")
             {
                 PosBranch_Win.Reports.FinancialReports.frmVendorPaymentReport vendorPaymentReport = new PosBranch_Win.Reports.FinancialReports.frmVendorPaymentReport();
-                OpenFormInTab(vendorPaymentReport, "Vendor DN/Payment Report");
+                OpenFormInTab(vendorPaymentReport, "Vendor Payment Report");
             }
             if (e.Tool.Key == "UnallocatedPurchaseReturns")
             {
@@ -5385,6 +5795,7 @@ namespace PosBranch_Win
                 if (ultraToolbarsManager1.Tools.Exists(keyToExecute) ||
                     keyToExecute == "AuditTrail" ||
                     keyToExecute == "VendorPurchaseReport" ||
+                    keyToExecute == "VendorPaymentReport" ||
                     keyToExecute == "VendorDNPaymentReport" ||
                     keyToExecute == "CustomerReceiptReport" ||
                     keyToExecute == "CustomerLedgerReport" ||
@@ -5899,6 +6310,137 @@ namespace PosBranch_Win
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error in Home.ApplyLanguageToAllForms: {ex.Message}");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Host window for floating/detached tab forms so users can move forms anywhere on screen or across multiple monitors.
+    /// </summary>
+    public class FloatingTabHostForm : Form
+    {
+        private readonly Home _home;
+        private readonly Form _hostedForm;
+        private readonly string _tabText;
+        private readonly string _tabKey;
+        private readonly object _tag;
+        private bool _isDockingBack = false;
+
+        public Form HostedForm => _hostedForm;
+
+        public FloatingTabHostForm(Home home, Form hostedForm, string tabText, string tabKey, object tag)
+        {
+            _home = home;
+            _hostedForm = hostedForm;
+            _tabText = tabText;
+            _tabKey = tabKey;
+            _tag = tag;
+
+            InitializeHost();
+        }
+
+        private void InitializeHost()
+        {
+            this.Text = $"{_tabText} - Nexoris";
+            int initialWidth = Math.Max(1024, _hostedForm.Width + 24);
+            int initialHeight = Math.Max(700, _hostedForm.Height + 70);
+            this.Size = new Size(initialWidth, initialHeight);
+            this.StartPosition = FormStartPosition.CenterScreen;
+            this.ShowInTaskbar = true;
+            this.Icon = _home?.Icon;
+
+            // Docking banner at top
+            var topPanel = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 36,
+                BackColor = Color.FromArgb(235, 244, 255),
+                Padding = new Padding(10, 4, 10, 4)
+            };
+
+            var titleLabel = new Label
+            {
+                Text = $"📄 {_tabText}",
+                Font = new Font("Segoe UI", 9.5f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(0, 70, 150),
+                AutoSize = true,
+                Location = new Point(10, 8)
+            };
+
+            var btnDock = new Button
+            {
+                Text = "📌 Dock Back to Tabs",
+                Font = new Font("Segoe UI", 9f, FontStyle.Bold),
+                BackColor = Color.FromArgb(0, 120, 215),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Size = new Size(160, 26),
+                Anchor = AnchorStyles.Top | AnchorStyles.Right,
+                Location = new Point(topPanel.Width - 170, 5),
+                Cursor = Cursors.Hand
+            };
+            btnDock.FlatAppearance.BorderSize = 0;
+            btnDock.Click += (s, e) => DockBack();
+
+            topPanel.Resize += (s, e) =>
+            {
+                btnDock.Location = new Point(topPanel.Width - 170, 5);
+            };
+
+            topPanel.Controls.Add(titleLabel);
+            topPanel.Controls.Add(btnDock);
+
+            // Container for hosted form
+            var contentPanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.White
+            };
+
+            this.Controls.Add(contentPanel);
+            this.Controls.Add(topPanel);
+
+            // Place hosted form inside content panel
+            _hostedForm.TopLevel = false;
+            _hostedForm.FormBorderStyle = FormBorderStyle.None;
+            _hostedForm.Dock = DockStyle.Fill;
+            _hostedForm.Visible = true;
+            contentPanel.Controls.Add(_hostedForm);
+            _hostedForm.BringToFront();
+
+            this.FormClosing += FloatingTabHostForm_FormClosing;
+        }
+
+        public void DockBack()
+        {
+            if (_isDockingBack) return;
+            _isDockingBack = true;
+
+            var contentPanel = this.Controls.OfType<Panel>().FirstOrDefault(p => p.Dock == DockStyle.Fill);
+            if (contentPanel != null)
+            {
+                contentPanel.Controls.Remove(_hostedForm);
+            }
+
+            _home?.RemoveFloatingHost(this);
+            this.Close();
+            _home?.DockFormBack(_hostedForm, _tabText, _tabKey, _tag);
+        }
+
+        private void FloatingTabHostForm_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            if (!_isDockingBack)
+            {
+                try
+                {
+                    if (!_hostedForm.IsDisposed)
+                    {
+                        _hostedForm.Close();
+                        _hostedForm.Dispose();
+                    }
+                }
+                catch { }
+                _home?.RemoveFloatingHost(this);
             }
         }
     }

@@ -162,6 +162,16 @@ namespace Repository.ReportRepository
                             model.ManualCustomerBalance = GetDecimal(r, "ManualCustomerBalance");
                             model.ManualVendorBalance = GetDecimal(r, "ManualVendorBalance");
                             model.ManualBalanceCount = GetInt(r, "ManualBalanceCount");
+
+                            // 9. Cash In & Cash Out Flow
+                            model.TotalCashIn = GetDecimal(r, "TotalCashIn");
+                            model.TotalCashOut = GetDecimal(r, "TotalCashOut");
+                            model.NetCashFlow = GetDecimal(r, "NetCashFlow");
+                            model.VendorPaymentsCompleted = GetDecimal(r, "VendorPaymentsCompleted");
+                            model.CustomerReceiptsCollected = GetDecimal(r, "CustomerReceiptsCollected");
+                            model.CounterCashSales = GetDecimal(r, "CounterCashSales");
+                            model.DigitalSales = GetDecimal(r, "DigitalSales");
+                            model.CashPurchasesPaid = GetDecimal(r, "CashPurchasesPaid");
                         }
 
                         // Result Set 2: Monthly Growth Matrix
