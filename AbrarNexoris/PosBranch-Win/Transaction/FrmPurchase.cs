@@ -662,6 +662,21 @@ namespace PosBranch_Win.Transaction
             SetupColumnChooserMenu();
         }
 
+        public FrmPurchase(int purchaseId) : this()
+        {
+            this.Load += (s, e) =>
+            {
+                try
+                {
+                    LoadPurchaseData(purchaseId);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error loading purchase #{purchaseId}: {ex.Message}");
+                }
+            };
+        }
+
         private void ApplyPurchaseOrderTheme()
         {
             BackColor = FormBackColor;

@@ -78,6 +78,21 @@ namespace PosBranch_Win.Accounts
             };
         }
 
+        public FrmPayment(long voucherId) : this()
+        {
+            this.Load += (s, e) =>
+            {
+                try
+                {
+                    LoadPayment(voucherId);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error loading payment #{voucherId}: {ex.Message}");
+                }
+            };
+        }
+
         private void ultraPictureBox7_Click(object sender, EventArgs e)
         {
             using (var dlg = new PosBranch_Win.DialogBox.frmSalesPersonDial())

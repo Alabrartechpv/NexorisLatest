@@ -41,6 +41,25 @@ namespace PosBranch_Win.Accounts
             this.Enter += (s, e) => { if (!isBinding) { BindLedgers(); } };
         }
 
+        public FrmContra(string voucherNo) : this()
+        {
+            this.Load += (s, e) =>
+            {
+                try
+                {
+                    if (!string.IsNullOrWhiteSpace(voucherNo))
+                    {
+                        txtVoucherNo.Text = voucherNo.Trim();
+                        LoadContra();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error loading contra #{voucherNo}: {ex.Message}");
+                }
+            };
+        }
+
         private void OnExternalLedgerSaved(object sender, EventArgs e)
         {
             if (this.IsDisposed) return;

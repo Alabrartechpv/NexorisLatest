@@ -93,6 +93,21 @@ namespace PosBranch_Win.Accounts
                     "Receipt Status", MessageBoxButtons.OK, MessageBoxIcon.Information);
             };
         }
+
+        public FrmReceipt(long voucherId) : this()
+        {
+            this.Load += (s, e) =>
+            {
+                try
+                {
+                    LoadReceipt(voucherId);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error loading receipt #{voucherId}: {ex.Message}");
+                }
+            };
+        }
         private void ultraPictureBox7_Click(object sender, EventArgs e)
         {
             using (var dlg = new PosBranch_Win.DialogBox.frmSalesPersonDial())

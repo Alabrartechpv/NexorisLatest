@@ -313,7 +313,7 @@ namespace Repository.Accounts
                                 ? SessionContext.CompanyId
                                 : int.TryParse(DataBase.CompanyId, out legacyCompanyId) && legacyCompanyId > 0
                                     ? legacyCompanyId
-                                    : master.BranchId;
+                                    : 1;
 
                             // 2. Insert into CustomerReceiptMaster
                             using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._CustomerReceiptMaster, conn, transaction))

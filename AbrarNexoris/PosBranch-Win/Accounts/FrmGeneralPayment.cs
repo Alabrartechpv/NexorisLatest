@@ -44,6 +44,21 @@ namespace PosBranch_Win.Accounts
             this.Enter += (s, e) => { if (!isBinding) { BindLedgers(); UpdateCashBankBalanceDisplay(); } };
         }
 
+        public FrmGeneralPayment(string voucherNo) : this()
+        {
+            this.Load += (s, e) =>
+            {
+                try
+                {
+                    LoadVoucherByNumber(voucherNo);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error loading expense #{voucherNo}: {ex.Message}");
+                }
+            };
+        }
+
         private void OnExternalLedgerSaved(object sender, EventArgs e)
         {
             if (this.IsDisposed) return;

@@ -416,6 +416,26 @@ namespace PosBranch_Win.Transaction
             }
         }
 
+        public frmSalesInvoice(long billNo) : this()
+        {
+            this.Load += (s, e) =>
+            {
+                try
+                {
+                    LoadBill(billNo);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error loading bill #{billNo}: {ex.Message}");
+                }
+            };
+        }
+
+        public void LoadBill(long billNo)
+        {
+            SalesList_OnSalesSelected(billNo, "", 0);
+        }
+
         private void frmSalesInvoice_FormClosed(object sender, FormClosedEventArgs e)
         {
             try
