@@ -5803,6 +5803,7 @@ namespace PosBranch_Win
                     keyToExecute == "VendorPurchaseReport" ||
                     keyToExecute == "PurchaseAuditReport" ||
                     keyToExecute == "VendorDNPaymentReport" ||
+                    keyToExecute == "VendorPaymentReport" ||
                     keyToExecute == "CustomerReceiptReport" ||
                     keyToExecute == "CustomerLedgerReport" ||
                     keyToExecute == "StockValuationReport" ||
