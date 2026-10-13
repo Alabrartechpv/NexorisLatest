@@ -82,6 +82,7 @@ namespace PosBranch_Win
             new ReportNavigatorDefinition("Sales", "Daily Sales", "DSales"),
             new ReportNavigatorDefinition("Sales", "Counter Report", "CounterReport"),
             new ReportNavigatorDefinition("Purchase", "Purchase Details", "Purchase Details"),
+            new ReportNavigatorDefinition("Purchase", "Purchase Audit Report", "PurchaseAuditReport"),
             new ReportNavigatorDefinition("Purchase", "Purchase Return Report", "PurchaseReturn"),
             new ReportNavigatorDefinition("Purchase", "Vendor Purchase Report", "VendorPurchaseReport"),
             new ReportNavigatorDefinition("Customer", "Customer Outstanding Listing", "CustomerOutstandingReport"),
@@ -2922,6 +2923,11 @@ namespace PosBranch_Win
                 Reports.PurchaseReports.frmvendorpurchasereport vendorPurchaseReport = new Reports.PurchaseReports.frmvendorpurchasereport();
                 OpenFormInTab(vendorPurchaseReport, "Vendor Purchase Report");
             }
+            if (e.Tool.Key == "PurchaseAuditReport")
+            {
+                Reports.PurchaseReports.frmpurchaseAuditreport purchaseAuditReport = new Reports.PurchaseReports.frmpurchaseAuditreport();
+                OpenFormInTab(purchaseAuditReport, "Purchase Audit Report");
+            }
             if (e.Tool.Key == "AuditTrail")
             {
                 Reports.AuditReport.frmAuditReport frmAuditTrail = new Reports.AuditReport.frmAuditReport();
@@ -5385,6 +5391,7 @@ namespace PosBranch_Win
                 if (ultraToolbarsManager1.Tools.Exists(keyToExecute) ||
                     keyToExecute == "AuditTrail" ||
                     keyToExecute == "VendorPurchaseReport" ||
+                    keyToExecute == "PurchaseAuditReport" ||
                     keyToExecute == "VendorDNPaymentReport" ||
                     keyToExecute == "CustomerReceiptReport" ||
                     keyToExecute == "CustomerLedgerReport" ||
