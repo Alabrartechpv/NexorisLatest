@@ -126,6 +126,11 @@ namespace PosBranch_Win.Reports.InventoryReport
                 if (!string.IsNullOrEmpty(_initialStockFilter))
                 {
                     comboStockFilter.Text = _initialStockFilter;
+                    if (string.Equals(_initialStockFilter, "Dead Stock", StringComparison.OrdinalIgnoreCase))
+                    {
+                        dtFrom.Value = now.AddDays(-90);
+                        comboPeriod.Text = "Custom";
+                    }
                 }
                 LoadGroups();
                 LoadCategories();
