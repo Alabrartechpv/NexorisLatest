@@ -1,4 +1,4 @@
-﻿using Dapper;
+using Dapper;
 using ModelClass;
 using ModelClass.Master;
 using System;
@@ -87,6 +87,7 @@ namespace Repository
                             UPDATE PriceSettings 
                             SET OpnStk = @OpnStk,
                                 OpeningCost = @OpeningCost,
+                                Cost = @OpeningCost,
                                 OpnDate = @OpnDate,
                                 OpnValue = @OpnValue,
                                 Stock = @Stock,
