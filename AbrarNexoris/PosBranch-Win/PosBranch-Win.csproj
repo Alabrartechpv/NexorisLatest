@@ -1222,6 +1222,12 @@
     <Compile Include="Reports\PurchaseReports\frmpurchaseAuditreport.Designer.cs">
       <DependentUpon>frmpurchaseAuditreport.cs</DependentUpon>
     </Compile>
+    <Compile Include="Reports\PurchaseReports\purchasereturnauditreport.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Reports\PurchaseReports\purchasereturnauditreport.Designer.cs">
+      <DependentUpon>purchasereturnauditreport.cs</DependentUpon>
+    </Compile>
     <Compile Include="Reports\SalesReports\frmSalesDetailsReport.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -1266,6 +1272,12 @@
     </Compile>
     <Compile Include="Reports\InventoryReport\frmStockAdjustmentReport.Designer.cs">
       <DependentUpon>frmStockAdjustmentReport.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Reports\InventoryReport\stockadjustmentauditreport.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Reports\InventoryReport\stockadjustmentauditreport.Designer.cs">
+      <DependentUpon>stockadjustmentauditreport.cs</DependentUpon>
     </Compile>
     <Compile Include="Reports\InventoryReport\frmInactiveItemsReport.cs">
       <SubType>Form</SubType>
@@ -1855,6 +1867,9 @@
     <EmbeddedResource Include="Reports\InventoryReport\frmStockAdjustmentReport.resx">
       <DependentUpon>frmStockAdjustmentReport.cs</DependentUpon>
     </EmbeddedResource>
+    <EmbeddedResource Include="Reports\InventoryReport\stockadjustmentauditreport.resx">
+      <DependentUpon>stockadjustmentauditreport.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="Reports\InventoryReport\frmInactiveItemsReport.resx">
       <DependentUpon>frmInactiveItemsReport.cs</DependentUpon>
     </EmbeddedResource>
@@ -1869,6 +1884,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Reports\PurchaseReports\frmpurchaseAuditreport.resx">
       <DependentUpon>frmpurchaseAuditreport.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Reports\PurchaseReports\purchasereturnauditreport.resx">
+      <DependentUpon>purchasereturnauditreport.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Reports\SalesReports\frmSalesDetailsReport.resx">
       <DependentUpon>frmSalesDetailsReport.cs</DependentUpon>
