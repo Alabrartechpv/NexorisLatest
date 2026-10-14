@@ -863,23 +863,23 @@ namespace PosBranch_Win.Dashboard
                 switch (target)
                 {
                     case "StockValuation":
-                        formToOpen = new Reports.InventoryReport.frmStockValuationReport("All Items");
+                        formToOpen = new Reports.InventoryReport.frmStockValuationReport("All Items", _model.GroupId, _model.CategoryId);
                         title = "Stock Valuation Report";
                         break;
                     case "StockValuationPositive":
-                        formToOpen = new Reports.InventoryReport.frmStockValuationReport("Positive Stock");
+                        formToOpen = new Reports.InventoryReport.frmStockValuationReport("Positive Stock", _model.GroupId, _model.CategoryId);
                         title = "Stock Valuation Report (Positive Stock)";
                         break;
                     case "StockValuationNegative":
-                        formToOpen = new Reports.InventoryReport.frmStockValuationReport("Negative Stock");
+                        formToOpen = new Reports.InventoryReport.frmStockValuationReport("Negative Stock", _model.GroupId, _model.CategoryId);
                         title = "Stock Valuation Report (Negative Stock)";
                         break;
                     case "StockValuationExcess":
-                        formToOpen = new Reports.InventoryReport.frmStockValuationReport("Excess Stock");
+                        formToOpen = new Reports.InventoryReport.frmStockValuationReport("Excess Stock", _model.GroupId, _model.CategoryId);
                         title = "Stock Valuation Report (Excess Stock)";
                         break;
                     case "StockValuationDead":
-                        formToOpen = new Reports.InventoryReport.frmStockValuationReport("Dead Stock");
+                        formToOpen = new Reports.InventoryReport.frmStockValuationReport("Dead Stock", _model.GroupId, _model.CategoryId);
                         title = "Stock Valuation Report (Dead Stock)";
                         break;
                     case "StockAnalytics":

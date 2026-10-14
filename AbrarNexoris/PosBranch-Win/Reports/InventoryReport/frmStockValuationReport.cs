@@ -82,13 +82,21 @@ namespace PosBranch_Win.Reports.InventoryReport
         {
         }
 
-        public frmStockValuationReport(string initialStockFilter)
+        public frmStockValuationReport(string initialStockFilter, int? groupId = null, int? categoryId = null)
         {
             _initialStockFilter = string.IsNullOrWhiteSpace(initialStockFilter) ? "All Items" : initialStockFilter;
             InitializeComponent();
             this.Font = new Font("Segoe UI", 9F);
             InitializeBackgroundWorker();
             InitializeForm();
+            if (groupId.HasValue && groupId.Value > 0)
+            {
+                try { comboGroup.Value = groupId.Value; } catch { }
+            }
+            if (categoryId.HasValue && categoryId.Value > 0)
+            {
+                try { comboCategory.Value = categoryId.Value; } catch { }
+            }
             this.Load += (s, e) => RunSearch();
         }
 

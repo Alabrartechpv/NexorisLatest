@@ -61,6 +61,8 @@ namespace Repository.ReportRepository
                     cmd.Parameters.AddWithValue("@FinYearId", effectiveFinYear);
                     cmd.Parameters.AddWithValue("@FromDate", rangeFrom);
                     cmd.Parameters.AddWithValue("@ToDate", rangeTo);
+                    cmd.Parameters.AddWithValue("@GroupId", groupId.HasValue ? groupId.Value : 0);
+                    cmd.Parameters.AddWithValue("@CategoryId", categoryId.HasValue ? categoryId.Value : 0);
 
                     using (SqlDataAdapter adapter = new SqlDataAdapter(cmd))
                     {
