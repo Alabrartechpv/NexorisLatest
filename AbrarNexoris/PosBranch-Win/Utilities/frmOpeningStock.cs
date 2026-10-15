@@ -21,18 +21,172 @@ namespace PosBranch_Win.Utilities
         private List<OpeningStockModel> allItems;
         private DataTable fullDataTable;
         private int selectedGroupId = 0; // 0 means all groups
+        private bool _isDirty = false;
 
         public frmOpeningStock()
         {
             InitializeComponent();
+            this.KeyPreview = true;
             openingStockRepo = new OpeningStockRepo();
             dropdowns = new Dropdowns();
         }
+
+        /// <summary>
+        /// Handle toggle to show only items that have opening stock entered
+        /// </summary>
+        private void chkStockOnly_CheckedChanged(object sender, EventArgs e)
+        {
+            ApplyFilter();
+        }
+
+        /// <summary>
+        /// Prompt user to save unsaved changes before closing the form
+        /// </summary>
+        private void frmOpeningStock_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            try
+            {
+                if (_isDirty)
+                {
+                    var res = MessageBox.Show(
+                        "You have unsaved changes in Opening Stock.\n\nDo you want to save your changes before closing?",
+                        "Unsaved Changes",
+                        MessageBoxButtons.YesNoCancel,
+                        MessageBoxIcon.Warning);
+
+                    if (res == DialogResult.Yes)
+                    {
+                        lblSave_Click(this, EventArgs.Empty);
+                        if (_isDirty)
+                        {
+                            // Save failed or was cancelled by user
+                            e.Cancel = true;
+                        }
+                    }
+                    else if (res == DialogResult.Cancel)
+                    {
+                        e.Cancel = true;
+                    }
+                }
+            }
+            catch { }
+        }
+
+        #region Public Methods for Ribbon / Shortcut Delegation
+        /// <summary>
+        /// Public Save method called by Ribbon Save button (F8)
+        /// </summary>
+        public void SaveRecord()
+        {
+            lblSave_Click(this, EventArgs.Empty);
+        }
+
+        public void Save()
+        {
+            lblSave_Click(this, EventArgs.Empty);
+        }
+
+        /// <summary>
+        /// Public Clear method called by Ribbon Clear button (F1)
+        /// </summary>
+        public void RibbonClear()
+        {
+            ResetFiltersAndReload();
+        }
+
+        public void Clear()
+        {
+            ResetFiltersAndReload();
+        }
+
+        public void ClearFields()
+        {
+            ResetFiltersAndReload();
+        }
+
+        public void RefreshData()
+        {
+            ResetFiltersAndReload();
+        }
+
+        /// <summary>
+        /// Focus and select search box
+        /// </summary>
+        public void Search()
+        {
+            txtSearch.Focus();
+            txtSearch.SelectAll();
+        }
+
+        /// <summary>
+        /// Reset search, reset group filter to All Groups, uncheck stocked-only filter, and reload items
+        /// </summary>
+        public void ResetFiltersAndReload()
+        {
+            try
+            {
+                txtSearch.Clear();
+                if (chkStockOnly != null)
+                {
+                    chkStockOnly.Checked = false;
+                }
+                if (cmbGroup.Items.Count > 0)
+                {
+                    cmbGroup.SelectedIndex = 0;
+                }
+                selectedGroupId = 0;
+                _isDirty = false;
+                LoadItems();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error resetting: " + ex.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        /// <summary>
+        /// Handle keyboard shortcuts directly on the form
+        /// </summary>
+        protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+        {
+            if (keyData == Keys.F8)
+            {
+                SaveRecord();
+                return true;
+            }
+            if (keyData == Keys.F1)
+            {
+                RibbonClear();
+                return true;
+            }
+            if (keyData == Keys.F5)
+            {
+                LoadItems();
+                return true;
+            }
+            if (keyData == (Keys.Control | Keys.F))
+            {
+                Search();
+                return true;
+            }
+            if (keyData == Keys.Escape)
+            {
+                if (!string.IsNullOrEmpty(txtSearch.Text))
+                {
+                    txtSearch.Clear();
+                    return true;
+                }
+            }
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
+        #endregion
 
         private void frmOpeningStock_Load(object sender, EventArgs e)
         {
             try
             {
+                this.KeyPreview = true;
+
                 // Apply modern styling to form controls
                 StyleFormControls();
 
@@ -47,6 +201,12 @@ namespace PosBranch_Win.Utilities
 
                 // Apply button hover effects
                 ApplyButtonHoverEffects();
+
+                // Automatically load items so user doesn't face an empty grid
+                this.BeginInvoke((Action)(() =>
+                {
+                    LoadItems();
+                }));
             }
             catch (Exception ex)
             {
@@ -193,6 +353,8 @@ namespace PosBranch_Win.Utilities
             DataTable dt = new DataTable();
             dt.Columns.Add("SlNo", typeof(int));
             dt.Columns.Add("ItemId", typeof(int));
+            dt.Columns.Add("ItemNo", typeof(string));
+            dt.Columns.Add("BarCode", typeof(string));
             dt.Columns.Add("ItemName", typeof(string));
             dt.Columns.Add("Unit", typeof(string));
             dt.Columns.Add("OpeningQty", typeof(double));
@@ -214,6 +376,8 @@ namespace PosBranch_Win.Utilities
                 dt.Rows.Add(
                     i + 1,
                     item.ItemId,
+                    item.ItemNo ?? "",
+                    item.BarCode ?? "",
                     item.Description ?? "",
                     item.Unit ?? "",
                     openingQty,
@@ -313,9 +477,15 @@ namespace PosBranch_Win.Utilities
                 ultraGrid1.DisplayLayout.Override.CellAppearance.TextVAlign = Infragistics.Win.VAlign.Middle;
                 ultraGrid1.DisplayLayout.Override.CellAppearance.TextHAlign = Infragistics.Win.HAlign.Left;
 
+                // Enable smooth tab/enter navigation across editable cells
+                ultraGrid1.DisplayLayout.TabNavigation = TabNavigation.NextCell;
+
                 // Wire up events
                 ultraGrid1.InitializeLayout += UltraGrid1_InitializeLayout;
+                ultraGrid1.InitializeRow += UltraGrid1_InitializeRow;
                 ultraGrid1.CellChange += UltraGrid1_CellChange;
+                ultraGrid1.AfterCellUpdate += UltraGrid1_AfterCellUpdate;
+                ultraGrid1.KeyDown += UltraGrid1_KeyDown;
             }
             catch (Exception ex)
             {
@@ -331,6 +501,7 @@ namespace PosBranch_Win.Utilities
             try
             {
                 Color headerColor = Color.FromArgb(51, 65, 85);
+                Color editableCellColor = Color.FromArgb(254, 252, 232); // subtle light warm tint indicating editable field
 
                 // Style headers
                 if (e.Layout.Bands.Count > 0)
@@ -356,14 +527,34 @@ namespace PosBranch_Win.Utilities
                         else if (col.Key == "ItemId")
                         {
                             col.Header.Caption = "Item ID";
-                            col.Width = 100;
+                            col.Width = 80;
+                            col.CellActivation = Activation.NoEdit;
+                            col.CellAppearance.TextHAlign = Infragistics.Win.HAlign.Center;
+                        }
+                        else if (col.Key == "ItemNo")
+                        {
+                            col.Header.Caption = "Item No";
+                            col.Width = 90;
+                            col.CellActivation = Activation.NoEdit;
+                            col.CellAppearance.TextHAlign = Infragistics.Win.HAlign.Center;
+                        }
+                        else if (col.Key == "BarCode")
+                        {
+                            col.Header.Caption = "Barcode";
+                            col.Width = 120;
                             col.CellActivation = Activation.NoEdit;
                             col.CellAppearance.TextHAlign = Infragistics.Win.HAlign.Center;
                         }
                         else if (col.Key == "ItemName")
                         {
                             col.Header.Caption = "Item Name";
-                            col.Width = 250;
+                            col.Width = 260;
+                            col.CellActivation = Activation.NoEdit;
+                        }
+                        else if (col.Key == "GroupName")
+                        {
+                            col.Header.Caption = "Group";
+                            col.Width = 140;
                             col.CellActivation = Activation.NoEdit;
                         }
                         else if (col.Key == "Unit")
@@ -379,41 +570,38 @@ namespace PosBranch_Win.Utilities
                             col.Width = 120;
                             col.CellActivation = Activation.AllowEdit;
                             col.CellAppearance.TextHAlign = Infragistics.Win.HAlign.Right;
+                            col.CellAppearance.BackColor = editableCellColor;
                             col.Format = "N2";
                         }
                         else if (col.Key == "OpeningCost")
                         {
-                            col.Header.Caption = "Opening Cost";
-                            col.Width = 120;
+                            col.Header.Caption = "Opening Cost (₹)";
+                            col.Width = 130;
                             col.CellActivation = Activation.AllowEdit;
                             col.CellAppearance.TextHAlign = Infragistics.Win.HAlign.Right;
+                            col.CellAppearance.BackColor = editableCellColor;
                             col.Format = "N2";
                         }
                         else if (col.Key == "OpeningValue")
                         {
-                            col.Header.Caption = "Opening Value";
-                            col.Width = 120;
+                            col.Header.Caption = "Opening Value (₹)";
+                            col.Width = 140;
                             col.CellActivation = Activation.NoEdit;
                             col.CellAppearance.TextHAlign = Infragistics.Win.HAlign.Right;
+                            col.CellAppearance.FontData.Bold = Infragistics.Win.DefaultableBoolean.True;
                             col.Format = "N2";
                         }
                         else if (col.Key == "OpeningDate")
                         {
                             col.Header.Caption = "Opening Date";
-                            col.Width = 120;
+                            col.Width = 110;
                             col.CellActivation = Activation.AllowEdit;
                             col.CellAppearance.TextHAlign = Infragistics.Win.HAlign.Center;
                             col.Format = "dd/MM/yyyy";
                         }
-                        else if (col.Key == "GroupName")
-                        {
-                            col.Header.Caption = "Group";
-                            col.Width = 150;
-                            col.CellActivation = Activation.NoEdit;
-                        }
                         else
                         {
-                            // Hide other columns
+                            // Hide internal ID and calculation columns
                             col.Hidden = true;
                         }
                     }
@@ -424,6 +612,36 @@ namespace PosBranch_Win.Utilities
                 e.Layout.Override.RowSelectorAppearance.BackColor2 = headerColor;
                 e.Layout.Override.RowSelectorAppearance.BackGradientStyle = Infragistics.Win.GradientStyle.None;
                 e.Layout.Override.RowSelectorAppearance.ForeColor = Color.White;
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// Highlight rows that already have opening stock entered
+        /// </summary>
+        private void UltraGrid1_InitializeRow(object sender, InitializeRowEventArgs e)
+        {
+            try
+            {
+                if (e.Row != null && e.Row.Cells.Exists("OpeningQty"))
+                {
+                    double qty = 0;
+                    var qtyVal = e.Row.Cells["OpeningQty"].Value;
+                    if (qtyVal != null && qtyVal != DBNull.Value)
+                    {
+                        double.TryParse(qtyVal.ToString(), out qty);
+                    }
+
+                    if (qty > 0)
+                    {
+                        // Subtle soft green tint indicating stocked item
+                        e.Row.Appearance.BackColor = Color.FromArgb(240, 253, 244);
+                    }
+                    else
+                    {
+                        e.Row.Appearance.ResetBackColor();
+                    }
+                }
             }
             catch { }
         }
@@ -456,16 +674,106 @@ namespace PosBranch_Win.Utilities
                     double.TryParse(qtyText, out openingQty);
                     double.TryParse(costText, out openingCost);
 
+                    // Restrict to non-negative numbers
+                    if (openingQty < 0) openingQty = 0;
+                    if (openingCost < 0) openingCost = 0;
+
                     // Calculate and set OpeningValue
                     double openingValue = openingQty * openingCost;
                     e.Cell.Row.Cells["OpeningValue"].Value = openingValue;
+
+                    // Mark form as having unsaved changes
+                    _isDirty = true;
+
+                    // Update row visual highlight
+                    if (openingQty > 0)
+                    {
+                        e.Cell.Row.Appearance.BackColor = Color.FromArgb(240, 253, 244);
+                    }
+                    else
+                    {
+                        e.Cell.Row.Appearance.ResetBackColor();
+                    }
+
+                    // Update summary statistics live
+                    UpdateSummaryStatistics();
                 }
             }
             catch (Exception ex)
             {
-                // Silently handle errors in cell change
                 System.Diagnostics.Debug.WriteLine("Error in cell change: " + ex.Message);
             }
+        }
+
+        /// <summary>
+        /// After cell value is committed, refresh totals and row highlight
+        /// </summary>
+        private void UltraGrid1_AfterCellUpdate(object sender, CellEventArgs e)
+        {
+            try
+            {
+                if (e.Cell == null || e.Cell.Row == null) return;
+
+                if (e.Cell.Column.Key == "OpeningQty" || e.Cell.Column.Key == "OpeningCost")
+                {
+                    double openingQty = 0;
+                    double openingCost = 0;
+
+                    var qtyVal = e.Cell.Row.Cells["OpeningQty"].Value;
+                    var costVal = e.Cell.Row.Cells["OpeningCost"].Value;
+
+                    if (qtyVal != null && qtyVal != DBNull.Value) double.TryParse(qtyVal.ToString(), out openingQty);
+                    if (costVal != null && costVal != DBNull.Value) double.TryParse(costVal.ToString(), out openingCost);
+
+                    // Clamp to non-negative
+                    if (openingQty < 0)
+                    {
+                        openingQty = 0;
+                        e.Cell.Row.Cells["OpeningQty"].Value = 0;
+                    }
+                    if (openingCost < 0)
+                    {
+                        openingCost = 0;
+                        e.Cell.Row.Cells["OpeningCost"].Value = 0;
+                    }
+
+                    double openingValue = openingQty * openingCost;
+                    e.Cell.Row.Cells["OpeningValue"].Value = openingValue;
+
+                    _isDirty = true;
+
+                    if (openingQty > 0)
+                    {
+                        e.Cell.Row.Appearance.BackColor = Color.FromArgb(240, 253, 244);
+                    }
+                    else
+                    {
+                        e.Cell.Row.Appearance.ResetBackColor();
+                    }
+
+                    UpdateSummaryStatistics();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("Error in after cell update: " + ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Handle Enter key in grid to move to next editable cell
+        /// </summary>
+        private void UltraGrid1_KeyDown(object sender, KeyEventArgs e)
+        {
+            try
+            {
+                if (e.KeyCode == Keys.Enter)
+                {
+                    ultraGrid1.PerformAction(UltraGridAction.NextCellByTab, false, false);
+                    e.Handled = true;
+                }
+            }
+            catch { }
         }
 
         /// <summary>
@@ -512,15 +820,12 @@ namespace PosBranch_Win.Utilities
                 cmbGroup.Font = new Font("Segoe UI", 10.5F);
                 cmbGroup.ForeColor = Color.FromArgb(15, 23, 42);
 
-                // Record count label
-                lblRecordCount.Font = new Font("Segoe UI", 9.5F, FontStyle.Regular);
-                lblRecordCount.ForeColor = Color.FromArgb(71, 85, 105);
+                // Summary status label spanning across the bottom
+                lblRecordCount.Font = new Font("Segoe UI", 10.5F, FontStyle.Bold);
+                lblRecordCount.ForeColor = Color.FromArgb(30, 41, 59);
 
-                // Style buttons with premium semantic colors
-                StyleButtonPanel(ultraPanelLoadItems, lblLoadItems, Color.FromArgb(37, 99, 235)); // Modern Blue
-                StyleButtonPanel(ultraPanelSave, lblSave, Color.FromArgb(22, 163, 74));           // Success Green
-                StyleButtonPanel(ultraPanelRefresh, lblRefresh, Color.FromArgb(13, 148, 136));     // Teal
-                StyleButtonPanel(ultraPanelClose, lblClose, Color.FromArgb(220, 38, 38));          // Danger Red
+                // Hide bottom button panel as all actions are now seamlessly integrated with the top Ribbon toolbar
+                ultraPanelButtons.Visible = false;
             }
             catch (Exception ex)
             {
@@ -616,7 +921,7 @@ namespace PosBranch_Win.Utilities
         }
 
         /// <summary>
-        /// Apply filter to the grid based on search text
+        /// Apply filter to the grid based on search text and stocked-only toggle
         /// </summary>
         private void ApplyFilter()
         {
@@ -626,15 +931,29 @@ namespace PosBranch_Win.Utilities
 
                 string searchText = txtSearch.Text.Trim();
                 DataView dv = fullDataTable.DefaultView;
+                string searchCondition = "";
 
                 if (!string.IsNullOrEmpty(searchText))
                 {
                     string escapedSearchText = searchText.Replace("'", "''");
-                    dv.RowFilter = $"ItemName LIKE '%{escapedSearchText}%' OR CONVERT(ItemId, 'System.String') LIKE '%{escapedSearchText}%' OR CONVERT(SlNo, 'System.String') LIKE '%{escapedSearchText}%' OR GroupName LIKE '%{escapedSearchText}%'";
+                    searchCondition = $"ItemName LIKE '%{escapedSearchText}%' OR ItemNo LIKE '%{escapedSearchText}%' OR BarCode LIKE '%{escapedSearchText}%' OR CONVERT(ItemId, 'System.String') LIKE '%{escapedSearchText}%' OR CONVERT(SlNo, 'System.String') LIKE '%{escapedSearchText}%' OR GroupName LIKE '%{escapedSearchText}%'";
+                }
+
+                // If Stocked Only is checked, filter for OpeningQty > 0
+                if (chkStockOnly != null && chkStockOnly.Checked)
+                {
+                    if (string.IsNullOrEmpty(searchCondition))
+                    {
+                        dv.RowFilter = "OpeningQty > 0";
+                    }
+                    else
+                    {
+                        dv.RowFilter = $"({searchCondition}) AND OpeningQty > 0";
+                    }
                 }
                 else
                 {
-                    dv.RowFilter = string.Empty;
+                    dv.RowFilter = searchCondition;
                 }
 
                 UpdateRecordCount();
@@ -654,25 +973,58 @@ namespace PosBranch_Win.Utilities
         }
 
         /// <summary>
-        /// Update record count label
+        /// Update live summary statistics including counts, quantities, and stock valuation
         /// </summary>
-        private void UpdateRecordCount()
+        private void UpdateSummaryStatistics()
         {
             try
             {
-                int totalRecords = fullDataTable != null ? fullDataTable.Rows.Count : 0;
-                int visibleRecords = fullDataTable != null ? fullDataTable.DefaultView.Count : 0;
+                if (fullDataTable == null || fullDataTable.Rows.Count == 0)
+                {
+                    lblRecordCount.Text = "No items loaded";
+                    return;
+                }
 
-                if (visibleRecords == totalRecords)
+                int totalRecords = fullDataTable.Rows.Count;
+                int visibleRecords = fullDataTable.DefaultView.Count;
+                int itemsWithStock = 0;
+                double totalQty = 0;
+                double totalValuation = 0;
+
+                foreach (DataRow row in fullDataTable.Rows)
                 {
-                    lblRecordCount.Text = $"Total Records: {totalRecords}";
+                    double qty = 0;
+                    double cost = 0;
+                    double val = 0;
+
+                    if (row["OpeningQty"] != DBNull.Value) double.TryParse(row["OpeningQty"].ToString(), out qty);
+                    if (row["OpeningCost"] != DBNull.Value) double.TryParse(row["OpeningCost"].ToString(), out cost);
+                    if (row["OpeningValue"] != DBNull.Value) double.TryParse(row["OpeningValue"].ToString(), out val);
+                    else val = qty * cost;
+
+                    if (qty > 0)
+                    {
+                        itemsWithStock++;
+                        totalQty += qty;
+                    }
+                    if (val > 0)
+                    {
+                        totalValuation += val;
+                    }
                 }
-                else
-                {
-                    lblRecordCount.Text = $"Showing {visibleRecords} of {totalRecords} records";
-                }
+
+                string filterInfo = (visibleRecords < totalRecords) ? $" [Filtered: {visibleRecords}]" : "";
+                lblRecordCount.Text = $"Total Items: {totalRecords:N0}{filterInfo}   |   Items with Stock: {itemsWithStock:N0}   |   Total Qty: {totalQty:N2}   |   Total Valuation: ₹ {totalValuation:N2}";
             }
             catch { }
+        }
+
+        /// <summary>
+        /// Backward compatible record count delegate
+        /// </summary>
+        private void UpdateRecordCount()
+        {
+            UpdateSummaryStatistics();
         }
 
         /// <summary>
@@ -730,6 +1082,12 @@ namespace PosBranch_Win.Utilities
                                 errorMessage += $"Invalid Opening Qty for Item ID {itemId}\n";
                                 continue;
                             }
+                            if (openingQty < 0)
+                            {
+                                hasErrors = true;
+                                errorMessage += $"Negative Opening Qty ({openingQty}) is not allowed for Item ID {itemId}\n";
+                                continue;
+                            }
                         }
 
                         // Parse OpeningCost
@@ -739,6 +1097,12 @@ namespace PosBranch_Win.Utilities
                             {
                                 hasErrors = true;
                                 errorMessage += $"Invalid Opening Cost for Item ID {itemId}\n";
+                                continue;
+                            }
+                            if (openingCost < 0)
+                            {
+                                hasErrors = true;
+                                errorMessage += $"Negative Opening Cost ({openingCost}) is not allowed for Item ID {itemId}\n";
                                 continue;
                             }
                         }
@@ -761,6 +1125,8 @@ namespace PosBranch_Win.Utilities
                             var openingStockItem = new OpeningStockModel
                             {
                                 ItemId = itemId,
+                                ItemNo = row["ItemNo"]?.ToString() ?? "",
+                                BarCode = row["BarCode"]?.ToString() ?? "",
                                 Description = row["ItemName"].ToString(),
                                 Unit = row["Unit"].ToString(),
                                 UnitId = Convert.ToInt32(row["UnitId"]),
@@ -785,6 +1151,7 @@ namespace PosBranch_Win.Utilities
                 if (hasErrors)
                 {
                     MessageBox.Show("Validation errors found:\n" + errorMessage, "Validation Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
                 }
 
                 if (itemsToSave.Count == 0)
@@ -818,6 +1185,7 @@ namespace PosBranch_Win.Utilities
 
                 if (saveResult == "Success")
                 {
+                    _isDirty = false;
                     MessageBox.Show($"Successfully saved opening stock for {itemsToSave.Count} item(s)!", "Save Successful", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     // Refresh data
                     LoadItems();
@@ -835,14 +1203,13 @@ namespace PosBranch_Win.Utilities
         }
 
         /// <summary>
-        /// Refresh data
+        /// Refresh / Clear data
         /// </summary>
         private void lblRefresh_Click(object sender, EventArgs e)
         {
             try
             {
-                txtSearch.Clear();
-                LoadItems();
+                ResetFiltersAndReload();
                 MessageBox.Show("Data refreshed successfully!", "Refresh", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)

@@ -2655,6 +2655,13 @@ namespace PosBranch_Win
                         saved = true;
                     }
 
+                    // 3. frmOpeningStock - explicit SaveRecord
+                    if (!saved && activeForm is Utilities.frmOpeningStock openingStock)
+                    {
+                        openingStock.SaveRecord();
+                        saved = true;
+                    }
+
                     // 2. Generic fallback: try public Save(), SaveRecord(), or SaveData() methods FIRST
                     if (!saved)
                     {
@@ -2734,6 +2741,12 @@ namespace PosBranch_Win
                 {
                     Form activeForm = GetActiveTabForm();
                     if (activeForm == null || activeForm.IsDisposed) return;
+
+                    if (toolKey == "Clear" && activeForm is Utilities.frmOpeningStock openingStock)
+                    {
+                        openingStock.RibbonClear();
+                        return;
+                    }
 
                     string[] candidateMethods = new string[0];
                     if (toolKey == "Clear")
@@ -3247,7 +3260,7 @@ namespace PosBranch_Win
             if (e.Tool.Key == "OpeningStock")
             {
                 Utilities.frmOpeningStock frmOpnstk = new Utilities.frmOpeningStock();
-                OpenFormInTab(frmOpnstk, "OpeningStock");
+                OpenFormInTabSafe(frmOpnstk, "Opening Stock");
             }
             if (e.Tool.Key == "BtnClosing")
             {
