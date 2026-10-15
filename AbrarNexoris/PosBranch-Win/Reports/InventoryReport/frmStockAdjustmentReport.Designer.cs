@@ -38,6 +38,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             this.btnPrint = new Infragistics.Win.Misc.UltraButton();
             this.btnClose = new Infragistics.Win.Misc.UltraButton();
             this.panelGrid = new Infragistics.Win.Misc.UltraPanel();
+            this.ultraPanelGridFooter = new Infragistics.Win.Misc.UltraPanel();
             this.gridReport = new Infragistics.Win.UltraWinGrid.UltraGrid();
             this.panelSummary = new Infragistics.Win.Misc.UltraPanel();
             this.cardDocCount = new Infragistics.Win.Misc.UltraPanel();
@@ -60,6 +61,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             ((System.ComponentModel.ISupportInitialize)(this.txtSearch)).BeginInit();
             this.panelGrid.ClientArea.SuspendLayout();
             this.panelGrid.SuspendLayout();
+            this.ultraPanelGridFooter.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.gridReport)).BeginInit();
             this.panelSummary.ClientArea.SuspendLayout();
             this.panelSummary.SuspendLayout();
@@ -229,20 +231,29 @@ namespace PosBranch_Win.Reports.InventoryReport
             // 
             // panelGrid.ClientArea
             // 
+            this.panelGrid.ClientArea.Controls.Add(this.ultraPanelGridFooter);
             this.panelGrid.ClientArea.Controls.Add(this.gridReport);
             this.panelGrid.Dock = System.Windows.Forms.DockStyle.Fill;
             this.panelGrid.Location = new System.Drawing.Point(0, 64);
             this.panelGrid.Name = "panelGrid";
-            this.panelGrid.Padding = new System.Windows.Forms.Padding(15, 10, 15, 10);
+            this.panelGrid.Padding = new System.Windows.Forms.Padding(0);
             this.panelGrid.Size = new System.Drawing.Size(1250, 565);
             this.panelGrid.TabIndex = 0;
+            // 
+            // ultraPanelGridFooter
+            // 
+            this.ultraPanelGridFooter.Dock = System.Windows.Forms.DockStyle.Bottom;
+            this.ultraPanelGridFooter.Location = new System.Drawing.Point(0, 539);
+            this.ultraPanelGridFooter.Name = "ultraPanelGridFooter";
+            this.ultraPanelGridFooter.Size = new System.Drawing.Size(1250, 26);
+            this.ultraPanelGridFooter.TabIndex = 1;
             // 
             // gridReport
             // 
             this.gridReport.Dock = System.Windows.Forms.DockStyle.Fill;
             this.gridReport.Location = new System.Drawing.Point(0, 0);
             this.gridReport.Name = "gridReport";
-            this.gridReport.Size = new System.Drawing.Size(1250, 565);
+            this.gridReport.Size = new System.Drawing.Size(1250, 539);
             this.gridReport.TabIndex = 0;
             // 
             // panelSummary
@@ -406,6 +417,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             ((System.ComponentModel.ISupportInitialize)(this.txtSearch)).EndInit();
             this.panelGrid.ClientArea.ResumeLayout(false);
             this.panelGrid.ResumeLayout(false);
+            this.ultraPanelGridFooter.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.gridReport)).EndInit();
             this.panelSummary.ClientArea.ResumeLayout(false);
             this.panelSummary.ResumeLayout(false);
@@ -440,6 +452,7 @@ namespace PosBranch_Win.Reports.InventoryReport
         private Infragistics.Win.Misc.UltraButton btnPrint;
         private Infragistics.Win.Misc.UltraButton btnClose;
         private Infragistics.Win.Misc.UltraPanel panelGrid;
+        private Infragistics.Win.Misc.UltraPanel ultraPanelGridFooter;
         private Infragistics.Win.UltraWinGrid.UltraGrid gridReport;
         private Infragistics.Win.Misc.UltraPanel panelSummary;
         private Infragistics.Win.Misc.UltraPanel cardDocCount;
