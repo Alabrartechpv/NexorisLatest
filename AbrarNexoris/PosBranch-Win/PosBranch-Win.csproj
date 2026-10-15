@@ -1234,6 +1234,12 @@
     <Compile Include="Reports\SalesReports\frmSalesDetailsReport.Designer.cs">
       <DependentUpon>frmSalesDetailsReport.cs</DependentUpon>
     </Compile>
+    <Compile Include="Reports\SalesReports\salesauditreport.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Reports\SalesReports\salesauditreport.Designer.cs">
+      <DependentUpon>salesauditreport.cs</DependentUpon>
+    </Compile>
     <Compile Include="Reports\SalesReports\frmSales_RPT.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -1890,6 +1896,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Reports\SalesReports\frmSalesDetailsReport.resx">
       <DependentUpon>frmSalesDetailsReport.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Reports\SalesReports\salesauditreport.resx">
+      <DependentUpon>salesauditreport.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Reports\SalesReports\frmSalesmanIncentiveReport.resx">
       <DependentUpon>frmSalesmanIncentiveReport.cs</DependentUpon>
