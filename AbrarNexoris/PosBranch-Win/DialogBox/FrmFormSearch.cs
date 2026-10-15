@@ -133,6 +133,11 @@ namespace PosBranch_Win.DialogBox
             if (string.Equals(name, "FrmCustomer", StringComparison.OrdinalIgnoreCase)) return "Customer Master";
             if (string.Equals(name, "FrmRolePermissions", StringComparison.OrdinalIgnoreCase)) return "Role Permissions";
             if (string.Equals(name, "FrmUserActivityLog", StringComparison.OrdinalIgnoreCase)) return "User Activity Log";
+            if (string.Equals(name, "frmpurchaseAuditreport", StringComparison.OrdinalIgnoreCase)) return "Purchase Audit Report";
+            if (string.Equals(name, "purchasereturnauditreport", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(name, "frmpurchasereturnauditreport", StringComparison.OrdinalIgnoreCase)) return "Purchase Return Audit Report";
+            if (string.Equals(name, "stockadjustmentauditreport", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(name, "frmstockadjustmentauditreport", StringComparison.OrdinalIgnoreCase)) return "Stock Adjustment Audit Report";
 
             // Strip leading 'frm' or 'Frm'
             if (name.StartsWith("frm", StringComparison.OrdinalIgnoreCase) && name.Length > 3)

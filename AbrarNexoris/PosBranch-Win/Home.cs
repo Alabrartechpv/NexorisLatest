@@ -70,6 +70,7 @@ namespace PosBranch_Win
             new ReportNavigatorDefinition("Item", "Stock Valuation Report", "StockValuationReport"),
             new ReportNavigatorDefinition("Item", "Low Stock Alert Report", "LowStockAlertReport"),
             new ReportNavigatorDefinition("Item", "Stock Adjustment Report", "StockAdjustmentReport"),
+            new ReportNavigatorDefinition("Item", "Stock Adjustment Audit Report", "StockAdjustmentAuditReport"),
             new ReportNavigatorDefinition("Item", "Inactive Items Report", "InactiveItemsReport"),
             new ReportNavigatorDefinition("Sales", "Sales Details", "Sales Details"),
             new ReportNavigatorDefinition("Sales", "Item-wise Sales Summary", "ItemwiseSalesSummaryReport"),
@@ -82,7 +83,9 @@ namespace PosBranch_Win
             new ReportNavigatorDefinition("Sales", "Daily Sales", "DSales"),
             new ReportNavigatorDefinition("Sales", "Counter Report", "CounterReport"),
             new ReportNavigatorDefinition("Purchase", "Purchase Details", "Purchase Details"),
+            new ReportNavigatorDefinition("Purchase", "Purchase Audit Report", "PurchaseAuditReport"),
             new ReportNavigatorDefinition("Purchase", "Purchase Return Report", "PurchaseReturn"),
+            new ReportNavigatorDefinition("Purchase", "Purchase Return Audit Report", "PurchaseReturnAuditReport"),
             new ReportNavigatorDefinition("Purchase", "Vendor Purchase Report", "VendorPurchaseReport"),
             new ReportNavigatorDefinition("Customer", "Customer Outstanding Listing", "CustomerOutstandingReport"),
             new ReportNavigatorDefinition("Customer", "Customer Receipt Report", "CustomerReceiptReport"),
@@ -3345,6 +3348,16 @@ namespace PosBranch_Win
                 Reports.PurchaseReports.frmvendorpurchasereport vendorPurchaseReport = new Reports.PurchaseReports.frmvendorpurchasereport();
                 OpenFormInTab(vendorPurchaseReport, "Vendor Purchase Report");
             }
+            if (e.Tool.Key == "PurchaseAuditReport")
+            {
+                Reports.PurchaseReports.frmpurchaseAuditreport purchaseAuditReport = new Reports.PurchaseReports.frmpurchaseAuditreport();
+                OpenFormInTab(purchaseAuditReport, "Purchase Audit Report");
+            }
+            if (e.Tool.Key == "PurchaseReturnAuditReport")
+            {
+                Reports.PurchaseReports.purchasereturnauditreport returnAuditReport = new Reports.PurchaseReports.purchasereturnauditreport();
+                OpenFormInTab(returnAuditReport, "Purchase Return Audit Report");
+            }
             if (e.Tool.Key == "AuditTrail")
             {
                 Reports.AuditReport.frmAuditReport frmAuditTrail = new Reports.AuditReport.frmAuditReport();
@@ -3380,6 +3393,11 @@ namespace PosBranch_Win
             {
                 Reports.InventoryReport.frmStockAdjustmentReport frmStockAdjustment = new Reports.InventoryReport.frmStockAdjustmentReport();
                 OpenFormInTab(frmStockAdjustment, "Stock Adjustment Report");
+            }
+            if (e.Tool.Key == "StockAdjustmentAuditReport")
+            {
+                Reports.InventoryReport.stockadjustmentauditreport frmStockAdjustmentAudit = new Reports.InventoryReport.stockadjustmentauditreport();
+                OpenFormInTab(frmStockAdjustmentAudit, "Stock Adjustment Audit Report");
             }
             if (e.Tool.Key == "InactiveItemsReport")
             {
@@ -5808,13 +5826,16 @@ namespace PosBranch_Win
                 if (ultraToolbarsManager1.Tools.Exists(keyToExecute) ||
                     keyToExecute == "AuditTrail" ||
                     keyToExecute == "VendorPurchaseReport" ||
-                    keyToExecute == "VendorPaymentReport" ||
+                    keyToExecute == "PurchaseAuditReport" ||
+                    keyToExecute == "PurchaseReturnAuditReport" ||
                     keyToExecute == "VendorDNPaymentReport" ||
+                    keyToExecute == "VendorPaymentReport" ||
                     keyToExecute == "CustomerReceiptReport" ||
                     keyToExecute == "CustomerLedgerReport" ||
                     keyToExecute == "StockValuationReport" ||
                     keyToExecute == "LowStockAlertReport" ||
                     keyToExecute == "StockAdjustmentReport" ||
+                    keyToExecute == "StockAdjustmentAuditReport" ||
                     keyToExecute == "InactiveItemsReport" ||
                     keyToExecute == "CustomerwiseSalesSummaryReport" ||
                     keyToExecute == "SalesmanwiseSalesSummaryReport" ||

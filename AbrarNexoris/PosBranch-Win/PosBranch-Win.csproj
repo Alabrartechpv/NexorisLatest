@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -1222,6 +1222,18 @@
     <Compile Include="Reports\PurchaseReports\frmvendorpurchasereport.Designer.cs">
       <DependentUpon>frmvendorpurchasereport.cs</DependentUpon>
     </Compile>
+    <Compile Include="Reports\PurchaseReports\frmpurchaseAuditreport.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Reports\PurchaseReports\frmpurchaseAuditreport.Designer.cs">
+      <DependentUpon>frmpurchaseAuditreport.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Reports\PurchaseReports\purchasereturnauditreport.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Reports\PurchaseReports\purchasereturnauditreport.Designer.cs">
+      <DependentUpon>purchasereturnauditreport.cs</DependentUpon>
+    </Compile>
     <Compile Include="Reports\SalesReports\frmSalesDetailsReport.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -1266,6 +1278,12 @@
     </Compile>
     <Compile Include="Reports\InventoryReport\frmStockAdjustmentReport.Designer.cs">
       <DependentUpon>frmStockAdjustmentReport.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Reports\InventoryReport\stockadjustmentauditreport.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Reports\InventoryReport\stockadjustmentauditreport.Designer.cs">
+      <DependentUpon>stockadjustmentauditreport.cs</DependentUpon>
     </Compile>
     <Compile Include="Reports\InventoryReport\frmInactiveItemsReport.cs">
       <SubType>Form</SubType>
@@ -1858,6 +1876,9 @@
     <EmbeddedResource Include="Reports\InventoryReport\frmStockAdjustmentReport.resx">
       <DependentUpon>frmStockAdjustmentReport.cs</DependentUpon>
     </EmbeddedResource>
+    <EmbeddedResource Include="Reports\InventoryReport\stockadjustmentauditreport.resx">
+      <DependentUpon>stockadjustmentauditreport.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="Reports\InventoryReport\frmInactiveItemsReport.resx">
       <DependentUpon>frmInactiveItemsReport.cs</DependentUpon>
     </EmbeddedResource>
@@ -1869,6 +1890,12 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Reports\PurchaseReports\frmvendorpurchasereport.resx">
       <DependentUpon>frmvendorpurchasereport.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Reports\PurchaseReports\frmpurchaseAuditreport.resx">
+      <DependentUpon>frmpurchaseAuditreport.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Reports\PurchaseReports\purchasereturnauditreport.resx">
+      <DependentUpon>purchasereturnauditreport.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Reports\SalesReports\frmSalesDetailsReport.resx">
       <DependentUpon>frmSalesDetailsReport.cs</DependentUpon>
