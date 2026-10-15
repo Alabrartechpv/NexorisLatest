@@ -111,12 +111,14 @@ namespace Repository
                     }
                     else
                     {
-                        // Record doesn't exist - INSERT using stored procedure
+                        // Record doesn't exist - INSERT using POS_ItemMasterPriceSettings stored procedure
                         using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_ItemMasterPriceSettings, (SqlConnection)DataConnection, (SqlTransaction)transaction))
                         {
                             cmd.CommandType = CommandType.StoredProcedure;
+
                             cmd.Parameters.AddWithValue("@ItemId", item.ItemId);
                             cmd.Parameters.AddWithValue("@CompanyId", companyId);
+                            cmd.Parameters.AddWithValue("@CompanyName", DBNull.Value);
                             cmd.Parameters.AddWithValue("@BranchId", branchId);
                             cmd.Parameters.AddWithValue("@BranchName", DBNull.Value);
                             cmd.Parameters.AddWithValue("@FinYearId", finYearId);
@@ -133,10 +135,10 @@ namespace Repository
                             cmd.Parameters.AddWithValue("@MRP", 0);
                             cmd.Parameters.AddWithValue("@MinPrice", DBNull.Value);
                             cmd.Parameters.AddWithValue("@StaffPrice", DBNull.Value);
-                            cmd.Parameters.AddWithValue("@MDWalkinPrice", DBNull.Value);
+                            cmd.Parameters.AddWithValue("@WStaffPrice", DBNull.Value);
                             cmd.Parameters.AddWithValue("@MDRetailPrice", DBNull.Value);
+                            cmd.Parameters.AddWithValue("@MDWholeSalePrice", DBNull.Value);
                             cmd.Parameters.AddWithValue("@MDCreditPrice", DBNull.Value);
-                            cmd.Parameters.AddWithValue("@MDMrpPrice", DBNull.Value);
                             cmd.Parameters.AddWithValue("@MDCardPrice", DBNull.Value);
                             cmd.Parameters.AddWithValue("@MDStaffPrice", DBNull.Value);
                             cmd.Parameters.AddWithValue("@MDMinPrice", DBNull.Value);
@@ -182,6 +184,41 @@ namespace Repository
                             }
                         }
                     }
+                }
+
+                // Automatically sync total opening inventory value to LedgerMaster:
+                // Debit: STOCK IN HAND (Asset), Credit: OPENING STOCK RESERVE (Capital Equity)
+                string syncLedgersSql = @"
+                    DECLARE @TotalVal DECIMAL(18,4) = 0;
+                    SELECT @TotalVal = ISNULL(SUM(ISNULL(OpnValue, OpnStk * ISNULL(OpeningCost, Cost))), 0)
+                    FROM PriceSettings 
+                    WHERE BranchId = @BranchId AND IsBaseUnit = 'Y';
+
+                    -- 1. Update STOCK IN HAND Opening Debit
+                    UPDATE LedgerMaster 
+                    SET OpnDebit = @TotalVal, OpnCredit = 0
+                    WHERE LedgerName = 'STOCK IN HAND' AND BranchID = @BranchId;
+
+                    -- 2. Ensure OPENING STOCK RESERVE exists and update Opening Credit
+                    IF NOT EXISTS (SELECT 1 FROM LedgerMaster WHERE LedgerName = 'OPENING STOCK RESERVE' AND BranchID = @BranchId)
+                    BEGIN
+                        DECLARE @NewLedgerID INT;
+                        SELECT @NewLedgerID = ISNULL(MAX(LedgerID), 0) + 1 FROM LedgerMaster;
+                        INSERT INTO LedgerMaster (CompanyID, BranchID, LedgerID, LedgerName, GroupID, OpnDebit, OpnCredit, InventoryValuesAffected, Notes)
+                        VALUES (@CompanyId, @BranchId, @NewLedgerID, 'OPENING STOCK RESERVE', 1, 0, @TotalVal, 0, 'Automatic Opening Stock Equity Reserve for store inventory');
+                    END
+                    ELSE
+                    BEGIN
+                        UPDATE LedgerMaster 
+                        SET OpnCredit = @TotalVal, OpnDebit = 0
+                        WHERE LedgerName = 'OPENING STOCK RESERVE' AND BranchID = @BranchId;
+                    END";
+
+                using (SqlCommand syncCmd = new SqlCommand(syncLedgersSql, (SqlConnection)DataConnection, (SqlTransaction)transaction))
+                {
+                    syncCmd.Parameters.AddWithValue("@BranchId", branchId);
+                    syncCmd.Parameters.AddWithValue("@CompanyId", companyId);
+                    syncCmd.ExecuteNonQuery();
                 }
 
                 transaction.Commit();

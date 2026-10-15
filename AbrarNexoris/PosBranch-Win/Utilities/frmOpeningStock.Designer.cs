@@ -1,4 +1,4 @@
-﻿
+
 namespace PosBranch_Win.Utilities
 {
     partial class frmOpeningStock
@@ -47,6 +47,7 @@ namespace PosBranch_Win.Utilities
             this.ultraPanelGroup = new Infragistics.Win.Misc.UltraPanel();
             this.cmbGroup = new System.Windows.Forms.ComboBox();
             this.lblGroup = new System.Windows.Forms.Label();
+            this.chkStockOnly = new System.Windows.Forms.CheckBox();
             this.ultraPanelButtons = new Infragistics.Win.Misc.UltraPanel();
             this.ultraPanelLoadItems = new Infragistics.Win.Misc.UltraPanel();
             this.lblLoadItems = new System.Windows.Forms.Label();
@@ -106,7 +107,7 @@ namespace PosBranch_Win.Utilities
             | System.Windows.Forms.AnchorStyles.Right)));
             this.ultraGrid1.Location = new System.Drawing.Point(20, 123);
             this.ultraGrid1.Name = "ultraGrid1";
-            this.ultraGrid1.Size = new System.Drawing.Size(1095, 317);
+            this.ultraGrid1.Size = new System.Drawing.Size(1095, 360);
             this.ultraGrid1.TabIndex = 1;
             this.ultraGrid1.Text = "Opening Stock Items";
             // 
@@ -117,7 +118,7 @@ namespace PosBranch_Win.Utilities
             this.lblRecordCount.BackColor = System.Drawing.Color.Transparent;
             this.lblRecordCount.Font = new System.Drawing.Font("Microsoft Sans Serif", 10F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.lblRecordCount.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(116)))), ((int)(((byte)(217)))));
-            this.lblRecordCount.Location = new System.Drawing.Point(20, 450);
+            this.lblRecordCount.Location = new System.Drawing.Point(20, 495);
             this.lblRecordCount.Name = "lblRecordCount";
             this.lblRecordCount.Size = new System.Drawing.Size(113, 17);
             this.lblRecordCount.TabIndex = 4;
@@ -199,6 +200,7 @@ namespace PosBranch_Win.Utilities
             // 
             this.ultraPanelGroup.ClientArea.Controls.Add(this.cmbGroup);
             this.ultraPanelGroup.ClientArea.Controls.Add(this.lblGroup);
+            this.ultraPanelGroup.ClientArea.Controls.Add(this.chkStockOnly);
             this.ultraPanelGroup.Location = new System.Drawing.Point(640, 65);
             this.ultraPanelGroup.Name = "ultraPanelGroup";
             this.ultraPanelGroup.Size = new System.Drawing.Size(475, 45);
@@ -209,9 +211,9 @@ namespace PosBranch_Win.Utilities
             this.cmbGroup.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList;
             this.cmbGroup.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
             this.cmbGroup.FormattingEnabled = true;
-            this.cmbGroup.Location = new System.Drawing.Point(90, 9);
+            this.cmbGroup.Location = new System.Drawing.Point(80, 9);
             this.cmbGroup.Name = "cmbGroup";
-            this.cmbGroup.Size = new System.Drawing.Size(370, 28);
+            this.cmbGroup.Size = new System.Drawing.Size(205, 28);
             this.cmbGroup.TabIndex = 1;
             this.cmbGroup.SelectedIndexChanged += new System.EventHandler(this.cmbGroup_SelectedIndexChanged);
             // 
@@ -226,6 +228,21 @@ namespace PosBranch_Win.Utilities
             this.lblGroup.Size = new System.Drawing.Size(55, 18);
             this.lblGroup.TabIndex = 0;
             this.lblGroup.Text = "Group";
+            // 
+            // chkStockOnly
+            // 
+            this.chkStockOnly.AutoSize = true;
+            this.chkStockOnly.BackColor = System.Drawing.Color.Transparent;
+            this.chkStockOnly.Cursor = System.Windows.Forms.Cursors.Hand;
+            this.chkStockOnly.Font = new System.Drawing.Font("Segoe UI", 9.5F, System.Drawing.FontStyle.Bold);
+            this.chkStockOnly.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(30)))), ((int)(((byte)(41)))), ((int)(((byte)(59)))));
+            this.chkStockOnly.Location = new System.Drawing.Point(295, 12);
+            this.chkStockOnly.Name = "chkStockOnly";
+            this.chkStockOnly.Size = new System.Drawing.Size(165, 21);
+            this.chkStockOnly.TabIndex = 2;
+            this.chkStockOnly.Text = "Stocked Only (Qty > 0)";
+            this.chkStockOnly.UseVisualStyleBackColor = false;
+            this.chkStockOnly.CheckedChanged += new System.EventHandler(this.chkStockOnly_CheckedChanged);
             // 
             // ultraPanelButtons
             // 
@@ -244,6 +261,7 @@ namespace PosBranch_Win.Utilities
             this.ultraPanelButtons.Name = "ultraPanelButtons";
             this.ultraPanelButtons.Size = new System.Drawing.Size(551, 60);
             this.ultraPanelButtons.TabIndex = 3;
+            this.ultraPanelButtons.Visible = false;
             // 
             // ultraPanelLoadItems
             // 
@@ -373,6 +391,7 @@ namespace PosBranch_Win.Utilities
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "Opening Stock Entry";
             this.WindowState = System.Windows.Forms.FormWindowState.Maximized;
+            this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.frmOpeningStock_FormClosing);
             this.Load += new System.EventHandler(this.frmOpeningStock_Load);
             this.ultraPanelMain.ClientArea.ResumeLayout(false);
             this.ultraPanelMain.ClientArea.PerformLayout();
@@ -422,5 +441,6 @@ namespace PosBranch_Win.Utilities
         private Infragistics.Win.Misc.UltraPanel ultraPanelGroup;
         private System.Windows.Forms.ComboBox cmbGroup;
         private System.Windows.Forms.Label lblGroup;
+        private System.Windows.Forms.CheckBox chkStockOnly;
     }
 }

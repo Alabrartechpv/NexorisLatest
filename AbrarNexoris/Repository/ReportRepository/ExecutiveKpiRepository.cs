@@ -166,14 +166,14 @@ namespace Repository.ReportRepository
                             model.ManualBalanceCount = GetInt(r, "ManualBalanceCount");
 
                             // 9. Cash In & Cash Out Flow
-                            model.TotalCashIn = GetDecimal(r, "TotalCashIn");
-                            model.TotalCashOut = GetDecimal(r, "TotalCashOut");
+                            model.TotalCashIn = r.Table.Columns.Contains("TotalCashIn") ? GetDecimal(r, "TotalCashIn") : GetDecimal(r, "CashInTotal");
+                            model.TotalCashOut = r.Table.Columns.Contains("TotalCashOut") ? GetDecimal(r, "TotalCashOut") : GetDecimal(r, "CashOutTotal");
                             model.NetCashFlow = GetDecimal(r, "NetCashFlow");
-                            model.VendorPaymentsCompleted = GetDecimal(r, "VendorPaymentsCompleted");
-                            model.CustomerReceiptsCollected = GetDecimal(r, "CustomerReceiptsCollected");
-                            model.CounterCashSales = GetDecimal(r, "CounterCashSales");
-                            model.DigitalSales = GetDecimal(r, "DigitalSales");
-                            model.CashPurchasesPaid = GetDecimal(r, "CashPurchasesPaid");
+                            model.VendorPaymentsCompleted = r.Table.Columns.Contains("VendorPaymentsCompleted") ? GetDecimal(r, "VendorPaymentsCompleted") : GetDecimal(r, "CashOutVendorPayments");
+                            model.CustomerReceiptsCollected = r.Table.Columns.Contains("CustomerReceiptsCollected") ? GetDecimal(r, "CustomerReceiptsCollected") : GetDecimal(r, "CashInCustomerReceipts");
+                            model.CounterCashSales = r.Table.Columns.Contains("CounterCashSales") ? GetDecimal(r, "CounterCashSales") : GetDecimal(r, "CashInCounterCash");
+                            model.DigitalSales = r.Table.Columns.Contains("DigitalSales") ? GetDecimal(r, "DigitalSales") : GetDecimal(r, "CashInCounterDigital");
+                            model.CashPurchasesPaid = r.Table.Columns.Contains("CashPurchasesPaid") ? GetDecimal(r, "CashPurchasesPaid") : GetDecimal(r, "CashOutCashPurchases");
                         }
 
                         // Result Set 2: Monthly Growth Matrix

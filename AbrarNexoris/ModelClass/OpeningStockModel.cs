@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -10,6 +10,8 @@ namespace ModelClass
     {
         public int BranchId { get; set; }
         public int ItemId { get; set; }
+        public string ItemNo { get; set; }
+        public string BarCode { get; set; }
         public string Description { get; set; }
         public int GroupId { get; set; }
         public string GroupName { get; set; }
