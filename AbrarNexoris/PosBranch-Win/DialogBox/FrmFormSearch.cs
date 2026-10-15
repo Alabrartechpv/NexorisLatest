@@ -140,6 +140,8 @@ namespace PosBranch_Win.DialogBox
                 string.Equals(name, "frmstockadjustmentauditreport", StringComparison.OrdinalIgnoreCase)) return "Stock Adjustment Audit Report";
             if (string.Equals(name, "salesauditreport", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(name, "frmsalesauditreport", StringComparison.OrdinalIgnoreCase)) return "Sales Audit Report";
+            if (string.Equals(name, "salesreturnauditreport", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(name, "frmsalesreturnauditreport", StringComparison.OrdinalIgnoreCase)) return "Sales Return Audit Report";
 
             // Strip leading 'frm' or 'Frm'
             if (name.StartsWith("frm", StringComparison.OrdinalIgnoreCase) && name.Length > 3)

@@ -1240,6 +1240,12 @@
     <Compile Include="Reports\SalesReports\salesauditreport.Designer.cs">
       <DependentUpon>salesauditreport.cs</DependentUpon>
     </Compile>
+    <Compile Include="Reports\SalesReports\salesreturnauditreport.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Reports\SalesReports\salesreturnauditreport.Designer.cs">
+      <DependentUpon>salesreturnauditreport.cs</DependentUpon>
+    </Compile>
     <Compile Include="Reports\SalesReports\frmSales_RPT.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -1899,6 +1905,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Reports\SalesReports\salesauditreport.resx">
       <DependentUpon>salesauditreport.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Reports\SalesReports\salesreturnauditreport.resx">
+      <DependentUpon>salesreturnauditreport.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Reports\SalesReports\frmSalesmanIncentiveReport.resx">
       <DependentUpon>frmSalesmanIncentiveReport.cs</DependentUpon>
