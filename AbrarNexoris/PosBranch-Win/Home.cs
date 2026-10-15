@@ -73,6 +73,7 @@ namespace PosBranch_Win
             new ReportNavigatorDefinition("Item", "Stock Adjustment Audit Report", "StockAdjustmentAuditReport"),
             new ReportNavigatorDefinition("Item", "Inactive Items Report", "InactiveItemsReport"),
             new ReportNavigatorDefinition("Sales", "Sales Details", "Sales Details"),
+            new ReportNavigatorDefinition("Sales", "Sales Audit Report", "SalesAuditReport"),
             new ReportNavigatorDefinition("Sales", "Item-wise Sales Summary", "ItemwiseSalesSummaryReport"),
             new ReportNavigatorDefinition("Sales", "Customer-wise Sales Summary", "CustomerwiseSalesSummaryReport"),
             new ReportNavigatorDefinition("Sales", "Salesman-wise Sales Summary", "SalesmanwiseSalesSummaryReport"),
@@ -3345,6 +3346,11 @@ namespace PosBranch_Win
                 Reports.PurchaseReports.purchasereturnauditreport returnAuditReport = new Reports.PurchaseReports.purchasereturnauditreport();
                 OpenFormInTab(returnAuditReport, "Purchase Return Audit Report");
             }
+            if (e.Tool.Key == "SalesAuditReport")
+            {
+                Reports.SalesReports.salesauditreport salesAuditReport = new Reports.SalesReports.salesauditreport();
+                OpenFormInTab(salesAuditReport, "Sales Audit Report");
+            }
             if (e.Tool.Key == "AuditTrail")
             {
                 Reports.AuditReport.frmAuditReport frmAuditTrail = new Reports.AuditReport.frmAuditReport();
@@ -5815,6 +5821,7 @@ namespace PosBranch_Win
                     keyToExecute == "VendorPurchaseReport" ||
                     keyToExecute == "PurchaseAuditReport" ||
                     keyToExecute == "PurchaseReturnAuditReport" ||
+                    keyToExecute == "SalesAuditReport" ||
                     keyToExecute == "VendorDNPaymentReport" ||
                     keyToExecute == "VendorPaymentReport" ||
                     keyToExecute == "CustomerReceiptReport" ||

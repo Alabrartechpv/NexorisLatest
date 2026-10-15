@@ -50,9 +50,18 @@ namespace PosBranch_Win.Reports.InventoryReport
         private Infragistics.Win.Misc.UltraLabel lblPeriod;
         private Infragistics.Win.UltraWinEditors.UltraComboEditor comboPeriod;
 
-        private Infragistics.Win.Misc.UltraPanel gridFooterPanel;
-        private readonly Dictionary<string, Label> _footerLabels = new Dictionary<string, Label>();
+        private readonly Dictionary<string, Label> _footerLabels = new Dictionary<string, Label>(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, string> _columnAggregations = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> summaryDefaultNumericColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "SystemStock",
+            "PhysicalStock",
+            "QtyDifference",
+            "StockInQty",
+            "StockOutQty",
+            "Cost",
+            "AdjustmentValue"
+        };
 
         // ─── Column Chooser & Drag-Down to Hide State ────────────────────────────────
         private ListBox columnChooserListBox;
@@ -171,9 +180,14 @@ namespace PosBranch_Win.Reports.InventoryReport
             SetupCardControls(cardNetValue, lblNetValueCaption, lblNetValueValue, "NET ADJUSTMENT VALUE", Color.FromArgb(81, 45, 168));
             LayoutSummaryCards();
 
-            // Register footer cell sync and column drag-to-hide handlers matching frmPurchaseReturn / frmStockReport
+            // Register footer cell sync and column drag-to-hide handlers matching frmVendorOutstandingReport
             gridReport.Resize += (s, e) => UpdateFooterCellPositions();
-            gridReport.AfterColPosChanged += (s, e) => UpdateFooterCellPositions();
+            gridReport.AfterColPosChanged += (s, e) =>
+            {
+                CreateFooterCells();
+                UpdateFooterCellPositions();
+                UpdateFooterValues();
+            };
             gridReport.AfterColRegionScroll += (s, e) => UpdateFooterCellPositions();
             gridReport.AfterRowRegionScroll += (s, e) => UpdateFooterCellPositions();
             gridReport.Paint += (s, e) => UpdateFooterCellPositions();
@@ -183,6 +197,11 @@ namespace PosBranch_Win.Reports.InventoryReport
                 UpdateFooterCellPositions();
             };
             gridReport.AfterSortChange += (s, e) => UpdateFooterValues();
+
+            if (ultraPanelGridFooter != null)
+            {
+                ultraPanelGridFooter.Resize += (s, e) => UpdateFooterCellPositions();
+            }
 
             SetupHeaderDragToHideAndColumnChooser();
             InitializeGridFooter();
@@ -284,8 +303,19 @@ namespace PosBranch_Win.Reports.InventoryReport
             if (panelGrid != null)
             {
                 panelGrid.Appearance.BackColor = FormBackColor;
-                panelGrid.Appearance.BorderColor = BorderBlue;
-                panelGrid.BorderStyle = UIElementBorderStyle.Solid;
+                panelGrid.BorderStyle = UIElementBorderStyle.None;
+                panelGrid.Padding = new Padding(0);
+            }
+
+            if (ultraPanelGridFooter != null)
+            {
+                ultraPanelGridFooter.Appearance.BackColor = GridHeaderBlue;
+                ultraPanelGridFooter.Appearance.BackColor2 = GridHeaderBlue;
+                ultraPanelGridFooter.Appearance.BackGradientStyle = GradientStyle.None;
+                ultraPanelGridFooter.Appearance.BorderColor = GridFooterBorder;
+                ultraPanelGridFooter.BorderStyle = UIElementBorderStyle.Solid;
+                ultraPanelGridFooter.Dock = DockStyle.Bottom;
+                ultraPanelGridFooter.Height = 26;
             }
 
             // Style Labels
@@ -996,33 +1026,35 @@ namespace PosBranch_Win.Reports.InventoryReport
 
         #endregion
 
-        #region GridFooterPanel Dynamic Alignment & Calculation
+        #region Grid Footer Setup & Alignment (Parity with frmVendorOutstandingReport)
 
         private void InitializeGridFooter()
         {
-            if (gridFooterPanel == null && panelGrid != null)
+            if (ultraPanelGridFooter == null) return;
+
+            ultraPanelGridFooter.Appearance.BackColor = GridHeaderBlue;
+            ultraPanelGridFooter.Appearance.BackColor2 = GridHeaderBlue;
+            ultraPanelGridFooter.Appearance.BackGradientStyle = GradientStyle.None;
+            ultraPanelGridFooter.Appearance.BorderColor = GridFooterBorder;
+            ultraPanelGridFooter.BorderStyle = UIElementBorderStyle.Solid;
+            ultraPanelGridFooter.Dock = DockStyle.Bottom;
+            ultraPanelGridFooter.Height = 26;
+
+            _columnAggregations.Clear();
+            foreach (var col in summaryDefaultNumericColumns)
             {
-                gridFooterPanel = new Infragistics.Win.Misc.UltraPanel();
-                gridFooterPanel.Dock = DockStyle.Bottom;
-                gridFooterPanel.Height = 28;
-                gridFooterPanel.Appearance.BackColor = GridHeaderBlue;
-                gridFooterPanel.Appearance.BackColor2 = GridHeaderBlue;
-                gridFooterPanel.Appearance.BackGradientStyle = GradientStyle.None;
-                gridFooterPanel.Appearance.BorderColor = GridFooterBorder;
-                gridFooterPanel.BorderStyle = UIElementBorderStyle.Solid;
-                panelGrid.ClientArea.Controls.Add(gridFooterPanel);
-                gridFooterPanel.BringToFront();
+                _columnAggregations[col] = "Sum";
             }
 
             CreateFooterCells();
             UpdateFooterCellPositions();
-            UpdateFooterValues();
+            UpdateFooterValues(new List<StockAdjustmentReportRow>());
         }
 
         private void CreateFooterCells()
         {
-            if (gridFooterPanel == null) return;
-            gridFooterPanel.ClientArea.Controls.Clear();
+            if (ultraPanelGridFooter == null) return;
+            ultraPanelGridFooter.ClientArea.Controls.Clear();
             _footerLabels.Clear();
 
             if (gridReport.DisplayLayout == null || gridReport.DisplayLayout.Bands.Count == 0)
@@ -1038,31 +1070,37 @@ namespace PosBranch_Win.Reports.InventoryReport
                 if (column.Hidden)
                     continue;
 
+                ContentAlignment align = ContentAlignment.MiddleLeft;
+                if (column.CellAppearance.TextHAlign == HAlign.Right || IsSummableColumn(column))
+                    align = ContentAlignment.MiddleRight;
+                else if (column.CellAppearance.TextHAlign == HAlign.Center)
+                    align = ContentAlignment.MiddleCenter;
+
                 Label footerLabel = new Label
                 {
                     Name = "footer_" + column.Key,
                     Text = string.Empty,
-                    TextAlign = ContentAlignment.MiddleCenter,
+                    TextAlign = align,
                     BackColor = GridHeaderBlue,
                     BorderStyle = BorderStyle.None,
                     AutoSize = false,
                     Width = column.Width,
-                    Height = Math.Max(gridFooterPanel.Height - 2, 20),
+                    Height = Math.Max(ultraPanelGridFooter.Height - 2, 20),
                     Left = xOffset,
                     Top = 1,
                     Tag = Tuple.Create(column.Key, string.Empty),
                     ForeColor = Color.White,
-                    Font = new Font("Microsoft Sans Serif", 8.25F, FontStyle.Regular, GraphicsUnit.Point, 0),
+                    Font = new Font("Microsoft Sans Serif", 8.25F, FontStyle.Bold, GraphicsUnit.Point, 0),
                     ContextMenuStrip = CreateFooterContextMenu(column.Key)
                 };
 
                 footerLabel.Paint += FooterLabel_Paint;
-                gridFooterPanel.ClientArea.Controls.Add(footerLabel);
+                ultraPanelGridFooter.ClientArea.Controls.Add(footerLabel);
                 _footerLabels[column.Key] = footerLabel;
 
                 if (!_columnAggregations.ContainsKey(column.Key))
                 {
-                    _columnAggregations[column.Key] = "None";
+                    _columnAggregations[column.Key] = summaryDefaultNumericColumns.Contains(column.Key) ? "Sum" : "None";
                 }
 
                 xOffset += column.Width;
@@ -1082,64 +1120,43 @@ namespace PosBranch_Win.Reports.InventoryReport
 
         private ContextMenuStrip CreateFooterContextMenu(string columnKey)
         {
-            ContextMenuStrip menu = new ContextMenuStrip();
-            menu.Tag = columnKey;
+            ContextMenuStrip menu = new ContextMenuStrip { Tag = columnKey };
 
             bool isNumeric = gridReport.DisplayLayout.Bands.Count > 0 &&
                              gridReport.DisplayLayout.Bands[0].Columns.Exists(columnKey) &&
                              IsSummableColumn(gridReport.DisplayLayout.Bands[0].Columns[columnKey]);
 
-            ToolStripMenuItem itemSum = new ToolStripMenuItem("Sum");
-            itemSum.Tag = "Sum";
-            itemSum.Enabled = isNumeric;
-            itemSum.Click += FooterContextMenu_Click;
-
-            ToolStripMenuItem itemMin = new ToolStripMenuItem("Min");
-            itemMin.Tag = "Min";
-            itemMin.Click += FooterContextMenu_Click;
-
-            ToolStripMenuItem itemMax = new ToolStripMenuItem("Max");
-            itemMax.Tag = "Max";
-            itemMax.Click += FooterContextMenu_Click;
-
-            ToolStripMenuItem itemCount = new ToolStripMenuItem("Count");
-            itemCount.Tag = "Count";
-            itemCount.Click += FooterContextMenu_Click;
-
-            ToolStripMenuItem itemAverage = new ToolStripMenuItem("Average");
-            itemAverage.Tag = "Avg";
-            itemAverage.Enabled = isNumeric;
-            itemAverage.Click += FooterContextMenu_Click;
-
-            ToolStripMenuItem itemNone = new ToolStripMenuItem("None");
-            itemNone.Tag = "None";
-            itemNone.Click += FooterContextMenu_Click;
-
-            menu.Items.Add(itemSum);
-            menu.Items.Add(itemMin);
-            menu.Items.Add(itemMax);
-            menu.Items.Add(itemCount);
-            menu.Items.Add(itemAverage);
+            AddFooterMenuItem(menu, "Sum", "Sum", isNumeric);
+            AddFooterMenuItem(menu, "Min", "Min", isNumeric);
+            AddFooterMenuItem(menu, "Max", "Max", isNumeric);
+            AddFooterMenuItem(menu, "Count", "Count", true);
+            AddFooterMenuItem(menu, "Average", "Avg", isNumeric);
             menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add(itemNone);
+            AddFooterMenuItem(menu, "None", "None", true);
 
             menu.Opening += (sender, e) =>
             {
-                string currentAggregation = _columnAggregations.ContainsKey(columnKey)
+                string current = _columnAggregations.ContainsKey(columnKey)
                     ? _columnAggregations[columnKey]
-                    : "None";
+                    : (summaryDefaultNumericColumns.Contains(columnKey) ? "Sum" : "None");
 
-                foreach (ToolStripItem menuItem in menu.Items)
+                foreach (ToolStripItem item in menu.Items)
                 {
-                    ToolStripMenuItem toolStripMenuItem = menuItem as ToolStripMenuItem;
-                    if (toolStripMenuItem != null && toolStripMenuItem.Tag != null)
+                    if (item is ToolStripMenuItem menuItem && menuItem.Tag != null)
                     {
-                        toolStripMenuItem.Checked = string.Equals(toolStripMenuItem.Tag.ToString(), currentAggregation, StringComparison.OrdinalIgnoreCase);
+                        menuItem.Checked = string.Equals(menuItem.Tag.ToString(), current, StringComparison.OrdinalIgnoreCase);
                     }
                 }
             };
 
             return menu;
+        }
+
+        private void AddFooterMenuItem(ContextMenuStrip menu, string text, string tag, bool enabled)
+        {
+            ToolStripMenuItem item = new ToolStripMenuItem(text) { Tag = tag, Enabled = enabled };
+            item.Click += FooterContextMenu_Click;
+            menu.Items.Add(item);
         }
 
         private bool IsSummableColumn(UltraGridColumn column)
@@ -1152,30 +1169,23 @@ namespace PosBranch_Win.Reports.InventoryReport
 
         private void FooterContextMenu_Click(object sender, EventArgs e)
         {
-            ToolStripMenuItem item = sender as ToolStripMenuItem;
-            if (item == null)
-                return;
-
-            ContextMenuStrip menu = item.Owner as ContextMenuStrip;
-            if (menu == null || menu.Tag == null || item.Tag == null)
-                return;
-
-            string columnKey = menu.Tag.ToString();
-            string aggregation = item.Tag.ToString();
-
-            _columnAggregations[columnKey] = aggregation;
-            UpdateFooterValues();
+            if (sender is ToolStripMenuItem item && item.Owner is ContextMenuStrip menu && menu.Tag != null && item.Tag != null)
+            {
+                _columnAggregations[menu.Tag.ToString()] = item.Tag.ToString();
+                UpdateFooterValues(gridReport.DataSource as IList<StockAdjustmentReportRow>);
+            }
         }
 
         private void UpdateFooterCellPositions()
         {
-            if (gridReport.DisplayLayout == null || gridReport.DisplayLayout.Bands.Count == 0 || _footerLabels.Count == 0 || gridFooterPanel == null)
+            if (gridReport == null || gridReport.DisplayLayout == null || gridReport.DisplayLayout.Bands.Count == 0 || _footerLabels.Count == 0 || ultraPanelGridFooter == null)
                 return;
 
             UltraGridBand band = gridReport.DisplayLayout.Bands[0];
             int rowSelectorWidth = gridReport.DisplayLayout.Override.RowSelectors == DefaultableBoolean.True
                 ? gridReport.DisplayLayout.Override.RowSelectorWidth
                 : 0;
+
             int scrollOffset = 0;
             if (gridReport.ActiveColScrollRegion != null)
             {
@@ -1197,27 +1207,27 @@ namespace PosBranch_Win.Reports.InventoryReport
                 {
                     left = headerUI.Rect.Left;
                     width = headerUI.Rect.Width;
+                    calculatedX = left + width;
                 }
                 else
                 {
                     left = calculatedX;
                     width = column.Width;
+                    calculatedX += column.Width;
                 }
-
-                calculatedX += column.Width;
 
                 footerLabel.Left = left;
                 footerLabel.Width = width;
-                footerLabel.Top = 0;
-                footerLabel.Height = gridFooterPanel.Height;
-                footerLabel.Visible = (left + width > 0 && left < gridFooterPanel.Width);
+                footerLabel.Top = 1;
+                footerLabel.Height = Math.Max(ultraPanelGridFooter.Height - 2, 20);
+                footerLabel.Visible = (left + width > 0 && left < ultraPanelGridFooter.Width);
                 footerLabel.Invalidate();
             }
         }
 
-        private void UpdateFooterValues()
+        private void UpdateFooterValues(IList<StockAdjustmentReportRow> rows = null)
         {
-            if (_footerLabels.Count == 0)
+            if (_footerLabels.Count == 0 || gridReport.DisplayLayout == null || gridReport.DisplayLayout.Bands.Count == 0)
                 return;
 
             List<UltraGridRow> visibleRows = GetVisibleDataRows().ToList();
@@ -1305,16 +1315,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                 return string.Empty;
 
             if (result == null)
-            {
-                if (string.Equals(aggregation, "Count", StringComparison.OrdinalIgnoreCase))
-                    return "0";
-                if (string.Equals(aggregation, "Sum", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(aggregation, "Avg", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(aggregation, "Min", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(aggregation, "Max", StringComparison.OrdinalIgnoreCase))
-                    return "0.00";
                 return string.Empty;
-            }
 
             if (aggregation == "Count")
                 return Convert.ToString(result);
@@ -1327,10 +1328,16 @@ namespace PosBranch_Win.Reports.InventoryReport
                 decimal? numericValue = GetNumericValue(result);
                 if (numericValue.HasValue)
                 {
+                    string formatted;
                     if (!string.IsNullOrWhiteSpace(column.Format))
-                        return numericValue.Value.ToString(column.Format);
+                        formatted = numericValue.Value.ToString(column.Format);
+                    else
+                        formatted = numericValue.Value.ToString("N2");
 
-                    return numericValue.Value.ToString("N2");
+                    if (aggregation == "Avg") return "Avg: " + formatted;
+                    if (aggregation == "Min") return "Min: " + formatted;
+                    if (aggregation == "Max") return "Max: " + formatted;
+                    return formatted;
                 }
             }
 
@@ -1382,7 +1389,9 @@ namespace PosBranch_Win.Reports.InventoryReport
             _allRows.Clear();
             gridReport.DataSource = null;
             CalculateSummaryValues(new List<StockAdjustmentReportRow>());
-            UpdateFooterValues();
+            CreateFooterCells();
+            UpdateFooterCellPositions();
+            UpdateFooterValues(new List<StockAdjustmentReportRow>());
             lblStatus.Text = "Ready | Select filters and press Search (F5)";
         }
 
@@ -1495,7 +1504,9 @@ namespace PosBranch_Win.Reports.InventoryReport
 
             gridReport.DataSource = filtered;
             CalculateSummaryValues(filtered);
-            UpdateFooterValues();
+            CreateFooterCells();
+            UpdateFooterCellPositions();
+            UpdateFooterValues(filtered);
             lblStatus.Text = $"Ready | Found {filtered.Count} records.";
         }
 
