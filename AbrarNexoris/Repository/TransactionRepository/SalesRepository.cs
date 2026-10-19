@@ -197,8 +197,10 @@ namespace Repository.TransactionRepository
                         cmd.Parameters.AddWithValue("_Operation", sales._Operation);
 
                         // Set default values for required parameters that aren't in our C# model
-                        cmd.Parameters.AddWithValue("CounterId", SessionContext.CounterId);
-                        cmd.Parameters.AddWithValue("CounterSessionId", SessionContext.CounterSessionId);
+                        int effectiveCounterId = SessionContext.CounterId > 0 ? SessionContext.CounterId : (sales.CounterId > 0 ? sales.CounterId : 1);
+                        long effectiveCounterSessionId = SessionContext.CounterSessionId > 0 ? SessionContext.CounterSessionId : (sales.CounterSessionId > 0 ? sales.CounterSessionId : 0);
+                        cmd.Parameters.AddWithValue("CounterId", effectiveCounterId);
+                        cmd.Parameters.AddWithValue("CounterSessionId", effectiveCounterSessionId);
                         cmd.Parameters.AddWithValue("Freight", 0);
                         cmd.Parameters.AddWithValue("FreightProfit", 0);
                         cmd.Parameters.AddWithValue("PaymodeLedgerId", sales.PaymodeLedgerId);
@@ -785,8 +787,10 @@ namespace Repository.TransactionRepository
                         cmd.Parameters.AddWithValue("_Operation", sales._Operation);
 
                         // Set default values for required parameters that aren't in our C# model
-                        cmd.Parameters.AddWithValue("CounterId", SessionContext.CounterId);
-                        cmd.Parameters.AddWithValue("CounterSessionId", SessionContext.CounterSessionId);
+                        int effectiveCounterId = SessionContext.CounterId > 0 ? SessionContext.CounterId : (sales.CounterId > 0 ? sales.CounterId : 1);
+                        long effectiveCounterSessionId = SessionContext.CounterSessionId > 0 ? SessionContext.CounterSessionId : (sales.CounterSessionId > 0 ? sales.CounterSessionId : 0);
+                        cmd.Parameters.AddWithValue("CounterId", effectiveCounterId);
+                        cmd.Parameters.AddWithValue("CounterSessionId", effectiveCounterSessionId);
                         cmd.Parameters.AddWithValue("Freight", 0);
                         cmd.Parameters.AddWithValue("FreightProfit", 0);
                         cmd.Parameters.AddWithValue("PaymodeLedgerId", sales.PaymodeLedgerId);
@@ -1309,8 +1313,10 @@ namespace Repository.TransactionRepository
                 parameters.Add("_Operation", sales._Operation);
 
                 // Add default values for parameters not in our model
-                parameters.Add("CounterId", SessionContext.CounterId);
-                parameters.Add("CounterSessionId", SessionContext.CounterSessionId);
+                int effectiveCounterId = SessionContext.CounterId > 0 ? SessionContext.CounterId : (sales.CounterId > 0 ? sales.CounterId : 1);
+                long effectiveCounterSessionId = SessionContext.CounterSessionId > 0 ? SessionContext.CounterSessionId : (sales.CounterSessionId > 0 ? sales.CounterSessionId : 0);
+                parameters.Add("CounterId", effectiveCounterId);
+                parameters.Add("CounterSessionId", effectiveCounterSessionId);
                 parameters.Add("Freight", 0);
                 parameters.Add("FreightProfit", 0);
                 parameters.Add("PaymodeLedgerId", sales.PaymodeLedgerId);

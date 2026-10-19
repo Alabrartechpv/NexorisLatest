@@ -44,11 +44,37 @@ namespace Repository.ReportRepository
                         {
                             foreach (DataRow row in dt.Rows)
                             {
+                                string counterVal = "";
+                                if (row.Table.Columns.Contains("Counter") && row["Counter"] != DBNull.Value && !string.IsNullOrWhiteSpace(row["Counter"].ToString()))
+                                {
+                                    counterVal = row["Counter"].ToString().Trim();
+                                }
+                                else if (row.Table.Columns.Contains("CounterName") && row["CounterName"] != DBNull.Value && !string.IsNullOrWhiteSpace(row["CounterName"].ToString()))
+                                {
+                                    counterVal = row["CounterName"].ToString().Trim();
+                                }
+                                else if (row.Table.Columns.Contains("CounterId") && row["CounterId"] != DBNull.Value && Convert.ToInt32(row["CounterId"]) > 0)
+                                {
+                                    counterVal = $"Counter-{row["CounterId"]}";
+                                }
+                                else if (row.Table.Columns.Contains("CounterID") && row["CounterID"] != DBNull.Value && Convert.ToInt32(row["CounterID"]) > 0)
+                                {
+                                    counterVal = $"Counter-{row["CounterID"]}";
+                                }
+
+                                if (string.IsNullOrWhiteSpace(counterVal))
+                                {
+                                    counterVal = !string.IsNullOrWhiteSpace(SessionContext.CounterName) 
+                                        ? SessionContext.CounterName 
+                                        : (SessionContext.CounterId > 0 ? $"Counter-{SessionContext.CounterId}" : "Counter-1");
+                                }
+
                                 list.Add(new CounterReportModel
                                 {
                                     BillNo = Convert.ToInt64(row["BillNo"]),
                                     BillDate = Convert.ToDateTime(row["BillDate"]),
-                                    Counter = row["Counter"]?.ToString() ?? "",
+                                    CounterId = row.Table.Columns.Contains("CounterId") && row["CounterId"] != DBNull.Value ? Convert.ToInt32(row["CounterId"]) : (SessionContext.CounterId > 0 ? SessionContext.CounterId : 1),
+                                    Counter = counterVal,
                                     UserName = row["UserName"]?.ToString() ?? "",
                                     CustomerName = row["CustomerName"]?.ToString() ?? "",
                                     PaymodeName = row["PaymodeName"]?.ToString() ?? "",
@@ -99,9 +125,21 @@ namespace Repository.ReportRepository
                     {
                         while (reader.Read())
                         {
-                            counters.Add(reader["Counter"].ToString());
+                            string c = reader["Counter"]?.ToString()?.Trim();
+                            if (!string.IsNullOrWhiteSpace(c) && !counters.Contains(c))
+                            {
+                                counters.Add(c);
+                            }
                         }
                     }
+                }
+
+                if (counters.Count == 0)
+                {
+                    string defaultCounter = !string.IsNullOrWhiteSpace(SessionContext.CounterName) 
+                        ? SessionContext.CounterName 
+                        : (SessionContext.CounterId > 0 ? $"Counter-{SessionContext.CounterId}" : "Counter-1");
+                    counters.Add(defaultCounter);
                 }
             }
             catch (Exception ex)

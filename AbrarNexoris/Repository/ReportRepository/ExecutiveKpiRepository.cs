@@ -475,6 +475,97 @@ namespace Repository.ReportRepository
                 {
                     System.Diagnostics.Debug.WriteLine($"Expense reconciliation info: {exExp.Message}");
                 }
+
+                // ═══════════════════════════════════════════════════════════════════
+                // 10. DAILY TENDER BREAKDOWN & CASHIER RECONCILIATION VIA STORED PROCEDURES
+                // ═══════════════════════════════════════════════════════════════════
+                try
+                {
+                    model.DailyCashSales = model.CounterCashSales;
+                    model.DailyBankSales = model.DigitalSales;
+
+                    // Query Shift Closing records using Stored Procedure POS_ShiftClosing via ClosingRepo
+                    try
+                    {
+                        var closingRepo = new ClosingRepo();
+                        var shiftHistory = closingRepo.GetShiftHistory();
+                        if (shiftHistory != null && shiftHistory.Count > 0)
+                        {
+                            var matchingShifts = shiftHistory
+                                .Where(s => s.TransactionDate.Date >= rangeFrom && s.TransactionDate.Date <= rangeTo)
+                                .ToList();
+
+                            if (matchingShifts.Count > 0)
+                            {
+                                decimal shiftCash = matchingShifts.Sum(s => s.CashSale);
+                                decimal shiftDigital = matchingShifts.Sum(s => s.CardSale + s.UpiSale);
+                                decimal shiftCredit = matchingShifts.Sum(s => s.CreditSale);
+
+                                if (model.DailyCashSales == 0 && model.DailyBankSales == 0 && (shiftCash > 0 || shiftDigital > 0))
+                                {
+                                    model.DailyCashSales = shiftCash;
+                                    model.DailyBankSales = shiftDigital;
+                                    model.DailyCreditSales = shiftCredit;
+                                }
+
+                                model.TotalExpectedCash = matchingShifts.Sum(s => s.SystemExpectedCash);
+                                model.TotalCountedCash = matchingShifts.Sum(s => s.PhysicalCashCounted);
+                                model.NetCashDifference = matchingShifts.Sum(s => s.CashDifference);
+                                model.TotalShortageAmount = matchingShifts.Where(s => s.CashDifference < 0).Sum(s => s.CashDifference);
+                                model.TotalExcessAmount = matchingShifts.Where(s => s.CashDifference > 0).Sum(s => s.CashDifference);
+                                model.ShortageShiftCount = matchingShifts.Count(s => s.CashDifference < 0);
+                                model.ExcessShiftCount = matchingShifts.Count(s => s.CashDifference > 0);
+                                model.TotalShiftClosingCount = matchingShifts.Count;
+                            }
+                        }
+                    }
+                    catch (Exception exShift)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"ShiftClosing SP retrieval info: {exShift.Message}");
+                    }
+
+                    // Fallback tender lookup via Stored Procedure POS_CounterReport if tender breakdown is still zero
+                    if (model.DailyCashSales == 0 && model.DailyBankSales == 0 && model.TotalSalesRevenue > 0)
+                    {
+                        try
+                        {
+                            var counterRepo = new CounterReportRepository();
+                            var bills = counterRepo.GetCounterReportData(rangeFrom, rangeTo, null, 0);
+                            if (bills != null && bills.Count > 0)
+                            {
+                                decimal cSales = 0;
+                                decimal bSales = 0;
+                                decimal crSales = 0;
+                                foreach (var b in bills)
+                                {
+                                    string mode = (b.PaymodeName ?? b.CashMode ?? "").ToLowerInvariant();
+                                    if (mode.Contains("cash")) cSales += b.NetAmount;
+                                    else if (mode.Contains("card") || mode.Contains("upi") || mode.Contains("bank") || mode.Contains("online")) bSales += b.NetAmount;
+                                    else if (mode.Contains("credit")) crSales += b.NetAmount;
+                                    else cSales += b.NetAmount;
+                                }
+                                model.DailyCashSales = cSales;
+                                model.DailyBankSales = bSales;
+                                model.DailyCreditSales = crSales;
+                            }
+                            else
+                            {
+                                model.DailyCashSales = model.TotalSalesRevenue;
+                            }
+                        }
+                        catch
+                        {
+                            if (model.DailyCashSales == 0 && model.DailyBankSales == 0)
+                            {
+                                model.DailyCashSales = model.TotalSalesRevenue;
+                            }
+                        }
+                    }
+                }
+                catch (Exception exTender)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Daily tender / shift reconciliation info: {exTender.Message}");
+                }
             }
             catch (Exception ex)
             {
@@ -497,86 +588,89 @@ namespace Repository.ReportRepository
             var list = new List<ExpenseLedgerSummaryItem>();
             try
             {
-                if (DataConnection.State != ConnectionState.Open)
-                    DataConnection.Open();
-
-                string sql = @"
-WITH CleanGroup AS (
-    SELECT GroupID, MIN(GroupName) AS GroupName
-    FROM AccountGroupMaster
-    GROUP BY GroupID
-)
-SELECT 
-    lm.LedgerID,
-    lm.LedgerName,
-    ag.GroupName,
-    CASE 
-        WHEN ag.GroupName LIKE '%Indirect%' THEN 'Indirect Expense'
-        WHEN ag.GroupName LIKE '%Direct%' THEN 'Direct Expense'
-        ELSE 'Indirect Expense'
-    END AS ExpenseType,
-    ISNULL(SUM(v.Debit), 0) AS TotalDebit,
-    ISNULL(SUM(v.Credit), 0) AS TotalCredit,
-    ISNULL(SUM(v.Debit), 0) - ISNULL(SUM(v.Credit), 0) AS NetAmount,
-    COUNT(DISTINCT v.VoucherID) AS VoucherCount
-FROM Vouchers v
-INNER JOIN LedgerMaster lm ON lm.LedgerID = v.LedgerID
-INNER JOIN CleanGroup ag ON ag.GroupID = lm.GroupID
-WHERE (ag.GroupID IN (10, 12) OR ag.GroupName LIKE '%Expense%')
-  AND v.VoucherDate >= @FromDate AND v.VoucherDate <= @ToDate
-  AND (@BranchId = 0 OR v.BranchID = @BranchId)
-  AND (@CompanyId = 0 OR v.CompanyID = @CompanyId)
-  AND ISNULL(v.CancelFlag, 0) = 0
-GROUP BY lm.LedgerID, lm.LedgerName, ag.GroupID, ag.GroupName
-HAVING (ISNULL(SUM(v.Debit), 0) - ISNULL(SUM(v.Credit), 0)) <> 0
-ORDER BY ExpenseType, NetAmount DESC, lm.LedgerName;";
-
-                using (SqlCommand cmd = new SqlCommand(sql, (SqlConnection)DataConnection))
+                // Execute official Stored Procedure: POS_TradingPLAccount via TradingPLRepository
+                var tradingRepo = new TradingPLRepository();
+                var plReport = tradingRepo.GetTradingPLReport(fromDate, toDate, branchId, companyId);
+                if (plReport != null)
                 {
-                    cmd.Parameters.AddWithValue("@FromDate", fromDate.Date);
-                    cmd.Parameters.AddWithValue("@ToDate", toDate.Date.AddDays(1).AddSeconds(-1));
-                    cmd.Parameters.AddWithValue("@BranchId", branchId);
-                    cmd.Parameters.AddWithValue("@CompanyId", companyId);
+                    int slNo = 1;
 
-                    using (SqlDataReader reader = cmd.ExecuteReader())
+                    // Table 0: Direct Expenses (Trading line items)
+                    if (plReport.TradingItems != null)
                     {
-                        int slNo = 1;
-                        while (reader.Read())
+                        var directItems = plReport.TradingItems
+                            .Where(x => string.Equals(x.Category, "Expenses", StringComparison.OrdinalIgnoreCase) ||
+                                        (x.GroupName != null && x.GroupName.IndexOf("Direct", StringComparison.OrdinalIgnoreCase) >= 0) ||
+                                        (x.GroupName != null && x.GroupName.IndexOf("Expense", StringComparison.OrdinalIgnoreCase) >= 0 && x.GroupName.IndexOf("Indirect", StringComparison.OrdinalIgnoreCase) < 0));
+
+                        foreach (var item in directItems)
                         {
-                            list.Add(new ExpenseLedgerSummaryItem
+                            decimal net = item.TotalDebit - item.TotalCredit;
+                            decimal finalNet = net != 0 ? net : item.NetBalance;
+                            if (finalNet != 0 || item.TotalDebit != 0 || item.TotalCredit != 0)
                             {
-                                SlNo = slNo++,
-                                LedgerID = reader["LedgerID"] != DBNull.Value ? Convert.ToInt32(reader["LedgerID"]) : 0,
-                                LedgerName = reader["LedgerName"]?.ToString() ?? "",
-                                GroupName = reader["GroupName"]?.ToString() ?? "",
-                                ExpenseType = reader["ExpenseType"]?.ToString() ?? "Indirect Expense",
-                                TotalDebit = reader["TotalDebit"] != DBNull.Value ? Convert.ToDecimal(reader["TotalDebit"]) : 0,
-                                TotalCredit = reader["TotalCredit"] != DBNull.Value ? Convert.ToDecimal(reader["TotalCredit"]) : 0,
-                                NetAmount = reader["NetAmount"] != DBNull.Value ? Convert.ToDecimal(reader["NetAmount"]) : 0,
-                                VoucherCount = reader["VoucherCount"] != DBNull.Value ? Convert.ToInt32(reader["VoucherCount"]) : 0
-                            });
+                                list.Add(new ExpenseLedgerSummaryItem
+                                {
+                                    SlNo = slNo++,
+                                    LedgerID = item.LedgerID,
+                                    LedgerName = item.LedgerName ?? "",
+                                    GroupName = item.GroupName ?? "Direct Expense",
+                                    ExpenseType = "Direct Expense",
+                                    TotalDebit = item.TotalDebit,
+                                    TotalCredit = item.TotalCredit,
+                                    NetAmount = finalNet,
+                                    VoucherCount = 1
+                                });
+                            }
                         }
                     }
-                }
 
-                decimal total = list.Sum(x => x.NetAmount);
-                if (total > 0)
-                {
-                    foreach (var item in list)
+                    // Table 1: Indirect Expenses (Profit & Loss line items)
+                    if (plReport.ProfitLossItems != null)
                     {
-                        item.PercentageOfTotal = Math.Round((item.NetAmount / total) * 100, 1);
+                        var indirectItems = plReport.ProfitLossItems
+                            .Where(x => string.Equals(x.Category, "Expenses", StringComparison.OrdinalIgnoreCase) ||
+                                        (x.GroupName != null && x.GroupName.IndexOf("Indirect", StringComparison.OrdinalIgnoreCase) >= 0) ||
+                                        (x.GroupName != null && x.GroupName.IndexOf("Expense", StringComparison.OrdinalIgnoreCase) >= 0));
+
+                        foreach (var item in indirectItems)
+                        {
+                            decimal net = item.TotalDebit - item.TotalCredit;
+                            decimal finalNet = net != 0 ? net : item.NetBalance;
+                            if (finalNet != 0 || item.TotalDebit != 0 || item.TotalCredit != 0)
+                            {
+                                list.Add(new ExpenseLedgerSummaryItem
+                                {
+                                    SlNo = slNo++,
+                                    LedgerID = item.LedgerID,
+                                    LedgerName = item.LedgerName ?? "",
+                                    GroupName = item.GroupName ?? "Indirect Expense",
+                                    ExpenseType = "Indirect Expense",
+                                    TotalDebit = item.TotalDebit,
+                                    TotalCredit = item.TotalCredit,
+                                    NetAmount = finalNet,
+                                    VoucherCount = 1
+                                });
+                            }
+                        }
+                    }
+
+                    // Compute percentages of total expenses
+                    decimal total = list.Sum(x => x.NetAmount);
+                    if (total > 0)
+                    {
+                        foreach (var item in list)
+                        {
+                            item.PercentageOfTotal = Math.Round((item.NetAmount / total) * 100m, 1);
+                        }
                     }
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine("GetExpenseLedgerSummary error: " + ex.Message);
+                System.Diagnostics.Debug.WriteLine("GetExpenseLedgerSummary via POS_TradingPLAccount SP error: " + ex.Message);
             }
-            finally
-            {
-                if (DataConnection != null && DataConnection.State == ConnectionState.Open)
-                    DataConnection.Close();
-            }
+
             return list;
         }
 
@@ -585,79 +679,49 @@ ORDER BY ExpenseType, NetAmount DESC, lm.LedgerName;";
             var list = new List<ExpenseVoucherTransactionItem>();
             try
             {
-                if (DataConnection.State != ConnectionState.Open)
-                    DataConnection.Open();
+                // Execute official Stored Procedure: _POS_CashInOutReport via CashInOutRepository
+                var cashInOutRepo = new CashInOutRepository();
+                var cashInOutReport = cashInOutRepo.GetCashInOutReport(fromDate, toDate, branchId, companyId);
 
-                string sql = @"
-WITH CleanGroup AS (
-    SELECT GroupID, MIN(GroupName) AS GroupName
-    FROM AccountGroupMaster
-    GROUP BY GroupID
-)
-SELECT 
-    v.VoucherID,
-    v.VoucherDate,
-    v.VoucherNumber,
-    v.VoucherType,
-    lm.LedgerName,
-    ag.GroupName,
-    CASE 
-        WHEN ag.GroupName LIKE '%Indirect%' THEN 'Indirect Expense'
-        WHEN ag.GroupName LIKE '%Direct%' THEN 'Direct Expense'
-        ELSE 'Indirect Expense'
-    END AS ExpenseType,
-    ISNULL(v.Debit, 0) AS Debit,
-    ISNULL(v.Credit, 0) AS Credit,
-    ISNULL(v.Debit, 0) - ISNULL(v.Credit, 0) AS NetAmount,
-    ISNULL(v.Narration, '') AS Narration
-FROM Vouchers v
-INNER JOIN LedgerMaster lm ON lm.LedgerID = v.LedgerID
-INNER JOIN CleanGroup ag ON ag.GroupID = lm.GroupID
-WHERE (ag.GroupID IN (10, 12) OR ag.GroupName LIKE '%Expense%')
-  AND v.VoucherDate >= @FromDate AND v.VoucherDate <= @ToDate
-  AND (@BranchId = 0 OR v.BranchID = @BranchId)
-  AND (@CompanyId = 0 OR v.CompanyID = @CompanyId)
-  AND ISNULL(v.CancelFlag, 0) = 0
-ORDER BY v.VoucherDate DESC, v.VoucherID DESC;";
+                // Build set of direct expense ledger names from GetExpenseLedgerSummary for accurate categorization
+                var ledgerSummaries = GetExpenseLedgerSummary(fromDate, toDate, branchId, companyId);
+                var directLedgerNames = new HashSet<string>(
+                    ledgerSummaries.Where(x => x.ExpenseType == "Direct Expense").Select(x => x.LedgerName),
+                    StringComparer.OrdinalIgnoreCase);
 
-                using (SqlCommand cmd = new SqlCommand(sql, (SqlConnection)DataConnection))
+                if (cashInOutReport != null && cashInOutReport.Transactions != null)
                 {
-                    cmd.Parameters.AddWithValue("@FromDate", fromDate.Date);
-                    cmd.Parameters.AddWithValue("@ToDate", toDate.Date.AddDays(1).AddSeconds(-1));
-                    cmd.Parameters.AddWithValue("@BranchId", branchId);
-                    cmd.Parameters.AddWithValue("@CompanyId", companyId);
+                    var expenseTx = cashInOutReport.Transactions
+                        .Where(t => t.OutflowAmount > 0 &&
+                                    (string.Equals(t.Category, "Operating Expenses", StringComparison.OrdinalIgnoreCase) ||
+                                     (t.Category != null && t.Category.IndexOf("Expense", StringComparison.OrdinalIgnoreCase) >= 0)))
+                        .ToList();
 
-                    using (SqlDataReader reader = cmd.ExecuteReader())
+                    foreach (var tx in expenseTx)
                     {
-                        while (reader.Read())
+                        string expType = directLedgerNames.Contains(tx.Particulars) ? "Direct Expense" : "Indirect Expense";
+                        list.Add(new ExpenseVoucherTransactionItem
                         {
-                            list.Add(new ExpenseVoucherTransactionItem
-                            {
-                                VoucherID = reader["VoucherID"] != DBNull.Value ? Convert.ToInt64(reader["VoucherID"]) : 0,
-                                VoucherDate = reader["VoucherDate"] != DBNull.Value ? Convert.ToDateTime(reader["VoucherDate"]) : DateTime.MinValue,
-                                VoucherNumber = reader["VoucherNumber"]?.ToString() ?? "",
-                                VoucherType = reader["VoucherType"]?.ToString() ?? "",
-                                LedgerName = reader["LedgerName"]?.ToString() ?? "",
-                                GroupName = reader["GroupName"]?.ToString() ?? "",
-                                ExpenseType = reader["ExpenseType"]?.ToString() ?? "Indirect Expense",
-                                Debit = reader["Debit"] != DBNull.Value ? Convert.ToDecimal(reader["Debit"]) : 0,
-                                Credit = reader["Credit"] != DBNull.Value ? Convert.ToDecimal(reader["Credit"]) : 0,
-                                NetAmount = reader["NetAmount"] != DBNull.Value ? Convert.ToDecimal(reader["NetAmount"]) : 0,
-                                Narration = reader["Narration"]?.ToString() ?? ""
-                            });
-                        }
+                            VoucherID = tx.SlNo,
+                            VoucherDate = tx.VoucherDate,
+                            VoucherNumber = tx.VoucherNo,
+                            VoucherType = tx.VoucherType,
+                            LedgerName = tx.Particulars,
+                            GroupName = expType,
+                            ExpenseType = expType,
+                            Debit = tx.OutflowAmount,
+                            Credit = 0,
+                            NetAmount = tx.OutflowAmount,
+                            Narration = tx.Narration
+                        });
                     }
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine("GetExpenseVoucherTransactions error: " + ex.Message);
+                System.Diagnostics.Debug.WriteLine("GetExpenseVoucherTransactions via _POS_CashInOutReport SP error: " + ex.Message);
             }
-            finally
-            {
-                if (DataConnection != null && DataConnection.State == ConnectionState.Open)
-                    DataConnection.Close();
-            }
+
             return list;
         }
 
