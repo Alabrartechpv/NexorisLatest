@@ -9,6 +9,7 @@ namespace ModelClass.Report
     {
         public long BillNo { get; set; }
         public DateTime BillDate { get; set; }
+        public int CounterId { get; set; }
         public string Counter { get; set; }
         public string UserName { get; set; }
         public string CustomerName { get; set; }

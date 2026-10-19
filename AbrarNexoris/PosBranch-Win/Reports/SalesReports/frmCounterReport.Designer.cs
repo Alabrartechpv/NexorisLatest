@@ -46,6 +46,7 @@ namespace PosBranch_Win.Reports.SalesReports
             this.btnPrint = new Infragistics.Win.Misc.UltraButton();
             this.btnExport = new Infragistics.Win.Misc.UltraButton();
             this.btnClear = new Infragistics.Win.Misc.UltraButton();
+            this.btnPreviewGrid = new Infragistics.Win.Misc.UltraButton();
             this.btnSearch = new Infragistics.Win.Misc.UltraButton();
             this.ultraComboPresetDates = new Infragistics.Win.UltraWinEditors.UltraComboEditor();
             this.lblQuickDate = new System.Windows.Forms.Label();
@@ -200,6 +201,7 @@ namespace PosBranch_Win.Reports.SalesReports
             this.ultraGroupBoxFilters.Controls.Add(this.btnPrint);
             this.ultraGroupBoxFilters.Controls.Add(this.btnExport);
             this.ultraGroupBoxFilters.Controls.Add(this.btnClear);
+            this.ultraGroupBoxFilters.Controls.Add(this.btnPreviewGrid);
             this.ultraGroupBoxFilters.Controls.Add(this.btnSearch);
             this.ultraGroupBoxFilters.Controls.Add(this.ultraComboPresetDates);
             this.ultraGroupBoxFilters.Controls.Add(this.lblQuickDate);
@@ -225,8 +227,8 @@ namespace PosBranch_Win.Reports.SalesReports
             this.btnClose.Location = new System.Drawing.Point(1108, 25);
             this.btnClose.Name = "btnClose";
             this.btnClose.Size = new System.Drawing.Size(80, 28);
-            this.btnClose.TabIndex = 14;
-            this.btnClose.Text = "✖ Close";
+            this.btnClose.TabIndex = 15;
+            this.btnClose.Text = "Close";
             this.btnClose.Click += new System.EventHandler(this.btnClose_Click);
             // 
             // btnPrint
@@ -234,8 +236,8 @@ namespace PosBranch_Win.Reports.SalesReports
             this.btnPrint.Location = new System.Drawing.Point(1022, 25);
             this.btnPrint.Name = "btnPrint";
             this.btnPrint.Size = new System.Drawing.Size(80, 28);
-            this.btnPrint.TabIndex = 13;
-            this.btnPrint.Text = "🖨 Print";
+            this.btnPrint.TabIndex = 14;
+            this.btnPrint.Text = "Print";
             this.btnPrint.Click += new System.EventHandler(this.btnPrint_Click);
             // 
             // btnExport
@@ -243,8 +245,8 @@ namespace PosBranch_Win.Reports.SalesReports
             this.btnExport.Location = new System.Drawing.Point(936, 25);
             this.btnExport.Name = "btnExport";
             this.btnExport.Size = new System.Drawing.Size(80, 28);
-            this.btnExport.TabIndex = 12;
-            this.btnExport.Text = "Export";
+            this.btnExport.TabIndex = 13;
+            this.btnExport.Text = "Export Grid";
             this.btnExport.Click += new System.EventHandler(this.btnExport_Click);
             // 
             // btnClear
@@ -252,17 +254,26 @@ namespace PosBranch_Win.Reports.SalesReports
             this.btnClear.Location = new System.Drawing.Point(850, 25);
             this.btnClear.Name = "btnClear";
             this.btnClear.Size = new System.Drawing.Size(80, 28);
-            this.btnClear.TabIndex = 11;
-            this.btnClear.Text = "🗑 Clear";
+            this.btnClear.TabIndex = 12;
+            this.btnClear.Text = "Clear";
             this.btnClear.Click += new System.EventHandler(this.btnClear_Click);
+            // 
+            // btnPreviewGrid
+            // 
+            this.btnPreviewGrid.Location = new System.Drawing.Point(764, 25);
+            this.btnPreviewGrid.Name = "btnPreviewGrid";
+            this.btnPreviewGrid.Size = new System.Drawing.Size(95, 28);
+            this.btnPreviewGrid.TabIndex = 11;
+            this.btnPreviewGrid.Text = "Preview Grid";
+            this.btnPreviewGrid.Click += new System.EventHandler(this.btnPreviewGrid_Click);
             // 
             // btnSearch
             // 
-            this.btnSearch.Location = new System.Drawing.Point(764, 25);
+            this.btnSearch.Location = new System.Drawing.Point(678, 25);
             this.btnSearch.Name = "btnSearch";
             this.btnSearch.Size = new System.Drawing.Size(80, 28);
             this.btnSearch.TabIndex = 10;
-            this.btnSearch.Text = "Search";
+            this.btnSearch.Text = "View Grid";
             this.btnSearch.Click += new System.EventHandler(this.btnSearch_Click);
             // 
             // ultraComboPresetDates
@@ -416,6 +427,7 @@ namespace PosBranch_Win.Reports.SalesReports
         private System.Windows.Forms.Label lblUser;
         private Infragistics.Win.UltraWinEditors.UltraComboEditor ultraComboUser;
         private Infragistics.Win.Misc.UltraButton btnSearch;
+        private Infragistics.Win.Misc.UltraButton btnPreviewGrid;
         private Infragistics.Win.Misc.UltraButton btnClear;
         private Infragistics.Win.Misc.UltraButton btnExport;
         private Infragistics.Win.Misc.UltraButton btnPrint;

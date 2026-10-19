@@ -4,6 +4,7 @@ using Infragistics.Win.UltraWinGrid;
 using ModelClass;
 using ModelClass.Report;
 using PosBranch_Win.Reports.FinancialReports;
+using PosBranch_Win.Transaction;
 using Repository;
 using Repository.ReportRepository;
 using System;
@@ -203,6 +204,7 @@ namespace PosBranch_Win.Reports.SalesReports
             ultraGridCounterReport.Font = new Font("Microsoft Sans Serif", 8.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
             
             ultraGridCounterReport.InitializeLayout += ultraGridCounterReport_InitializeLayout;
+            ultraGridCounterReport.DoubleClickRow += ultraGridCounterReport_DoubleClickRow;
         }
 
         private void InitializePanels()
@@ -331,6 +333,31 @@ namespace PosBranch_Win.Reports.SalesReports
             lblDifferenceValue.Appearance.ForeColor = Color.FromArgb(254, 202, 202);
 
             lblDifferenceCaption.Visible = false;
+
+            // Setup interactive dashboard click-filtering on summary cards
+            lblTotalNetSalesValue.Cursor = Cursors.Hand;
+            lblTotalNetSalesCaption.Cursor = Cursors.Hand;
+            lblTotalNetSalesValue.Click += (s, e) => { ultraComboPayMode.Value = ""; };
+            lblTotalNetSalesCaption.Click += (s, e) => { ultraComboPayMode.Value = ""; };
+
+            lblCashSalesValue.Cursor = Cursors.Hand;
+            lblCashSalesCaption.Cursor = Cursors.Hand;
+            lblCashSalesValue.Click += (s, e) => { ultraComboPayMode.Value = "Cash"; };
+            lblCashSalesCaption.Click += (s, e) => { ultraComboPayMode.Value = "Cash"; };
+
+            lblBankSalesValue.Cursor = Cursors.Hand;
+            lblBankSalesCaption.Cursor = Cursors.Hand;
+            lblBankSubtext.Cursor = Cursors.Hand;
+            lblBankSalesValue.Click += (s, e) => { ultraComboPayMode.Value = "BANK_ALL"; };
+            lblBankSalesCaption.Click += (s, e) => { ultraComboPayMode.Value = "BANK_ALL"; };
+            lblBankSubtext.Click += (s, e) => { ultraComboPayMode.Value = "BANK_ALL"; };
+
+            lblCreditSalesValue.Cursor = Cursors.Hand;
+            lblCreditSalesCaption.Cursor = Cursors.Hand;
+            lblTotalSessionsValue.Cursor = Cursors.Hand;
+            lblCreditSalesValue.Click += (s, e) => { ultraComboPayMode.Value = "Credit"; };
+            lblCreditSalesCaption.Click += (s, e) => { ultraComboPayMode.Value = "Credit"; };
+            lblTotalSessionsValue.Click += (s, e) => { ultraComboPayMode.Value = "Credit"; };
         }
 
         private static void StyleSubtextLabel(Infragistics.Win.Misc.UltraLabel label)
@@ -436,20 +463,25 @@ namespace PosBranch_Win.Reports.SalesReports
             toolTip.SetToolTip(ultraDateTimeTo, "Select end date for the report");
             toolTip.SetToolTip(ultraComboCounter, "Filter by specific Counter Name");
             toolTip.SetToolTip(ultraComboUser, "Filter by specific Cashier");
-            toolTip.SetToolTip(ultraComboPayMode, "Filter by Payment Mode (Bank, UPI, Card, Cash, Credit, etc.)");
-            toolTip.SetToolTip(btnSearch, "Search with current filters (F5)");
+            toolTip.SetToolTip(btnSearch, "View Grid (F5)");
+            toolTip.SetToolTip(btnPreviewGrid, "Preview Grid (F6)");
+            toolTip.SetToolTip(btnExport, "Export Grid to CSV / Excel (Ctrl+E)");
+            toolTip.SetToolTip(btnPrint, "Print report formats (Ctrl+P)");
             toolTip.SetToolTip(btnClear, "Clear all filters");
-            toolTip.SetToolTip(btnExport, "Export to CSV (Ctrl+E)");
-            toolTip.SetToolTip(btnPrint, "Print report (Ctrl+P)");
             toolTip.SetToolTip(btnClose, "Close form (Escape)");
+            toolTip.SetToolTip(lblTotalNetSalesValue, "Click to show All Sales");
+            toolTip.SetToolTip(lblCashSalesValue, "Click to filter by Cash Sales");
+            toolTip.SetToolTip(lblBankSalesValue, "Click to filter by Bank & Digital Sales");
+            toolTip.SetToolTip(lblCreditSalesValue, "Click to filter by Credit Sales");
         }
 
         private void StyleButtons()
         {
             StyleClassicButton(btnSearch);
-            StyleClassicButton(btnClear);
+            StyleClassicButton(btnPreviewGrid);
             StyleClassicButton(btnExport);
             StyleClassicButton(btnPrint);
+            StyleClassicButton(btnClear);
             StyleClassicButton(btnClose);
         }
 
@@ -501,6 +533,11 @@ namespace PosBranch_Win.Reports.SalesReports
                 ConfigureMoneyColumn(band, "NetAmount", "Net Amount", 120, Color.FromArgb(56, 142, 60));
 
                 ConfigureColumn(band, "Status", "Status", 90);
+
+                if (band.Columns.Exists("CounterId"))
+                {
+                    band.Columns["CounterId"].Hidden = true;
+                }
 
                 if (band.Columns.Exists("NetAmount"))
                 {
@@ -816,14 +853,27 @@ namespace PosBranch_Win.Reports.SalesReports
 
             // 6. Action Buttons
             btnSearch.Location = new Point(left, top - 2);
+            btnSearch.Width = 82;
             left += btnSearch.Width + 6;
-            btnClear.Location = new Point(left, top - 2);
-            left += btnClear.Width + 6;
+
+            btnPreviewGrid.Location = new Point(left, top - 2);
+            btnPreviewGrid.Width = 95;
+            left += btnPreviewGrid.Width + 6;
+
             btnExport.Location = new Point(left, top - 2);
+            btnExport.Width = 88;
             left += btnExport.Width + 6;
+
             btnPrint.Location = new Point(left, top - 2);
+            btnPrint.Width = 72;
             left += btnPrint.Width + 6;
+
+            btnClear.Location = new Point(left, top - 2);
+            btnClear.Width = 72;
+            left += btnClear.Width + 6;
+
             btnClose.Location = new Point(left, top - 2);
+            btnClose.Width = 72;
         }
 
         private void ultraComboPresetDates_ValueChanged(object sender, EventArgs e)
@@ -1122,11 +1172,88 @@ namespace PosBranch_Win.Reports.SalesReports
             Close();
         }
 
+        private void btnPreviewGrid_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (ultraGridCounterReport.Rows == null || ultraGridCounterReport.Rows.Count == 0)
+                {
+                    MessageBox.Show("There is no data to preview. Click View Grid first.", "Preview", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+                ultraGridCounterReport.PrintPreview();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error generating grid preview: " + ex.Message, "Preview Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void ultraGridCounterReport_DoubleClickRow(object sender, DoubleClickRowEventArgs e)
+        {
+            if (e.Row == null || !e.Row.IsDataRow) return;
+
+            long billNo = 0;
+            if (e.Row.Cells.Exists("BillNo") && e.Row.Cells["BillNo"].Value != null)
+            {
+                long.TryParse(Convert.ToString(e.Row.Cells["BillNo"].Value), out billNo);
+            }
+
+            if (billNo > 0)
+            {
+                OpenSalesTransaction(billNo);
+            }
+        }
+
+        private void OpenSalesTransaction(long billNo)
+        {
+            try
+            {
+                Home homeInstance = Application.OpenForms.OfType<Home>().FirstOrDefault();
+                frmSalesInvoice salesForm = null;
+
+                if (homeInstance != null && !homeInstance.IsDisposed)
+                {
+                    homeInstance.OpenFormByType(typeof(frmSalesInvoice), "Sales Invoice");
+                    salesForm = Application.OpenForms.OfType<frmSalesInvoice>().FirstOrDefault();
+                }
+                else
+                {
+                    salesForm = Application.OpenForms.OfType<frmSalesInvoice>().FirstOrDefault();
+                    if (salesForm == null)
+                    {
+                        salesForm = new frmSalesInvoice();
+                        salesForm.StartPosition = FormStartPosition.CenterScreen;
+                        salesForm.Show();
+                    }
+                    else
+                    {
+                        salesForm.BringToFront();
+                    }
+                }
+
+                if (salesForm != null && !salesForm.IsDisposed)
+                {
+                    salesForm.LoadBillByBillNo(billNo);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Unable to open Sales Invoice for Bill No: {billNo}.\n{ex.Message}", "Sales Invoice",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
         private void Form_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.KeyCode == Keys.F5)
             {
                 btnSearch_Click(sender, e);
+                e.Handled = true;
+            }
+            else if (e.KeyCode == Keys.F6)
+            {
+                btnPreviewGrid_Click(sender, e);
                 e.Handled = true;
             }
             else if (e.KeyCode == Keys.Escape)
