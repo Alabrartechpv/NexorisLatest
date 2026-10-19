@@ -76,15 +76,15 @@ namespace PosBranch_Win.Reports.InventoryReport
         // ════════════════════════════════════════════════════════════
         //  Constructor
         // ════════════════════════════════════════════════════════════
-        private string _initialStockFilter = "All Items";
+        private string _initialStockFilter = "Positive Stock";
 
-        public frmStockValuationReport() : this("All Items")
+        public frmStockValuationReport() : this("Positive Stock")
         {
         }
 
         public frmStockValuationReport(string initialStockFilter, int? groupId = null, int? categoryId = null)
         {
-            _initialStockFilter = string.IsNullOrWhiteSpace(initialStockFilter) ? "All Items" : initialStockFilter;
+            _initialStockFilter = string.IsNullOrWhiteSpace(initialStockFilter) ? "Positive Stock" : initialStockFilter;
             InitializeComponent();
             this.Font = new Font("Segoe UI", 9F);
             InitializeBackgroundWorker();
