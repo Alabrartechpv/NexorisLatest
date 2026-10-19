@@ -226,6 +226,42 @@ namespace ModelClass.Report
 
         /// <summary>Stock Adjustment Count in period (സ്റ്റോക്ക് മാറ്റിയതിന്റെ എണ്ണം)</summary>
         public int StockAdjustmentCount { get; set; }
+
+        // ═══════════════════════════════════════════════════════════════════
+        // SECTION 6: DAILY CASH/BANK RECONCILIATION & SHORTAGE/EXCESS TRACKER
+        // ═══════════════════════════════════════════════════════════════════
+        /// <summary>Daily Cash Sales Collected (കൗണ്ടർ ക്യാഷ് സെയിൽസ്)</summary>
+        public decimal DailyCashSales { get; set; }
+
+        /// <summary>Daily Bank / UPI / Card Sales Collected (ബാങ്ക്/യു.പി.ഐ സെയിൽസ്)</summary>
+        public decimal DailyBankSales { get; set; }
+
+        /// <summary>Daily Credit Sales (ക്രെഡിറ്റ് സെയിൽസ്)</summary>
+        public decimal DailyCreditSales { get; set; }
+
+        /// <summary>Total System Expected Cash across shift closings (സിസ്റ്റം കണക്കാക്കിയ ആകെ ക്യാഷ്)</summary>
+        public decimal TotalExpectedCash { get; set; }
+
+        /// <summary>Total Physical Cash Counted by cashiers (ക്യാഷിയർമാർ എണ്ണി തിട്ടപ്പെടുത്തിയ ആകെ ക്യാഷ്)</summary>
+        public decimal TotalCountedCash { get; set; }
+
+        /// <summary>Net Cash Shortage / Excess Variance (ക്യാഷ് വ്യത്യാസം = Counted - Expected)</summary>
+        public decimal NetCashDifference { get; set; }
+
+        /// <summary>Total Cash Shortage amount (ആകെ കുറവ് വന്ന ക്യാഷ്)</summary>
+        public decimal TotalShortageAmount { get; set; }
+
+        /// <summary>Total Cash Excess amount (ആകെ അധികം വന്ന ക്യാഷ്)</summary>
+        public decimal TotalExcessAmount { get; set; }
+
+        /// <summary>Number of shifts with cash shortage</summary>
+        public int ShortageShiftCount { get; set; }
+
+        /// <summary>Number of shifts with cash excess</summary>
+        public int ExcessShiftCount { get; set; }
+
+        /// <summary>Total shift closings count in period</summary>
+        public int TotalShiftClosingCount { get; set; }
     }
 
     public class MonthlyGrowthMatrixItem

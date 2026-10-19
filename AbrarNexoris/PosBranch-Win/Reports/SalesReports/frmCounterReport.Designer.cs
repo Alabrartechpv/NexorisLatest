@@ -49,6 +49,8 @@ namespace PosBranch_Win.Reports.SalesReports
             this.btnSearch = new Infragistics.Win.Misc.UltraButton();
             this.ultraComboPresetDates = new Infragistics.Win.UltraWinEditors.UltraComboEditor();
             this.lblQuickDate = new System.Windows.Forms.Label();
+            this.lblPayMode = new System.Windows.Forms.Label();
+            this.ultraComboPayMode = new Infragistics.Win.UltraWinEditors.UltraComboEditor();
             this.ultraComboUser = new Infragistics.Win.UltraWinEditors.UltraComboEditor();
             this.lblUser = new System.Windows.Forms.Label();
             this.ultraComboCounter = new Infragistics.Win.UltraWinEditors.UltraComboEditor();
@@ -67,6 +69,7 @@ namespace PosBranch_Win.Reports.SalesReports
             ((System.ComponentModel.ISupportInitialize)(this.ultraGroupBoxFilters)).BeginInit();
             this.ultraGroupBoxFilters.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.ultraComboPresetDates)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.ultraComboPayMode)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.ultraComboUser)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.ultraComboCounter)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.ultraDateTimeTo)).BeginInit();
@@ -200,6 +203,8 @@ namespace PosBranch_Win.Reports.SalesReports
             this.ultraGroupBoxFilters.Controls.Add(this.btnSearch);
             this.ultraGroupBoxFilters.Controls.Add(this.ultraComboPresetDates);
             this.ultraGroupBoxFilters.Controls.Add(this.lblQuickDate);
+            this.ultraGroupBoxFilters.Controls.Add(this.ultraComboPayMode);
+            this.ultraGroupBoxFilters.Controls.Add(this.lblPayMode);
             this.ultraGroupBoxFilters.Controls.Add(this.ultraComboUser);
             this.ultraGroupBoxFilters.Controls.Add(this.lblUser);
             this.ultraGroupBoxFilters.Controls.Add(this.ultraComboCounter);
@@ -349,6 +354,24 @@ namespace PosBranch_Win.Reports.SalesReports
             this.lblFromDate.TabIndex = 0;
             this.lblFromDate.Text = "From";
             // 
+            // lblPayMode
+            // 
+            this.lblPayMode.AutoSize = true;
+            this.lblPayMode.Font = new System.Drawing.Font("Segoe UI", 9.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lblPayMode.Location = new System.Drawing.Point(620, 30);
+            this.lblPayMode.Name = "lblPayMode";
+            this.lblPayMode.Size = new System.Drawing.Size(60, 17);
+            this.lblPayMode.TabIndex = 15;
+            this.lblPayMode.Text = "Payment:";
+            // 
+            // ultraComboPayMode
+            // 
+            this.ultraComboPayMode.Location = new System.Drawing.Point(685, 27);
+            this.ultraComboPayMode.Name = "ultraComboPayMode";
+            this.ultraComboPayMode.Size = new System.Drawing.Size(145, 24);
+            this.ultraComboPayMode.TabIndex = 16;
+            this.ultraComboPayMode.ValueChanged += new System.EventHandler(this.ultraComboPayMode_ValueChanged);
+            // 
             // frmCounterReport
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
@@ -371,6 +394,7 @@ namespace PosBranch_Win.Reports.SalesReports
             this.ultraGroupBoxFilters.ResumeLayout(false);
             this.ultraGroupBoxFilters.PerformLayout();
             ((System.ComponentModel.ISupportInitialize)(this.ultraComboPresetDates)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.ultraComboPayMode)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.ultraComboUser)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.ultraComboCounter)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.ultraDateTimeTo)).EndInit();
@@ -409,5 +433,7 @@ namespace PosBranch_Win.Reports.SalesReports
         private Infragistics.Win.Misc.UltraLabel lblDifferenceValue;
         private System.Windows.Forms.Label lblQuickDate;
         private Infragistics.Win.UltraWinEditors.UltraComboEditor ultraComboPresetDates;
+        private System.Windows.Forms.Label lblPayMode;
+        private Infragistics.Win.UltraWinEditors.UltraComboEditor ultraComboPayMode;
     }
 }

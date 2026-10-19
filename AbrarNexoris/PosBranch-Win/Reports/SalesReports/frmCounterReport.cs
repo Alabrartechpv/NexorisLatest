@@ -39,11 +39,28 @@ namespace PosBranch_Win.Reports.SalesReports
 
         private CounterReportRepository _reportRepository;
         private Dropdowns _dropdowns;
+        private List<CounterReportModel> _allRawData;
         private List<CounterReportModel> _currentData;
+        private string _initialPayMode;
 
-        public frmCounterReport()
+        // Enhanced Tender Split Summary Panel Controls
+        private Infragistics.Win.Misc.UltraLabel lblCashSalesCaption;
+        private Infragistics.Win.Misc.UltraLabel lblCashSalesValue;
+        private Infragistics.Win.Misc.UltraLabel lblBankSalesCaption;
+        private Infragistics.Win.Misc.UltraLabel lblBankSalesValue;
+        private Infragistics.Win.Misc.UltraLabel lblCreditSalesCaption;
+        private Infragistics.Win.Misc.UltraLabel lblCreditSalesValue;
+        private Infragistics.Win.Misc.UltraLabel lblBillsSubtext;
+        private Infragistics.Win.Misc.UltraLabel lblBankSubtext;
+
+        public frmCounterReport() : this("")
+        {
+        }
+
+        public frmCounterReport(string initialPayMode)
         {
             InitializeComponent();
+            _initialPayMode = initialPayMode ?? "";
             _reportRepository = new CounterReportRepository();
             _dropdowns = new Dropdowns();
             InitializeForm();
@@ -81,6 +98,9 @@ namespace PosBranch_Win.Reports.SalesReports
                 KeyPreview = true;
                 KeyDown += Form_KeyDown;
                 InitializeTooltips();
+
+                UpdateFilterLayout();
+                Resize += (s, e) => UpdateFilterLayout();
             }
             catch (Exception ex)
             {
@@ -200,24 +220,128 @@ namespace PosBranch_Win.Reports.SalesReports
             ultraGroupBoxGrid.HeaderAppearance.ForeColor = Color.White;
             ultraGroupBoxGrid.HeaderAppearance.FontData.Bold = DefaultableBoolean.True;
 
+            ultraPanelSummary.Height = 85;
             ultraPanelSummary.Appearance.BackColor = GridHeaderBlue;
             ultraPanelSummary.Appearance.BorderColor = GridFooterBorder;
             ultraPanelSummary.BorderStyle = UIElementBorderStyle.Solid;
-            
-            lblTotalSessionsCaption.Text = "Total Bills:";
-            lblTotalNetSalesCaption.Text = "Total Net Sales:";
-            lblTotalCollectionCaption.Text = "Total Tax:";
-            lblDifferenceCaption.Text = "Total Discount:";
 
-            StyleSummaryLabel(lblTotalSessionsCaption);
+            // Instantiate additional labels for Tender Split summary
+            if (lblCashSalesCaption == null)
+            {
+                lblCashSalesCaption = new Infragistics.Win.Misc.UltraLabel();
+                lblCashSalesValue = new Infragistics.Win.Misc.UltraLabel();
+                lblBankSalesCaption = new Infragistics.Win.Misc.UltraLabel();
+                lblBankSalesValue = new Infragistics.Win.Misc.UltraLabel();
+                lblCreditSalesCaption = new Infragistics.Win.Misc.UltraLabel();
+                lblCreditSalesValue = new Infragistics.Win.Misc.UltraLabel();
+                lblBillsSubtext = new Infragistics.Win.Misc.UltraLabel();
+                lblBankSubtext = new Infragistics.Win.Misc.UltraLabel();
+
+                ultraPanelSummary.ClientArea.Controls.Add(lblCashSalesCaption);
+                ultraPanelSummary.ClientArea.Controls.Add(lblCashSalesValue);
+                ultraPanelSummary.ClientArea.Controls.Add(lblBankSalesCaption);
+                ultraPanelSummary.ClientArea.Controls.Add(lblBankSalesValue);
+                ultraPanelSummary.ClientArea.Controls.Add(lblCreditSalesCaption);
+                ultraPanelSummary.ClientArea.Controls.Add(lblCreditSalesValue);
+                ultraPanelSummary.ClientArea.Controls.Add(lblBillsSubtext);
+                ultraPanelSummary.ClientArea.Controls.Add(lblBankSubtext);
+            }
+
+            // 1. Total Net Sales Card (Left: 15)
+            lblTotalNetSalesCaption.Text = "TOTAL NET SALES:";
+            lblTotalNetSalesCaption.Location = new Point(15, 8);
+            lblTotalNetSalesCaption.Size = new Size(200, 18);
             StyleSummaryLabel(lblTotalNetSalesCaption);
-            StyleSummaryLabel(lblTotalCollectionCaption);
-            StyleSummaryLabel(lblDifferenceCaption);
-            
-            StyleSummaryValueLabel(lblTotalSessionsValue);
+
+            lblTotalNetSalesValue.Location = new Point(15, 28);
+            lblTotalNetSalesValue.Size = new Size(210, 26);
             StyleSummaryValueLabel(lblTotalNetSalesValue);
-            StyleSummaryValueLabel(lblTotalCollectionValue);
-            StyleSummaryValueLabel(lblDifferenceValue);
+
+            lblBillsSubtext.Location = new Point(15, 56);
+            lblBillsSubtext.Size = new Size(210, 18);
+            lblBillsSubtext.Text = "0 Bills | SubTotal: ₹ 0.00";
+            StyleSubtextLabel(lblBillsSubtext);
+
+            // 2. Cash Sales Card (Left: 245)
+            lblCashSalesCaption.Text = "CASH SALES:";
+            lblCashSalesCaption.Location = new Point(245, 8);
+            lblCashSalesCaption.Size = new Size(190, 18);
+            StyleSummaryLabel(lblCashSalesCaption);
+
+            lblCashSalesValue.Location = new Point(245, 28);
+            lblCashSalesValue.Size = new Size(190, 26);
+            StyleSummaryValueLabel(lblCashSalesValue);
+            lblCashSalesValue.Appearance.ForeColor = Color.FromArgb(187, 247, 208);
+
+            lblTotalSessionsCaption.Text = "Cash in Drawer";
+            lblTotalSessionsCaption.Location = new Point(245, 56);
+            lblTotalSessionsCaption.Size = new Size(190, 18);
+            StyleSubtextLabel(lblTotalSessionsCaption);
+
+            // 3. Bank & Digital Card (Left: 455)
+            lblBankSalesCaption.Text = "BANK / DIGITAL (UPI/CARD):";
+            lblBankSalesCaption.Location = new Point(455, 8);
+            lblBankSalesCaption.Size = new Size(245, 18);
+            StyleSummaryLabel(lblBankSalesCaption);
+
+            lblBankSalesValue.Location = new Point(455, 28);
+            lblBankSalesValue.Size = new Size(245, 26);
+            StyleSummaryValueLabel(lblBankSalesValue);
+            lblBankSalesValue.Appearance.ForeColor = Color.FromArgb(191, 219, 254);
+
+            lblBankSubtext.Location = new Point(455, 56);
+            lblBankSubtext.Size = new Size(250, 18);
+            lblBankSubtext.Text = "UPI: ₹ 0.00 | Card/Bank: ₹ 0.00";
+            StyleSubtextLabel(lblBankSubtext);
+
+            // 4. Credit Sales Card (Left: 720)
+            lblCreditSalesCaption.Text = "CREDIT SALES:";
+            lblCreditSalesCaption.Location = new Point(720, 8);
+            lblCreditSalesCaption.Size = new Size(180, 18);
+            StyleSummaryLabel(lblCreditSalesCaption);
+
+            lblCreditSalesValue.Location = new Point(720, 28);
+            lblCreditSalesValue.Size = new Size(180, 26);
+            StyleSummaryValueLabel(lblCreditSalesValue);
+            lblCreditSalesValue.Appearance.ForeColor = Color.FromArgb(254, 240, 138);
+
+            lblTotalSessionsValue.Location = new Point(720, 56);
+            lblTotalSessionsValue.Size = new Size(180, 18);
+            lblTotalSessionsValue.Text = "Party / Customer Credit";
+            StyleSubtextLabel(lblTotalSessionsValue);
+
+            // 5. Tax & Discount Card (Left: 920)
+            lblTotalCollectionCaption.Text = "TAX & DISCOUNT:";
+            lblTotalCollectionCaption.Location = new Point(920, 8);
+            lblTotalCollectionCaption.Size = new Size(200, 18);
+            StyleSummaryLabel(lblTotalCollectionCaption);
+
+            lblTotalCollectionValue.Location = new Point(920, 28);
+            lblTotalCollectionValue.Size = new Size(200, 24);
+            lblTotalCollectionValue.Text = "Tax: ₹ 0.00";
+            StyleSummaryLabel(lblTotalCollectionValue);
+            lblTotalCollectionValue.Appearance.FontData.SizeInPoints = 10F;
+            lblTotalCollectionValue.Appearance.ForeColor = Color.FromArgb(254, 243, 199);
+
+            lblDifferenceValue.Location = new Point(920, 52);
+            lblDifferenceValue.Size = new Size(200, 24);
+            lblDifferenceValue.Text = "Discount: ₹ 0.00";
+            StyleSummaryLabel(lblDifferenceValue);
+            lblDifferenceValue.Appearance.FontData.SizeInPoints = 10F;
+            lblDifferenceValue.Appearance.ForeColor = Color.FromArgb(254, 202, 202);
+
+            lblDifferenceCaption.Visible = false;
+        }
+
+        private static void StyleSubtextLabel(Infragistics.Win.Misc.UltraLabel label)
+        {
+            if (label == null) return;
+            label.Appearance.BackColor = Color.Transparent;
+            label.Appearance.ForeColor = Color.FromArgb(219, 234, 254);
+            label.Appearance.FontData.Bold = DefaultableBoolean.False;
+            label.Appearance.FontData.Name = "Tahoma";
+            label.Appearance.FontData.SizeInPoints = 8.5F;
+            label.Appearance.TextHAlign = HAlign.Left;
         }
 
         private static void StyleSummaryLabel(Infragistics.Win.Misc.UltraLabel label)
@@ -248,6 +372,7 @@ namespace PosBranch_Win.Reports.SalesReports
             StyleFilterLabel(lblToDate);
             StyleFilterLabel(lblCounter);
             StyleFilterLabel(lblUser);
+            StyleFilterLabel(lblPayMode);
             StyleFilterLabel(lblQuickDate);
         }
 
@@ -265,6 +390,7 @@ namespace PosBranch_Win.Reports.SalesReports
             StyleFilterCombo(ultraComboPresetDates);
             StyleFilterCombo(ultraComboCounter);
             StyleFilterCombo(ultraComboUser);
+            StyleFilterCombo(ultraComboPayMode);
             StyleDateEditor(ultraDateTimeFrom);
             StyleDateEditor(ultraDateTimeTo);
         }
@@ -310,6 +436,7 @@ namespace PosBranch_Win.Reports.SalesReports
             toolTip.SetToolTip(ultraDateTimeTo, "Select end date for the report");
             toolTip.SetToolTip(ultraComboCounter, "Filter by specific Counter Name");
             toolTip.SetToolTip(ultraComboUser, "Filter by specific Cashier");
+            toolTip.SetToolTip(ultraComboPayMode, "Filter by Payment Mode (Bank, UPI, Card, Cash, Credit, etc.)");
             toolTip.SetToolTip(btnSearch, "Search with current filters (F5)");
             toolTip.SetToolTip(btnClear, "Clear all filters");
             toolTip.SetToolTip(btnExport, "Export to CSV (Ctrl+E)");
@@ -380,6 +507,25 @@ namespace PosBranch_Win.Reports.SalesReports
                     band.Columns["NetAmount"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
                     band.Columns["NetAmount"].CellAppearance.ForeColor = Color.FromArgb(46, 125, 50);
                 }
+
+                // Enable Grid Footer Summaries
+                e.Layout.Override.SummaryDisplayArea = SummaryDisplayAreas.BottomFixed | SummaryDisplayAreas.InGroupByRows;
+                e.Layout.Override.SummaryValueAppearance.TextHAlign = HAlign.Right;
+                e.Layout.Override.SummaryValueAppearance.FontData.Bold = DefaultableBoolean.True;
+                e.Layout.Override.SummaryValueAppearance.BackColor = Color.FromArgb(232, 241, 252);
+                e.Layout.Override.SummaryValueAppearance.ForeColor = Color.FromArgb(18, 49, 102);
+
+                band.Summaries.Clear();
+                if (band.Columns.Exists("NetAmount"))
+                    band.Summaries.Add("SumNetAmount", SummaryType.Sum, band.Columns["NetAmount"]).DisplayFormat = "{0:#,##0.00}";
+                if (band.Columns.Exists("SubTotal"))
+                    band.Summaries.Add("SumSubTotal", SummaryType.Sum, band.Columns["SubTotal"]).DisplayFormat = "{0:#,##0.00}";
+                if (band.Columns.Exists("TaxAmt"))
+                    band.Summaries.Add("SumTaxAmt", SummaryType.Sum, band.Columns["TaxAmt"]).DisplayFormat = "{0:#,##0.00}";
+                if (band.Columns.Exists("DiscountAmt"))
+                    band.Summaries.Add("SumDiscountAmt", SummaryType.Sum, band.Columns["DiscountAmt"]).DisplayFormat = "{0:#,##0.00}";
+                if (band.Columns.Exists("BillNo"))
+                    band.Summaries.Add("CountBillNo", SummaryType.Count, band.Columns["BillNo"]).DisplayFormat = "Total: {0} Bills";
             }
 
             e.Layout.AutoFitStyle = AutoFitStyle.None;
@@ -447,6 +593,49 @@ namespace PosBranch_Win.Reports.SalesReports
                     }
                 }
                 ultraComboUser.SelectedIndex = 0;
+
+                // Load Payment Modes / Tender types
+                ultraComboPayMode.Items.Clear();
+                ultraComboPayMode.Items.Add("", "--- All Payment Modes ---");
+                ultraComboPayMode.Items.Add("BANK_ALL", "Bank & Digital (All)");
+                ultraComboPayMode.Items.Add("Bank Transfer", "Bank Transfer");
+                ultraComboPayMode.Items.Add("UPI", "UPI / QR");
+                ultraComboPayMode.Items.Add("Card", "Card / POS");
+                ultraComboPayMode.Items.Add("Cash", "Cash");
+                ultraComboPayMode.Items.Add("Credit", "Credit / Account");
+
+                try
+                {
+                    var paymodeRepo = new Repository.MasterRepositry.PaymodeRepository();
+                    var allPaymodes = paymodeRepo.GetAllPaymodes();
+                    if (allPaymodes != null)
+                    {
+                        var standardKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                        {
+                            "Cash", "Credit", "Card", "Bank Transfer", "BankTransfer", "UPI", "Bank"
+                        };
+                        foreach (var pm in allPaymodes)
+                        {
+                            if (!string.IsNullOrWhiteSpace(pm.PayModeName) && !standardKeys.Contains(pm.PayModeName.Trim()))
+                            {
+                                ultraComboPayMode.Items.Add(pm.PayModeName.Trim(), pm.PayModeName.Trim());
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error loading master paymodes: {ex.Message}");
+                }
+
+                if (!string.IsNullOrEmpty(_initialPayMode))
+                {
+                    ultraComboPayMode.Value = _initialPayMode;
+                }
+                else
+                {
+                    ultraComboPayMode.SelectedIndex = 0;
+                }
             }
             catch (Exception ex)
             {
@@ -473,19 +662,8 @@ namespace PosBranch_Win.Reports.SalesReports
                 string selectedCounter = ultraComboCounter.Value?.ToString() ?? "";
                 int selectedUserId = Convert.ToInt32(ultraComboUser.Value ?? 0);
 
-                _currentData = _reportRepository.GetCounterReportData(fromDate, toDate, selectedCounter, selectedUserId);
-
-                if (_currentData != null && _currentData.Count > 0)
-                {
-                    ultraGridCounterReport.DataSource = _currentData;
-                    UpdateSummary();
-                }
-                else
-                {
-                    ultraGridCounterReport.DataSource = null;
-                    ClearSummary();
-                    MessageBox.Show("No records found for the selected criteria.", "Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
+                _allRawData = _reportRepository.GetCounterReportData(fromDate, toDate, selectedCounter, selectedUserId);
+                ApplyPayModeFilter();
             }
             catch (Exception ex)
             {
@@ -506,22 +684,146 @@ namespace PosBranch_Win.Reports.SalesReports
             }
 
             int totalBills = _currentData.Count;
+            decimal totalSubTotal = _currentData.Sum(x => x.SubTotal);
             decimal totalNetSales = _currentData.Sum(x => x.NetAmount);
             decimal totalTax = _currentData.Sum(x => x.TaxAmt);
             decimal totalDiscount = _currentData.Sum(x => x.DiscountAmt);
 
-            lblTotalSessionsValue.Text = totalBills.ToString("N0");
+            decimal cashSales = 0;
+            decimal bankCardSales = 0;
+            decimal upiSales = 0;
+            decimal creditSales = 0;
+
+            foreach (var item in _currentData)
+            {
+                string mode = (item.CashMode ?? "").Trim().ToLowerInvariant();
+                string paymode = (item.PaymodeName ?? "").Trim().ToLowerInvariant();
+
+                if (paymode.Contains("credit") || mode.Contains("credit"))
+                {
+                    creditSales += item.NetAmount;
+                }
+                else if (mode.Contains("upi"))
+                {
+                    upiSales += item.NetAmount;
+                }
+                else if (mode.Contains("card") || mode.Contains("bank") || mode.Contains("transfer") || mode.Contains("online") || mode.Contains("pos"))
+                {
+                    bankCardSales += item.NetAmount;
+                }
+                else if (mode.Contains("cash") || paymode.Contains("cash"))
+                {
+                    cashSales += item.NetAmount;
+                }
+                else
+                {
+                    cashSales += item.NetAmount;
+                }
+            }
+
+            decimal digitalTotal = bankCardSales + upiSales;
+
             lblTotalNetSalesValue.Text = "₹ " + totalNetSales.ToString("N2");
-            lblTotalCollectionValue.Text = "₹ " + totalTax.ToString("N2");
-            lblDifferenceValue.Text = "₹ " + totalDiscount.ToString("N2");
+            if (lblBillsSubtext != null)
+                lblBillsSubtext.Text = $"{totalBills} Bills | SubTotal: ₹ {totalSubTotal:N2}";
+
+            if (lblCashSalesValue != null)
+                lblCashSalesValue.Text = "₹ " + cashSales.ToString("N2");
+
+            if (lblBankSalesValue != null)
+                lblBankSalesValue.Text = "₹ " + digitalTotal.ToString("N2");
+
+            if (lblBankSubtext != null)
+                lblBankSubtext.Text = $"UPI: ₹ {upiSales:N2} | Bank/Card: ₹ {bankCardSales:N2}";
+
+            if (lblCreditSalesValue != null)
+                lblCreditSalesValue.Text = "₹ " + creditSales.ToString("N2");
+
+            lblTotalCollectionValue.Text = "Tax: ₹ " + totalTax.ToString("N2");
+            lblDifferenceValue.Text = "Discount: ₹ " + totalDiscount.ToString("N2");
         }
 
         private void ClearSummary()
         {
-            lblTotalSessionsValue.Text = "0";
             lblTotalNetSalesValue.Text = "₹ 0.00";
-            lblTotalCollectionValue.Text = "₹ 0.00";
-            lblDifferenceValue.Text = "₹ 0.00";
+            if (lblBillsSubtext != null) lblBillsSubtext.Text = "0 Bills | SubTotal: ₹ 0.00";
+            if (lblCashSalesValue != null) lblCashSalesValue.Text = "₹ 0.00";
+            if (lblBankSalesValue != null) lblBankSalesValue.Text = "₹ 0.00";
+            if (lblBankSubtext != null) lblBankSubtext.Text = "UPI: ₹ 0.00 | Bank/Card: ₹ 0.00";
+            if (lblCreditSalesValue != null) lblCreditSalesValue.Text = "₹ 0.00";
+            lblTotalCollectionValue.Text = "Tax: ₹ 0.00";
+            lblDifferenceValue.Text = "Discount: ₹ 0.00";
+        }
+
+        private void UpdateFilterLayout()
+        {
+            string preset = ultraComboPresetDates.Value?.ToString() ?? "ThisMonth";
+            bool isCustom = string.Equals(preset, "Custom", StringComparison.OrdinalIgnoreCase);
+
+            lblFromDate.Visible = isCustom;
+            ultraDateTimeFrom.Visible = isCustom;
+            lblToDate.Visible = isCustom;
+            ultraDateTimeTo.Visible = isCustom;
+
+            int left = 10;
+            int top = 26;
+            int labelTop = 29;
+
+            // 1. Range Preset Combo first on the left
+            lblQuickDate.Text = "Range:";
+            lblQuickDate.Location = new Point(left, labelTop);
+            left += lblQuickDate.PreferredWidth + 6;
+            ultraComboPresetDates.Location = new Point(left, top);
+            ultraComboPresetDates.Width = 120;
+            left += ultraComboPresetDates.Width + 14;
+
+            // 2. Custom Date Pickers (only shown when Custom is chosen)
+            if (isCustom)
+            {
+                lblFromDate.Location = new Point(left, labelTop);
+                left += lblFromDate.PreferredWidth + 5;
+                ultraDateTimeFrom.Location = new Point(left, top);
+                ultraDateTimeFrom.Width = 100;
+                left += ultraDateTimeFrom.Width + 12;
+
+                lblToDate.Location = new Point(left, labelTop);
+                left += lblToDate.PreferredWidth + 5;
+                ultraDateTimeTo.Location = new Point(left, top);
+                ultraDateTimeTo.Width = 100;
+                left += ultraDateTimeTo.Width + 14;
+            }
+
+            // 3. Counter Filter
+            lblCounter.Location = new Point(left, labelTop);
+            left += lblCounter.PreferredWidth + 5;
+            ultraComboCounter.Location = new Point(left, top);
+            ultraComboCounter.Width = 125;
+            left += ultraComboCounter.Width + 12;
+
+            // 4. Cashier Filter
+            lblUser.Location = new Point(left, labelTop);
+            left += lblUser.PreferredWidth + 5;
+            ultraComboUser.Location = new Point(left, top);
+            ultraComboUser.Width = 125;
+            left += ultraComboUser.Width + 12;
+
+            // 5. Payment Mode / Bank Filter
+            lblPayMode.Location = new Point(left, labelTop);
+            left += lblPayMode.PreferredWidth + 5;
+            ultraComboPayMode.Location = new Point(left, top);
+            ultraComboPayMode.Width = 140;
+            left += ultraComboPayMode.Width + 16;
+
+            // 6. Action Buttons
+            btnSearch.Location = new Point(left, top - 2);
+            left += btnSearch.Width + 6;
+            btnClear.Location = new Point(left, top - 2);
+            left += btnClear.Width + 6;
+            btnExport.Location = new Point(left, top - 2);
+            left += btnExport.Width + 6;
+            btnPrint.Location = new Point(left, top - 2);
+            left += btnPrint.Width + 6;
+            btnClose.Location = new Point(left, top - 2);
         }
 
         private void ultraComboPresetDates_ValueChanged(object sender, EventArgs e)
@@ -585,13 +887,16 @@ namespace PosBranch_Win.Reports.SalesReports
                     toDate = new DateTime(DateTime.Now.Year - 1, 12, 31).AddHours(23).AddMinutes(59).AddSeconds(59);
                     break;
                 case "Custom":
+                    UpdateFilterLayout();
                     return;
                 default:
+                    UpdateFilterLayout();
                     return;
             }
 
             ultraDateTimeFrom.Value = fromDate;
             ultraDateTimeTo.Value = toDate;
+            UpdateFilterLayout();
         }
 
         private void btnSearch_Click(object sender, EventArgs e)
@@ -604,12 +909,155 @@ namespace PosBranch_Win.Reports.SalesReports
 
         private void btnClear_Click(object sender, EventArgs e)
         {
-            ultraDateTimeFrom.Value = DateTime.Now.AddDays(-30);
-            ultraDateTimeTo.Value = DateTime.Now;
+            ultraComboPresetDates.Value = "ThisMonth";
+            UpdateFilterLayout();
             ultraComboCounter.SelectedIndex = 0;
             ultraComboUser.SelectedIndex = 0;
+            ultraComboPayMode.SelectedIndex = 0;
+            _allRawData = null;
+            _currentData = null;
             ultraGridCounterReport.DataSource = null;
             ClearSummary();
+        }
+
+        private void ultraComboPayMode_ValueChanged(object sender, EventArgs e)
+        {
+            if (_allRawData != null)
+            {
+                ApplyPayModeFilter();
+            }
+            else
+            {
+                LoadData();
+            }
+        }
+
+        private void ApplyPayModeFilter()
+        {
+            if (_allRawData == null)
+            {
+                _currentData = new List<CounterReportModel>();
+                ultraGridCounterReport.DataSource = null;
+                ClearSummary();
+                return;
+            }
+
+            string selectedMode = (ultraComboPayMode.Value?.ToString() ?? "").Trim();
+
+            if (string.IsNullOrEmpty(selectedMode) || string.Equals(selectedMode, "ALL", StringComparison.OrdinalIgnoreCase))
+            {
+                _currentData = _allRawData.ToList();
+            }
+            else if (string.Equals(selectedMode, "BANK_ALL", StringComparison.OrdinalIgnoreCase))
+            {
+                _currentData = _allRawData.Where(IsBankOrDigital).ToList();
+            }
+            else if (string.Equals(selectedMode, "Bank Transfer", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(selectedMode, "Bank", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(selectedMode, "BankTransfer", StringComparison.OrdinalIgnoreCase))
+            {
+                _currentData = _allRawData.Where(IsBankTransfer).ToList();
+            }
+            else if (string.Equals(selectedMode, "UPI", StringComparison.OrdinalIgnoreCase))
+            {
+                _currentData = _allRawData.Where(IsUpi).ToList();
+            }
+            else if (string.Equals(selectedMode, "Card", StringComparison.OrdinalIgnoreCase))
+            {
+                _currentData = _allRawData.Where(IsCard).ToList();
+            }
+            else if (string.Equals(selectedMode, "Cash", StringComparison.OrdinalIgnoreCase))
+            {
+                _currentData = _allRawData.Where(IsCash).ToList();
+            }
+            else if (string.Equals(selectedMode, "Credit", StringComparison.OrdinalIgnoreCase))
+            {
+                _currentData = _allRawData.Where(IsCredit).ToList();
+            }
+            else
+            {
+                _currentData = _allRawData.Where(x => MatchesPayMode(x, selectedMode)).ToList();
+            }
+
+            if (_currentData != null && _currentData.Count > 0)
+            {
+                ultraGridCounterReport.DataSource = _currentData;
+                UpdateSummary();
+            }
+            else
+            {
+                ultraGridCounterReport.DataSource = null;
+                ClearSummary();
+            }
+        }
+
+        private static bool IsCredit(CounterReportModel x)
+        {
+            if (x == null) return false;
+            string pm = (x.PaymodeName ?? "").ToLowerInvariant();
+            string cm = (x.CashMode ?? "").ToLowerInvariant();
+            return pm.Contains("credit") || cm.Contains("credit");
+        }
+
+        private static bool IsUpi(CounterReportModel x)
+        {
+            if (x == null) return false;
+            if (IsCredit(x)) return false;
+            string pm = (x.PaymodeName ?? "").ToLowerInvariant();
+            string cm = (x.CashMode ?? "").ToLowerInvariant();
+            return pm.Contains("upi") || cm.Contains("upi") || pm.Contains("qr") || cm.Contains("qr");
+        }
+
+        private static bool IsCard(CounterReportModel x)
+        {
+            if (x == null) return false;
+            if (IsCredit(x)) return false;
+            string pm = (x.PaymodeName ?? "").ToLowerInvariant();
+            string cm = (x.CashMode ?? "").ToLowerInvariant();
+            return pm.Contains("card") || cm.Contains("card") || pm.Contains("pos") || cm.Contains("pos");
+        }
+
+        private static bool IsBankTransfer(CounterReportModel x)
+        {
+            if (x == null) return false;
+            if (IsCredit(x)) return false;
+            string pm = (x.PaymodeName ?? "").ToLowerInvariant();
+            string cm = (x.CashMode ?? "").ToLowerInvariant();
+            return pm.Contains("bank") || cm.Contains("bank") ||
+                   pm.Contains("transfer") || cm.Contains("transfer") ||
+                   pm.Contains("neft") || cm.Contains("neft") ||
+                   pm.Contains("rtgs") || cm.Contains("rtgs") ||
+                   pm.Contains("imps") || cm.Contains("imps");
+        }
+
+        private static bool IsBankOrDigital(CounterReportModel x)
+        {
+            if (x == null) return false;
+            if (IsCredit(x)) return false;
+            string pm = (x.PaymodeName ?? "").ToLowerInvariant();
+            string cm = (x.CashMode ?? "").ToLowerInvariant();
+            return IsBankTransfer(x) || IsUpi(x) || IsCard(x) ||
+                   pm.Contains("online") || cm.Contains("online") ||
+                   pm.Contains("digital") || cm.Contains("digital");
+        }
+
+        private static bool IsCash(CounterReportModel x)
+        {
+            if (x == null) return false;
+            if (IsCredit(x)) return false;
+            if (IsBankOrDigital(x)) return false;
+            string pm = (x.PaymodeName ?? "").ToLowerInvariant();
+            string cm = (x.CashMode ?? "").ToLowerInvariant();
+            return pm.Contains("cash") || cm.Contains("cash") || (string.IsNullOrWhiteSpace(pm) && string.IsNullOrWhiteSpace(cm));
+        }
+
+        private static bool MatchesPayMode(CounterReportModel x, string targetMode)
+        {
+            if (x == null || string.IsNullOrWhiteSpace(targetMode)) return false;
+            string pm = (x.PaymodeName ?? "");
+            string cm = (x.CashMode ?? "");
+            return pm.IndexOf(targetMode, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                   cm.IndexOf(targetMode, StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         private void btnExport_Click(object sender, EventArgs e)

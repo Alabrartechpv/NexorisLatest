@@ -361,8 +361,13 @@ namespace PosBranch_Win.Dashboard
             int containerWidth = Math.Max(960, pnlScrollableContent.ClientSize.Width - (leftMargin * 2));
             int currentY = 8;
 
+            if (lblDashboardSubtitle != null)
+            {
+                lblDashboardSubtitle.Text = "41 Key Business Metrics, EOD Reconciliation & Performance Matrix";
+            }
+
             // ═══════════════════════════════════════════════════════════════════
-            // ALL 36 METRICS IN EXACT NUMERICAL ORDER (1 to 36)
+            // ALL 41 METRICS IN EXACT NUMERICAL ORDER (1 to 41)
             // ═══════════════════════════════════════════════════════════════════
             var allCards = new List<Control>
             {
@@ -481,7 +486,25 @@ namespace PosBranch_Win.Dashboard
                 CreateKpiCard("38. Manual Balance", "Total outstanding manual party balances (Customers & Vendors)", FormatCurr(_model.TotalManualBalance), $"Cust: {FormatCurr(_model.ManualCustomerBalance)} | Supp: {FormatCurr(_model.ManualVendorBalance)}", Color.FromArgb(123, 31, 162), () => DrillDown("ManualPartyBalanceReport")),
 
                 // 39. Cash In / Cash Out Flow
-                CreateKpiCard("39. Cash In / Out", "Total cash movement: Money In vs Money Out", FormatCurr(_model.NetCashFlow), $"In: {FormatCurr(_model.TotalCashIn)} | Out: {FormatCurr(_model.TotalCashOut)}", _model.NetCashFlow >= 0 ? Color.FromArgb(46, 125, 50) : Color.FromArgb(198, 40, 40), () => DrillDown("CashInOutReport"))
+                CreateKpiCard("39. Cash In / Out", "Total cash movement: Money In vs Money Out", FormatCurr(_model.NetCashFlow), $"In: {FormatCurr(_model.TotalCashIn)} | Out: {FormatCurr(_model.TotalCashOut)}", _model.NetCashFlow >= 0 ? Color.FromArgb(46, 125, 50) : Color.FromArgb(198, 40, 40), () => DrillDown("CashInOutReport")),
+
+                // 40. Daily Tender Split (Cash vs Bank/UPI Sales & Reconciliation)
+                CreateKpiCard("40. Cash vs Bank Sales", "Daily sales tender breakup: Cash vs Bank/UPI/Card with day-end reconciliation", FormatCurr((_model.DailyCashSales + _model.DailyBankSales) > 0 ? (_model.DailyCashSales + _model.DailyBankSales) : _model.TotalSalesRevenue), $"Cash: {FormatCurr(_model.DailyCashSales)} | Bank: {FormatCurr(_model.DailyBankSales)}", Color.FromArgb(13, 148, 136), () => DrillDown("CounterReport")),
+
+                // 41. Counter Cash Shortage / Excess Tracker (Discrepancy Audit)
+                CreateKpiCard("41. Shortage / Excess", "Counter cash discrepancy: Counted vs System Expected cash (Shift/Day Close)",
+                    _model.NetCashDifference == 0 
+                        ? "₹ 0.00 (Balanced)" 
+                        : (_model.NetCashDifference < 0 
+                            ? $"- {FormatCurr(Math.Abs(_model.NetCashDifference))} (Shortage)" 
+                            : $"+ {FormatCurr(_model.NetCashDifference)} (Excess)"),
+                    _model.NetCashDifference < 0 
+                        ? $"Shortage: {FormatCurr(Math.Abs(_model.TotalShortageAmount))} ({_model.ShortageShiftCount} Shifts)" 
+                        : (_model.NetCashDifference > 0 
+                            ? $"Excess: {FormatCurr(_model.TotalExcessAmount)} ({_model.ExcessShiftCount} Shifts)" 
+                            : (_model.TotalShiftClosingCount > 0 ? $"All {_model.TotalShiftClosingCount} Shifts Balanced" : "0 Discrepancy (Reconciled)")),
+                    _model.NetCashDifference < 0 ? Color.FromArgb(220, 38, 38) : (_model.NetCashDifference > 0 ? Color.FromArgb(37, 99, 235) : Color.FromArgb(22, 163, 74)),
+                    () => DrillDown("ShiftReconciliation"))
             };
 
             // Display in clean full-width responsive grid:
@@ -995,6 +1018,21 @@ namespace PosBranch_Win.Dashboard
                     case "ManualBalance":
                         formToOpen = new Reports.FinancialReports.FrmManualPartyBalanceReport();
                         title = "Manual Party Balance Report";
+                        break;
+                    case "CounterReport":
+                    case "TenderSplit":
+                        formToOpen = new Reports.SalesReports.frmCounterReport();
+                        title = "Counter Report & Tender Breakdown";
+                        break;
+                    case "ShiftReconciliation":
+                    case "DailyReconciliation":
+                    case "ShortageExcess":
+                        formToOpen = new Reports.FinancialReports.FrmShiftReconciliationReport();
+                        title = "Shift Cashier Reconciliation & Z-Report Audit";
+                        break;
+                    case "BankReconciliation":
+                        formToOpen = new Accounts.FrmBankReconciliation();
+                        title = "Bank Reconciliation";
                         break;
                 }
 
@@ -1702,7 +1740,9 @@ namespace PosBranch_Win.Dashboard
                 Tuple.Create(35, "Price Change Modifications", $"{_model.PriceChangeCount} Events", "Item Master price updates"),
                 Tuple.Create(36, "Physical Stock Discrepancy Logs", $"{_model.StockAdjustmentCount} Adjustments", "Stock reconciliation entries"),
                 Tuple.Create(37, "Manual Party Balance", FormatCurr(_model.TotalManualBalance), $"Cust: {FormatCurr(_model.ManualCustomerBalance)} | Supp: {FormatCurr(_model.ManualVendorBalance)} ({_model.ManualBalanceCount} Open Entries)"),
-                Tuple.Create(38, "Cash In / Cash Out Flow", FormatCurr(_model.NetCashFlow), $"In: {FormatCurr(_model.TotalCashIn)} | Out: {FormatCurr(_model.TotalCashOut)} (Net)")
+                Tuple.Create(38, "Cash In / Cash Out Flow", FormatCurr(_model.NetCashFlow), $"In: {FormatCurr(_model.TotalCashIn)} | Out: {FormatCurr(_model.TotalCashOut)} (Net)"),
+                Tuple.Create(39, "Daily Cash vs Bank Sales (Tender Split)", FormatCurr((_model.DailyCashSales + _model.DailyBankSales) > 0 ? (_model.DailyCashSales + _model.DailyBankSales) : _model.TotalSalesRevenue), $"Cash: {FormatCurr(_model.DailyCashSales)} | Bank/UPI: {FormatCurr(_model.DailyBankSales)}"),
+                Tuple.Create(40, "Counter Cash Shortage / Excess Tracker", _model.NetCashDifference == 0 ? "₹ 0.00 (Balanced)" : (_model.NetCashDifference < 0 ? $"- {FormatCurr(Math.Abs(_model.NetCashDifference))} (Shortage)" : $"+ {FormatCurr(_model.NetCashDifference)} (Excess)"), $"Expected: {FormatCurr(_model.TotalExpectedCash)} | Counted: {FormatCurr(_model.TotalCountedCash)} ({_model.TotalShiftClosingCount} Shifts)")
             };
 
             foreach (var item in summaryList)
@@ -1756,7 +1796,7 @@ namespace PosBranch_Win.Dashboard
             sb.AppendLine("</style></head><body><div class='container'>");
 
             string filterLabel = GetFilterLabel();
-            sb.AppendLine("<h1>Executive Business KPI Cockpit — 37 Key Metrics</h1>");
+            sb.AppendLine("<h1>Executive Business KPI Cockpit — 41 Key Metrics &amp; EOD Reconciliation</h1>");
             sb.AppendLine($"<div class='meta'>{EscapeXml(filterLabel)} | Generated: <b>{_model.GeneratedAt:dd-MMM-yyyy hh:mm tt}</b></div>");
 
             // 1. Growth Performance Matrix
@@ -1777,8 +1817,8 @@ namespace PosBranch_Win.Dashboard
             }
             sb.AppendLine("</table></div>");
 
-            // 2. Complete 37 KPI Summary Table
-            sb.AppendLine("<h2>2. Complete 37 Business KPI Summary</h2>");
+            // 2. Complete 41 KPI Summary Table
+            sb.AppendLine("<h2>2. Complete 41 Business KPI Summary</h2>");
             sb.AppendLine("<table><tr><th style='width:50px;'>#</th><th>Metric Name</th><th style='text-align:right;'>Value</th><th>Business Context & Notes</th></tr>");
             sb.AppendLine($"<tr><td>1</td><td>Total Stock Value</td><td class='value'>{FormatCurr(_model.TotalStockCostValue)}</td><td>Valued at Cost Price ({_model.TotalStockItemCount:N0} Items, {_model.TotalStockQuantity:N0} Units)</td></tr>");
             sb.AppendLine($"<tr><td>2</td><td>Stock Profit Potential</td><td class='value'>{FormatCurr(_model.StockProfitPotential)}</td><td>Retail Value: {FormatCurr(_model.TotalStockRetailValue)}</td></tr>");
@@ -1818,6 +1858,8 @@ namespace PosBranch_Win.Dashboard
             sb.AppendLine($"<tr><td>36</td><td>Physical Stock Discrepancy Logs</td><td class='value'>{_model.StockAdjustmentCount} Adjustments</td><td>Stock reconciliation entries</td></tr>");
             sb.AppendLine($"<tr><td>37</td><td>Manual Party Balance</td><td class='value'>{FormatCurr(_model.TotalManualBalance)}</td><td>Cust: {FormatCurr(_model.ManualCustomerBalance)} | Supp: {FormatCurr(_model.ManualVendorBalance)} ({_model.ManualBalanceCount} Open Entries)</td></tr>");
             sb.AppendLine($"<tr><td>38</td><td>Cash In / Cash Out Flow</td><td class='value'>{FormatCurr(_model.NetCashFlow)}</td><td>In: {FormatCurr(_model.TotalCashIn)} | Out: {FormatCurr(_model.TotalCashOut)} (Net)</td></tr>");
+            sb.AppendLine($"<tr><td>39</td><td>Daily Cash vs Bank Sales</td><td class='value'>{FormatCurr((_model.DailyCashSales + _model.DailyBankSales) > 0 ? (_model.DailyCashSales + _model.DailyBankSales) : _model.TotalSalesRevenue)}</td><td>Cash: {FormatCurr(_model.DailyCashSales)} | Bank/UPI: {FormatCurr(_model.DailyBankSales)}</td></tr>");
+            sb.AppendLine($"<tr><td>40</td><td>Counter Cash Shortage / Excess</td><td class='value' style='color:{(_model.NetCashDifference < 0 ? "#dc2626" : "#16a34a")};'>{(_model.NetCashDifference == 0 ? "₹ 0.00 (Balanced)" : (_model.NetCashDifference < 0 ? $"- {FormatCurr(Math.Abs(_model.NetCashDifference))} (Shortage)" : $"+ {FormatCurr(_model.NetCashDifference)} (Excess)"))}</td><td>Expected: {FormatCurr(_model.TotalExpectedCash)} | Counted: {FormatCurr(_model.TotalCountedCash)} ({_model.TotalShiftClosingCount} Shifts)</td></tr>");
             sb.AppendLine("</table>");
 
             sb.AppendLine("</div></body></html>");
@@ -1867,10 +1909,12 @@ namespace PosBranch_Win.Dashboard
             sb.AppendLine($"36,Physical Stock Discrepancy Logs,\"{_model.StockAdjustmentCount}\",Stock Adjustments");
             sb.AppendLine($"37,Manual Party Balance,\"{_model.TotalManualBalance:N2}\",Cust: {_model.ManualCustomerBalance:N2} | Supp: {_model.ManualVendorBalance:N2} (Entries: {_model.ManualBalanceCount})");
             sb.AppendLine($"38,Cash In / Cash Out Flow,\"{_model.NetCashFlow:N2}\",In: {_model.TotalCashIn:N2} | Out: {_model.TotalCashOut:N2} (Net)");
+            sb.AppendLine($"39,Daily Cash vs Bank Sales,\"{((_model.DailyCashSales + _model.DailyBankSales) > 0 ? (_model.DailyCashSales + _model.DailyBankSales) : _model.TotalSalesRevenue):N2}\",Cash: {_model.DailyCashSales:N2} | Bank/UPI: {_model.DailyBankSales:N2}");
+            sb.AppendLine($"40,Counter Cash Shortage / Excess,\"{(_model.NetCashDifference == 0 ? "0.00 (Balanced)" : (_model.NetCashDifference < 0 ? $"-{Math.Abs(_model.NetCashDifference):N2} (Shortage)" : $"+{_model.NetCashDifference:N2} (Excess)"))}\",Expected: {_model.TotalExpectedCash:N2} | Counted: {_model.TotalCountedCash:N2}");
 
             // Growth Matrix in CSV
             sb.AppendLine();
-            sb.AppendLine("38. Growth Performance Matrix");
+            sb.AppendLine("Growth Performance Matrix");
             sb.AppendLine("Period,1.Stock,2.StkProfit,3.DeadStock,4.NegStk,5.NegItems,6.Loss,7.Extra,8.AdjBal,9.ExcAlert,10.LowAlert,11.Reorder,12.Sales,13.SalesRet,14.Purchases,15.PurchRet,16.HoldBills,17.GrossProfit,18.Expenses,19.NetProfit,20.OpMargin%,21.NetGST,22.Cash,23.Bank,24.VenOut,25.CustOut,26.DelayCust,27.DelaySupp,28.NBA,29.Drawings,30.BadDebt,31.WriteOff,32.SupAdvance,33.CustAdvance,34.Deletions,35.PriceChange,36.StockAdj,37.ManualBal,Sales Growth %,Profit Growth %");
 
             if (_model.MonthlyGrowthMatrix != null && _model.MonthlyGrowthMatrix.Count > 0)
