@@ -7357,6 +7357,12 @@ namespace PosBranch_Win.Transaction
                 System.Diagnostics.Debug.WriteLine("Error in ultraGrid1_InitializeRow: " + ex.Message);
             }
         }
+
+        public void LoadBillByBillNo(long billNo)
+        {
+            SalesList_OnSalesSelected(billNo, string.Empty, 0);
+        }
+
         private void SalesList_OnSalesSelected(Int64 billNo, string customerName, double netAmount)
         {
             try
