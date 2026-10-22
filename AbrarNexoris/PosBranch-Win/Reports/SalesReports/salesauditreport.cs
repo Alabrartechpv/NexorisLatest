@@ -6,6 +6,7 @@ using ModelClass;
 using ModelClass.Master;
 using ModelClass.Report;
 using PosBranch_Win.DialogBox;
+using PosBranch_Win.Reports;
 using PosBranch_Win.Reports.FinancialReports;
 using PosBranch_Win.Transaction;
 using Repository;
@@ -172,6 +173,7 @@ namespace PosBranch_Win.Reports.SalesReports
                 CreateFooterCells();
                 UpdateFooterCellPositions();
                 UpdateFooterValues();
+                ReportGridLayoutHelper.SaveLayout("SalesAuditReport", gridReport, userHiddenColumnKeys);
             };
             gridReport.AfterColRegionScroll += (s, e) => UpdateFooterCellPositions();
             gridReport.AfterRowRegionScroll += (s, e) => UpdateFooterCellPositions();
@@ -191,6 +193,8 @@ namespace PosBranch_Win.Reports.SalesReports
 
         private void salesauditreport_FormClosing(object sender, FormClosingEventArgs e)
         {
+            ReportGridLayoutHelper.SaveLayout("SalesAuditReport", gridReport, userHiddenColumnKeys);
+
             if (columnChooserForm != null && !columnChooserForm.IsDisposed)
             {
                 columnChooserForm.Dispose();
@@ -209,6 +213,7 @@ namespace PosBranch_Win.Reports.SalesReports
             _isLoading = true;
             try
             {
+                ReportGridLayoutHelper.LoadHiddenColumns("SalesAuditReport", userHiddenColumnKeys);
                 Text = "Sales Audit Report";
                 if (TopLevel)
                 {
@@ -1088,21 +1093,26 @@ namespace PosBranch_Win.Reports.SalesReports
 
         private static bool IsCustomizableColumn(UltraGridColumn col)
         {
-            if (col == null || col.IsChaptered) return false;
-            return true;
+            if (col == null || col.IsChaptered || col.ExcludeFromColumnChooser == ExcludeFromColumnChooser.True) return false;
+            string key = col.Key;
+            return !string.Equals(key, "PeriodKey", StringComparison.OrdinalIgnoreCase) &&
+                   !string.Equals(key, "DetailID", StringComparison.OrdinalIgnoreCase) &&
+                   !key.EndsWith("Id", StringComparison.OrdinalIgnoreCase);
         }
 
         private void HideColumnWithAnimation(UltraGridColumn column)
         {
-            if (column == null) return;
+            if (column == null || !IsCustomizableColumn(column)) return;
 
             string keyWithBand = $"{column.Band.Index}:{column.Key}";
             userHiddenColumnKeys.Add(keyWithBand);
+            userHiddenColumnKeys.Add(column.Key);
             column.Hidden = true;
 
             CreateFooterCells();
             UpdateFooterCellPositions();
             UpdateFooterValues();
+            ReportGridLayoutHelper.SaveLayout("SalesAuditReport", gridReport, userHiddenColumnKeys);
             ShowColumnChooser(autoOpenIfClosed: false);
         }
 
@@ -1376,6 +1386,7 @@ namespace PosBranch_Win.Reports.SalesReports
             if (band.Columns.Exists(columnKey))
             {
                 userHiddenColumnKeys.Remove($"{bandIndex}:{columnKey}");
+                userHiddenColumnKeys.Remove(columnKey);
                 UltraGridColumn col = band.Columns[columnKey];
                 col.Hidden = false;
                 if (targetPosition >= 0)
@@ -1385,6 +1396,7 @@ namespace PosBranch_Win.Reports.SalesReports
                 CreateFooterCells();
                 UpdateFooterCellPositions();
                 UpdateFooterValues();
+                ReportGridLayoutHelper.SaveLayout("SalesAuditReport", gridReport, userHiddenColumnKeys);
                 PopulateColumnChooserListBox();
             }
         }
@@ -1399,7 +1411,7 @@ namespace PosBranch_Win.Reports.SalesReports
             {
                 foreach (UltraGridColumn col in gridReport.DisplayLayout.Bands[b].Columns)
                 {
-                    if (IsCustomizableColumn(col))
+                    if (IsCustomizableColumn(col) && col.ExcludeFromColumnChooser != ExcludeFromColumnChooser.True)
                     {
                         col.Hidden = false;
                     }
@@ -1408,6 +1420,7 @@ namespace PosBranch_Win.Reports.SalesReports
             CreateFooterCells();
             UpdateFooterCellPositions();
             UpdateFooterValues();
+            ReportGridLayoutHelper.SaveLayout("SalesAuditReport", gridReport, userHiddenColumnKeys);
             PopulateColumnChooserListBox();
         }
 
@@ -2056,12 +2069,31 @@ namespace PosBranch_Win.Reports.SalesReports
             for (int b = 0; b < e.Layout.Bands.Count; b++)
             {
                 UltraGridBand band = e.Layout.Bands[b];
+                foreach (UltraGridColumn col in band.Columns)
+                {
+                    col.ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
+                }
                 ConfigureBandByKey(band, b);
+
+                foreach (UltraGridColumn col in band.Columns)
+                {
+                    if (col.Key == "PeriodKey" || col.Key == "DetailID" || col.Key.EndsWith("Id", StringComparison.OrdinalIgnoreCase))
+                    {
+                        col.Hidden = true;
+                        col.ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
+                    }
+                }
             }
+
+            ReportGridLayoutHelper.ApplySavedLayout("SalesAuditReport", gridReport, userHiddenColumnKeys);
 
             CreateFooterCells();
             UpdateFooterCellPositions();
             UpdateFooterValues();
+            if (columnChooserForm != null && columnChooserForm.Visible)
+            {
+                PopulateColumnChooserListBox();
+            }
         }
 
         private void ConfigureBandByKey(UltraGridBand band, int bandIndex)
@@ -2299,7 +2331,8 @@ namespace PosBranch_Win.Reports.SalesReports
                 return;
 
             UltraGridColumn column = band.Columns[key];
-            column.Hidden = userHiddenColumnKeys.Contains($"{bandIndex}:{key}");
+            column.ExcludeFromColumnChooser = ExcludeFromColumnChooser.False;
+            column.Hidden = userHiddenColumnKeys.Contains($"{bandIndex}:{key}") || userHiddenColumnKeys.Contains(key);
             column.Header.Caption = header;
             column.Width = width;
             column.Header.VisiblePosition = visiblePosition;

@@ -12,6 +12,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
+using PosBranch_Win.Reports;
 
 namespace PosBranch_Win.Reports.FinancialReports
 {
@@ -41,6 +42,7 @@ namespace PosBranch_Win.Reports.FinancialReports
         private List<CustomerGridList> _customers;
         private readonly Dictionary<string, Label> _footerLabels;
         private readonly Dictionary<string, string> _columnAggregations;
+        private readonly HashSet<string> userHiddenColumnKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private bool _isLoading;
         private bool _isSyncingCustomerControls;
         private bool _suppressLayoutSave;
@@ -136,6 +138,7 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             try
             {
+                ReportGridLayoutHelper.LoadHiddenColumns("CustomerOutstandingReport", userHiddenColumnKeys);
                 Text = "Customer Outstanding Listing";
                 WindowState = FormWindowState.Maximized;
                 StartPosition = FormStartPosition.CenterScreen;
@@ -634,6 +637,11 @@ namespace PosBranch_Win.Reports.FinancialReports
                 band.Override.HeaderAppearance.ForeColor = Color.White;
                 band.Override.HeaderAppearance.BorderColor = BorderBlue;
 
+                foreach (UltraGridColumn col in band.Columns)
+                {
+                    col.ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
+                }
+
                 if (band.Columns.Exists("SalesmanId")) { band.Columns["SalesmanId"].Hidden = true; band.Columns["SalesmanId"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.True; }
                 if (band.Columns.Exists("CategoryId")) { band.Columns["CategoryId"].Hidden = true; band.Columns["CategoryId"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.True; }
                 if (band.Columns.Exists("CategoryName")) { band.Columns["CategoryName"].Hidden = true; band.Columns["CategoryName"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.True; }
@@ -665,6 +673,8 @@ namespace PosBranch_Win.Reports.FinancialReports
         {
             if (!band.Columns.Exists(key)) return;
             UltraGridColumn col = band.Columns[key];
+            col.ExcludeFromColumnChooser = ExcludeFromColumnChooser.False;
+            col.Hidden = userHiddenColumnKeys.Contains(key);
             col.Header.Caption = caption;
             col.Width = width;
             col.CellAppearance.TextHAlign = align;
@@ -1863,6 +1873,7 @@ namespace PosBranch_Win.Reports.FinancialReports
         {
             if (column == null || column.Hidden) return;
 
+            userHiddenColumnKeys.Add(column.Key);
             _savedColumnWidths[column.Key] = column.Width;
             gridReport.SuspendLayout();
             column.Hidden = true;
@@ -1880,6 +1891,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             if (gridReport.DisplayLayout.Bands.Count == 0 || !gridReport.DisplayLayout.Bands[0].Columns.Exists(columnKey))
                 return;
 
+            userHiddenColumnKeys.Remove(columnKey);
             UltraGridColumn column = gridReport.DisplayLayout.Bands[0].Columns[columnKey];
             gridReport.SuspendLayout();
             column.Hidden = false;
@@ -1966,77 +1978,8 @@ namespace PosBranch_Win.Reports.FinancialReports
             if (band.Columns.Exists("CategoryName")) { band.Columns["CategoryName"].Hidden = true; band.Columns["CategoryName"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.True; }
             if (band.Columns.Exists("DocNo")) { band.Columns["DocNo"].Hidden = true; band.Columns["DocNo"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.True; }
 
-            // 1. Try Infragistics LoadFromXml
-            try
-            {
-                if (File.Exists(GridLayoutPath))
-                {
-                    gridReport.DisplayLayout.LoadFromXml(GridLayoutPath, PropertyCategories.All);
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"LoadFromXml failed: {ex.Message}");
-            }
+            ReportGridLayoutHelper.ApplySavedLayout("CustomerOutstandingReport", gridReport, userHiddenColumnKeys);
 
-            // 2. Apply explicit state file to guarantee hidden columns, widths, and positions
-            try
-            {
-                string statePath = Path.Combine(Application.StartupPath, "CustomerOutstandingReport_LayoutState.txt");
-                if (File.Exists(statePath))
-                {
-                    string[] lines = File.ReadAllLines(statePath);
-                    foreach (string line in lines)
-                    {
-                        if (line.StartsWith("HIDDEN:", StringComparison.OrdinalIgnoreCase))
-                        {
-                            string raw = line.Substring(7);
-                            var hiddenKeys = new HashSet<string>(raw.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries), StringComparer.OrdinalIgnoreCase);
-                            foreach (UltraGridColumn col in band.Columns)
-                            {
-                                if (col.ExcludeFromColumnChooser == ExcludeFromColumnChooser.True)
-                                    continue;
-
-                                col.Hidden = hiddenKeys.Contains(col.Key);
-                            }
-                        }
-                        else if (line.StartsWith("WIDTHS:", StringComparison.OrdinalIgnoreCase))
-                        {
-                            string raw = line.Substring(7);
-                            var pairs = raw.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
-                            foreach (string pair in pairs)
-                            {
-                                var parts = pair.Split('=');
-                                if (parts.Length == 2 && band.Columns.Exists(parts[0]) && int.TryParse(parts[1], out int w))
-                                {
-                                    band.Columns[parts[0]].Width = w;
-                                }
-                            }
-                        }
-                        else if (line.StartsWith("POSITIONS:", StringComparison.OrdinalIgnoreCase))
-                        {
-                            string raw = line.Substring(10);
-                            var pairs = raw.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
-                            var sorted = pairs
-                                .Select(p => p.Split('='))
-                                .Where(p => p.Length == 2 && band.Columns.Exists(p[0]) && int.TryParse(p[1], out _))
-                                .OrderBy(p => int.Parse(p[1]))
-                                .ToList();
-
-                            foreach (var p in sorted)
-                            {
-                                band.Columns[p[0]].Header.VisiblePosition = int.Parse(p[1]);
-                            }
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Apply state file failed: {ex.Message}");
-            }
-
-            // Always ensure technical columns stay hidden
             if (band.Columns.Exists("SalesmanId")) { band.Columns["SalesmanId"].Hidden = true; band.Columns["SalesmanId"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.True; }
             if (band.Columns.Exists("CategoryId")) { band.Columns["CategoryId"].Hidden = true; band.Columns["CategoryId"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.True; }
             if (band.Columns.Exists("CategoryName")) { band.Columns["CategoryName"].Hidden = true; band.Columns["CategoryName"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.True; }
@@ -2052,48 +1995,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             if (gridReport.DisplayLayout == null || gridReport.DisplayLayout.Bands.Count == 0)
                 return;
 
-            try
-            {
-                gridReport.DisplayLayout.SaveAsXml(GridLayoutPath, PropertyCategories.All);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"SaveAsXml failed: {ex.Message}");
-            }
-
-            try
-            {
-                UltraGridBand band = gridReport.DisplayLayout.Bands[0];
-                var hiddenCols = new List<string>();
-                var widths = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-                var positions = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-
-                foreach (UltraGridColumn col in band.Columns)
-                {
-                    if (col.ExcludeFromColumnChooser == ExcludeFromColumnChooser.True)
-                        continue;
-
-                    if (col.Hidden)
-                    {
-                        hiddenCols.Add(col.Key);
-                    }
-                    widths[col.Key] = col.Width;
-                    positions[col.Key] = col.Header.VisiblePosition;
-                }
-
-                string statePath = Path.Combine(Application.StartupPath, "CustomerOutstandingReport_LayoutState.txt");
-                var lines = new List<string>
-                {
-                    "HIDDEN:" + string.Join(",", hiddenCols),
-                    "WIDTHS:" + string.Join(";", widths.Select(kv => $"{kv.Key}={kv.Value}")),
-                    "POSITIONS:" + string.Join(";", positions.Select(kv => $"{kv.Key}={kv.Value}"))
-                };
-                File.WriteAllLines(statePath, lines);
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Save state file failed: {ex.Message}");
-            }
+            ReportGridLayoutHelper.SaveLayout("CustomerOutstandingReport", gridReport, userHiddenColumnKeys);
         }
 
         #endregion

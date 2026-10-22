@@ -119,6 +119,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                 CreateFooterCells();
                 UpdateFooterCellPositions();
                 UpdateFooterValues();
+                ReportGridLayoutHelper.SaveLayout("CustomerReceiptReport", gridReport, userHiddenColumnKeys);
             };
             gridReport.AfterColRegionScroll += (s, e) => UpdateFooterCellPositions();
             gridReport.AfterRowRegionScroll += (s, e) => UpdateFooterCellPositions();
@@ -149,6 +150,7 @@ namespace PosBranch_Win.Reports.FinancialReports
 
         private void FrmCustomerReceiptReport_FormClosing(object sender, FormClosingEventArgs e)
         {
+            ReportGridLayoutHelper.SaveLayout("CustomerReceiptReport", gridReport, userHiddenColumnKeys);
             if (columnChooserForm != null && !columnChooserForm.IsDisposed)
             {
                 columnChooserForm.Dispose();
@@ -162,6 +164,7 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             try
             {
+                ReportGridLayoutHelper.LoadHiddenColumns("CustomerReceiptReport", userHiddenColumnKeys);
                 Text = "Customer Receipt Report";
                 WindowState = FormWindowState.Maximized;
                 StartPosition = FormStartPosition.CenterScreen;
@@ -1012,6 +1015,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             if (col == null) return;
             userHiddenColumnKeys.Add(col.Key);
             col.Hidden = true;
+            ReportGridLayoutHelper.SaveLayout("CustomerReceiptReport", gridReport, userHiddenColumnKeys);
             CreateFooterCells();
             UpdateFooterCellPositions();
             UpdateFooterValues();
@@ -1096,6 +1100,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             };
             columnChooserListBox.DrawItem += ColumnChooserListBox_DrawItem;
             columnChooserListBox.MouseDown += ColumnChooserListBox_MouseDown;
+            columnChooserListBox.DoubleClick += ColumnChooserListBox_DoubleClick;
 
             Panel searchPanel = new Panel
             {
@@ -1110,6 +1115,14 @@ namespace PosBranch_Win.Reports.FinancialReports
             columnChooserForm.Controls.Add(searchPanel);
         }
 
+        private void ColumnChooserListBox_DoubleClick(object sender, EventArgs e)
+        {
+            if (columnChooserListBox?.SelectedItem is ColumnChooserItem item)
+            {
+                UnhideColumn(item.ColumnKey, -1);
+            }
+        }
+
         private void PopulateColumnChooserListBox()
         {
             if (columnChooserListBox == null || gridReport.DisplayLayout == null || gridReport.DisplayLayout.Bands.Count == 0)
@@ -1121,7 +1134,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             UltraGridBand band = gridReport.DisplayLayout.Bands[0];
             foreach (UltraGridColumn col in band.Columns.Cast<UltraGridColumn>().OrderBy(c => c.Header.Caption))
             {
-                if (col.Hidden)
+                if (col.Hidden && col.ExcludeFromColumnChooser != ExcludeFromColumnChooser.True)
                 {
                     string caption = !string.IsNullOrEmpty(col.Header.Caption) ? col.Header.Caption : col.Key;
                     if (string.IsNullOrEmpty(filter) || caption.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0)
@@ -1210,7 +1223,11 @@ namespace PosBranch_Win.Reports.FinancialReports
                 userHiddenColumnKeys.Remove(columnKey);
                 UltraGridColumn col = band.Columns[columnKey];
                 col.Hidden = false;
-                col.Header.VisiblePosition = targetPosition;
+                if (targetPosition >= 0)
+                {
+                    col.Header.VisiblePosition = targetPosition;
+                }
+                ReportGridLayoutHelper.SaveLayout("CustomerReceiptReport", gridReport, userHiddenColumnKeys);
                 CreateFooterCells();
                 UpdateFooterCellPositions();
                 UpdateFooterValues();
@@ -1227,8 +1244,12 @@ namespace PosBranch_Win.Reports.FinancialReports
             UltraGridBand band = gridReport.DisplayLayout.Bands[0];
             foreach (UltraGridColumn col in band.Columns)
             {
-                col.Hidden = false;
+                if (col.ExcludeFromColumnChooser != ExcludeFromColumnChooser.True)
+                {
+                    col.Hidden = false;
+                }
             }
+            ReportGridLayoutHelper.SaveLayout("CustomerReceiptReport", gridReport, userHiddenColumnKeys);
             CreateFooterCells();
             UpdateFooterCellPositions();
             UpdateFooterValues();
@@ -1453,6 +1474,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                 return;
 
             UltraGridColumn column = band.Columns[key];
+            column.ExcludeFromColumnChooser = ExcludeFromColumnChooser.False;
             column.Hidden = userHiddenColumnKeys.Contains(key);
             column.Header.Caption = header;
             column.Width = width;
@@ -1522,6 +1544,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             foreach (UltraGridColumn column in band.Columns)
             {
                 column.Hidden = true;
+                column.ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
             }
 
             ConfigureGridColumn(band, "VoucherDate", "Date", 108, "dd-MMM-yyyy", HAlign.Left, 0);
@@ -1550,6 +1573,12 @@ namespace PosBranch_Win.Reports.FinancialReports
             if (band.Columns.Exists("Balance"))
             {
                 band.Columns["Balance"].CellAppearance.ForeColor = Color.FromArgb(191, 54, 12);
+            }
+
+            ReportGridLayoutHelper.ApplySavedLayout("CustomerReceiptReport", gridReport, userHiddenColumnKeys);
+            if (columnChooserForm != null && columnChooserForm.Visible)
+            {
+                PopulateColumnChooserListBox();
             }
 
             e.Layout.AutoFitStyle = AutoFitStyle.None;

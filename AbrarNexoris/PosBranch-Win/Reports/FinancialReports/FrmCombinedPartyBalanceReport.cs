@@ -13,6 +13,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
+using PosBranch_Win.Reports;
 
 namespace PosBranch_Win.Reports.FinancialReports
 {
@@ -51,6 +52,7 @@ namespace PosBranch_Win.Reports.FinancialReports
         private Form _columnChooserForm;
         private ListBox _columnChooserListBox;
         private readonly Dictionary<string, int> _savedColumnWidths = new Dictionary<string, int>();
+        private readonly HashSet<string> _userHiddenColumnKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private Point _dragStartPoint;
         private UltraGridColumn _columnToMove;
         private bool _isDraggingColumn;
@@ -67,6 +69,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             _vendorNameMap = BuildNameMap(_vendorRepository.GetVendors().Select(x => x.LedgerName));
             _customerMasterNames = _customerNameMap.Values.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             _vendorMasterNames = _vendorNameMap.Values.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            ReportGridLayoutHelper.LoadHiddenColumns("CombinedPartyBalanceReport", _userHiddenColumnKeys);
             InitializeComponent();
             Load += FrmCombinedPartyBalanceReport_Load;
             FormClosing += FrmCombinedPartyBalanceReport_FormClosing;
@@ -242,6 +245,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             foreach (UltraGridColumn column in band.Columns)
             {
                 column.Hidden = true;
+                column.ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
             }
 
             ConfigureGridColumn(band, "PartyType", "Party Type", 90, null, HAlign.Left);
@@ -275,6 +279,9 @@ namespace PosBranch_Win.Reports.FinancialReports
                 band.Columns["TotalBalance"].CellAppearance.ForeColor = Color.FromArgb(27, 94, 32);
                 band.Columns["TotalBalance"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
             }
+
+            ReportGridLayoutHelper.ApplySavedLayout("CombinedPartyBalanceReport", _gridReport, _userHiddenColumnKeys);
+            PopulateColumnChooserListBox();
 
             e.Layout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
         }
@@ -578,6 +585,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             _gridReport.MouseUp += GridReport_MouseUp;
             _gridReport.DragOver += GridReport_DragOver;
             _gridReport.DragDrop += GridReport_DragDrop;
+            _gridReport.AfterColPosChanged += (s, e) => SaveGridLayout();
             CreateColumnChooserForm();
         }
 
@@ -657,6 +665,20 @@ namespace PosBranch_Win.Reports.FinancialReports
             _columnChooserListBox.MouseDown += ColumnChooserListBox_MouseDown;
             _columnChooserListBox.DragOver += ColumnChooserListBox_DragOver;
             _columnChooserListBox.DragDrop += ColumnChooserListBox_DragDrop;
+            _columnChooserListBox.DoubleClick += (s, e) =>
+            {
+                if (_columnChooserListBox.SelectedItem is ColumnItem item)
+                {
+                    if (_gridReport.DisplayLayout.Bands.Count > 0 && _gridReport.DisplayLayout.Bands[0].Columns.Exists(item.ColumnKey))
+                    {
+                        UltraGridColumn col = _gridReport.DisplayLayout.Bands[0].Columns[item.ColumnKey];
+                        col.Hidden = false;
+                        _userHiddenColumnKeys.Remove(item.ColumnKey);
+                        PopulateColumnChooserListBox();
+                        SaveGridLayout();
+                    }
+                }
+            };
             _columnChooserForm.Controls.Add(_columnChooserListBox);
             PopulateColumnChooserListBox();
         }
@@ -703,7 +725,7 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             foreach (UltraGridColumn col in _gridReport.DisplayLayout.Bands[0].Columns)
             {
-                if (col.Hidden)
+                if (col.Hidden && col.ExcludeFromColumnChooser != ExcludeFromColumnChooser.True)
                 {
                     string displayText = !string.IsNullOrWhiteSpace(col.Header.Caption) ? col.Header.Caption : col.Key;
                     _columnChooserListBox.Items.Add(new ColumnItem(col.Key, displayText));
@@ -798,6 +820,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             _savedColumnWidths[column.Key] = column.Width;
             _gridReport.SuspendLayout();
             column.Hidden = true;
+            _userHiddenColumnKeys.Add(column.Key);
 
             foreach (UltraGridColumn col in _gridReport.DisplayLayout.Bands[0].Columns)
             {
@@ -831,6 +854,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             if (e.Data.GetData(typeof(UltraGridColumn)) is UltraGridColumn column && !column.Hidden)
             {
                 column.Hidden = true;
+                _userHiddenColumnKeys.Add(column.Key);
                 PopulateColumnChooserListBox();
                 SaveGridLayout();
             }
@@ -855,6 +879,7 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             UltraGridColumn column = _gridReport.DisplayLayout.Bands[0].Columns[item.ColumnKey];
             column.Hidden = false;
+            _userHiddenColumnKeys.Remove(item.ColumnKey);
             if (_savedColumnWidths.ContainsKey(column.Key))
             {
                 column.Width = _savedColumnWidths[column.Key];
@@ -878,25 +903,13 @@ namespace PosBranch_Win.Reports.FinancialReports
 
         private void ApplySavedLayoutIfAvailable()
         {
-            if (_gridLayoutLoaded || !File.Exists(GridLayoutPath))
-            {
-                return;
-            }
-
             if (_gridReport.DisplayLayout.Bands.Count == 0 || _gridReport.DisplayLayout.Bands[0].Columns.Count == 0)
             {
                 return;
             }
 
-            try
-            {
-                _gridReport.DisplayLayout.LoadFromXml(GridLayoutPath);
-                _gridLayoutLoaded = true;
-            }
-            catch
-            {
-                _gridLayoutLoaded = false;
-            }
+            ReportGridLayoutHelper.ApplySavedLayout("CombinedPartyBalanceReport", _gridReport, _userHiddenColumnKeys);
+            PopulateColumnChooserListBox();
         }
 
         private void SaveGridLayout()
@@ -906,14 +919,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                 return;
             }
 
-            try
-            {
-                _gridReport.DisplayLayout.SaveAsXml(GridLayoutPath);
-                _gridLayoutLoaded = true;
-            }
-            catch
-            {
-            }
+            ReportGridLayoutHelper.SaveLayout("CombinedPartyBalanceReport", _gridReport, _userHiddenColumnKeys);
         }
 
         private void FrmCombinedPartyBalanceReport_FormClosing(object sender, FormClosingEventArgs e)
@@ -921,7 +927,8 @@ namespace PosBranch_Win.Reports.FinancialReports
             SaveGridLayout();
             if (_columnChooserForm != null && !_columnChooserForm.IsDisposed)
             {
-                _columnChooserForm.Close();
+                _columnChooserForm.Dispose();
+                _columnChooserForm = null;
             }
         }
 
@@ -1017,13 +1024,14 @@ namespace PosBranch_Win.Reports.FinancialReports
             }
         }
 
-        private static void ConfigureGridColumn(UltraGridBand band, string key, string header, int width, string format, HAlign align)
+        private void ConfigureGridColumn(UltraGridBand band, string key, string header, int width, string format, HAlign align)
         {
             if (!band.Columns.Exists(key))
                 return;
 
             UltraGridColumn column = band.Columns[key];
-            column.Hidden = false;
+            column.ExcludeFromColumnChooser = ExcludeFromColumnChooser.False;
+            column.Hidden = _userHiddenColumnKeys.Contains(key);
             column.Header.Caption = header;
             column.Width = width;
             column.CellAppearance.TextHAlign = align;

@@ -2,6 +2,7 @@ using Infragistics.Win;
 using Infragistics.Win.Misc;
 using Infragistics.Win.UltraWinGrid;
 using ModelClass.Report;
+using PosBranch_Win.Reports;
 using Repository.ReportRepository;
 using System;
 using System.Collections.Generic;
@@ -65,6 +66,7 @@ namespace PosBranch_Win.Reports.SalesReports
         private bool isDraggingHeaderColumn;
         private readonly System.Windows.Forms.ToolTip gridToolTip = new System.Windows.Forms.ToolTip();
         private readonly Dictionary<string, int> savedColumnWidths = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> userHiddenColumnKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         #endregion
 
         #region Helper Classes
@@ -100,6 +102,7 @@ namespace PosBranch_Win.Reports.SalesReports
         #region Constructor
         public frmSalesProfit()
         {
+            ReportGridLayoutHelper.LoadHiddenColumns("SalesProfit", userHiddenColumnKeys);
             InitializeComponent();
             InitializePanels();
             InitializeSummaryFooter();
@@ -108,6 +111,7 @@ namespace PosBranch_Win.Reports.SalesReports
             _reportRepository = new SalesProfitReportRepository();
 
             Load += FrmSalesProfit_Load;
+            FormClosing += FrmSalesProfit_FormClosing;
             KeyPreview = true;
             KeyDown += FrmSalesProfit_KeyDown;
 
@@ -506,7 +510,7 @@ namespace PosBranch_Win.Reports.SalesReports
             // Wire alignment events
             ultraPanelGridFooter.Paint += (s, e) => AlignSummaryLabels();
             ultraPanelGridFooter.Resize += (s, e) => AlignSummaryLabels();
-            ultraGridProfit.AfterColPosChanged += (s, e) => { UpdateSummaryFooter(); AlignSummaryLabels(); };
+            ultraGridProfit.AfterColPosChanged += (s, e) => { UpdateSummaryFooter(); AlignSummaryLabels(); ReportGridLayoutHelper.SaveLayout("SalesProfit", ultraGridProfit, userHiddenColumnKeys); };
             ultraGridProfit.AfterSortChange += (s, e) => AlignSummaryLabels();
             ultraGridProfit.AfterRowFilterChanged += (s, e) => { UpdateFooterValues(); AlignSummaryLabels(); };
             ultraGridProfit.SizeChanged += (s, e) => AlignSummaryLabels();
@@ -915,6 +919,7 @@ namespace PosBranch_Win.Reports.SalesReports
                 {
                     var col = band.Columns[columnKey];
                     col.Hidden = false;
+                    userHiddenColumnKeys.Remove(col.Key);
                     if (savedColumnWidths.ContainsKey(col.Key))
                     {
                         col.Width = savedColumnWidths[col.Key];
@@ -930,6 +935,7 @@ namespace PosBranch_Win.Reports.SalesReports
                     }
 
                     UpdateSummaryFooter();
+                    ReportGridLayoutHelper.SaveLayout("SalesProfit", ultraGridProfit, userHiddenColumnKeys);
                     RefreshColumnChooserList();
                 }
             }
@@ -938,9 +944,11 @@ namespace PosBranch_Win.Reports.SalesReports
         private void HideGridColumn(UltraGridColumn column)
         {
             if (column == null || column.Hidden) return;
+            userHiddenColumnKeys.Add(column.Key);
             savedColumnWidths[column.Key] = column.Width;
             column.Hidden = true;
             UpdateSummaryFooter();
+            ReportGridLayoutHelper.SaveLayout("SalesProfit", ultraGridProfit, userHiddenColumnKeys);
             RefreshColumnChooserList();
         }
 
@@ -1100,8 +1108,10 @@ namespace PosBranch_Win.Reports.SalesReports
                     {
                         var col = band.Columns[item.ColumnKey];
                         col.Hidden = false;
+                        userHiddenColumnKeys.Remove(col.Key);
                         if (savedColumnWidths.ContainsKey(col.Key)) col.Width = savedColumnWidths[col.Key];
                         UpdateSummaryFooter();
+                        ReportGridLayoutHelper.SaveLayout("SalesProfit", ultraGridProfit, userHiddenColumnKeys);
                         RefreshColumnChooserList();
                     }
                 }
@@ -1268,9 +1278,16 @@ namespace PosBranch_Win.Reports.SalesReports
             foreach (var col in band.Columns.Cast<UltraGridColumn>())
             {
                 col.ExcludeFromColumnChooser = ExcludeFromColumnChooser.False;
+                if (userHiddenColumnKeys.Contains(col.Key))
+                {
+                    col.Hidden = true;
+                }
             }
 
             e.Layout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
+
+            ReportGridLayoutHelper.ApplySavedLayout("SalesProfit", ultraGridProfit, userHiddenColumnKeys);
+            RefreshColumnChooserList();
         }
 
         private void UltraGridProfit_InitializeRow(object sender, InitializeRowEventArgs e)
@@ -1625,6 +1642,20 @@ namespace PosBranch_Win.Reports.SalesReports
                 txtSearch.SelectAll();
                 e.Handled = true;
             }
+        }
+
+        private void FrmSalesProfit_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            try
+            {
+                ReportGridLayoutHelper.SaveLayout("SalesProfit", ultraGridProfit, userHiddenColumnKeys);
+                if (columnChooserForm != null && !columnChooserForm.IsDisposed)
+                {
+                    columnChooserForm.Dispose();
+                    columnChooserForm = null;
+                }
+            }
+            catch { }
         }
         #endregion
     }

@@ -1073,6 +1073,7 @@
     </Compile>
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Reports\ReportGridLayoutHelper.cs" />
     <Compile Include="Reports\FinancialReports\frmVendorOutstandingReport.cs">
       <SubType>Form</SubType>
     </Compile>

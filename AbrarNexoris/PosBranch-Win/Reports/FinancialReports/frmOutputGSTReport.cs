@@ -10,6 +10,7 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
+using PosBranch_Win.Reports;
 
 namespace PosBranch_Win.Reports.FinancialReports
 {
@@ -36,8 +37,33 @@ namespace PosBranch_Win.Reports.FinancialReports
         private readonly OutputGSTReportRepository _repository;
         private readonly Dictionary<string, Label> _footerLabels;
         private readonly Dictionary<string, string> _columnAggregations;
+        private readonly HashSet<string> userHiddenColumnKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private Form columnChooserForm;
+        private ListBox columnChooserListBox;
+        private TextBox txtColumnSearch;
+        private bool isDraggingHeaderToHide;
+        private UltraGridColumn columnBeingDragged;
+        private Point headerDragStartPoint;
+        private readonly System.Windows.Forms.ToolTip headerToolTip = new System.Windows.Forms.ToolTip();
+        private static readonly Cursor blackXCursor = CreateBlackXCursor();
         private bool _isLoading;
         private Infragistics.Win.UltraWinEditors.UltraComboEditor comboPeriod;
+
+        private sealed class ColumnChooserItem
+        {
+            public string ColumnKey { get; }
+            public string DisplayText { get; }
+
+            public ColumnChooserItem(string key, string text)
+            {
+                ColumnKey = key;
+                DisplayText = text;
+            }
+
+            public override string ToString() => DisplayText;
+        }
+
+        private string GetLayoutKey() => $"OutputGSTReport_{Convert.ToString(ultraComboReportView?.Value ?? "REGISTER")}";
 
         public frmOutputGSTReport()
         {
@@ -61,13 +87,23 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             gridReport.InitializeLayout += gridReport_InitializeLayout;
             gridReport.Resize += gridReport_Resize;
-            gridReport.AfterColPosChanged += (s, e) => UpdateFooterCellPositions();
+            gridReport.AfterColPosChanged += (s, e) =>
+            {
+                UpdateFooterCellPositions();
+                ReportGridLayoutHelper.SaveLayout(GetLayoutKey(), gridReport, userHiddenColumnKeys);
+            };
+            gridReport.BeforeColumnChooserDisplayed += (s, e) =>
+            {
+                e.Cancel = true;
+                ShowColumnChooserForm();
+            };
             gridReport.AfterColRegionScroll += (s, e) => UpdateFooterCellPositions();
             gridReport.AfterRowRegionScroll += (s, e) => UpdateFooterCellPositions();
             gridReport.Paint += (s, e) => UpdateFooterCellPositions();
 
             KeyPreview = true;
             KeyDown += frmOutputGSTReport_KeyDown;
+            FormClosing += FrmOutputGSTReport_FormClosing;
         }
 
         private void frmOutputGSTReport_Load(object sender, EventArgs e)
@@ -85,12 +121,15 @@ namespace PosBranch_Win.Reports.FinancialReports
                 WindowState = FormWindowState.Maximized;
                 StartPosition = FormStartPosition.CenterScreen;
 
+                ReportGridLayoutHelper.LoadHiddenColumns(GetLayoutKey(), userHiddenColumnKeys);
+
                 InitializeFilterControls();
                 InitializePanels();
                 StyleButtons();
                 StyleFilterControls();
                 SetupGrid();
                 InitializeGridFooter();
+                SetupHeaderDragToHideAndColumnChooser();
             }
             finally
             {
@@ -446,6 +485,8 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             try
             {
+                ReportGridLayoutHelper.LoadHiddenColumns(GetLayoutKey(), userHiddenColumnKeys);
+
                 OutputGSTReportFilter filter = new OutputGSTReportFilter
                 {
                     FromDate = Convert.ToDateTime(dtFrom.Value).Date,
@@ -505,6 +546,12 @@ namespace PosBranch_Win.Reports.FinancialReports
             UltraGridBand band = e.Layout.Bands[0];
             foreach (UltraGridColumn col in band.Columns)
             {
+                col.ExcludeFromColumnChooser = ExcludeFromColumnChooser.False;
+                if (userHiddenColumnKeys.Contains(col.Key))
+                {
+                    col.Hidden = true;
+                }
+
                 col.Header.Appearance.ThemedElementAlpha = Alpha.Transparent;
                 col.Header.Appearance.BackColor = GridHeaderBlue;
                 col.Header.Appearance.BackColor2 = GridHeaderBlueDark;
@@ -526,6 +573,12 @@ namespace PosBranch_Win.Reports.FinancialReports
                     col.CellAppearance.TextHAlign = HAlign.Left;
                     col.Header.Appearance.TextHAlign = HAlign.Left;
                 }
+            }
+
+            ReportGridLayoutHelper.ApplySavedLayout(GetLayoutKey(), gridReport, userHiddenColumnKeys);
+            if (columnChooserForm != null && columnChooserForm.Visible)
+            {
+                PopulateColumnChooserListBox();
             }
         }
 
@@ -822,9 +875,419 @@ namespace PosBranch_Win.Reports.FinancialReports
 
         private void frmOutputGSTReport_KeyDown(object sender, KeyEventArgs e)
         {
-            if (e.KeyCode == Keys.F5) { LoadReport(); e.Handled = true; }
+            if (e.KeyCode == Keys.Escape)
+            {
+                if (columnChooserForm != null && !columnChooserForm.IsDisposed && columnChooserForm.Visible)
+                {
+                    columnChooserForm.Hide();
+                    e.Handled = true;
+                    return;
+                }
+                Close();
+                e.Handled = true;
+            }
+            else if (e.KeyCode == Keys.F5) { LoadReport(); e.Handled = true; }
             else if (e.KeyCode == Keys.F6) { btnPreviewGrid_Click(sender, e); e.Handled = true; }
             else if (e.KeyCode == Keys.F7) { btnExportGrid_Click(sender, e); e.Handled = true; }
         }
+
+        private void FrmOutputGSTReport_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            ReportGridLayoutHelper.SaveLayout(GetLayoutKey(), gridReport, userHiddenColumnKeys);
+            if (columnChooserForm != null && !columnChooserForm.IsDisposed)
+            {
+                columnChooserForm.Dispose();
+                columnChooserForm = null;
+            }
+        }
+
+        #region Header Drag-to-Hide & Column Chooser
+        private static Cursor CreateBlackXCursor()
+        {
+            try
+            {
+                using (Bitmap bmp = new Bitmap(32, 32))
+                using (Graphics g = Graphics.FromImage(bmp))
+                {
+                    g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+                    g.Clear(Color.Transparent);
+                    using (SolidBrush bgBrush = new SolidBrush(Color.Black))
+                    {
+                        g.FillEllipse(bgBrush, 4, 4, 24, 24);
+                    }
+                    using (Pen whitePen = new Pen(Color.White, 3.5f))
+                    {
+                        whitePen.StartCap = System.Drawing.Drawing2D.LineCap.Round;
+                        whitePen.EndCap = System.Drawing.Drawing2D.LineCap.Round;
+                        g.DrawLine(whitePen, 11, 11, 21, 21);
+                        g.DrawLine(whitePen, 21, 11, 11, 21);
+                    }
+                    IntPtr hIcon = bmp.GetHicon();
+                    return new Cursor(hIcon);
+                }
+            }
+            catch
+            {
+                return Cursors.No;
+            }
+        }
+
+        private void SetupHeaderDragToHideAndColumnChooser()
+        {
+            gridReport.AllowDrop = true;
+            gridReport.MouseDown += GridReport_MouseDown;
+            gridReport.MouseMove += GridReport_MouseMove;
+            gridReport.MouseUp += GridReport_MouseUp;
+            gridReport.DragOver += GridReport_DragOver;
+            gridReport.DragDrop += GridReport_DragDrop;
+        }
+
+        private void GridReport_MouseDown(object sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Right)
+            {
+                Point pt = new Point(e.X, e.Y);
+                UIElement element = gridReport.DisplayLayout.UIElement?.ElementFromPoint(pt);
+                HeaderUIElement headerUI = element as HeaderUIElement ?? element?.GetAncestor(typeof(HeaderUIElement)) as HeaderUIElement;
+
+                if (headerUI != null && headerUI.Header?.Column != null)
+                {
+                    ShowHeaderContextMenu(headerUI.Header.Column, pt);
+                    return;
+                }
+            }
+
+            if (e.Button == MouseButtons.Left)
+            {
+                Point pt = new Point(e.X, e.Y);
+                UIElement element = gridReport.DisplayLayout.UIElement?.ElementFromPoint(pt);
+                HeaderUIElement headerUI = element as HeaderUIElement ?? element?.GetAncestor(typeof(HeaderUIElement)) as HeaderUIElement;
+
+                if (headerUI != null && headerUI.Header?.Column != null)
+                {
+                    columnBeingDragged = headerUI.Header.Column;
+                    headerDragStartPoint = pt;
+                    isDraggingHeaderToHide = false;
+                }
+                else
+                {
+                    columnBeingDragged = null;
+                }
+            }
+        }
+
+        private void GridReport_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Left && columnBeingDragged != null)
+            {
+                int deltaY = e.Y - headerDragStartPoint.Y;
+                int deltaX = Math.Abs(e.X - headerDragStartPoint.X);
+
+                if (deltaY > 12 && deltaY > deltaX)
+                {
+                    isDraggingHeaderToHide = true;
+                    Cursor.Current = blackXCursor;
+                    headerToolTip.Show("Drag down to hide column", gridReport, e.X + 15, e.Y + 15, 500);
+                }
+                else
+                {
+                    isDraggingHeaderToHide = false;
+                    Cursor.Current = Cursors.Default;
+                    headerToolTip.Hide(gridReport);
+                }
+            }
+        }
+
+        private void GridReport_MouseUp(object sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Left && columnBeingDragged != null)
+            {
+                if (isDraggingHeaderToHide)
+                {
+                    HideColumn(columnBeingDragged);
+                    headerToolTip.Hide(gridReport);
+                }
+                columnBeingDragged = null;
+                isDraggingHeaderToHide = false;
+                Cursor.Current = Cursors.Default;
+            }
+        }
+
+        private void GridReport_DragOver(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(typeof(ColumnChooserItem)))
+            {
+                e.Effect = DragDropEffects.Move;
+            }
+        }
+
+        private void GridReport_DragDrop(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetData(typeof(ColumnChooserItem)) is ColumnChooserItem item)
+            {
+                Point clientPt = gridReport.PointToClient(new Point(e.X, e.Y));
+                int dropPosition = GetTargetColumnPositionFromPoint(clientPt);
+                UnhideColumn(item.ColumnKey, dropPosition);
+            }
+        }
+
+        private int GetTargetColumnPositionFromPoint(Point pt)
+        {
+            if (gridReport.DisplayLayout == null || gridReport.DisplayLayout.Bands.Count == 0)
+                return 0;
+
+            UIElement element = gridReport.DisplayLayout.UIElement?.ElementFromPoint(pt);
+            HeaderUIElement headerUI = element as HeaderUIElement ?? element?.GetAncestor(typeof(HeaderUIElement)) as HeaderUIElement;
+
+            if (headerUI != null && headerUI.Header?.Column != null)
+            {
+                return headerUI.Header.Column.Header.VisiblePosition;
+            }
+
+            UltraGridBand band = gridReport.DisplayLayout.Bands[0];
+            foreach (UltraGridColumn col in band.Columns.Cast<UltraGridColumn>().OrderBy(c => c.Header.VisiblePosition))
+            {
+                if (!col.Hidden)
+                {
+                    UIElement hUI = col.Header.GetUIElement();
+                    if (hUI != null && pt.X >= hUI.Rect.Left && pt.X <= hUI.Rect.Right)
+                    {
+                        return col.Header.VisiblePosition;
+                    }
+                }
+            }
+
+            return band.Columns.Count;
+        }
+
+        private void HideColumn(UltraGridColumn col)
+        {
+            if (col == null) return;
+            userHiddenColumnKeys.Add(col.Key);
+            col.Hidden = true;
+            ReportGridLayoutHelper.SaveLayout(GetLayoutKey(), gridReport, userHiddenColumnKeys);
+            CreateFooterCells();
+            UpdateFooterCellPositions();
+            UpdateFooterValues();
+            if (columnChooserForm != null && columnChooserForm.Visible)
+            {
+                PopulateColumnChooserListBox();
+            }
+        }
+
+        private void ShowHeaderContextMenu(UltraGridColumn col, Point location)
+        {
+            if (col == null) return;
+            ContextMenuStrip menu = new ContextMenuStrip { Font = new Font("Segoe UI", 9F) };
+            string colName = !string.IsNullOrEmpty(col.Header.Caption) ? col.Header.Caption : col.Key;
+
+            ToolStripMenuItem hideItem = new ToolStripMenuItem($"🙈 Hide Column '{colName}'", null, (s, e) => HideColumn(col));
+            hideItem.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
+            menu.Items.Add(hideItem);
+
+            menu.Items.Add(new ToolStripSeparator());
+
+            ToolStripMenuItem chooserItem = new ToolStripMenuItem("📋 Field / Column Chooser...", null, (s, e) => ShowColumnChooserForm());
+            menu.Items.Add(chooserItem);
+
+            ToolStripMenuItem showAllItem = new ToolStripMenuItem("🔓 Show / Unhide All Columns", null, (s, e) => UnhideAllColumns());
+            menu.Items.Add(showAllItem);
+
+            menu.Show(gridReport, location);
+        }
+
+        private void ShowColumnChooserForm()
+        {
+            if (columnChooserForm == null || columnChooserForm.IsDisposed)
+            {
+                CreateColumnChooserForm();
+            }
+
+            PopulateColumnChooserListBox();
+            columnChooserForm.Show(this);
+            PositionColumnChooser();
+        }
+
+        private void CreateColumnChooserForm()
+        {
+            columnChooserForm = new Form
+            {
+                Text = "Customization (Field Chooser)",
+                Size = new Size(240, 320),
+                FormBorderStyle = FormBorderStyle.FixedSingle,
+                StartPosition = FormStartPosition.Manual,
+                TopMost = true,
+                MaximizeBox = false,
+                MinimizeBox = false,
+                BackColor = Color.FromArgb(240, 244, 248),
+                ShowIcon = false,
+                ShowInTaskbar = false
+            };
+
+            columnChooserForm.FormClosing += (s, e) =>
+            {
+                e.Cancel = true;
+                columnChooserForm.Hide();
+            };
+
+            txtColumnSearch = new TextBox
+            {
+                Dock = DockStyle.Top,
+                Font = new Font("Segoe UI", 9F),
+                Height = 25
+            };
+            txtColumnSearch.TextChanged += (s, e) => PopulateColumnChooserListBox();
+
+            columnChooserListBox = new ListBox
+            {
+                Dock = DockStyle.Fill,
+                Font = new Font("Segoe UI", 9F),
+                DrawMode = DrawMode.OwnerDrawFixed,
+                ItemHeight = 34,
+                IntegralHeight = false,
+                BorderStyle = BorderStyle.None,
+                BackColor = Color.FromArgb(240, 244, 248)
+            };
+            columnChooserListBox.DrawItem += ColumnChooserListBox_DrawItem;
+            columnChooserListBox.MouseDown += ColumnChooserListBox_MouseDown;
+            columnChooserListBox.DoubleClick += ColumnChooserListBox_DoubleClick;
+
+            Panel searchPanel = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 34,
+                Padding = new Padding(4),
+                BackColor = Color.FromArgb(232, 240, 250)
+            };
+            searchPanel.Controls.Add(txtColumnSearch);
+
+            columnChooserForm.Controls.Add(columnChooserListBox);
+            columnChooserForm.Controls.Add(searchPanel);
+        }
+
+        private void ColumnChooserListBox_DoubleClick(object sender, EventArgs e)
+        {
+            if (columnChooserListBox?.SelectedItem is ColumnChooserItem item)
+            {
+                int pos = gridReport.DisplayLayout.Bands.Count > 0 ? gridReport.DisplayLayout.Bands[0].Columns.Count : 0;
+                UnhideColumn(item.ColumnKey, pos);
+            }
+        }
+
+        private void PopulateColumnChooserListBox()
+        {
+            if (columnChooserListBox == null || gridReport.DisplayLayout == null || gridReport.DisplayLayout.Bands.Count == 0)
+                return;
+
+            columnChooserListBox.Items.Clear();
+            string filter = txtColumnSearch?.Text?.Trim() ?? string.Empty;
+
+            UltraGridBand band = gridReport.DisplayLayout.Bands[0];
+            foreach (UltraGridColumn col in band.Columns.Cast<UltraGridColumn>().OrderBy(c => c.Header.Caption))
+            {
+                if (col.Hidden && col.ExcludeFromColumnChooser != ExcludeFromColumnChooser.True)
+                {
+                    string caption = !string.IsNullOrEmpty(col.Header.Caption) ? col.Header.Caption : col.Key;
+                    if (string.IsNullOrEmpty(filter) || caption.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        columnChooserListBox.Items.Add(new ColumnChooserItem(col.Key, caption));
+                    }
+                }
+            }
+        }
+
+        private void ColumnChooserListBox_MouseDown(object sender, MouseEventArgs e)
+        {
+            int index = columnChooserListBox.IndexFromPoint(e.Location);
+            if (index >= 0 && index < columnChooserListBox.Items.Count)
+            {
+                if (columnChooserListBox.Items[index] is ColumnChooserItem item)
+                {
+                    columnChooserListBox.DoDragDrop(item, DragDropEffects.Move);
+                }
+            }
+        }
+
+        private void ColumnChooserListBox_DrawItem(object sender, DrawItemEventArgs e)
+        {
+            if (e.Index < 0 || e.Index >= columnChooserListBox.Items.Count) return;
+
+            e.DrawBackground();
+            ColumnChooserItem item = columnChooserListBox.Items[e.Index] as ColumnChooserItem;
+            if (item == null) return;
+
+            bool isSelected = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
+            Color backColor = isSelected ? Color.FromArgb(193, 219, 252) : Color.FromArgb(240, 244, 248);
+            Color textColor = isSelected ? Color.FromArgb(10, 31, 79) : Color.FromArgb(30, 41, 59);
+
+            using (SolidBrush bBrush = new SolidBrush(backColor))
+            {
+                e.Graphics.FillRectangle(bBrush, e.Bounds);
+            }
+
+            Rectangle pillRect = new Rectangle(e.Bounds.X + 4, e.Bounds.Y + 3, e.Bounds.Width - 8, e.Bounds.Height - 6);
+            using (SolidBrush pillBrush = new SolidBrush(Color.White))
+            using (Pen borderPen = new Pen(Color.FromArgb(180, 205, 235), 1))
+            {
+                e.Graphics.FillRectangle(pillBrush, pillRect);
+                e.Graphics.DrawRectangle(borderPen, pillRect);
+            }
+
+            Rectangle textRect = new Rectangle(pillRect.X + 8, pillRect.Y, pillRect.Width - 16, pillRect.Height);
+            TextRenderer.DrawText(e.Graphics, item.DisplayText, columnChooserListBox.Font, textRect, textColor,
+                TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis);
+
+            e.DrawFocusRectangle();
+        }
+
+        private void UnhideColumn(string columnKey, int targetPosition)
+        {
+            userHiddenColumnKeys.Remove(columnKey);
+            if (gridReport.DisplayLayout != null && gridReport.DisplayLayout.Bands.Count > 0 &&
+                gridReport.DisplayLayout.Bands[0].Columns.Exists(columnKey))
+            {
+                UltraGridColumn col = gridReport.DisplayLayout.Bands[0].Columns[columnKey];
+                col.Hidden = false;
+                col.Header.VisiblePosition = targetPosition;
+                ReportGridLayoutHelper.SaveLayout(GetLayoutKey(), gridReport, userHiddenColumnKeys);
+                CreateFooterCells();
+                UpdateFooterCellPositions();
+                UpdateFooterValues();
+                PopulateColumnChooserListBox();
+            }
+        }
+
+        private void UnhideAllColumns()
+        {
+            userHiddenColumnKeys.Clear();
+            if (gridReport.DisplayLayout == null || gridReport.DisplayLayout.Bands.Count == 0)
+                return;
+
+            UltraGridBand band = gridReport.DisplayLayout.Bands[0];
+            foreach (UltraGridColumn col in band.Columns)
+            {
+                if (col.ExcludeFromColumnChooser != ExcludeFromColumnChooser.True)
+                {
+                    col.Hidden = false;
+                }
+            }
+            ReportGridLayoutHelper.SaveLayout(GetLayoutKey(), gridReport, userHiddenColumnKeys);
+            CreateFooterCells();
+            UpdateFooterCellPositions();
+            UpdateFooterValues();
+            PopulateColumnChooserListBox();
+        }
+
+        private void PositionColumnChooser()
+        {
+            if (columnChooserForm != null && !columnChooserForm.IsDisposed && columnChooserForm.Visible)
+            {
+                columnChooserForm.Location = new Point(
+                    Right - columnChooserForm.Width - 30,
+                    Bottom - columnChooserForm.Height - 30);
+                columnChooserForm.BringToFront();
+            }
+        }
+        #endregion
     }
 }

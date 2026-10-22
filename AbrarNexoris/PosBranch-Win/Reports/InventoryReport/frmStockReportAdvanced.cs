@@ -86,6 +86,7 @@ namespace PosBranch_Win.Reports.InventoryReport
         {
             try
             {
+                ReportGridLayoutHelper.LoadHiddenColumns("StockReportAdvanced", userHiddenColumnKeys);
                 reportRepo = new StockReportAdvanceRepo();
                 dropdownRepo = new Dropdowns();
 
@@ -110,7 +111,11 @@ namespace PosBranch_Win.Reports.InventoryReport
 
                 // Register footer cell sync and column drag-to-hide handlers matching frmPurchaseReturn / frmStockReport
                 ultraGridStock.Resize += (s, e) => UpdateFooterCellPositions();
-                ultraGridStock.AfterColPosChanged += (s, e) => UpdateFooterCellPositions();
+                ultraGridStock.AfterColPosChanged += (s, e) =>
+                {
+                    UpdateFooterCellPositions();
+                    ReportGridLayoutHelper.SaveLayout("StockReportAdvanced", ultraGridStock, userHiddenColumnKeys);
+                };
                 ultraGridStock.AfterColRegionScroll += (s, e) => UpdateFooterCellPositions();
                 ultraGridStock.AfterRowRegionScroll += (s, e) => UpdateFooterCellPositions();
                 ultraGridStock.Paint += (s, e) => UpdateFooterCellPositions();
@@ -120,6 +125,16 @@ namespace PosBranch_Win.Reports.InventoryReport
 
                 // Style Buttons & Summary Cards
                 StyleButtons();
+
+                FormClosing += (s, e) =>
+                {
+                    ReportGridLayoutHelper.SaveLayout("StockReportAdvanced", ultraGridStock, userHiddenColumnKeys);
+                    if (columnChooserForm != null && !columnChooserForm.IsDisposed)
+                    {
+                        columnChooserForm.Dispose();
+                        columnChooserForm = null;
+                    }
+                };
             }
             catch (Exception ex)
             {
@@ -782,6 +797,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             if (col == null) return;
             userHiddenColumnKeys.Add(col.Key);
             col.Hidden = true;
+            ReportGridLayoutHelper.SaveLayout("StockReportAdvanced", ultraGridStock, userHiddenColumnKeys);
             CreateFooterCells();
             UpdateFooterCellPositions();
             UpdateFooterValues();
@@ -889,7 +905,7 @@ namespace PosBranch_Win.Reports.InventoryReport
 
             foreach (UltraGridColumn col in band.Columns)
             {
-                if (col.Hidden && !col.Key.EndsWith("Id", StringComparison.OrdinalIgnoreCase))
+                if (col.Hidden && !col.Key.EndsWith("Id", StringComparison.OrdinalIgnoreCase) && col.ExcludeFromColumnChooser != ExcludeFromColumnChooser.True)
                 {
                     string caption = !string.IsNullOrEmpty(col.Header.Caption) ? col.Header.Caption : col.Key;
                     columnChooserListBox.Items.Add(new ColumnChooserItem(col.Key, caption));
@@ -916,6 +932,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                 {
                     col.Header.VisiblePosition = targetVisiblePosition.Value;
                 }
+                ReportGridLayoutHelper.SaveLayout("StockReportAdvanced", ultraGridStock, userHiddenColumnKeys);
                 CreateFooterCells();
                 UpdateFooterCellPositions();
                 UpdateFooterValues();
@@ -930,11 +947,12 @@ namespace PosBranch_Win.Reports.InventoryReport
             UltraGridBand band = ultraGridStock.DisplayLayout.Bands[0];
             foreach (UltraGridColumn col in band.Columns)
             {
-                if (!col.Key.EndsWith("Id", StringComparison.OrdinalIgnoreCase))
+                if (!col.Key.EndsWith("Id", StringComparison.OrdinalIgnoreCase) && col.ExcludeFromColumnChooser != ExcludeFromColumnChooser.True)
                 {
                     col.Hidden = false;
                 }
             }
+            ReportGridLayoutHelper.SaveLayout("StockReportAdvanced", ultraGridStock, userHiddenColumnKeys);
             CreateFooterCells();
             UpdateFooterCellPositions();
             UpdateFooterValues();
@@ -1387,7 +1405,17 @@ namespace PosBranch_Win.Reports.InventoryReport
 
             UltraGridBand band = e.Layout.Bands[0];
             foreach (UltraGridColumn col in band.Columns)
+            {
                 col.Hidden = true;
+                if (col.Key.EndsWith("Id", StringComparison.OrdinalIgnoreCase))
+                {
+                    col.ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
+                }
+                else
+                {
+                    col.ExcludeFromColumnChooser = ExcludeFromColumnChooser.False;
+                }
+            }
 
             // Columns: Category | Group | Barcode | Description | Cost | Selling Price | UOM | Stock | Hold | Available | Stock Value | Future Sales Value
             ConfigureColumn(band, "CategoryName", "Category", 110, null, HAlign.Left, 0);
@@ -1404,21 +1432,21 @@ namespace PosBranch_Win.Reports.InventoryReport
             ConfigureColumn(band, "FutureSalesValue", "Future Sales Value", 110, "#,##0.00", HAlign.Right, 11);
 
             // Configure friendly names for additional hidden fields in model for column chooser
-            if (band.Columns.Exists("OpeningStock")) band.Columns["OpeningStock"].Header.Caption = "Opening Stock";
-            if (band.Columns.Exists("Purchase")) band.Columns["Purchase"].Header.Caption = "Purchase";
-            if (band.Columns.Exists("PurchaseReturn")) band.Columns["PurchaseReturn"].Header.Caption = "Purchase Return";
-            if (band.Columns.Exists("StockAdjustmentIn")) band.Columns["StockAdjustmentIn"].Header.Caption = "Adj In";
-            if (band.Columns.Exists("StockAdjustmentOut")) band.Columns["StockAdjustmentOut"].Header.Caption = "Adj Out";
-            if (band.Columns.Exists("StockTransferIn")) band.Columns["StockTransferIn"].Header.Caption = "Transfer In";
-            if (band.Columns.Exists("StockTransferOut")) band.Columns["StockTransferOut"].Header.Caption = "Transfer Out";
-            if (band.Columns.Exists("Sales")) band.Columns["Sales"].Header.Caption = "Sales";
-            if (band.Columns.Exists("SalesReturn")) band.Columns["SalesReturn"].Header.Caption = "Sales Return";
-            if (band.Columns.Exists("OrderedStock")) band.Columns["OrderedStock"].Header.Caption = "Ordered Stock";
-            if (band.Columns.Exists("WholeSalePrice")) band.Columns["WholeSalePrice"].Header.Caption = "Wholesale Price";
-            if (band.Columns.Exists("CreditPrice")) band.Columns["CreditPrice"].Header.Caption = "Credit Price";
-            if (band.Columns.Exists("Profit")) band.Columns["Profit"].Header.Caption = "Profit";
-            if (band.Columns.Exists("SaleAmount")) band.Columns["SaleAmount"].Header.Caption = "Sale Amount";
-            if (band.Columns.Exists("SubCategoryName")) band.Columns["SubCategoryName"].Header.Caption = "Sub Category";
+            if (band.Columns.Exists("OpeningStock")) { band.Columns["OpeningStock"].Header.Caption = "Opening Stock"; band.Columns["OpeningStock"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.False; }
+            if (band.Columns.Exists("Purchase")) { band.Columns["Purchase"].Header.Caption = "Purchase"; band.Columns["Purchase"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.False; }
+            if (band.Columns.Exists("PurchaseReturn")) { band.Columns["PurchaseReturn"].Header.Caption = "Purchase Return"; band.Columns["PurchaseReturn"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.False; }
+            if (band.Columns.Exists("StockAdjustmentIn")) { band.Columns["StockAdjustmentIn"].Header.Caption = "Adj In"; band.Columns["StockAdjustmentIn"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.False; }
+            if (band.Columns.Exists("StockAdjustmentOut")) { band.Columns["StockAdjustmentOut"].Header.Caption = "Adj Out"; band.Columns["StockAdjustmentOut"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.False; }
+            if (band.Columns.Exists("StockTransferIn")) { band.Columns["StockTransferIn"].Header.Caption = "Transfer In"; band.Columns["StockTransferIn"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.False; }
+            if (band.Columns.Exists("StockTransferOut")) { band.Columns["StockTransferOut"].Header.Caption = "Transfer Out"; band.Columns["StockTransferOut"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.False; }
+            if (band.Columns.Exists("Sales")) { band.Columns["Sales"].Header.Caption = "Sales"; band.Columns["Sales"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.False; }
+            if (band.Columns.Exists("SalesReturn")) { band.Columns["SalesReturn"].Header.Caption = "Sales Return"; band.Columns["SalesReturn"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.False; }
+            if (band.Columns.Exists("OrderedStock")) { band.Columns["OrderedStock"].Header.Caption = "Ordered Stock"; band.Columns["OrderedStock"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.False; }
+            if (band.Columns.Exists("WholeSalePrice")) { band.Columns["WholeSalePrice"].Header.Caption = "Wholesale Price"; band.Columns["WholeSalePrice"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.False; }
+            if (band.Columns.Exists("CreditPrice")) { band.Columns["CreditPrice"].Header.Caption = "Credit Price"; band.Columns["CreditPrice"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.False; }
+            if (band.Columns.Exists("Profit")) { band.Columns["Profit"].Header.Caption = "Profit"; band.Columns["Profit"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.False; }
+            if (band.Columns.Exists("SaleAmount")) { band.Columns["SaleAmount"].Header.Caption = "Sale Amount"; band.Columns["SaleAmount"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.False; }
+            if (band.Columns.Exists("SubCategoryName")) { band.Columns["SubCategoryName"].Header.Caption = "Sub Category"; band.Columns["SubCategoryName"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.False; }
 
             // Colour coding
             if (band.Columns.Exists("ClosingStock"))
@@ -1432,6 +1460,12 @@ namespace PosBranch_Win.Reports.InventoryReport
             if (band.Columns.Exists("FutureSalesValue"))
                 band.Columns["FutureSalesValue"].CellAppearance.ForeColor = Color.FromArgb(128, 0, 128);
 
+            ReportGridLayoutHelper.ApplySavedLayout("StockReportAdvanced", ultraGridStock, userHiddenColumnKeys);
+            if (columnChooserForm != null && columnChooserForm.Visible)
+            {
+                PopulateColumnChooserListBox();
+            }
+
             e.Layout.AutoFitStyle = AutoFitStyle.None;
             e.Layout.ScrollBounds = ScrollBounds.ScrollToFill;
             e.Layout.Scrollbars = Scrollbars.Both;
@@ -1443,6 +1477,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             if (!band.Columns.Exists(key)) return;
 
             UltraGridColumn col = band.Columns[key];
+            col.ExcludeFromColumnChooser = ExcludeFromColumnChooser.False;
             col.Header.Caption = header;
             col.Width = width;
             col.Header.VisiblePosition = visPos;

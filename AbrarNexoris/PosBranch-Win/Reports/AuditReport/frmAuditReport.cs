@@ -15,6 +15,7 @@ using System.Drawing;
 using System.Drawing.Drawing2D;
 using System.Linq;
 using System.Windows.Forms;
+using PosBranch_Win.Reports;
 
 namespace PosBranch_Win.Reports.AuditReport
 {
@@ -87,11 +88,16 @@ namespace PosBranch_Win.Reports.AuditReport
 
             InitializeComponent();
             Load += FrmAuditReport_Load;
+            FormClosing += (s, e) => ReportGridLayoutHelper.SaveLayout("AuditReport", gridAudit, userHiddenColumnKeys);
             FormClosed += FrmAuditReport_FormClosed;
 
             // Register footer cell sync and column drag-to-hide handlers matching frmPurchaseReturn / frmStockReport
             gridAudit.Resize += (s, e) => UpdateFooterCellPositions();
-            gridAudit.AfterColPosChanged += (s, e) => UpdateFooterCellPositions();
+            gridAudit.AfterColPosChanged += (s, e) =>
+            {
+                UpdateFooterCellPositions();
+                ReportGridLayoutHelper.SaveLayout("AuditReport", gridAudit, userHiddenColumnKeys);
+            };
             gridAudit.AfterColRegionScroll += (s, e) => UpdateFooterCellPositions();
             gridAudit.AfterRowRegionScroll += (s, e) => UpdateFooterCellPositions();
             gridAudit.Paint += (s, e) => UpdateFooterCellPositions();
@@ -113,6 +119,7 @@ namespace PosBranch_Win.Reports.AuditReport
                 return;
             }
 
+            ReportGridLayoutHelper.LoadHiddenColumns("AuditReport", userHiddenColumnKeys);
             InitializeRuntimeAppearance();
             LoadLookupData();
             ResetFilters(false);
@@ -163,9 +170,10 @@ namespace PosBranch_Win.Reports.AuditReport
 
         private void FrmAuditReport_FormClosed(object sender, FormClosedEventArgs e)
         {
+            ReportGridLayoutHelper.SaveLayout("AuditReport", gridAudit, userHiddenColumnKeys);
             if (columnChooserForm != null && !columnChooserForm.IsDisposed)
             {
-                columnChooserForm.Close();
+                columnChooserForm.Dispose();
                 columnChooserForm = null;
             }
         }
@@ -426,7 +434,7 @@ namespace PosBranch_Win.Reports.AuditReport
                     return;
                 }
 
-                if (e.Button == MouseButtons.Left)
+                if (e.Button == MouseButtons.Left && IsCustomizableColumn(col))
                 {
                     isDraggingHeaderToHide = true;
                     columnBeingDragged = col;
@@ -518,14 +526,23 @@ namespace PosBranch_Win.Reports.AuditReport
             return band.Columns.Count;
         }
 
+        private bool IsCustomizableColumn(UltraGridColumn col)
+        {
+            if (col == null || col.IsChaptered || col.ExcludeFromColumnChooser == ExcludeFromColumnChooser.True) return false;
+            if (col.Key.EndsWith("Id", StringComparison.OrdinalIgnoreCase)) return false;
+            if (string.Equals(col.Key, "TableName", StringComparison.OrdinalIgnoreCase)) return false;
+            return true;
+        }
+
         private void HideColumn(UltraGridColumn col)
         {
-            if (col == null) return;
+            if (col == null || col.Hidden || !IsCustomizableColumn(col)) return;
             userHiddenColumnKeys.Add(col.Key);
             col.Hidden = true;
             CreateFooterCells();
             UpdateFooterCellPositions();
             UpdateFooterValues();
+            ReportGridLayoutHelper.SaveLayout("AuditReport", gridAudit, userHiddenColumnKeys);
             if (columnChooserForm != null && columnChooserForm.Visible)
             {
                 PopulateColumnChooserListBox();
@@ -538,11 +555,13 @@ namespace PosBranch_Win.Reports.AuditReport
             ContextMenuStrip menu = new ContextMenuStrip { Font = new Font("Segoe UI", 9F) };
             string colName = !string.IsNullOrEmpty(col.Header.Caption) ? col.Header.Caption : col.Key;
 
-            ToolStripMenuItem hideItem = new ToolStripMenuItem($"🙈 Hide Column '{colName}'", null, (s, e) => HideColumn(col));
-            hideItem.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
-            menu.Items.Add(hideItem);
-
-            menu.Items.Add(new ToolStripSeparator());
+            if (IsCustomizableColumn(col))
+            {
+                ToolStripMenuItem hideItem = new ToolStripMenuItem($"🙈 Hide Column '{colName}'", null, (s, e) => HideColumn(col));
+                hideItem.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
+                menu.Items.Add(hideItem);
+                menu.Items.Add(new ToolStripSeparator());
+            }
 
             ToolStripMenuItem chooserItem = new ToolStripMenuItem("📋 Field / Column Chooser...", null, (s, e) => ShowColumnChooserForm());
             menu.Items.Add(chooserItem);
@@ -570,7 +589,7 @@ namespace PosBranch_Win.Reports.AuditReport
             columnChooserForm = new Form
             {
                 Text = "Customization (Field Chooser)",
-                Size = new Size(240, 300),
+                Size = new Size(240, 320),
                 FormBorderStyle = FormBorderStyle.FixedSingle,
                 StartPosition = FormStartPosition.Manual,
                 TopMost = true,
@@ -630,7 +649,7 @@ namespace PosBranch_Win.Reports.AuditReport
 
             foreach (UltraGridColumn col in band.Columns)
             {
-                if (col.Hidden && !col.Key.EndsWith("Id", StringComparison.OrdinalIgnoreCase) && !string.Equals(col.Key, "TableName", StringComparison.OrdinalIgnoreCase))
+                if (col.Hidden && IsCustomizableColumn(col) && col.ExcludeFromColumnChooser != ExcludeFromColumnChooser.True)
                 {
                     string caption = !string.IsNullOrEmpty(col.Header.Caption) ? col.Header.Caption : col.Key;
                     columnChooserListBox.Items.Add(new ColumnChooserItem(col.Key, caption));
@@ -660,6 +679,7 @@ namespace PosBranch_Win.Reports.AuditReport
                 CreateFooterCells();
                 UpdateFooterCellPositions();
                 UpdateFooterValues();
+                ReportGridLayoutHelper.SaveLayout("AuditReport", gridAudit, userHiddenColumnKeys);
                 PopulateColumnChooserListBox();
             }
         }
@@ -671,7 +691,7 @@ namespace PosBranch_Win.Reports.AuditReport
             UltraGridBand band = gridAudit.DisplayLayout.Bands[0];
             foreach (UltraGridColumn col in band.Columns)
             {
-                if (!col.Key.EndsWith("Id", StringComparison.OrdinalIgnoreCase) && !string.Equals(col.Key, "TableName", StringComparison.OrdinalIgnoreCase))
+                if (IsCustomizableColumn(col) && col.ExcludeFromColumnChooser != ExcludeFromColumnChooser.True)
                 {
                     col.Hidden = false;
                 }
@@ -679,6 +699,7 @@ namespace PosBranch_Win.Reports.AuditReport
             CreateFooterCells();
             UpdateFooterCellPositions();
             UpdateFooterValues();
+            ReportGridLayoutHelper.SaveLayout("AuditReport", gridAudit, userHiddenColumnKeys);
             PopulateColumnChooserListBox();
         }
 
@@ -1430,6 +1451,12 @@ namespace PosBranch_Win.Reports.AuditReport
             }
 
             UltraGridBand band = targetGrid.DisplayLayout.Bands[0];
+
+            foreach (UltraGridColumn col in band.Columns)
+            {
+                col.ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
+            }
+
             HideColumn(band, "ItemId");
             HideColumn(band, "UserId");
             HideColumn(band, "GroupId");
@@ -1438,84 +1465,54 @@ namespace PosBranch_Win.Reports.AuditReport
             HideColumn(band, "ModelId");
             HideColumn(band, "TableName");
 
-            SetCaption(band, "SlNo", "Sl.No");
-            SetCaption(band, "DocDate", "Doc. Date");
-            SetCaption(band, "ReportDate", "Report Date");
-            SetCaption(band, "ItemNo", "Item No");
-            SetCaption(band, "Description", "Description");
-            SetCaption(band, "CategoryName", "Category");
-            SetCaption(band, "GroupName", "Group");
-            SetCaption(band, "DocNo", "Doc No");
-            SetCaption(band, "Account", "Account");
-            SetCaption(band, "Reference", "Reference");
-            SetCaption(band, "Price", "Price");
-            SetCaption(band, "Cost", "Cost");
-            SetCaption(band, "BalanceBF", "Balance B/F");
-            SetCaption(band, "Action", "Action");
-            SetCaption(band, "Quantity", "Quantity");
-            SetCaption(band, "BalanceCF", "Balance C/F");
-            SetCaption(band, "UserName", "User");
-
-            SetVisiblePosition(band, "SlNo", 0);
-            SetVisiblePosition(band, "DocDate", 1);
-            SetVisiblePosition(band, "ReportDate", 2);
-            SetVisiblePosition(band, "ItemNo", 3);
-            SetVisiblePosition(band, "Description", 4);
-            SetVisiblePosition(band, "CategoryName", 5);
-            SetVisiblePosition(band, "GroupName", 6);
-            SetVisiblePosition(band, "DocNo", 7);
-            SetVisiblePosition(band, "Account", 8);
-            SetVisiblePosition(band, "Reference", 9);
-            SetVisiblePosition(band, "Price", 10);
-            SetVisiblePosition(band, "Cost", 11);
-            SetVisiblePosition(band, "BalanceBF", 12);
-            SetVisiblePosition(band, "Action", 13);
-            SetVisiblePosition(band, "Quantity", 14);
-            SetVisiblePosition(band, "BalanceCF", 15);
-            SetVisiblePosition(band, "UserName", 16);
-
-            foreach (UltraGridColumn column in band.Columns)
+            void SetupCol(string colName, string caption, int pos, int width, string format = null, HAlign align = HAlign.Left)
             {
-                column.AllowRowFiltering = DefaultableBoolean.True;
+                if (band.Columns.Exists(colName))
+                {
+                    var col = band.Columns[colName];
+                    col.ExcludeFromColumnChooser = ExcludeFromColumnChooser.False;
+                    col.Hidden = userHiddenColumnKeys.Contains(colName);
+                    col.Header.Caption = caption;
+                    col.Header.VisiblePosition = pos;
+                    col.Width = width;
+                    col.AllowRowFiltering = DefaultableBoolean.True;
+                    if (!string.IsNullOrEmpty(format)) col.Format = format;
+                    col.CellAppearance.TextHAlign = align;
+                }
             }
 
-            SetWidth(band, "SlNo", 55);
-            SetWidth(band, "DocDate", 130);
-            SetWidth(band, "ReportDate", 130);
-            SetWidth(band, "ItemNo", 100);
-            SetWidth(band, "Description", 260);
-            SetWidth(band, "CategoryName", 120);
-            SetWidth(band, "GroupName", 120);
-            SetWidth(band, "DocNo", 105);
-            SetWidth(band, "Account", 110);
-            SetWidth(band, "Reference", 180);
-            SetWidth(band, "Price", 85);
-            SetWidth(band, "Cost", 85);
-            SetWidth(band, "BalanceBF", 95);
-            SetWidth(band, "Action", 95);
-            SetWidth(band, "Quantity", 85);
-            SetWidth(band, "BalanceCF", 95);
-            SetWidth(band, "UserName", 100);
+            SetupCol("SlNo", "Sl.No", 0, 55, format: "0", align: HAlign.Center);
+            SetupCol("DocDate", "Doc. Date", 1, 130, format: "dd/MM/yyyy HH:mm:ss", align: HAlign.Left);
+            SetupCol("ReportDate", "Report Date", 2, 130, format: "dd/MM/yyyy HH:mm:ss", align: HAlign.Left);
+            SetupCol("ItemNo", "Item No", 3, 100);
+            SetupCol("Description", "Description", 4, 260);
+            SetupCol("CategoryName", "Category", 5, 120);
+            SetupCol("GroupName", "Group", 6, 120);
+            SetupCol("DocNo", "Doc No", 7, 105);
+            SetupCol("Account", "Account", 8, 110);
+            SetupCol("Reference", "Reference", 9, 180);
+            SetupCol("Price", "Price", 10, 85, format: "n2", align: HAlign.Right);
+            SetupCol("Cost", "Cost", 11, 85, format: "n2", align: HAlign.Right);
+            SetupCol("BalanceBF", "Balance B/F", 12, 95, format: "n2", align: HAlign.Right);
+            SetupCol("Action", "Action", 13, 95);
+            SetupCol("Quantity", "Quantity", 14, 85, format: "n2", align: HAlign.Right);
+            SetupCol("BalanceCF", "Balance C/F", 15, 95, format: "n2", align: HAlign.Right);
+            SetupCol("UserName", "User", 16, 100);
 
-            FormatDateColumn(band, "DocDate");
-            FormatDateColumn(band, "ReportDate");
-            FormatIntegerColumn(band, "SlNo");
-            FormatDecimalColumn(band, "Price");
-            FormatDecimalColumn(band, "Cost");
-            FormatDecimalColumn(band, "BalanceBF");
-            FormatDecimalColumn(band, "Quantity");
-            FormatDecimalColumn(band, "BalanceCF");
+            string[] internalCols = new[] { "ItemId", "UserId", "GroupId", "CategoryId", "BrandId", "ModelId", "TableName" };
+            foreach (string cName in internalCols)
+            {
+                if (band.Columns.Exists(cName))
+                {
+                    band.Columns[cName].Hidden = true;
+                    band.Columns[cName].ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
+                }
+            }
 
-            // Re-apply user hidden columns
+            // Re-apply user hidden columns and layout
             if (targetGrid == gridAudit)
             {
-                foreach (UltraGridColumn col in band.Columns)
-                {
-                    if (userHiddenColumnKeys.Contains(col.Key))
-                    {
-                        col.Hidden = true;
-                    }
-                }
+                ReportGridLayoutHelper.ApplySavedLayout("AuditReport", gridAudit, userHiddenColumnKeys);
 
                 CreateFooterCells();
                 UpdateFooterCellPositions();
@@ -1556,6 +1553,7 @@ namespace PosBranch_Win.Reports.AuditReport
             if (band.Columns.Exists(columnName))
             {
                 band.Columns[columnName].Hidden = true;
+                band.Columns[columnName].ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
             }
         }
 
