@@ -100,6 +100,9 @@ namespace PosBranch_Win.Reports.SalesReports
         #endregion
 
         #region Constructor & Lifecycle
+        public DateTime? InitialFromDate { get; set; }
+        public DateTime? InitialToDate { get; set; }
+
         public frmSalesReportMasterDetail()
         {
             _reportRepository = new SalesReportRepository();
@@ -113,13 +116,26 @@ namespace PosBranch_Win.Reports.SalesReports
             KeyPreview = true;
         }
 
+        public frmSalesReportMasterDetail(DateTime fromDate, DateTime toDate) : this()
+        {
+            InitialFromDate = fromDate;
+            InitialToDate = toDate;
+        }
+
         private void FrmSalesReportMasterDetail_Load(object sender, EventArgs e)
         {
             if (IsDesignTime()) return;
 
             InitializeRuntimeAppearance();
             LoadLookupData();
-            ResetFilters(false);
+            if (InitialFromDate.HasValue && InitialToDate.HasValue)
+            {
+                ApplyDateRange(InitialFromDate.Value, InitialToDate.Value);
+            }
+            else
+            {
+                ResetFilters(false);
+            }
             LoadData();
         }
 
@@ -450,6 +466,42 @@ namespace PosBranch_Win.Reports.SalesReports
             }
         }
 
+        public void ApplyDateRange(DateTime fromDate, DateTime toDate)
+        {
+            DateTime today = DateTime.Today;
+            if (fromDate <= new DateTime(1990, 1, 1))
+            {
+                ultraComboDateMode.Value = "ALL";
+                dtFromDate.DateTime = new DateTime(1900, 1, 1);
+                dtToDate.DateTime = toDate > today ? toDate : new DateTime(2099, 12, 31);
+            }
+            else if (fromDate.Date == today && toDate.Date == today)
+            {
+                ultraComboDateMode.Value = "TODAY";
+                dtFromDate.DateTime = today;
+                dtToDate.DateTime = today;
+            }
+            else if (fromDate.Date == new DateTime(today.Year, today.Month, 1) && toDate.Date == today)
+            {
+                ultraComboDateMode.Value = "THIS_MONTH";
+                dtFromDate.DateTime = new DateTime(today.Year, today.Month, 1);
+                dtToDate.DateTime = today;
+            }
+            else if (fromDate.Date == new DateTime(today.Year, 1, 1) && toDate.Date == today)
+            {
+                ultraComboDateMode.Value = "THIS_YEAR";
+                dtFromDate.DateTime = new DateTime(today.Year, 1, 1);
+                dtToDate.DateTime = today;
+            }
+            else
+            {
+                ultraComboDateMode.Value = "RANGE";
+                dtFromDate.DateTime = fromDate.Date;
+                dtToDate.DateTime = toDate.Date;
+            }
+            UpdateDateControlsVisibility();
+        }
+
         private void UpdateDateControlsVisibility()
         {
             bool isRange = string.Equals(ultraComboDateMode.Value?.ToString(), "RANGE", StringComparison.OrdinalIgnoreCase);
@@ -521,7 +573,7 @@ namespace PosBranch_Win.Reports.SalesReports
         #endregion
 
         #region Data Retrieval & Grid Binding (Clean Flat Report)
-        private void LoadData()
+        public void LoadData()
         {
             if (isLoading) return;
 

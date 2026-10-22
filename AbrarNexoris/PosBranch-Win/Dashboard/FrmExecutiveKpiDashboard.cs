@@ -955,7 +955,9 @@ namespace PosBranch_Win.Dashboard
                         title = "Customer Receipt Report";
                         break;
                     case "SalesDetailsReport":
-                        formToOpen = new Reports.SalesReports.frmSalesReportMasterDetail();
+                        DateTime salesFrom = _model != null && _model.FromDate > DateTime.MinValue ? _model.FromDate : new DateTime(1990, 1, 1);
+                        DateTime salesTo = _model != null && _model.ToDate > DateTime.MinValue ? _model.ToDate : DateTime.Today;
+                        formToOpen = new Reports.SalesReports.frmSalesReportMasterDetail(salesFrom, salesTo);
                         title = "Sales Details Report";
                         break;
                     case "SalesAnalytics":
@@ -986,7 +988,9 @@ namespace PosBranch_Win.Dashboard
                         break;
                     case "SalesProfit":
                     case "SalesProfitReport":
-                        formToOpen = new Reports.SalesReports.frmSalesProfit();
+                        DateTime profitFrom = _model != null && _model.FromDate > DateTime.MinValue ? _model.FromDate : new DateTime(1990, 1, 1);
+                        DateTime profitTo = _model != null && _model.ToDate > DateTime.MinValue ? _model.ToDate : DateTime.Today;
+                        formToOpen = new Reports.SalesReports.frmSalesProfit(profitFrom, profitTo);
                         title = "Sales Profit Report";
                         break;
                     case "PurchaseDetailsReport":
