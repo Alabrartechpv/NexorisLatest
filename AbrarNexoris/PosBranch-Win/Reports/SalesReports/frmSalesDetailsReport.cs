@@ -86,11 +86,13 @@ namespace PosBranch_Win.Reports.SalesReports
         {
             public string ColumnKey { get; }
             public string DisplayText { get; }
+            public int BandIndex { get; }
 
-            public ColumnChooserItem(string key, string text)
+            public ColumnChooserItem(string key, string text, int bandIndex = 0)
             {
                 ColumnKey = key;
                 DisplayText = text;
+                BandIndex = bandIndex;
             }
 
             public override string ToString() => DisplayText;
@@ -269,7 +271,10 @@ namespace PosBranch_Win.Reports.SalesReports
             layout.Appearance.BorderColor = BorderBlue;
             layout.BorderStyle = UIElementBorderStyle.Solid;
 
-            // Flat single-band view (no hierarchical tree +/- expansion icons)
+            // Hierarchical Master-Detail setup
+            layout.ViewStyleBand = ViewStyleBand.Vertical;
+            layout.Override.ExpansionIndicator = ShowExpansionIndicator.CheckOnDisplay;
+
             layout.CaptionVisible = DefaultableBoolean.False;
             layout.GroupByBox.Hidden = true;
             layout.AutoFitStyle = AutoFitStyle.None;
@@ -344,8 +349,11 @@ namespace PosBranch_Win.Reports.SalesReports
             layout.Override.RowSpacingBefore = 0;
             layout.Override.RowSpacingAfter = 0;
 
-            // Sync Footer with Grid Scroll/Resize/Paint
+            // Sync Footer with Grid Scroll/Resize/Paint & Row Expansion
             grid.InitializeLayout += UltraGridMaster_InitializeLayout;
+            grid.BeforeRowExpanded += UltraGridMaster_BeforeRowExpanded;
+            grid.AfterRowExpanded += (s, e) => UpdateFooterCellPositions();
+            grid.AfterRowCollapsed += (s, e) => UpdateFooterCellPositions();
             grid.Resize += (s, e) => UpdateFooterCellPositions();
             grid.AfterColPosChanged += (s, e) => UpdateFooterCellPositions();
             grid.AfterColRegionScroll += (s, e) => UpdateFooterCellPositions();
@@ -555,22 +563,47 @@ namespace PosBranch_Win.Reports.SalesReports
 
                 var finalBills = filteredBills.ToList();
 
-                // Build a clean single-table flat DataTable for the grid
-                DataTable dt = new DataTable("SalesMaster");
-                dt.Columns.Add("SlNo", typeof(int));
-                dt.Columns.Add("BillNo", typeof(int));
-                dt.Columns.Add("BillDate", typeof(DateTime));
-                dt.Columns.Add("CustomerName", typeof(string));
-                dt.Columns.Add("PaymodeName", typeof(string));
-                dt.Columns.Add("SubTotal", typeof(decimal));
-                dt.Columns.Add("TaxAmt", typeof(decimal));
-                dt.Columns.Add("NetAmount", typeof(decimal));
-                dt.Columns.Add("Profit", typeof(decimal));
+                // Create Master-Detail DataSet
+                DataSet dsHierarchical = new DataSet("SalesMasterDetail");
+
+                // 1. Master Table (Bills)
+                DataTable masterTable = new DataTable("SalesMaster");
+                masterTable.Columns.Add("SlNo", typeof(int));
+                masterTable.Columns.Add("BillNo", typeof(int));
+                masterTable.Columns.Add("BillDate", typeof(DateTime));
+                masterTable.Columns.Add("CustomerName", typeof(string));
+                masterTable.Columns.Add("PaymodeName", typeof(string));
+                masterTable.Columns.Add("SubTotal", typeof(decimal));
+                masterTable.Columns.Add("TaxAmt", typeof(decimal));
+                masterTable.Columns.Add("NetAmount", typeof(decimal));
+                masterTable.Columns.Add("Profit", typeof(decimal));
+
+                // 2. Detail Table (Bill Items)
+                DataTable detailTable = new DataTable("SalesDetails");
+                detailTable.Columns.Add("DetailID", typeof(int));
+                detailTable.Columns["DetailID"].AutoIncrement = true;
+                detailTable.Columns["DetailID"].AutoIncrementSeed = 1;
+                detailTable.Columns["DetailID"].AutoIncrementStep = 1;
+
+                detailTable.Columns.Add("BillNo", typeof(int));
+                detailTable.Columns.Add("SlNo", typeof(int));
+                detailTable.Columns.Add("ItemName", typeof(string));
+                detailTable.Columns.Add("Barcode", typeof(string));
+                detailTable.Columns.Add("Unit", typeof(string));
+                detailTable.Columns.Add("Packing", typeof(string));
+                detailTable.Columns.Add("Qty", typeof(decimal));
+                detailTable.Columns.Add("UnitPrice", typeof(decimal));
+                detailTable.Columns.Add("Amount", typeof(decimal));
+                detailTable.Columns.Add("MarginPer", typeof(decimal));
+                detailTable.Columns.Add("Profit", typeof(decimal));
+                detailTable.Columns.Add("TaxPer", typeof(decimal));
+                detailTable.Columns.Add("TaxAmt", typeof(decimal));
+                detailTable.Columns.Add("TotalAmount", typeof(decimal));
 
                 int serial = 1;
                 foreach (var b in finalBills)
                 {
-                    DataRow row = dt.NewRow();
+                    DataRow row = masterTable.NewRow();
                     row["SlNo"] = serial++;
                     row["BillNo"] = b.BillNo;
                     row["BillDate"] = b.BillDate;
@@ -580,12 +613,57 @@ namespace PosBranch_Win.Reports.SalesReports
                     row["TaxAmt"] = Convert.ToDecimal(b.TaxAmt);
                     row["NetAmount"] = Convert.ToDecimal(b.NetAmount);
                     row["Profit"] = Convert.ToDecimal(b.Profit);
-                    dt.Rows.Add(row);
+                    masterTable.Rows.Add(row);
+
+                    // Fetch detail items for this bill
+                    try
+                    {
+                        var details = _reportRepository.GetSalesReportDetails(b.BillNo, fromDate, toDate);
+                        if (details?.Details != null && details.Details.Count > 0)
+                        {
+                            int detailSerial = 1;
+                            foreach (var d in details.Details)
+                            {
+                                DataRow dRow = detailTable.NewRow();
+                                dRow["BillNo"] = b.BillNo;
+                                dRow["SlNo"] = detailSerial++;
+                                dRow["ItemName"] = d.ItemName ?? "";
+                                dRow["Barcode"] = d.Barcode ?? "";
+                                dRow["Unit"] = d.Unit ?? "";
+                                dRow["Packing"] = d.Packing ?? "";
+                                dRow["Qty"] = Convert.ToDecimal(d.Qty);
+                                dRow["UnitPrice"] = Convert.ToDecimal(d.UnitPrice);
+                                dRow["Amount"] = Convert.ToDecimal(d.Amount);
+                                dRow["MarginPer"] = Convert.ToDecimal(d.MarginPer);
+                                dRow["Profit"] = Convert.ToDecimal(d.Profit);
+                                dRow["TaxPer"] = Convert.ToDecimal(d.TaxPer);
+                                dRow["TaxAmt"] = Convert.ToDecimal(d.TaxAmt);
+                                dRow["TotalAmount"] = Convert.ToDecimal(d.TotalAmount);
+                                detailTable.Rows.Add(dRow);
+                            }
+                        }
+                    }
+                    catch (Exception exDetail)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Error retrieving details for Bill {b.BillNo}: {exDetail.Message}");
+                    }
                 }
 
-                _currentDataTable = dt;
+                dsHierarchical.Tables.Add(masterTable);
+                dsHierarchical.Tables.Add(detailTable);
+
+                // Create relationship between master and detail
+                DataRelation relation = new DataRelation(
+                    "BillDetails",
+                    masterTable.Columns["BillNo"],
+                    detailTable.Columns["BillNo"],
+                    false
+                );
+                dsHierarchical.Relations.Add(relation);
+
+                _currentDataTable = masterTable;
                 ultraGridMaster.DataSource = null;
-                ultraGridMaster.DataSource = dt;
+                ultraGridMaster.DataSource = dsHierarchical;
 
                 ApplyUserHiddenColumns();
 
@@ -606,99 +684,82 @@ namespace PosBranch_Win.Reports.SalesReports
             }
         }
 
+        private void UltraGridMaster_BeforeRowExpanded(object sender, CancelableRowEventArgs e)
+        {
+            try
+            {
+                if (e.Row.Band.Index == 0 && e.Row.Cells.Exists("BillNo"))
+                {
+                    int billNo = Convert.ToInt32(e.Row.Cells["BillNo"].Value);
+                    if (ultraGridMaster.DataSource is DataSet ds && ds.Tables.Contains("SalesDetails"))
+                    {
+                        DataTable detailTable = ds.Tables["SalesDetails"];
+                        DataRow[] existing = detailTable.Select($"BillNo = {billNo}");
+                        if (existing.Length == 0)
+                        {
+                            DateTime fromDate = dtFromDate.DateTime.Date;
+                            DateTime toDate = dtToDate.DateTime.Date.AddDays(1).AddMilliseconds(-3);
+                            var details = _reportRepository.GetSalesReportDetails(billNo, fromDate, toDate);
+                            if (details?.Details != null && details.Details.Count > 0)
+                            {
+                                int detailSerial = 1;
+                                foreach (var d in details.Details)
+                                {
+                                    DataRow dRow = detailTable.NewRow();
+                                    dRow["BillNo"] = billNo;
+                                    dRow["SlNo"] = detailSerial++;
+                                    dRow["ItemName"] = d.ItemName ?? "";
+                                    dRow["Barcode"] = d.Barcode ?? "";
+                                    dRow["Unit"] = d.Unit ?? "";
+                                    dRow["Packing"] = d.Packing ?? "";
+                                    dRow["Qty"] = Convert.ToDecimal(d.Qty);
+                                    dRow["UnitPrice"] = Convert.ToDecimal(d.UnitPrice);
+                                    dRow["Amount"] = Convert.ToDecimal(d.Amount);
+                                    dRow["MarginPer"] = Convert.ToDecimal(d.MarginPer);
+                                    dRow["Profit"] = Convert.ToDecimal(d.Profit);
+                                    dRow["TaxPer"] = Convert.ToDecimal(d.TaxPer);
+                                    dRow["TaxAmt"] = Convert.ToDecimal(d.TaxAmt);
+                                    dRow["TotalAmount"] = Convert.ToDecimal(d.TotalAmount);
+                                    detailTable.Rows.Add(dRow);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"BeforeRowExpanded error: {ex.Message}");
+            }
+        }
+
         private void UltraGridMaster_InitializeLayout(object sender, InitializeLayoutEventArgs e)
         {
             try
             {
-                if (e.Layout.Bands.Count == 0) return;
+                // Ensure chaptered / relation columns are completely excluded from chooser
+                foreach (var b in e.Layout.Bands)
+                {
+                    foreach (var col in b.Columns)
+                    {
+                        if (col.IsChaptered || string.Equals(col.Key, "BillDetails", StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(col.Key, "DetailID", StringComparison.OrdinalIgnoreCase))
+                        {
+                            col.ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
+                        }
+                    }
+                }
 
-                UltraGridBand band = e.Layout.Bands[0];
-                int pos = 0;
+                // Master Band (Band 0 - Bills)
+                if (e.Layout.Bands.Count > 0)
+                {
+                    ConfigureMasterBandColumns(e.Layout.Bands[0]);
+                }
 
-                if (band.Columns.Exists("SlNo"))
+                // Detail Band (Band 1 - Items)
+                if (e.Layout.Bands.Count > 1)
                 {
-                    band.Columns["SlNo"].Header.Caption = "S.No";
-                    band.Columns["SlNo"].Width = 45;
-                    band.Columns["SlNo"].CellAppearance.TextHAlign = HAlign.Center;
-                    band.Columns["SlNo"].CellAppearance.TextVAlign = VAlign.Middle;
-                    band.Columns["SlNo"].Header.VisiblePosition = pos++;
-                }
-                if (band.Columns.Exists("BillNo"))
-                {
-                    band.Columns["BillNo"].Header.Caption = "Bill No";
-                    band.Columns["BillNo"].Width = 85;
-                    band.Columns["BillNo"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
-                    band.Columns["BillNo"].CellAppearance.ForeColor = Color.FromArgb(21, 101, 192);
-                    band.Columns["BillNo"].CellAppearance.TextHAlign = HAlign.Center;
-                    band.Columns["BillNo"].CellAppearance.TextVAlign = VAlign.Middle;
-                    band.Columns["BillNo"].Header.VisiblePosition = pos++;
-                }
-                if (band.Columns.Exists("BillDate"))
-                {
-                    band.Columns["BillDate"].Header.Caption = "Bill Date";
-                    band.Columns["BillDate"].Format = "dd-MM-yyyy hh:mm tt";
-                    band.Columns["BillDate"].Width = 145;
-                    band.Columns["BillDate"].CellAppearance.TextHAlign = HAlign.Center;
-                    band.Columns["BillDate"].CellAppearance.TextVAlign = VAlign.Middle;
-                    band.Columns["BillDate"].Header.VisiblePosition = pos++;
-                }
-                if (band.Columns.Exists("CustomerName"))
-                {
-                    band.Columns["CustomerName"].Header.Caption = "Customer";
-                    band.Columns["CustomerName"].Width = 240;
-                    band.Columns["CustomerName"].CellAppearance.TextHAlign = HAlign.Left;
-                    band.Columns["CustomerName"].CellAppearance.TextVAlign = VAlign.Middle;
-                    band.Columns["CustomerName"].Header.VisiblePosition = pos++;
-                }
-                if (band.Columns.Exists("PaymodeName"))
-                {
-                    band.Columns["PaymodeName"].Header.Caption = "Pay Mode";
-                    band.Columns["PaymodeName"].Width = 95;
-                    band.Columns["PaymodeName"].CellAppearance.TextHAlign = HAlign.Center;
-                    band.Columns["PaymodeName"].CellAppearance.TextVAlign = VAlign.Middle;
-                    band.Columns["PaymodeName"].Header.VisiblePosition = pos++;
-                }
-                if (band.Columns.Exists("SubTotal"))
-                {
-                    band.Columns["SubTotal"].Header.Caption = "Sub Total";
-                    band.Columns["SubTotal"].Format = "₹ #,##0.00";
-                    band.Columns["SubTotal"].Width = 120;
-                    band.Columns["SubTotal"].CellAppearance.TextHAlign = HAlign.Right;
-                    band.Columns["SubTotal"].CellAppearance.TextVAlign = VAlign.Middle;
-                    band.Columns["SubTotal"].CellAppearance.ForeColor = Color.FromArgb(13, 71, 161);
-                    band.Columns["SubTotal"].Header.VisiblePosition = pos++;
-                }
-                if (band.Columns.Exists("TaxAmt"))
-                {
-                    band.Columns["TaxAmt"].Header.Caption = "Tax Amount";
-                    band.Columns["TaxAmt"].Format = "₹ #,##0.00";
-                    band.Columns["TaxAmt"].Width = 115;
-                    band.Columns["TaxAmt"].CellAppearance.TextHAlign = HAlign.Right;
-                    band.Columns["TaxAmt"].CellAppearance.TextVAlign = VAlign.Middle;
-                    band.Columns["TaxAmt"].CellAppearance.ForeColor = Color.FromArgb(211, 84, 0);
-                    band.Columns["TaxAmt"].Header.VisiblePosition = pos++;
-                }
-                if (band.Columns.Exists("NetAmount"))
-                {
-                    band.Columns["NetAmount"].Header.Caption = "Net Amount";
-                    band.Columns["NetAmount"].Format = "₹ #,##0.00";
-                    band.Columns["NetAmount"].Width = 135;
-                    band.Columns["NetAmount"].CellAppearance.TextHAlign = HAlign.Right;
-                    band.Columns["NetAmount"].CellAppearance.TextVAlign = VAlign.Middle;
-                    band.Columns["NetAmount"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
-                    band.Columns["NetAmount"].CellAppearance.ForeColor = Color.FromArgb(27, 94, 32);
-                    band.Columns["NetAmount"].Header.VisiblePosition = pos++;
-                }
-                if (band.Columns.Exists("Profit"))
-                {
-                    band.Columns["Profit"].Header.Caption = "Profit";
-                    band.Columns["Profit"].Format = "₹ #,##0.00";
-                    band.Columns["Profit"].Width = 120;
-                    band.Columns["Profit"].CellAppearance.TextHAlign = HAlign.Right;
-                    band.Columns["Profit"].CellAppearance.TextVAlign = VAlign.Middle;
-                    band.Columns["Profit"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
-                    band.Columns["Profit"].CellAppearance.ForeColor = Color.FromArgb(22, 160, 133);
-                    band.Columns["Profit"].Header.VisiblePosition = pos++;
+                    ConfigureDetailBandColumns(e.Layout.Bands[1]);
                 }
 
                 CreateFooterCells();
@@ -711,15 +772,255 @@ namespace PosBranch_Win.Reports.SalesReports
             }
         }
 
+        private void ConfigureMasterBandColumns(UltraGridBand band)
+        {
+            int pos = 0;
+
+            if (band.Columns.Exists("SlNo"))
+            {
+                band.Columns["SlNo"].Header.Caption = "S.No";
+                band.Columns["SlNo"].Width = 45;
+                band.Columns["SlNo"].CellAppearance.TextHAlign = HAlign.Center;
+                band.Columns["SlNo"].CellAppearance.TextVAlign = VAlign.Middle;
+                band.Columns["SlNo"].Header.VisiblePosition = pos++;
+            }
+            if (band.Columns.Exists("BillNo"))
+            {
+                band.Columns["BillNo"].Header.Caption = "Bill No";
+                band.Columns["BillNo"].Width = 85;
+                band.Columns["BillNo"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
+                band.Columns["BillNo"].CellAppearance.ForeColor = Color.FromArgb(21, 101, 192);
+                band.Columns["BillNo"].CellAppearance.TextHAlign = HAlign.Center;
+                band.Columns["BillNo"].CellAppearance.TextVAlign = VAlign.Middle;
+                band.Columns["BillNo"].Header.VisiblePosition = pos++;
+            }
+            if (band.Columns.Exists("BillDate"))
+            {
+                band.Columns["BillDate"].Header.Caption = "Bill Date";
+                band.Columns["BillDate"].Format = "dd-MM-yyyy hh:mm tt";
+                band.Columns["BillDate"].Width = 145;
+                band.Columns["BillDate"].CellAppearance.TextHAlign = HAlign.Center;
+                band.Columns["BillDate"].CellAppearance.TextVAlign = VAlign.Middle;
+                band.Columns["BillDate"].Header.VisiblePosition = pos++;
+            }
+            if (band.Columns.Exists("CustomerName"))
+            {
+                band.Columns["CustomerName"].Header.Caption = "Customer";
+                band.Columns["CustomerName"].Width = 240;
+                band.Columns["CustomerName"].CellAppearance.TextHAlign = HAlign.Left;
+                band.Columns["CustomerName"].CellAppearance.TextVAlign = VAlign.Middle;
+                band.Columns["CustomerName"].Header.VisiblePosition = pos++;
+            }
+            if (band.Columns.Exists("PaymodeName"))
+            {
+                band.Columns["PaymodeName"].Header.Caption = "Pay Mode";
+                band.Columns["PaymodeName"].Width = 95;
+                band.Columns["PaymodeName"].CellAppearance.TextHAlign = HAlign.Center;
+                band.Columns["PaymodeName"].CellAppearance.TextVAlign = VAlign.Middle;
+                band.Columns["PaymodeName"].Header.VisiblePosition = pos++;
+            }
+            if (band.Columns.Exists("SubTotal"))
+            {
+                band.Columns["SubTotal"].Header.Caption = "Sub Total";
+                band.Columns["SubTotal"].Format = "₹ #,##0.00";
+                band.Columns["SubTotal"].Width = 120;
+                band.Columns["SubTotal"].CellAppearance.TextHAlign = HAlign.Right;
+                band.Columns["SubTotal"].CellAppearance.TextVAlign = VAlign.Middle;
+                band.Columns["SubTotal"].CellAppearance.ForeColor = Color.FromArgb(13, 71, 161);
+                band.Columns["SubTotal"].Header.VisiblePosition = pos++;
+            }
+            if (band.Columns.Exists("TaxAmt"))
+            {
+                band.Columns["TaxAmt"].Header.Caption = "Tax Amount";
+                band.Columns["TaxAmt"].Format = "₹ #,##0.00";
+                band.Columns["TaxAmt"].Width = 115;
+                band.Columns["TaxAmt"].CellAppearance.TextHAlign = HAlign.Right;
+                band.Columns["TaxAmt"].CellAppearance.TextVAlign = VAlign.Middle;
+                band.Columns["TaxAmt"].CellAppearance.ForeColor = Color.FromArgb(211, 84, 0);
+                band.Columns["TaxAmt"].Header.VisiblePosition = pos++;
+            }
+            if (band.Columns.Exists("NetAmount"))
+            {
+                band.Columns["NetAmount"].Header.Caption = "Net Amount";
+                band.Columns["NetAmount"].Format = "₹ #,##0.00";
+                band.Columns["NetAmount"].Width = 135;
+                band.Columns["NetAmount"].CellAppearance.TextHAlign = HAlign.Right;
+                band.Columns["NetAmount"].CellAppearance.TextVAlign = VAlign.Middle;
+                band.Columns["NetAmount"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
+                band.Columns["NetAmount"].CellAppearance.ForeColor = Color.FromArgb(27, 94, 32);
+                band.Columns["NetAmount"].Header.VisiblePosition = pos++;
+            }
+            if (band.Columns.Exists("Profit"))
+            {
+                band.Columns["Profit"].Header.Caption = "Profit";
+                band.Columns["Profit"].Format = "₹ #,##0.00";
+                band.Columns["Profit"].Width = 120;
+                band.Columns["Profit"].CellAppearance.TextHAlign = HAlign.Right;
+                band.Columns["Profit"].CellAppearance.TextVAlign = VAlign.Middle;
+                band.Columns["Profit"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
+                band.Columns["Profit"].CellAppearance.ForeColor = Color.FromArgb(22, 160, 133);
+                band.Columns["Profit"].Header.VisiblePosition = pos++;
+            }
+        }
+
+        private void ConfigureDetailBandColumns(UltraGridBand detailBand)
+        {
+            detailBand.Header.Caption = "Item Details";
+            detailBand.HeaderVisible = true;
+            detailBand.Header.Appearance.BackColor = GridHeaderBlue;
+            detailBand.Header.Appearance.BackColor2 = GridHeaderBlueDark;
+            detailBand.Header.Appearance.BackGradientStyle = GradientStyle.Vertical;
+            detailBand.Header.Appearance.ForeColor = Color.White;
+            detailBand.Header.Appearance.FontData.Bold = DefaultableBoolean.True;
+
+            // Hide internal keys and exclude from column chooser
+            if (detailBand.Columns.Exists("DetailID"))
+            {
+                detailBand.Columns["DetailID"].Hidden = true;
+                detailBand.Columns["DetailID"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
+            }
+            if (detailBand.Columns.Exists("BillNo"))
+            {
+                detailBand.Columns["BillNo"].Hidden = true;
+                detailBand.Columns["BillNo"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
+            }
+
+            int pos = 0;
+            if (detailBand.Columns.Exists("SlNo"))
+            {
+                detailBand.Columns["SlNo"].Header.Caption = "S.No";
+                detailBand.Columns["SlNo"].Width = 45;
+                detailBand.Columns["SlNo"].CellAppearance.TextHAlign = HAlign.Center;
+                detailBand.Columns["SlNo"].CellAppearance.TextVAlign = VAlign.Middle;
+                detailBand.Columns["SlNo"].Header.VisiblePosition = pos++;
+            }
+            if (detailBand.Columns.Exists("ItemName"))
+            {
+                detailBand.Columns["ItemName"].Header.Caption = "Item Name";
+                detailBand.Columns["ItemName"].Width = 200;
+                detailBand.Columns["ItemName"].CellAppearance.TextHAlign = HAlign.Left;
+                detailBand.Columns["ItemName"].CellAppearance.TextVAlign = VAlign.Middle;
+                detailBand.Columns["ItemName"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
+                detailBand.Columns["ItemName"].Header.VisiblePosition = pos++;
+            }
+            if (detailBand.Columns.Exists("Barcode"))
+            {
+                detailBand.Columns["Barcode"].Header.Caption = "Barcode";
+                detailBand.Columns["Barcode"].Width = 95;
+                detailBand.Columns["Barcode"].CellAppearance.TextHAlign = HAlign.Center;
+                detailBand.Columns["Barcode"].CellAppearance.TextVAlign = VAlign.Middle;
+                detailBand.Columns["Barcode"].CellAppearance.ForeColor = Color.FromArgb(84, 110, 122);
+                detailBand.Columns["Barcode"].Header.VisiblePosition = pos++;
+            }
+            if (detailBand.Columns.Exists("Unit"))
+            {
+                detailBand.Columns["Unit"].Header.Caption = "Unit";
+                detailBand.Columns["Unit"].Width = 60;
+                detailBand.Columns["Unit"].CellAppearance.TextHAlign = HAlign.Center;
+                detailBand.Columns["Unit"].CellAppearance.TextVAlign = VAlign.Middle;
+                detailBand.Columns["Unit"].Header.VisiblePosition = pos++;
+            }
+            if (detailBand.Columns.Exists("Packing"))
+            {
+                detailBand.Columns["Packing"].Header.Caption = "Packing";
+                detailBand.Columns["Packing"].Width = 70;
+                detailBand.Columns["Packing"].CellAppearance.TextHAlign = HAlign.Center;
+                detailBand.Columns["Packing"].CellAppearance.TextVAlign = VAlign.Middle;
+                detailBand.Columns["Packing"].Header.VisiblePosition = pos++;
+            }
+            if (detailBand.Columns.Exists("Qty"))
+            {
+                detailBand.Columns["Qty"].Header.Caption = "Quantity";
+                detailBand.Columns["Qty"].Format = "0.00";
+                detailBand.Columns["Qty"].Width = 75;
+                detailBand.Columns["Qty"].CellAppearance.TextHAlign = HAlign.Right;
+                detailBand.Columns["Qty"].CellAppearance.TextVAlign = VAlign.Middle;
+                detailBand.Columns["Qty"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
+                detailBand.Columns["Qty"].Header.VisiblePosition = pos++;
+            }
+            if (detailBand.Columns.Exists("UnitPrice"))
+            {
+                detailBand.Columns["UnitPrice"].Header.Caption = "Unit Price";
+                detailBand.Columns["UnitPrice"].Format = "₹ #,##0.00";
+                detailBand.Columns["UnitPrice"].Width = 95;
+                detailBand.Columns["UnitPrice"].CellAppearance.TextHAlign = HAlign.Right;
+                detailBand.Columns["UnitPrice"].CellAppearance.TextVAlign = VAlign.Middle;
+                detailBand.Columns["UnitPrice"].Header.VisiblePosition = pos++;
+            }
+            if (detailBand.Columns.Exists("Amount"))
+            {
+                detailBand.Columns["Amount"].Header.Caption = "Amount";
+                detailBand.Columns["Amount"].Format = "₹ #,##0.00";
+                detailBand.Columns["Amount"].Width = 105;
+                detailBand.Columns["Amount"].CellAppearance.TextHAlign = HAlign.Right;
+                detailBand.Columns["Amount"].CellAppearance.TextVAlign = VAlign.Middle;
+                detailBand.Columns["Amount"].CellAppearance.ForeColor = Color.FromArgb(13, 71, 161);
+                detailBand.Columns["Amount"].Header.VisiblePosition = pos++;
+            }
+            if (detailBand.Columns.Exists("MarginPer"))
+            {
+                detailBand.Columns["MarginPer"].Header.Caption = "Margin %";
+                detailBand.Columns["MarginPer"].Format = "0.00 %";
+                detailBand.Columns["MarginPer"].Width = 75;
+                detailBand.Columns["MarginPer"].CellAppearance.TextHAlign = HAlign.Center;
+                detailBand.Columns["MarginPer"].CellAppearance.TextVAlign = VAlign.Middle;
+                detailBand.Columns["MarginPer"].Header.VisiblePosition = pos++;
+            }
+            if (detailBand.Columns.Exists("Profit"))
+            {
+                detailBand.Columns["Profit"].Header.Caption = "Profit";
+                detailBand.Columns["Profit"].Format = "₹ #,##0.00";
+                detailBand.Columns["Profit"].Width = 105;
+                detailBand.Columns["Profit"].CellAppearance.TextHAlign = HAlign.Right;
+                detailBand.Columns["Profit"].CellAppearance.TextVAlign = VAlign.Middle;
+                detailBand.Columns["Profit"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
+                detailBand.Columns["Profit"].CellAppearance.ForeColor = Color.FromArgb(22, 160, 133);
+                detailBand.Columns["Profit"].Header.VisiblePosition = pos++;
+            }
+            if (detailBand.Columns.Exists("TaxPer"))
+            {
+                detailBand.Columns["TaxPer"].Header.Caption = "Tax %";
+                detailBand.Columns["TaxPer"].Format = "0.00 %";
+                detailBand.Columns["TaxPer"].Width = 70;
+                detailBand.Columns["TaxPer"].CellAppearance.TextHAlign = HAlign.Center;
+                detailBand.Columns["TaxPer"].CellAppearance.TextVAlign = VAlign.Middle;
+                detailBand.Columns["TaxPer"].Header.VisiblePosition = pos++;
+            }
+            if (detailBand.Columns.Exists("TaxAmt"))
+            {
+                detailBand.Columns["TaxAmt"].Header.Caption = "Tax Amount";
+                detailBand.Columns["TaxAmt"].Format = "₹ #,##0.00";
+                detailBand.Columns["TaxAmt"].Width = 105;
+                detailBand.Columns["TaxAmt"].CellAppearance.TextHAlign = HAlign.Right;
+                detailBand.Columns["TaxAmt"].CellAppearance.TextVAlign = VAlign.Middle;
+                detailBand.Columns["TaxAmt"].CellAppearance.ForeColor = Color.FromArgb(211, 84, 0);
+                detailBand.Columns["TaxAmt"].Header.VisiblePosition = pos++;
+            }
+            if (detailBand.Columns.Exists("TotalAmount"))
+            {
+                detailBand.Columns["TotalAmount"].Header.Caption = "Total Amount";
+                detailBand.Columns["TotalAmount"].Format = "₹ #,##0.00";
+                detailBand.Columns["TotalAmount"].Width = 115;
+                detailBand.Columns["TotalAmount"].CellAppearance.TextHAlign = HAlign.Right;
+                detailBand.Columns["TotalAmount"].CellAppearance.TextVAlign = VAlign.Middle;
+                detailBand.Columns["TotalAmount"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
+                detailBand.Columns["TotalAmount"].CellAppearance.ForeColor = Color.FromArgb(27, 94, 32);
+                detailBand.Columns["TotalAmount"].Header.VisiblePosition = pos++;
+            }
+        }
+
         private void ApplyUserHiddenColumns()
         {
             if (ultraGridMaster.DisplayLayout == null || ultraGridMaster.DisplayLayout.Bands.Count == 0) return;
-            var band = ultraGridMaster.DisplayLayout.Bands[0];
             foreach (var key in userHiddenColumnKeys)
             {
-                if (band.Columns.Exists(key))
+                for (int b = 0; b < ultraGridMaster.DisplayLayout.Bands.Count; b++)
                 {
-                    band.Columns[key].Hidden = true;
+                    var band = ultraGridMaster.DisplayLayout.Bands[b];
+                    if (band.Columns.Exists(key))
+                    {
+                        band.Columns[key].Hidden = true;
+                    }
                 }
             }
         }
@@ -766,7 +1067,7 @@ namespace PosBranch_Win.Reports.SalesReports
 
             foreach (UltraGridColumn column in band.Columns.Cast<UltraGridColumn>().OrderBy(c => c.Header.VisiblePosition))
             {
-                if (column.Hidden)
+                if (column.Hidden || column.IsChaptered || string.Equals(column.Key, "BillDetails", StringComparison.OrdinalIgnoreCase))
                     continue;
 
                 Label footerLabel = new Label
@@ -904,7 +1205,7 @@ namespace PosBranch_Win.Reports.SalesReports
 
             foreach (UltraGridColumn column in band.Columns.Cast<UltraGridColumn>().OrderBy(c => c.Header.VisiblePosition))
             {
-                if (column.Hidden || !_footerLabels.ContainsKey(column.Key))
+                if (column.Hidden || column.IsChaptered || string.Equals(column.Key, "BillDetails", StringComparison.OrdinalIgnoreCase) || !_footerLabels.ContainsKey(column.Key))
                     continue;
 
                 Label footerLabel = _footerLabels[column.Key];
@@ -1202,7 +1503,7 @@ namespace PosBranch_Win.Reports.SalesReports
             {
                 Point clientPt = ultraGridMaster.PointToClient(new Point(e.X, e.Y));
                 int dropPosition = GetTargetColumnPositionFromPoint(clientPt);
-                UnhideColumn(item.ColumnKey, dropPosition);
+                UnhideColumn(item.ColumnKey, item.BandIndex, dropPosition);
             }
         }
 
@@ -1237,7 +1538,14 @@ namespace PosBranch_Win.Reports.SalesReports
 
         private void HideColumn(UltraGridColumn col)
         {
-            if (col == null) return;
+            if (col == null || col.Hidden) return;
+            int bandIdx = col.Band != null ? col.Band.Index : 0;
+            if (!IsCustomizableColumn(col, bandIdx))
+            {
+                MessageBox.Show($"The '{col.Header.Caption}' column cannot be hidden.", "Cannot Hide Column", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
             userHiddenColumnKeys.Add(col.Key);
             col.Hidden = true;
             CreateFooterCells();
@@ -1247,6 +1555,16 @@ namespace PosBranch_Win.Reports.SalesReports
             {
                 PopulateColumnChooserListBox();
             }
+        }
+
+        private bool IsCustomizableColumn(UltraGridColumn col, int bandIndex)
+        {
+            if (col == null || col.IsChaptered) return false;
+            if (col.ExcludeFromColumnChooser == ExcludeFromColumnChooser.True) return false;
+            if (string.Equals(col.Key, "BillDetails", StringComparison.OrdinalIgnoreCase)) return false;
+            if (string.Equals(col.Key, "DetailID", StringComparison.OrdinalIgnoreCase)) return false;
+            if (bandIndex > 0 && string.Equals(col.Key, "BillNo", StringComparison.OrdinalIgnoreCase)) return false;
+            return true;
         }
 
         private void ShowHeaderContextMenu(UltraGridColumn col, Point location)
@@ -1352,17 +1670,24 @@ namespace PosBranch_Win.Reports.SalesReports
                 return;
 
             columnChooserListBox.Items.Clear();
-            UltraGridBand band = ultraGridMaster.DisplayLayout.Bands[0];
             string filterText = txtColumnSearch?.Text?.Trim() ?? "";
 
-            foreach (UltraGridColumn col in band.Columns)
+            for (int b = 0; b < ultraGridMaster.DisplayLayout.Bands.Count; b++)
             {
-                if (col.Hidden)
+                UltraGridBand band = ultraGridMaster.DisplayLayout.Bands[b];
+                string bandPrefix = b > 0 ? "[Item] " : "";
+
+                foreach (UltraGridColumn col in band.Columns)
                 {
-                    string caption = !string.IsNullOrEmpty(col.Header.Caption) ? col.Header.Caption : col.Key;
-                    if (string.IsNullOrEmpty(filterText) || caption.IndexOf(filterText, StringComparison.OrdinalIgnoreCase) >= 0)
+                    if (col.Hidden && IsCustomizableColumn(col, b))
                     {
-                        columnChooserListBox.Items.Add(new ColumnChooserItem(col.Key, caption));
+                        string caption = !string.IsNullOrEmpty(col.Header.Caption) ? col.Header.Caption : col.Key;
+                        string display = bandPrefix + caption;
+
+                        if (string.IsNullOrEmpty(filterText) || display.IndexOf(filterText, StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            columnChooserListBox.Items.Add(new ColumnChooserItem(col.Key, display, b));
+                        }
                     }
                 }
             }
@@ -1372,16 +1697,16 @@ namespace PosBranch_Win.Reports.SalesReports
         {
             if (columnChooserListBox.SelectedItem is ColumnChooserItem item)
             {
-                UnhideColumn(item.ColumnKey);
+                UnhideColumn(item.ColumnKey, item.BandIndex);
             }
         }
 
-        private void UnhideColumn(string columnKey, int? targetVisiblePosition = null)
+        private void UnhideColumn(string columnKey, int bandIndex = 0, int? targetVisiblePosition = null)
         {
             userHiddenColumnKeys.Remove(columnKey);
-            if (ultraGridMaster.DisplayLayout.Bands.Count > 0 && ultraGridMaster.DisplayLayout.Bands[0].Columns.Exists(columnKey))
+            if (ultraGridMaster.DisplayLayout.Bands.Count > bandIndex && ultraGridMaster.DisplayLayout.Bands[bandIndex].Columns.Exists(columnKey))
             {
-                UltraGridColumn col = ultraGridMaster.DisplayLayout.Bands[0].Columns[columnKey];
+                UltraGridColumn col = ultraGridMaster.DisplayLayout.Bands[bandIndex].Columns[columnKey];
                 col.Hidden = false;
                 if (targetVisiblePosition.HasValue)
                 {
@@ -1397,11 +1722,16 @@ namespace PosBranch_Win.Reports.SalesReports
         private void UnhideAllColumns()
         {
             userHiddenColumnKeys.Clear();
-            if (ultraGridMaster.DisplayLayout.Bands.Count == 0) return;
-            UltraGridBand band = ultraGridMaster.DisplayLayout.Bands[0];
-            foreach (UltraGridColumn col in band.Columns)
+            for (int b = 0; b < ultraGridMaster.DisplayLayout.Bands.Count; b++)
             {
-                col.Hidden = false;
+                UltraGridBand band = ultraGridMaster.DisplayLayout.Bands[b];
+                foreach (UltraGridColumn col in band.Columns)
+                {
+                    if (IsCustomizableColumn(col, b))
+                    {
+                        col.Hidden = false;
+                    }
+                }
             }
             CreateFooterCells();
             UpdateFooterCellPositions();
@@ -1433,7 +1763,9 @@ namespace PosBranch_Win.Reports.SalesReports
 
             e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
 
-            using (SolidBrush bgBrush = new SolidBrush(Color.FromArgb(0, 121, 211)))
+            Color badgeColor = item.BandIndex == 0 ? Color.FromArgb(0, 121, 211) : Color.FromArgb(70, 90, 120);
+
+            using (SolidBrush bgBrush = new SolidBrush(badgeColor))
             using (GraphicsPath path = RoundedRect(rect, 4))
             {
                 e.Graphics.FillPath(bgBrush, path);
@@ -1497,7 +1829,7 @@ namespace PosBranch_Win.Reports.SalesReports
                     {
                         var visibleCols = ultraGridMaster.DisplayLayout.Bands[0].Columns
                             .Cast<UltraGridColumn>()
-                            .Where(c => !c.Hidden)
+                            .Where(c => !c.Hidden && !c.IsChaptered && !string.Equals(c.Key, "BillDetails", StringComparison.OrdinalIgnoreCase))
                             .OrderBy(c => c.Header.VisiblePosition)
                             .ToList();
 
@@ -1508,7 +1840,7 @@ namespace PosBranch_Win.Reports.SalesReports
                         {
                             var cells = visibleCols.Select(c =>
                             {
-                                object v = row.Cells[c.Key].Value;
+                                object v = row.Cells.Exists(c.Key) ? row.Cells[c.Key].Value : "";
                                 string s = v != null && v != DBNull.Value ? v.ToString() : "";
                                 if (s.Contains(",") || s.Contains("\"") || s.Contains("\n"))
                                 {
@@ -1517,6 +1849,36 @@ namespace PosBranch_Win.Reports.SalesReports
                                 return s;
                             });
                             sb.AppendLine(string.Join(",", cells));
+
+                            if (row.ChildBands != null && row.ChildBands.Count > 0)
+                            {
+                                var childBand = row.ChildBands[0];
+                                if (childBand.Rows.Count > 0)
+                                {
+                                    var detailCols = childBand.Band.Columns
+                                        .Cast<UltraGridColumn>()
+                                        .Where(c => !c.Hidden && !c.IsChaptered && !string.Equals(c.Key, "DetailID", StringComparison.OrdinalIgnoreCase) && !string.Equals(c.Key, "BillNo", StringComparison.OrdinalIgnoreCase))
+                                        .OrderBy(c => c.Header.VisiblePosition)
+                                        .ToList();
+
+                                    sb.AppendLine("   -> Item Details:," + string.Join(",", detailCols.Select(c => $"\"{c.Header.Caption}\"")));
+
+                                    foreach (var cRow in childBand.Rows)
+                                    {
+                                        var dCells = detailCols.Select(c =>
+                                        {
+                                            object v = cRow.Cells.Exists(c.Key) ? cRow.Cells[c.Key].Value : "";
+                                            string s = v != null && v != DBNull.Value ? v.ToString() : "";
+                                            if (s.Contains(",") || s.Contains("\"") || s.Contains("\n"))
+                                            {
+                                                s = "\"" + s.Replace("\"", "\"\"") + "\"";
+                                            }
+                                            return s;
+                                        });
+                                        sb.AppendLine("   ," + string.Join(",", dCells));
+                                    }
+                                }
+                            }
                         }
 
                         File.WriteAllText(sfd.FileName, sb.ToString(), Encoding.UTF8);
