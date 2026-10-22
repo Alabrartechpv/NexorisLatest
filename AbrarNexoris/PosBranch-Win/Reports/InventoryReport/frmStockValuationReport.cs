@@ -72,19 +72,21 @@ namespace PosBranch_Win.Reports.InventoryReport
         private readonly System.Windows.Forms.ToolTip headerToolTip = new System.Windows.Forms.ToolTip();
         private readonly HashSet<string> userHiddenColumnKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private static readonly Cursor blackXCursor = CreateBlackXCursor();
+        private GridSideScrollFilter _sideScrollFilter;
+        private Label _lblRowSelectorSpacer;
 
         // ════════════════════════════════════════════════════════════
         //  Constructor
         // ════════════════════════════════════════════════════════════
-        private string _initialStockFilter = "All Items";
+        private string _initialStockFilter = "Positive Stock";
 
-        public frmStockValuationReport() : this("All Items")
+        public frmStockValuationReport() : this("Positive Stock")
         {
         }
 
         public frmStockValuationReport(string initialStockFilter, int? groupId = null, int? categoryId = null)
         {
-            _initialStockFilter = string.IsNullOrWhiteSpace(initialStockFilter) ? "All Items" : initialStockFilter;
+            _initialStockFilter = string.IsNullOrWhiteSpace(initialStockFilter) ? "Positive Stock" : initialStockFilter;
             InitializeComponent();
             this.Font = new Font("Segoe UI", 9F);
             InitializeBackgroundWorker();
@@ -162,6 +164,15 @@ namespace PosBranch_Win.Reports.InventoryReport
 
                 SetupHeaderDragToHideAndColumnChooser();
                 InitializeGridFooter();
+
+                // Enable side/horizontal mouse wheel scrolling and tilt-wheel filter
+                gridReport.MouseWheel += GridReport_MouseWheel;
+                _sideScrollFilter = new GridSideScrollFilter(this, gridReport);
+                this.FormClosing += (s, e) =>
+                {
+                    _sideScrollFilter?.ReleaseHandle();
+                    _sideScrollFilter = null;
+                };
 
                 // Keyboard shortcuts
                 this.KeyPreview = true;
@@ -345,6 +356,19 @@ namespace PosBranch_Win.Reports.InventoryReport
             gridReport.DisplayLayout.AutoFitStyle = AutoFitStyle.None;
             gridReport.DisplayLayout.ScrollBounds = ScrollBounds.ScrollToFill;
             gridReport.DisplayLayout.Scrollbars = Scrollbars.Both;
+            gridReport.DisplayLayout.MaxColScrollRegions = 1;
+            gridReport.DisplayLayout.MaxRowScrollRegions = 1;
+            gridReport.DisplayLayout.ScrollStyle = ScrollStyle.Immediate;
+
+            // Scroll bar appearance
+            gridReport.DisplayLayout.ScrollBarLook.Appearance.BackColor = ActionPanelBackColor;
+            gridReport.DisplayLayout.ScrollBarLook.Appearance.BorderColor = BorderBlue;
+            gridReport.DisplayLayout.ScrollBarLook.TrackAppearance.BackColor = Color.FromArgb(225, 236, 246);
+            gridReport.DisplayLayout.ScrollBarLook.ButtonAppearance.BackColor = GridHeaderBlue;
+            gridReport.DisplayLayout.ScrollBarLook.ButtonAppearance.BackColor2 = GridHeaderBlueDark;
+            gridReport.DisplayLayout.ScrollBarLook.ButtonAppearance.BackGradientStyle = GradientStyle.Vertical;
+            gridReport.DisplayLayout.ScrollBarLook.ButtonAppearance.BorderColor = BorderBlue;
+
             gridReport.DisplayLayout.BorderStyle = UIElementBorderStyle.Solid;
             gridReport.DisplayLayout.CaptionVisible = DefaultableBoolean.False;
             gridReport.DisplayLayout.GroupByBox.Hidden = true;
@@ -475,6 +499,13 @@ namespace PosBranch_Win.Reports.InventoryReport
                     col.Hidden = true;
                 }
             }
+
+            e.Layout.AutoFitStyle = AutoFitStyle.None;
+            e.Layout.ScrollBounds = ScrollBounds.ScrollToFill;
+            e.Layout.Scrollbars = Scrollbars.Both;
+            e.Layout.MaxColScrollRegions = 1;
+            e.Layout.MaxRowScrollRegions = 1;
+            e.Layout.ScrollStyle = ScrollStyle.Immediate;
 
             CreateFooterCells();
             UpdateFooterCellPositions();
@@ -963,8 +994,10 @@ namespace PosBranch_Win.Reports.InventoryReport
                 gridFooterPanel.Appearance.BackGradientStyle = GradientStyle.None;
                 gridFooterPanel.Appearance.BorderColor = GridFooterBorder;
                 gridFooterPanel.BorderStyle = UIElementBorderStyle.Solid;
+                gridFooterPanel.MouseWheel += GridFooter_MouseWheel;
                 panelGrid.ClientArea.Controls.Add(gridFooterPanel);
-                gridFooterPanel.BringToFront();
+                gridReport.BringToFront();
+                panelGrid.ClientArea.PerformLayout();
             }
 
             CreateFooterCells();
@@ -978,13 +1011,44 @@ namespace PosBranch_Win.Reports.InventoryReport
             gridFooterPanel.ClientArea.Controls.Clear();
             _footerLabels.Clear();
 
+            int rowSelectorWidth = gridReport.DisplayLayout.Override.RowSelectors == DefaultableBoolean.True
+                ? gridReport.DisplayLayout.Override.RowSelectorWidth
+                : 0;
+
+            if (rowSelectorWidth > 0)
+            {
+                _lblRowSelectorSpacer = new Label
+                {
+                    Name = "footer_row_selector_spacer",
+                    Text = "Σ",
+                    TextAlign = ContentAlignment.MiddleCenter,
+                    BackColor = GridHeaderBlueDark,
+                    BorderStyle = BorderStyle.None,
+                    AutoSize = false,
+                    Width = rowSelectorWidth,
+                    Height = gridFooterPanel.Height,
+                    Left = 0,
+                    Top = 0,
+                    ForeColor = Color.White,
+                    Font = new Font("Segoe UI", 9F, FontStyle.Bold)
+                };
+                _lblRowSelectorSpacer.Paint += (s, e) =>
+                {
+                    using (Pen borderPen = new Pen(BorderBlue, 1))
+                    {
+                        e.Graphics.DrawLine(borderPen, _lblRowSelectorSpacer.Width - 1, 0, _lblRowSelectorSpacer.Width - 1, _lblRowSelectorSpacer.Height);
+                    }
+                };
+                _lblRowSelectorSpacer.MouseWheel += GridFooter_MouseWheel;
+                gridFooterPanel.ClientArea.Controls.Add(_lblRowSelectorSpacer);
+                _lblRowSelectorSpacer.BringToFront();
+            }
+
             if (gridReport.DisplayLayout == null || gridReport.DisplayLayout.Bands.Count == 0)
                 return;
 
             UltraGridBand band = gridReport.DisplayLayout.Bands[0];
-            int xOffset = gridReport.DisplayLayout.Override.RowSelectors == DefaultableBoolean.True
-                ? gridReport.DisplayLayout.Override.RowSelectorWidth
-                : 0;
+            int xOffset = rowSelectorWidth;
 
             foreach (UltraGridColumn column in band.Columns.Cast<UltraGridColumn>().OrderBy(c => c.Header.VisiblePosition))
             {
@@ -1010,6 +1074,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                 };
 
                 footerLabel.Paint += FooterLabel_Paint;
+                footerLabel.MouseWheel += GridFooter_MouseWheel;
                 gridFooterPanel.ClientArea.Controls.Add(footerLabel);
                 _footerLabels[column.Key] = footerLabel;
 
@@ -1157,14 +1222,19 @@ namespace PosBranch_Win.Reports.InventoryReport
                     width = column.Width;
                 }
 
-                calculatedX += column.Width;
+                calculatedX += width;
 
                 footerLabel.Left = left;
                 footerLabel.Width = width;
                 footerLabel.Top = 0;
                 footerLabel.Height = gridFooterPanel.Height;
-                footerLabel.Visible = (left + width > 0 && left < gridFooterPanel.Width);
+                footerLabel.Visible = (left + width > rowSelectorWidth && left < gridFooterPanel.Width);
                 footerLabel.Invalidate();
+            }
+
+            if (_lblRowSelectorSpacer != null)
+            {
+                _lblRowSelectorSpacer.BringToFront();
             }
         }
 
@@ -1764,7 +1834,98 @@ namespace PosBranch_Win.Reports.InventoryReport
             else if (e.Control && e.KeyCode == Keys.E)        { e.Handled = true; BtnExport_Click(sender, e); }
             else if (e.Control && e.KeyCode == Keys.P)        { e.Handled = true; BtnPrint_Click(sender, e); }
             else if (e.KeyCode == Keys.Escape)                { e.Handled = true; this.Close(); }
+            else if (e.Control && e.KeyCode == Keys.Right)    { e.Handled = true; ScrollGridHorizontally(1); }
+            else if (e.Control && e.KeyCode == Keys.Left)     { e.Handled = true; ScrollGridHorizontally(-1); }
         }
+
+        #region Side / Horizontal Scrolling Helpers
+
+        private void GridReport_MouseWheel(object sender, MouseEventArgs e)
+        {
+            if ((Control.ModifierKeys & Keys.Shift) == Keys.Shift)
+            {
+                if (e is HandledMouseEventArgs handled)
+                {
+                    handled.Handled = true;
+                }
+
+                int steps = Math.Max(1, Math.Abs(e.Delta) / 120);
+                ScrollGridHorizontally(e.Delta > 0 ? -1 : 1, steps);
+            }
+        }
+
+        private void GridFooter_MouseWheel(object sender, MouseEventArgs e)
+        {
+            if (e is HandledMouseEventArgs handled)
+            {
+                handled.Handled = true;
+            }
+
+            int steps = Math.Max(1, Math.Abs(e.Delta) / 120);
+            ScrollGridHorizontally(e.Delta > 0 ? -1 : 1, steps);
+        }
+
+        public void ScrollGridHorizontally(int direction, int steps = 1)
+        {
+            try
+            {
+                if (gridReport.DisplayLayout == null || gridReport.DisplayLayout.ColScrollRegions.Count == 0)
+                    return;
+
+                ColScrollRegion region = gridReport.ActiveColScrollRegion ?? gridReport.DisplayLayout.ColScrollRegions[0];
+                if (region == null)
+                    return;
+
+                steps = Math.Max(1, Math.Min(steps, 5));
+                for (int i = 0; i < steps; i++)
+                {
+                    if (direction < 0)
+                    {
+                        region.Scroll(ColScrollAction.LineLeft);
+                    }
+                    else if (direction > 0)
+                    {
+                        region.Scroll(ColScrollAction.LineRight);
+                    }
+                }
+
+                UpdateFooterCellPositions();
+            }
+            catch { }
+        }
+
+        private sealed class GridSideScrollFilter : NativeWindow
+        {
+            private const int WM_MOUSEHWHEEL = 0x020E;
+            private readonly frmStockValuationReport _form;
+
+            public GridSideScrollFilter(frmStockValuationReport form, UltraGrid grid)
+            {
+                _form = form;
+                if (grid.IsHandleCreated)
+                    AssignHandle(grid.Handle);
+                grid.HandleCreated += (s, e) => AssignHandle(grid.Handle);
+                grid.HandleDestroyed += (s, e) => ReleaseHandle();
+            }
+
+            protected override void WndProc(ref Message m)
+            {
+                if (m.Msg == WM_MOUSEHWHEEL)
+                {
+                    short delta = (short)((m.WParam.ToInt64() >> 16) & 0xFFFF);
+                    if (delta != 0)
+                    {
+                        int steps = Math.Max(1, Math.Abs(delta) / 120);
+                        _form.ScrollGridHorizontally(delta > 0 ? 1 : -1, steps);
+                        m.Result = IntPtr.Zero;
+                        return;
+                    }
+                }
+                base.WndProc(ref m);
+            }
+        }
+
+        #endregion
 
     }
 

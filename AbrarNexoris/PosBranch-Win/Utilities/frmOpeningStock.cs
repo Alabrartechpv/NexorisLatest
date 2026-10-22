@@ -619,6 +619,45 @@ namespace PosBranch_Win.Utilities
         /// <summary>
         /// Highlight rows that already have opening stock entered
         /// </summary>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         private void UltraGrid1_InitializeRow(object sender, InitializeRowEventArgs e)
         {
             try

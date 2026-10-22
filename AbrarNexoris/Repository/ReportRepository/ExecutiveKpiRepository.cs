@@ -225,130 +225,134 @@ namespace Repository.ReportRepository
                 }
 
                 // ═══════════════════════════════════════════════════════════════════
-                // GROUP / CATEGORY STOCK RECONCILIATION VIA STORED PROCEDURE
-                // Execute _POS_StockReportAdvanced (_Test16) stored procedure directly
+                // STOCK RECONCILIATION VIA STORED PROCEDURE (_Test16)
+                // Ensures 100% exact parity with Stock Valuation Report
                 // ═══════════════════════════════════════════════════════════════════
-                if ((groupId.HasValue && groupId.Value > 0) || (categoryId.HasValue && categoryId.Value > 0))
+                bool hasGroupOrCategoryFilter = (groupId.HasValue && groupId.Value > 0) || (categoryId.HasValue && categoryId.Value > 0);
+                try
                 {
-                    try
+                    if (DataConnection.State != ConnectionState.Open)
+                        DataConnection.Open();
+
+                    using (SqlCommand cmdStock = new SqlCommand(STOREDPROCEDURE._POS_StockReportAdvanced, (SqlConnection)DataConnection))
                     {
-                        if (DataConnection.State != ConnectionState.Open)
-                            DataConnection.Open();
+                        cmdStock.CommandType = CommandType.StoredProcedure;
+                        cmdStock.CommandTimeout = 180;
+                        cmdStock.Parameters.AddWithValue("@FromDate", rangeFrom);
+                        cmdStock.Parameters.AddWithValue("@ToDate", rangeTo.AddDays(1).AddSeconds(-1));
+                        cmdStock.Parameters.AddWithValue("@CompanyId", effectiveCompany);
+                        cmdStock.Parameters.AddWithValue("@BranchId", effectiveBranch);
+                        cmdStock.Parameters.AddWithValue("@FinYearId", effectiveFinYear);
+                        cmdStock.Parameters.AddWithValue("@BarcodeContains", DBNull.Value);
+                        cmdStock.Parameters.AddWithValue("@GroupId", (groupId.HasValue && groupId.Value > 0) ? (object)groupId.Value : DBNull.Value);
+                        cmdStock.Parameters.AddWithValue("@CategoryId", (categoryId.HasValue && categoryId.Value > 0) ? (object)categoryId.Value : DBNull.Value);
+                        cmdStock.Parameters.AddWithValue("@SubCategoryId", DBNull.Value);
+                        cmdStock.Parameters.AddWithValue("@LedgerId", DBNull.Value);
 
-                        using (SqlCommand cmdStock = new SqlCommand(STOREDPROCEDURE._POS_StockReportAdvanced, (SqlConnection)DataConnection))
+                        using (SqlDataAdapter adaptStock = new SqlDataAdapter(cmdStock))
                         {
-                            cmdStock.CommandType = CommandType.StoredProcedure;
-                            cmdStock.CommandTimeout = 180;
-                            cmdStock.Parameters.AddWithValue("@FromDate", rangeFrom);
-                            cmdStock.Parameters.AddWithValue("@ToDate", rangeTo.AddDays(1).AddSeconds(-1));
-                            cmdStock.Parameters.AddWithValue("@CompanyId", effectiveCompany);
-                            cmdStock.Parameters.AddWithValue("@BranchId", effectiveBranch);
-                            cmdStock.Parameters.AddWithValue("@FinYearId", effectiveFinYear);
-                            cmdStock.Parameters.AddWithValue("@BarcodeContains", DBNull.Value);
-                            cmdStock.Parameters.AddWithValue("@GroupId", (groupId.HasValue && groupId.Value > 0) ? (object)groupId.Value : DBNull.Value);
-                            cmdStock.Parameters.AddWithValue("@CategoryId", (categoryId.HasValue && categoryId.Value > 0) ? (object)categoryId.Value : DBNull.Value);
-                            cmdStock.Parameters.AddWithValue("@SubCategoryId", DBNull.Value);
-                            cmdStock.Parameters.AddWithValue("@LedgerId", DBNull.Value);
+                            DataTable dtStock = new DataTable();
+                            adaptStock.Fill(dtStock);
 
-                            using (SqlDataAdapter adaptStock = new SqlDataAdapter(cmdStock))
+                            if (dtStock != null && dtStock.Rows.Count > 0)
                             {
-                                DataTable dtStock = new DataTable();
-                                adaptStock.Fill(dtStock);
+                                decimal totalCostAll = 0;
+                                decimal totalRetailValueAll = 0;
+                                decimal totalQtyAll = 0;
+                                int itemCountAll = 0;
 
-                                if (dtStock != null && dtStock.Rows.Count > 0)
+                                decimal negImpactValue = 0;
+                                decimal negTotalQty = 0;
+                                int negItemCount = 0;
+
+                                decimal filteredSales = 0;
+                                decimal filteredProfit = 0;
+                                decimal filteredPurchases = 0;
+                                decimal filteredSalesReturn = 0;
+                                decimal filteredPurchaseReturn = 0;
+                                decimal filteredLossStockVal = 0;
+                                decimal filteredLossStockQty = 0;
+                                int filteredLossItemCount = 0;
+                                decimal filteredExtraStockVal = 0;
+                                decimal filteredExtraStockQty = 0;
+                                int filteredExtraItemCount = 0;
+                                decimal filteredHoldVal = 0;
+                                decimal filteredHoldQty = 0;
+                                int filteredDeadItemCount = 0;
+                                decimal filteredDeadStockVal = 0;
+
+                                foreach (DataRow sr in dtStock.Rows)
                                 {
-                                    decimal totalCostAll = 0;
-                                    decimal totalRetailValueAll = 0;
-                                    decimal totalQtyAll = 0;
-                                    int itemCountAll = 0;
+                                    decimal closingStock = sr["ClosingStock"] != DBNull.Value ? Convert.ToDecimal(sr["ClosingStock"]) : 0;
+                                    decimal cost = sr["Cost"] != DBNull.Value ? Convert.ToDecimal(sr["Cost"]) : 0;
+                                    decimal retail = sr["RetailPrice"] != DBNull.Value ? Convert.ToDecimal(sr["RetailPrice"]) : 0;
+                                    decimal saleAmt = sr["SaleAmount"] != DBNull.Value ? Convert.ToDecimal(sr["SaleAmount"]) : 0;
+                                    decimal profit = sr["Profit"] != DBNull.Value ? Convert.ToDecimal(sr["Profit"]) : 0;
+                                    decimal purchQty = sr["Purchase"] != DBNull.Value ? Convert.ToDecimal(sr["Purchase"]) : 0;
+                                    decimal sRetQty = sr["SalesReturn"] != DBNull.Value ? Convert.ToDecimal(sr["SalesReturn"]) : 0;
+                                    decimal pRetQty = sr["PurchaseReturn"] != DBNull.Value ? Convert.ToDecimal(sr["PurchaseReturn"]) : 0;
+                                    decimal adjOut = sr["StockAdjustmentOut"] != DBNull.Value ? Convert.ToDecimal(sr["StockAdjustmentOut"]) : 0;
+                                    decimal adjIn = sr["StockAdjustmentIn"] != DBNull.Value ? Convert.ToDecimal(sr["StockAdjustmentIn"]) : 0;
+                                    decimal hold = sr.Table.Columns.Contains("HoldQty") && sr["HoldQty"] != DBNull.Value ? Convert.ToDecimal(sr["HoldQty"]) : 0;
+                                    decimal salesQty = sr["Sales"] != DBNull.Value ? Convert.ToDecimal(sr["Sales"]) : 0;
 
-                                    decimal negImpactValue = 0;
-                                    decimal negTotalQty = 0;
-                                    int negItemCount = 0;
+                                    totalCostAll += Math.Round(closingStock * cost, 2);
+                                    totalRetailValueAll += Math.Round(closingStock * retail, 2);
+                                    totalQtyAll += closingStock;
+                                    itemCountAll++;
 
-                                    decimal filteredSales = 0;
-                                    decimal filteredProfit = 0;
-                                    decimal filteredPurchases = 0;
-                                    decimal filteredSalesReturn = 0;
-                                    decimal filteredPurchaseReturn = 0;
-                                    decimal filteredLossStockVal = 0;
-                                    decimal filteredLossStockQty = 0;
-                                    int filteredLossItemCount = 0;
-                                    decimal filteredExtraStockVal = 0;
-                                    decimal filteredExtraStockQty = 0;
-                                    int filteredExtraItemCount = 0;
-                                    decimal filteredHoldVal = 0;
-                                    decimal filteredHoldQty = 0;
-                                    int filteredDeadItemCount = 0;
-                                    decimal filteredDeadStockVal = 0;
-
-                                    foreach (DataRow sr in dtStock.Rows)
+                                    if (closingStock < 0)
                                     {
-                                        decimal closingStock = sr["ClosingStock"] != DBNull.Value ? Convert.ToDecimal(sr["ClosingStock"]) : 0;
-                                        decimal cost = sr["Cost"] != DBNull.Value ? Convert.ToDecimal(sr["Cost"]) : 0;
-                                        decimal retail = sr["RetailPrice"] != DBNull.Value ? Convert.ToDecimal(sr["RetailPrice"]) : 0;
-                                        decimal saleAmt = sr["SaleAmount"] != DBNull.Value ? Convert.ToDecimal(sr["SaleAmount"]) : 0;
-                                        decimal profit = sr["Profit"] != DBNull.Value ? Convert.ToDecimal(sr["Profit"]) : 0;
-                                        decimal purchQty = sr["Purchase"] != DBNull.Value ? Convert.ToDecimal(sr["Purchase"]) : 0;
-                                        decimal sRetQty = sr["SalesReturn"] != DBNull.Value ? Convert.ToDecimal(sr["SalesReturn"]) : 0;
-                                        decimal pRetQty = sr["PurchaseReturn"] != DBNull.Value ? Convert.ToDecimal(sr["PurchaseReturn"]) : 0;
-                                        decimal adjOut = sr["StockAdjustmentOut"] != DBNull.Value ? Convert.ToDecimal(sr["StockAdjustmentOut"]) : 0;
-                                        decimal adjIn = sr["StockAdjustmentIn"] != DBNull.Value ? Convert.ToDecimal(sr["StockAdjustmentIn"]) : 0;
-                                        decimal hold = sr.Table.Columns.Contains("HoldQty") && sr["HoldQty"] != DBNull.Value ? Convert.ToDecimal(sr["HoldQty"]) : 0;
-                                        decimal salesQty = sr["Sales"] != DBNull.Value ? Convert.ToDecimal(sr["Sales"]) : 0;
-
-                                        totalCostAll += Math.Round(closingStock * cost, 2);
-                                        totalRetailValueAll += Math.Round(closingStock * retail, 2);
-                                        totalQtyAll += closingStock;
-                                        itemCountAll++;
-
-                                        if (closingStock < 0)
-                                        {
-                                            negImpactValue += Math.Round(Math.Abs(closingStock) * cost, 2);
-                                            negTotalQty += closingStock;
-                                            negItemCount++;
-                                        }
-
-                                        filteredSales += saleAmt;
-                                        filteredProfit += profit;
-                                        filteredPurchases += Math.Round(purchQty * cost, 2);
-                                        filteredSalesReturn += Math.Round(sRetQty * retail, 2);
-                                        filteredPurchaseReturn += Math.Round(pRetQty * cost, 2);
-
-                                        if (adjOut > 0)
-                                        {
-                                            filteredLossStockVal += Math.Round(adjOut * cost, 2);
-                                            filteredLossStockQty += adjOut;
-                                            filteredLossItemCount++;
-                                        }
-                                        if (adjIn > 0)
-                                        {
-                                            filteredExtraStockVal += Math.Round(adjIn * cost, 2);
-                                            filteredExtraStockQty += adjIn;
-                                            filteredExtraItemCount++;
-                                        }
-                                        if (hold > 0)
-                                        {
-                                            filteredHoldVal += Math.Round(hold * retail, 2);
-                                            filteredHoldQty += hold;
-                                        }
-                                        if (salesQty == 0 && closingStock > 0)
-                                        {
-                                            filteredDeadStockVal += Math.Round(closingStock * cost, 2);
-                                            filteredDeadItemCount++;
-                                        }
+                                        negImpactValue += Math.Round(Math.Abs(closingStock) * cost, 2);
+                                        negTotalQty += closingStock;
+                                        negItemCount++;
                                     }
 
-                                    model.TotalStockCostValue = totalCostAll;
-                                    model.TotalStockRetailValue = totalRetailValueAll;
-                                    model.TotalStockItemCount = itemCountAll;
-                                    model.TotalStockQuantity = totalQtyAll;
-                                    model.StockProfitPotential = Math.Max(0, totalRetailValueAll - totalCostAll);
+                                    filteredSales += saleAmt;
+                                    filteredProfit += profit;
+                                    filteredPurchases += Math.Round(purchQty * cost, 2);
+                                    filteredSalesReturn += Math.Round(sRetQty * retail, 2);
+                                    filteredPurchaseReturn += Math.Round(pRetQty * cost, 2);
 
-                                    model.NegativeStockImpactValue = negImpactValue;
-                                    model.NegativeStockItemCount = negItemCount;
-                                    model.NegativeStockTotalQty = negTotalQty;
+                                    if (adjOut > 0)
+                                    {
+                                        filteredLossStockVal += Math.Round(adjOut * cost, 2);
+                                        filteredLossStockQty += adjOut;
+                                        filteredLossItemCount++;
+                                    }
+                                    if (adjIn > 0)
+                                    {
+                                        filteredExtraStockVal += Math.Round(adjIn * cost, 2);
+                                        filteredExtraStockQty += adjIn;
+                                        filteredExtraItemCount++;
+                                    }
+                                    if (hold > 0)
+                                    {
+                                        filteredHoldVal += Math.Round(hold * retail, 2);
+                                        filteredHoldQty += hold;
+                                    }
+                                    if (salesQty == 0 && closingStock > 0)
+                                    {
+                                        filteredDeadStockVal += Math.Round(closingStock * cost, 2);
+                                        filteredDeadItemCount++;
+                                    }
+                                }
 
+                                model.TotalStockCostValue = totalCostAll;
+                                model.TotalStockRetailValue = totalRetailValueAll;
+                                model.TotalStockItemCount = itemCountAll;
+                                model.TotalStockQuantity = totalQtyAll;
+                                model.StockProfitPotential = Math.Max(0, totalRetailValueAll - totalCostAll);
+
+                                model.NegativeStockImpactValue = negImpactValue;
+                                model.NegativeStockItemCount = negItemCount;
+                                model.NegativeStockTotalQty = negTotalQty;
+
+                                model.TotalAssets = model.TotalStockCostValue + model.CashInHand + model.BankBalance + model.CustomerReceivables;
+                                model.NetBusinessAsset = model.TotalAssets - model.TotalLiabilities;
+
+                                if (hasGroupOrCategoryFilter)
+                                {
                                     model.TotalSalesRevenue = filteredSales;
                                     model.GrossProfit = filteredProfit;
                                     model.CostOfGoodsSold = Math.Max(0, filteredSales - filteredProfit);
@@ -374,10 +378,10 @@ namespace Repository.ReportRepository
                             }
                         }
                     }
-                    catch (Exception exStock)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Stock filter SP execution info: {exStock.Message}");
-                    }
+                }
+                catch (Exception exStock)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Stock filter SP execution info: {exStock.Message}");
                 }
 
                 // ═══════════════════════════════════════════════════════════════════
