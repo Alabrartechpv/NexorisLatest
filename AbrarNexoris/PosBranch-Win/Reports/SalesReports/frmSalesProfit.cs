@@ -98,6 +98,9 @@ namespace PosBranch_Win.Reports.SalesReports
         #endregion
 
         #region Constructor
+        public DateTime? InitialFromDate { get; set; }
+        public DateTime? InitialToDate { get; set; }
+
         public frmSalesProfit()
         {
             InitializeComponent();
@@ -128,15 +131,61 @@ namespace PosBranch_Win.Reports.SalesReports
             ultraGridProfit.InitializeRow += UltraGridProfit_InitializeRow;
             ultraGridProfit.DoubleClickRow += UltraGridProfit_DoubleClickRow;
         }
+
+        public frmSalesProfit(DateTime fromDate, DateTime toDate) : this()
+        {
+            InitialFromDate = fromDate;
+            InitialToDate = toDate;
+        }
         #endregion
 
         #region Form Lifecycle & Presets
         private void FrmSalesProfit_Load(object sender, EventArgs e)
         {
             PopulatePresetCombo();
-            ultraComboPresetDates.Value = "THIS_MONTH";
-            ApplyDatePreset("THIS_MONTH");
+            if (InitialFromDate.HasValue && InitialToDate.HasValue)
+            {
+                ApplyDateRange(InitialFromDate.Value, InitialToDate.Value);
+            }
+            else
+            {
+                ultraComboPresetDates.Value = "THIS_MONTH";
+                ApplyDatePreset("THIS_MONTH");
+            }
             LoadData();
+        }
+
+        public void ApplyDateRange(DateTime fromDate, DateTime toDate)
+        {
+            DateTime now = DateTime.Today;
+            if (fromDate <= new DateTime(1990, 1, 1))
+            {
+                ultraComboPresetDates.Value = "ALL";
+                ApplyDatePreset("ALL");
+            }
+            else if (fromDate.Date == now && toDate.Date == now)
+            {
+                ultraComboPresetDates.Value = "TODAY";
+                ApplyDatePreset("TODAY");
+            }
+            else if (fromDate.Date == new DateTime(now.Year, now.Month, 1) && toDate.Date == now)
+            {
+                ultraComboPresetDates.Value = "THIS_MONTH";
+                ApplyDatePreset("THIS_MONTH");
+            }
+            else if (fromDate.Date == new DateTime(now.Year, 1, 1) && toDate.Date == now)
+            {
+                ultraComboPresetDates.Value = "CURRENT_FY";
+                ApplyDatePreset("CURRENT_FY");
+            }
+            else
+            {
+                ultraComboPresetDates.Value = "DATE_RANGE";
+                ultraDateTimeFrom.DateTime = fromDate.Date;
+                ultraDateTimeTo.DateTime = toDate.Date;
+                ultraDateTimeFrom.Enabled = true;
+                ultraDateTimeTo.Enabled = true;
+            }
         }
 
         private void PopulatePresetCombo()
@@ -1151,7 +1200,7 @@ namespace PosBranch_Win.Reports.SalesReports
         #endregion
 
         #region Data Loading & Search
-        private void LoadData()
+        public void LoadData()
         {
             try
             {

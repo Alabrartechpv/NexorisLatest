@@ -1210,6 +1210,23 @@ namespace PosBranch_Win
                                     tabControlMain.SelectedTab = tab;
                                     existingForm.BringToFront();
                                     existingForm.Focus();
+                                    if (formToOpen is Reports.SalesReports.frmSalesReportMasterDetail newSalesRpt && existingForm is Reports.SalesReports.frmSalesReportMasterDetail existingSalesRpt)
+                                    {
+                                        if (newSalesRpt.InitialFromDate.HasValue && newSalesRpt.InitialToDate.HasValue)
+                                        {
+                                            existingSalesRpt.ApplyDateRange(newSalesRpt.InitialFromDate.Value, newSalesRpt.InitialToDate.Value);
+                                            existingSalesRpt.LoadData();
+                                        }
+                                    }
+                                    else if (formToOpen is Reports.SalesReports.frmSalesProfit newProfitRpt && existingForm is Reports.SalesReports.frmSalesProfit existingProfitRpt)
+                                    {
+                                        if (newProfitRpt.InitialFromDate.HasValue && newProfitRpt.InitialToDate.HasValue)
+                                        {
+                                            existingProfitRpt.ApplyDateRange(newProfitRpt.InitialFromDate.Value, newProfitRpt.InitialToDate.Value);
+                                            existingProfitRpt.LoadData();
+                                        }
+                                    }
+                                    try { formToOpen.Dispose(); } catch { }
                                     return;
                                 }
                             }
