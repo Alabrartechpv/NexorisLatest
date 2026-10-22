@@ -6,6 +6,7 @@ using ModelClass;
 using ModelClass.Master;
 using ModelClass.Report;
 using PosBranch_Win.DialogBox;
+using PosBranch_Win.Reports;
 using PosBranch_Win.Transaction;
 using Repository;
 using Repository.MasterRepositry;
@@ -70,6 +71,7 @@ namespace PosBranch_Win.Reports.InventoryReport
         private ContextMenuStrip _gridMenu;
         private bool _layoutLoaded;
         private bool _suppressGridCellUpdate;
+        private readonly HashSet<string> _userHiddenColumnKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // ─── Header Drag-to-Hide & Column Chooser State ──────────────────────────────
         private bool _isDraggingHeaderToHide;
@@ -94,6 +96,8 @@ namespace PosBranch_Win.Reports.InventoryReport
             _categoryOptions = new List<ComboItem>();
             _allRows = new List<SmartReorderItemModel>();
 
+            ReportGridLayoutHelper.LoadHiddenColumns("SmartReorderDashboard", _userHiddenColumnKeys);
+
             InitializeComponent();
 
             Load += FrmSmartReorderDashboard_Load;
@@ -101,7 +105,11 @@ namespace PosBranch_Win.Reports.InventoryReport
 
             // Wire grid events for attached cell footer scrolling
             ultraGridMaster.Resize += (s, e) => UpdateFooterCellPositions();
-            ultraGridMaster.AfterColPosChanged += (s, e) => UpdateFooterCellPositions();
+            ultraGridMaster.AfterColPosChanged += (s, e) =>
+            {
+                UpdateFooterCellPositions();
+                ReportGridLayoutHelper.SaveLayout("SmartReorderDashboard", ultraGridMaster, _userHiddenColumnKeys);
+            };
             ultraGridMaster.AfterColRegionScroll += (s, e) => UpdateFooterCellPositions();
             ultraGridMaster.AfterRowRegionScroll += (s, e) => UpdateFooterCellPositions();
             ultraGridMaster.Paint += (s, e) => UpdateFooterCellPositions();
@@ -1255,12 +1263,32 @@ namespace PosBranch_Win.Reports.InventoryReport
             ConfigureColumn(band, "Is_Perishable", "Perishable", 80, false, null);
             ConfigureColumn(band, "UnitId", "Unit ID", 80, false, null);
 
+            foreach (UltraGridColumn col in band.Columns)
+            {
+                col.ExcludeFromColumnChooser = ExcludeFromColumnChooser.False;
+                if (_userHiddenColumnKeys.Contains(col.Key))
+                {
+                    col.Hidden = true;
+                }
+            }
+
             HideColumn(band, "ItemId");
-            HideColumn(band, "UnitId");
-            HideColumn(band, "Is_Perishable");
-            HideColumn(band, "NearestExpiryDate");
-            HideColumn(band, "LastSaleDate");
-            HideColumn(band, "RequiredQuantity");
+            if (band.Columns.Exists("ItemId"))
+            {
+                band.Columns["ItemId"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
+            }
+
+            if (_userHiddenColumnKeys.Count == 0)
+            {
+                HideColumn(band, "UnitId");
+                HideColumn(band, "Is_Perishable");
+                HideColumn(band, "NearestExpiryDate");
+                HideColumn(band, "LastSaleDate");
+                HideColumn(band, "RequiredQuantity");
+            }
+
+            ReportGridLayoutHelper.ApplySavedLayout("SmartReorderDashboard", ultraGridMaster, _userHiddenColumnKeys);
+            RefreshColumnChooser();
 
             ultraGridMaster.AfterHeaderCheckStateChanged -= UltraGridMaster_AfterHeaderCheckStateChanged;
             ultraGridMaster.AfterHeaderCheckStateChanged += UltraGridMaster_AfterHeaderCheckStateChanged;
@@ -1281,6 +1309,8 @@ namespace PosBranch_Win.Reports.InventoryReport
             column.Header.Caption = caption;
             column.Width = width;
             column.CellActivation = editable ? Activation.AllowEdit : Activation.NoEdit;
+            column.ExcludeFromColumnChooser = ExcludeFromColumnChooser.False;
+            column.Hidden = _userHiddenColumnKeys.Contains(key);
 
             if (!string.IsNullOrWhiteSpace(format))
             {
@@ -1874,6 +1904,8 @@ namespace PosBranch_Win.Reports.InventoryReport
                 if (_isDraggingHeaderToHide)
                 {
                     _columnBeingDragged.Hidden = true;
+                    _userHiddenColumnKeys.Add(_columnBeingDragged.Key);
+                    ReportGridLayoutHelper.SaveLayout("SmartReorderDashboard", ultraGridMaster, _userHiddenColumnKeys);
                     CreateFooterCells();
                     UpdateFooterCellPositions();
                     UpdateFooterValues();
@@ -1946,7 +1978,8 @@ namespace PosBranch_Win.Reports.InventoryReport
 
             foreach (UltraGridColumn column in band.Columns)
             {
-                if (string.Equals(column.Key, "ItemId", StringComparison.OrdinalIgnoreCase))
+                if (column.ExcludeFromColumnChooser == ExcludeFromColumnChooser.True ||
+                    string.Equals(column.Key, "ItemId", StringComparison.OrdinalIgnoreCase))
                 {
                     continue;
                 }
@@ -1969,7 +2002,18 @@ namespace PosBranch_Win.Reports.InventoryReport
                     return;
                 }
 
-                item.Column.Hidden = e.NewValue != CheckState.Checked;
+                bool isHidden = e.NewValue != CheckState.Checked;
+                item.Column.Hidden = isHidden;
+                if (isHidden)
+                {
+                    _userHiddenColumnKeys.Add(item.Column.Key);
+                }
+                else
+                {
+                    _userHiddenColumnKeys.Remove(item.Column.Key);
+                }
+                ReportGridLayoutHelper.SaveLayout("SmartReorderDashboard", ultraGridMaster, _userHiddenColumnKeys);
+
                 CreateFooterCells();
                 UpdateFooterCellPositions();
                 UpdateFooterValues();
@@ -1996,11 +2040,7 @@ namespace PosBranch_Win.Reports.InventoryReport
 
             try
             {
-                // Delete stale runtime XML layout file if it exists so code layout always applies
-                if (File.Exists(GridLayoutPath))
-                {
-                    File.Delete(GridLayoutPath);
-                }
+                ReportGridLayoutHelper.ApplySavedLayout("SmartReorderDashboard", ultraGridMaster, _userHiddenColumnKeys);
             }
             catch
             {
@@ -2011,12 +2051,17 @@ namespace PosBranch_Win.Reports.InventoryReport
 
         private void SaveGridLayout()
         {
-            // Disabled runtime XML grid layout saving so the clean design and column order remains consistent across all computers
+            ReportGridLayoutHelper.SaveLayout("SmartReorderDashboard", ultraGridMaster, _userHiddenColumnKeys);
         }
 
         private void FrmSmartReorderDashboard_FormClosing(object sender, FormClosingEventArgs e)
         {
             SaveGridLayout();
+            if (_columnChooserForm != null && !_columnChooserForm.IsDisposed)
+            {
+                _columnChooserForm.Dispose();
+                _columnChooserForm = null;
+            }
         }
     }
 }

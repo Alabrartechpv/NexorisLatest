@@ -96,6 +96,7 @@ namespace PosBranch_Win.Reports.InventoryReport
         {
             try
             {
+                ReportGridLayoutHelper.LoadHiddenColumns("LowStockAlertReport", userHiddenColumnKeys);
                 _reportRepo = new LowStockAlertRepo();
                 _dropdownRepo = new Dropdowns();
 
@@ -122,7 +123,11 @@ namespace PosBranch_Win.Reports.InventoryReport
 
                 // Register footer cell sync and column drag-to-hide handlers matching frmPurchaseReturn / frmStockReport
                 gridReport.Resize += (s, e) => UpdateFooterCellPositions();
-                gridReport.AfterColPosChanged += (s, e) => UpdateFooterCellPositions();
+                gridReport.AfterColPosChanged += (s, e) =>
+                {
+                    UpdateFooterCellPositions();
+                    ReportGridLayoutHelper.SaveLayout("LowStockAlertReport", gridReport, userHiddenColumnKeys);
+                };
                 gridReport.AfterColRegionScroll += (s, e) => UpdateFooterCellPositions();
                 gridReport.AfterRowRegionScroll += (s, e) => UpdateFooterCellPositions();
                 gridReport.Paint += (s, e) => UpdateFooterCellPositions();
@@ -147,6 +152,15 @@ namespace PosBranch_Win.Reports.InventoryReport
                 // Handle keyboard shortcuts
                 this.KeyPreview = true;
                 this.KeyDown += FrmLowStockAlertReport_KeyDown;
+                this.FormClosing += (s, e) =>
+                {
+                    ReportGridLayoutHelper.SaveLayout("LowStockAlertReport", gridReport, userHiddenColumnKeys);
+                    if (columnChooserForm != null && !columnChooserForm.IsDisposed)
+                    {
+                        columnChooserForm.Dispose();
+                        columnChooserForm = null;
+                    }
+                };
 
                 // Cancel background work on form close to avoid disposed-control crash
                 this.FormClosing += (s, ev) =>
@@ -351,6 +365,12 @@ namespace PosBranch_Win.Reports.InventoryReport
             if (e.Layout.Bands.Count == 0) return;
             var band = e.Layout.Bands[0];
 
+            foreach (UltraGridColumn col in band.Columns)
+            {
+                col.Hidden = true;
+                col.ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
+            }
+
             // Define column order and captions
             var columns = new[]
             {
@@ -373,7 +393,8 @@ namespace PosBranch_Win.Reports.InventoryReport
                 if (band.Columns.Exists(col.Item1))
                 {
                     var bandCol = band.Columns[col.Item1];
-                    bandCol.Hidden         = false;
+                    bandCol.ExcludeFromColumnChooser = ExcludeFromColumnChooser.False;
+                    bandCol.Hidden         = userHiddenColumnKeys.Contains(col.Item1);
                     bandCol.Header.Caption = col.Item2;
                     bandCol.Width          = col.Item3;
                     bandCol.CellAppearance.TextHAlign = col.Item4;
@@ -392,33 +413,15 @@ namespace PosBranch_Win.Reports.InventoryReport
                 }
             }
 
-            // Hide unused columns
-            foreach (UltraGridColumn col in band.Columns)
+            ReportGridLayoutHelper.ApplySavedLayout("LowStockAlertReport", gridReport, userHiddenColumnKeys);
+            if (columnChooserForm != null && columnChooserForm.Visible)
             {
-                bool isPlanned = false;
-                foreach (var pc in columns)
-                {
-                    if (pc.Item1 == col.Key) { isPlanned = true; break; }
-                }
-                if (!isPlanned) col.Hidden = true;
-            }
-
-            // Re-apply user hidden columns
-            foreach (UltraGridColumn col in band.Columns)
-            {
-                if (userHiddenColumnKeys.Contains(col.Key))
-                {
-                    col.Hidden = true;
-                }
+                PopulateColumnChooserListBox();
             }
 
             CreateFooterCells();
             UpdateFooterCellPositions();
             UpdateFooterValues();
-            if (columnChooserForm != null && columnChooserForm.Visible)
-            {
-                PopulateColumnChooserListBox();
-            }
         }
 
         private void GridReport_InitializeRow(object sender, InitializeRowEventArgs e)
@@ -622,6 +625,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             if (col == null) return;
             userHiddenColumnKeys.Add(col.Key);
             col.Hidden = true;
+            ReportGridLayoutHelper.SaveLayout("LowStockAlertReport", gridReport, userHiddenColumnKeys);
             CreateFooterCells();
             UpdateFooterCellPositions();
             UpdateFooterValues();
@@ -729,7 +733,7 @@ namespace PosBranch_Win.Reports.InventoryReport
 
             foreach (UltraGridColumn col in band.Columns)
             {
-                if (col.Hidden && !col.Key.EndsWith("Id", StringComparison.OrdinalIgnoreCase))
+                if (col.Hidden && !col.Key.EndsWith("Id", StringComparison.OrdinalIgnoreCase) && col.ExcludeFromColumnChooser != ExcludeFromColumnChooser.True)
                 {
                     string caption = !string.IsNullOrEmpty(col.Header.Caption) ? col.Header.Caption : col.Key;
                     columnChooserListBox.Items.Add(new ColumnChooserItem(col.Key, caption));
@@ -756,6 +760,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                 {
                     col.Header.VisiblePosition = targetVisiblePosition.Value;
                 }
+                ReportGridLayoutHelper.SaveLayout("LowStockAlertReport", gridReport, userHiddenColumnKeys);
                 CreateFooterCells();
                 UpdateFooterCellPositions();
                 UpdateFooterValues();
@@ -770,11 +775,12 @@ namespace PosBranch_Win.Reports.InventoryReport
             UltraGridBand band = gridReport.DisplayLayout.Bands[0];
             foreach (UltraGridColumn col in band.Columns)
             {
-                if (!col.Key.EndsWith("Id", StringComparison.OrdinalIgnoreCase))
+                if (!col.Key.EndsWith("Id", StringComparison.OrdinalIgnoreCase) && col.ExcludeFromColumnChooser != ExcludeFromColumnChooser.True)
                 {
                     col.Hidden = false;
                 }
             }
+            ReportGridLayoutHelper.SaveLayout("LowStockAlertReport", gridReport, userHiddenColumnKeys);
             CreateFooterCells();
             UpdateFooterCellPositions();
             UpdateFooterValues();

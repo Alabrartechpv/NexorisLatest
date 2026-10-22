@@ -91,6 +91,7 @@ namespace PosBranch_Win.Reports.InventoryReport
 
         private void InitializeForm()
         {
+            ReportGridLayoutHelper.LoadHiddenColumns("StockAdjustmentReport", userHiddenColumnKeys);
             lblPeriod = new Infragistics.Win.Misc.UltraLabel();
             comboPeriod = new Infragistics.Win.UltraWinEditors.UltraComboEditor();
 
@@ -187,6 +188,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                 CreateFooterCells();
                 UpdateFooterCellPositions();
                 UpdateFooterValues();
+                ReportGridLayoutHelper.SaveLayout("StockAdjustmentReport", gridReport, userHiddenColumnKeys);
             };
             gridReport.AfterColRegionScroll += (s, e) => UpdateFooterCellPositions();
             gridReport.AfterRowRegionScroll += (s, e) => UpdateFooterCellPositions();
@@ -220,6 +222,12 @@ namespace PosBranch_Win.Reports.InventoryReport
             {
                 if (_searchWorker != null && _searchWorker.IsBusy)
                     _searchWorker.CancelAsync();
+                ReportGridLayoutHelper.SaveLayout("StockAdjustmentReport", gridReport, userHiddenColumnKeys);
+                if (columnChooserForm != null && !columnChooserForm.IsDisposed)
+                {
+                    columnChooserForm.Dispose();
+                    columnChooserForm = null;
+                }
             };
         }
 
@@ -524,6 +532,12 @@ namespace PosBranch_Win.Reports.InventoryReport
             if (e.Layout.Bands.Count == 0) return;
             UltraGridBand band = e.Layout.Bands[0];
 
+            foreach (UltraGridColumn column in band.Columns)
+            {
+                column.Hidden = true;
+                column.ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
+            }
+
             ConfigureColumn(band, "SlNo", "S.No", 55, HAlign.Center, 0, "N0");
             ConfigureColumn(band, "StockAdjustmentNo", "Adj No", 85, HAlign.Center, 1, "N0");
             ConfigureColumn(band, "StockAdjustmentDate", "Date", 105, HAlign.Center, 2, "dd-MM-yyyy");
@@ -540,40 +554,23 @@ namespace PosBranch_Win.Reports.InventoryReport
             ConfigureColumn(band, "LedgerName", "Ledger", 130, HAlign.Left, 13, null);
             ConfigureColumn(band, "UserName", "User", 95, HAlign.Left, 14, null);
 
-            string[] visibleColumns =
+            ReportGridLayoutHelper.ApplySavedLayout("StockAdjustmentReport", gridReport, userHiddenColumnKeys);
+            if (columnChooserForm != null && columnChooserForm.Visible)
             {
-                "SlNo", "StockAdjustmentNo", "StockAdjustmentDate", "AdjustmentType", "Barcode", "ItemName",
-                "UnitName", "SystemStock", "PhysicalStock", "QtyDifference", "Cost", "AdjustmentValue",
-                "Reason", "LedgerName", "UserName"
-            };
-
-            foreach (UltraGridColumn column in band.Columns)
-            {
-                column.Hidden = !visibleColumns.Contains(column.Key);
-            }
-
-            // Re-apply user hidden columns
-            foreach (UltraGridColumn col in band.Columns)
-            {
-                if (userHiddenColumnKeys.Contains(col.Key))
-                {
-                    col.Hidden = true;
-                }
+                PopulateColumnChooserListBox();
             }
 
             CreateFooterCells();
             UpdateFooterCellPositions();
             UpdateFooterValues();
-            if (columnChooserForm != null && columnChooserForm.Visible)
-            {
-                PopulateColumnChooserListBox();
-            }
         }
 
         private void ConfigureColumn(UltraGridBand band, string key, string caption, int width, HAlign align, int position, string format)
         {
             if (!band.Columns.Exists(key)) return;
             UltraGridColumn column = band.Columns[key];
+            column.ExcludeFromColumnChooser = ExcludeFromColumnChooser.False;
+            column.Hidden = userHiddenColumnKeys.Contains(key);
             column.Header.Caption = caption;
             column.Width = width;
             column.CellAppearance.TextHAlign = align;
@@ -779,6 +776,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             CreateFooterCells();
             UpdateFooterCellPositions();
             UpdateFooterValues();
+            ReportGridLayoutHelper.SaveLayout("StockAdjustmentReport", gridReport, userHiddenColumnKeys);
             if (columnChooserForm != null && columnChooserForm.Visible)
             {
                 PopulateColumnChooserListBox();
@@ -883,7 +881,7 @@ namespace PosBranch_Win.Reports.InventoryReport
 
             foreach (UltraGridColumn col in band.Columns)
             {
-                if (col.Hidden && !col.Key.EndsWith("Id", StringComparison.OrdinalIgnoreCase))
+                if (col.Hidden && !col.Key.EndsWith("Id", StringComparison.OrdinalIgnoreCase) && col.ExcludeFromColumnChooser != ExcludeFromColumnChooser.True)
                 {
                     string caption = !string.IsNullOrEmpty(col.Header.Caption) ? col.Header.Caption : col.Key;
                     columnChooserListBox.Items.Add(new ColumnChooserItem(col.Key, caption));
@@ -913,6 +911,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                 CreateFooterCells();
                 UpdateFooterCellPositions();
                 UpdateFooterValues();
+                ReportGridLayoutHelper.SaveLayout("StockAdjustmentReport", gridReport, userHiddenColumnKeys);
                 PopulateColumnChooserListBox();
             }
         }
@@ -924,7 +923,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             UltraGridBand band = gridReport.DisplayLayout.Bands[0];
             foreach (UltraGridColumn col in band.Columns)
             {
-                if (!col.Key.EndsWith("Id", StringComparison.OrdinalIgnoreCase))
+                if (!col.Key.EndsWith("Id", StringComparison.OrdinalIgnoreCase) && col.ExcludeFromColumnChooser != ExcludeFromColumnChooser.True)
                 {
                     col.Hidden = false;
                 }
@@ -932,6 +931,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             CreateFooterCells();
             UpdateFooterCellPositions();
             UpdateFooterValues();
+            ReportGridLayoutHelper.SaveLayout("StockAdjustmentReport", gridReport, userHiddenColumnKeys);
             PopulateColumnChooserListBox();
         }
 

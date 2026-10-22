@@ -169,6 +169,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 CreateFooterCells();
                 UpdateFooterCellPositions();
                 UpdateFooterValues();
+                ReportGridLayoutHelper.SaveLayout("PurchaseAuditReport", gridReport, userHiddenColumnKeys);
             };
             gridReport.AfterColRegionScroll += (s, e) => UpdateFooterCellPositions();
             gridReport.AfterRowRegionScroll += (s, e) => UpdateFooterCellPositions();
@@ -197,6 +198,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
         private void frmpurchaseAuditreport_FormClosing(object sender, FormClosingEventArgs e)
         {
+            ReportGridLayoutHelper.SaveLayout("PurchaseAuditReport", gridReport, userHiddenColumnKeys);
             if (columnChooserForm != null && !columnChooserForm.IsDisposed)
             {
                 columnChooserForm.Dispose();
@@ -235,6 +237,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 LoadVendors();
                 InitializeGridFooter();
                 SetupHeaderDragToHideAndColumnChooser();
+                ReportGridLayoutHelper.LoadHiddenColumns("PurchaseAuditReport", userHiddenColumnKeys);
             }
             finally
             {
@@ -1055,6 +1058,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
             if (col.ExcludeFromColumnChooser == ExcludeFromColumnChooser.True) return false;
             if (string.Equals(col.Key, "PeriodKey", StringComparison.OrdinalIgnoreCase)) return false;
             if (string.Equals(col.Key, "DetailID", StringComparison.OrdinalIgnoreCase)) return false;
+            if (col.Key.EndsWith("Id", StringComparison.OrdinalIgnoreCase)) return false;
             if (col.Band != null && col.Band.Index > 0 && string.Equals(col.Key, "PurchaseNo", StringComparison.OrdinalIgnoreCase) && col.Band.Key == "PurchaseDetail")
                 return false;
             return true;
@@ -1180,11 +1184,13 @@ namespace PosBranch_Win.Reports.PurchaseReports
         {
             if (col == null || !IsCustomizableColumn(col)) return;
             int bandIndex = col.Band != null ? col.Band.Index : 0;
-            userHiddenColumnKeys.Add($"{bandIndex}:{col.Key}");
+            string key = gridReport.DisplayLayout.Bands.Count > 1 ? $"{bandIndex}:{col.Key}" : col.Key;
+            userHiddenColumnKeys.Add(key);
             col.Hidden = true;
             CreateFooterCells();
             UpdateFooterCellPositions();
             UpdateFooterValues();
+            ReportGridLayoutHelper.SaveLayout("PurchaseAuditReport", gridReport, userHiddenColumnKeys);
             if (columnChooserForm != null && columnChooserForm.Visible)
             {
                 PopulateColumnChooserListBox();
@@ -1393,6 +1399,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
             UltraGridBand band = gridReport.DisplayLayout.Bands[bandIndex];
             if (band.Columns.Exists(columnKey))
             {
+                userHiddenColumnKeys.Remove(columnKey);
                 userHiddenColumnKeys.Remove($"{bandIndex}:{columnKey}");
                 UltraGridColumn col = band.Columns[columnKey];
                 col.Hidden = false;
@@ -1403,6 +1410,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 CreateFooterCells();
                 UpdateFooterCellPositions();
                 UpdateFooterValues();
+                ReportGridLayoutHelper.SaveLayout("PurchaseAuditReport", gridReport, userHiddenColumnKeys);
                 PopulateColumnChooserListBox();
             }
         }
@@ -1417,7 +1425,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
             {
                 foreach (UltraGridColumn col in gridReport.DisplayLayout.Bands[b].Columns)
                 {
-                    if (IsCustomizableColumn(col))
+                    if (IsCustomizableColumn(col) && col.ExcludeFromColumnChooser != ExcludeFromColumnChooser.True)
                     {
                         col.Hidden = false;
                     }
@@ -1426,6 +1434,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
             CreateFooterCells();
             UpdateFooterCellPositions();
             UpdateFooterValues();
+            ReportGridLayoutHelper.SaveLayout("PurchaseAuditReport", gridReport, userHiddenColumnKeys);
             PopulateColumnChooserListBox();
         }
 
@@ -2072,9 +2081,15 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 ConfigureBandByKey(band, b);
             }
 
+            ReportGridLayoutHelper.ApplySavedLayout("PurchaseAuditReport", gridReport, userHiddenColumnKeys);
+
             CreateFooterCells();
             UpdateFooterCellPositions();
             UpdateFooterValues();
+            if (columnChooserForm != null && columnChooserForm.Visible)
+            {
+                PopulateColumnChooserListBox();
+            }
         }
 
         private void ConfigureBandByKey(UltraGridBand band, int bandIndex)
@@ -2084,6 +2099,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 if (!col.IsChaptered)
                 {
                     col.Hidden = true;
+                    col.ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
                 }
             }
 
@@ -2304,7 +2320,8 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 return;
 
             UltraGridColumn column = band.Columns[key];
-            column.Hidden = userHiddenColumnKeys.Contains($"{bandIndex}:{key}");
+            column.ExcludeFromColumnChooser = ExcludeFromColumnChooser.False;
+            column.Hidden = userHiddenColumnKeys.Contains(key) || userHiddenColumnKeys.Contains($"{bandIndex}:{key}");
             column.Header.Caption = header;
             column.Width = width;
             column.Header.VisiblePosition = visiblePosition;

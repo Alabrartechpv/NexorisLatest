@@ -4,6 +4,7 @@ using Infragistics.Win.UltraWinGrid;
 using ModelClass;
 using ModelClass.Master;
 using ModelClass.Report;
+using PosBranch_Win.Reports;
 using Repository;
 using Repository.ReportRepository;
 using System;
@@ -79,6 +80,9 @@ namespace PosBranch_Win.Reports.SalesReports
         private bool isDraggingHeaderColumn;
         private bool summaryFooterInitialized;
         private readonly System.Windows.Forms.ToolTip columnChooserToolTip = new System.Windows.Forms.ToolTip();
+        private readonly HashSet<string> userHiddenColumnKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        private string GetLayoutKey() => $"SalesHoldReport_{cmbViewMode?.Value?.ToString() ?? "Summary"}";
 
         private sealed class ComboItem
         {
@@ -125,6 +129,8 @@ namespace PosBranch_Win.Reports.SalesReports
             InitializeRuntimeAppearance();
             LoadLookupData();
             ResetFilters(false);
+            userHiddenColumnKeys.Clear();
+            ReportGridLayoutHelper.LoadHiddenColumns(GetLayoutKey(), userHiddenColumnKeys);
             LoadData();
         }
 
@@ -183,11 +189,14 @@ namespace PosBranch_Win.Reports.SalesReports
 
         private void CmbViewMode_ValueChanged(object sender, EventArgs e)
         {
+            userHiddenColumnKeys.Clear();
+            ReportGridLayoutHelper.LoadHiddenColumns(GetLayoutKey(), userHiddenColumnKeys);
             LoadData();
         }
 
         private void FrmSalesHoldReport_FormClosed(object sender, FormClosedEventArgs e)
         {
+            ReportGridLayoutHelper.SaveLayout(GetLayoutKey(), gridHold, userHiddenColumnKeys);
             if (columnChooserForm != null && !columnChooserForm.IsDisposed)
             {
                 columnChooserForm.Close();
@@ -422,7 +431,7 @@ namespace PosBranch_Win.Reports.SalesReports
                 return;
             }
 
-            gridHold.AfterColPosChanged += (s, e) => UpdateSummaryFooterPositions();
+            gridHold.AfterColPosChanged += (s, e) => { UpdateSummaryFooterPositions(); ReportGridLayoutHelper.SaveLayout(GetLayoutKey(), gridHold, userHiddenColumnKeys); };
             gridHold.AfterColRegionScroll += (s, e) => UpdateSummaryFooterPositions();
             gridHold.AfterRowRegionScroll += (s, e) => UpdateSummaryFooterPositions();
             gridHold.Resize += (s, e) => UpdateSummaryFooterPositions();
@@ -643,6 +652,8 @@ namespace PosBranch_Win.Reports.SalesReports
             ConfigureColumn(cols, "Status", "Status", 90, HAlign.Center);
 
             RestoreSavedWidths(cols);
+            ReportGridLayoutHelper.ApplySavedLayout(GetLayoutKey(), gridHold, userHiddenColumnKeys);
+            PopulateColumnChooserItems();
         }
 
         private void FormatDetailGridColumns()
@@ -672,6 +683,8 @@ namespace PosBranch_Win.Reports.SalesReports
             ConfigureColumn(cols, "Status", "Status", 80, HAlign.Center);
 
             RestoreSavedWidths(cols);
+            ReportGridLayoutHelper.ApplySavedLayout(GetLayoutKey(), gridHold, userHiddenColumnKeys);
+            PopulateColumnChooserItems();
         }
 
         private void HideInternalColumns(ColumnsCollection cols)
@@ -681,6 +694,15 @@ namespace PosBranch_Win.Reports.SalesReports
                 if (internalGridColumns.Contains(col.Key))
                 {
                     col.Hidden = true;
+                    col.ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
+                }
+                else
+                {
+                    col.ExcludeFromColumnChooser = ExcludeFromColumnChooser.False;
+                    if (userHiddenColumnKeys.Contains(col.Key))
+                    {
+                        col.Hidden = true;
+                    }
                 }
             }
         }
@@ -1006,7 +1028,9 @@ namespace PosBranch_Win.Reports.SalesReports
 
                 if (shouldHide)
                 {
+                    userHiddenColumnKeys.Add(columnToHideByDrag.Key);
                     columnToHideByDrag.Hidden = true;
+                    ReportGridLayoutHelper.SaveLayout(GetLayoutKey(), gridHold, userHiddenColumnKeys);
                     PopulateColumnChooserItems();
                     UpdateSummaryFooterPositions();
                 }
@@ -1024,7 +1048,9 @@ namespace PosBranch_Win.Reports.SalesReports
 
             var hideItem = new ToolStripMenuItem($"Hide Column '{column.Header.Caption ?? column.Key}'", null, (s, e) =>
             {
+                userHiddenColumnKeys.Add(column.Key);
                 column.Hidden = true;
+                ReportGridLayoutHelper.SaveLayout(GetLayoutKey(), gridHold, userHiddenColumnKeys);
                 PopulateColumnChooserItems();
                 UpdateSummaryFooterPositions();
             });
@@ -1037,6 +1063,7 @@ namespace PosBranch_Win.Reports.SalesReports
             {
                 if (gridHold.DisplayLayout.Bands.Count > 0)
                 {
+                    userHiddenColumnKeys.Clear();
                     foreach (UltraGridColumn c in gridHold.DisplayLayout.Bands[0].Columns)
                     {
                         if (!internalGridColumns.Contains(c.Key))
@@ -1044,6 +1071,7 @@ namespace PosBranch_Win.Reports.SalesReports
                             c.Hidden = false;
                         }
                     }
+                    ReportGridLayoutHelper.SaveLayout(GetLayoutKey(), gridHold, userHiddenColumnKeys);
                     PopulateColumnChooserItems();
                     UpdateSummaryFooterPositions();
                 }
@@ -1104,6 +1132,8 @@ namespace PosBranch_Win.Reports.SalesReports
                     if (gridHold.DisplayLayout.Bands.Count > 0 && gridHold.DisplayLayout.Bands[0].Columns.Exists(item.ColumnKey))
                     {
                         gridHold.DisplayLayout.Bands[0].Columns[item.ColumnKey].Hidden = false;
+                        userHiddenColumnKeys.Remove(item.ColumnKey);
+                        ReportGridLayoutHelper.SaveLayout(GetLayoutKey(), gridHold, userHiddenColumnKeys);
                         PopulateColumnChooserItems();
                         UpdateSummaryFooterPositions();
                     }
@@ -1115,6 +1145,7 @@ namespace PosBranch_Win.Reports.SalesReports
             {
                 if (gridHold.DisplayLayout.Bands.Count > 0)
                 {
+                    userHiddenColumnKeys.Clear();
                     foreach (UltraGridColumn c in gridHold.DisplayLayout.Bands[0].Columns)
                     {
                         if (!internalGridColumns.Contains(c.Key))
@@ -1122,6 +1153,7 @@ namespace PosBranch_Win.Reports.SalesReports
                             c.Hidden = false;
                         }
                     }
+                    ReportGridLayoutHelper.SaveLayout(GetLayoutKey(), gridHold, userHiddenColumnKeys);
                     PopulateColumnChooserItems();
                     UpdateSummaryFooterPositions();
                 }
@@ -1136,6 +1168,8 @@ namespace PosBranch_Win.Reports.SalesReports
                     if (gridHold.DisplayLayout.Bands.Count > 0 && gridHold.DisplayLayout.Bands[0].Columns.Exists(item.ColumnKey))
                     {
                         gridHold.DisplayLayout.Bands[0].Columns[item.ColumnKey].Hidden = false;
+                        userHiddenColumnKeys.Remove(item.ColumnKey);
+                        ReportGridLayoutHelper.SaveLayout(GetLayoutKey(), gridHold, userHiddenColumnKeys);
                         PopulateColumnChooserItems();
                         UpdateSummaryFooterPositions();
                     }
@@ -1185,7 +1219,7 @@ namespace PosBranch_Win.Reports.SalesReports
             columnChooserListBox.Items.Clear();
             foreach (UltraGridColumn col in gridHold.DisplayLayout.Bands[0].Columns)
             {
-                if (col.Hidden && !internalGridColumns.Contains(col.Key))
+                if (col.Hidden && !internalGridColumns.Contains(col.Key) && col.ExcludeFromColumnChooser != ExcludeFromColumnChooser.True)
                 {
                     columnChooserListBox.Items.Add(new ColumnItem(col.Key, string.IsNullOrEmpty(col.Header.Caption) ? col.Key : col.Header.Caption));
                 }

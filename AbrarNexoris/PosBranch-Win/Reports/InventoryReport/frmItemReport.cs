@@ -76,6 +76,7 @@ namespace PosBranch_Win.Reports.InventoryReport
         {
             try
             {
+                ReportGridLayoutHelper.LoadHiddenColumns("ItemReport", userHiddenColumnKeys);
                 itemReportRepo = new ItemReportRepo();
                 baseRepo = new BaseRepostitory();
 
@@ -348,13 +349,27 @@ namespace PosBranch_Win.Reports.InventoryReport
 
             // Register footer cell sync and column drag-to-hide handlers matching frmPurchaseReturn / frmStockReport
             ultraGridTransactions.Resize += (s, e) => UpdateFooterCellPositions();
-            ultraGridTransactions.AfterColPosChanged += (s, e) => UpdateFooterCellPositions();
+            ultraGridTransactions.AfterColPosChanged += (s, e) =>
+            {
+                UpdateFooterCellPositions();
+                ReportGridLayoutHelper.SaveLayout("ItemReport", ultraGridTransactions, userHiddenColumnKeys);
+            };
             ultraGridTransactions.AfterColRegionScroll += (s, e) => UpdateFooterCellPositions();
             ultraGridTransactions.AfterRowRegionScroll += (s, e) => UpdateFooterCellPositions();
             ultraGridTransactions.Paint += (s, e) => UpdateFooterCellPositions();
 
             SetupHeaderDragToHideAndColumnChooser();
             InitializeGridFooter();
+
+            FormClosing += (s, e) =>
+            {
+                ReportGridLayoutHelper.SaveLayout("ItemReport", ultraGridTransactions, userHiddenColumnKeys);
+                if (columnChooserForm != null && !columnChooserForm.IsDisposed)
+                {
+                    columnChooserForm.Dispose();
+                    columnChooserForm = null;
+                }
+            };
         }
 
         private void InitializeGridFooter()
@@ -533,6 +548,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             if (col == null) return;
             userHiddenColumnKeys.Add(col.Key);
             col.Hidden = true;
+            ReportGridLayoutHelper.SaveLayout("ItemReport", ultraGridTransactions, userHiddenColumnKeys);
             CreateFooterCells();
             UpdateFooterCellPositions();
             UpdateFooterValues();
@@ -640,7 +656,7 @@ namespace PosBranch_Win.Reports.InventoryReport
 
             foreach (UltraGridColumn col in band.Columns)
             {
-                if (col.Hidden && !col.Key.EndsWith("Id", StringComparison.OrdinalIgnoreCase))
+                if (col.Hidden && !col.Key.EndsWith("Id", StringComparison.OrdinalIgnoreCase) && col.ExcludeFromColumnChooser != ExcludeFromColumnChooser.True)
                 {
                     string caption = !string.IsNullOrEmpty(col.Header.Caption) ? col.Header.Caption : col.Key;
                     columnChooserListBox.Items.Add(new ColumnChooserItem(col.Key, caption));
@@ -667,6 +683,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                 {
                     col.Header.VisiblePosition = targetVisiblePosition.Value;
                 }
+                ReportGridLayoutHelper.SaveLayout("ItemReport", ultraGridTransactions, userHiddenColumnKeys);
                 CreateFooterCells();
                 UpdateFooterCellPositions();
                 UpdateFooterValues();
@@ -681,11 +698,12 @@ namespace PosBranch_Win.Reports.InventoryReport
             UltraGridBand band = ultraGridTransactions.DisplayLayout.Bands[0];
             foreach (UltraGridColumn col in band.Columns)
             {
-                if (!col.Key.EndsWith("Id", StringComparison.OrdinalIgnoreCase))
+                if (!col.Key.EndsWith("Id", StringComparison.OrdinalIgnoreCase) && col.ExcludeFromColumnChooser != ExcludeFromColumnChooser.True)
                 {
                     col.Hidden = false;
                 }
             }
+            ReportGridLayoutHelper.SaveLayout("ItemReport", ultraGridTransactions, userHiddenColumnKeys);
             CreateFooterCells();
             UpdateFooterCellPositions();
             UpdateFooterValues();
@@ -1129,6 +1147,18 @@ namespace PosBranch_Win.Reports.InventoryReport
         {
             UltraGridBand band = e.Layout.Bands[0];
 
+            foreach (UltraGridColumn col in band.Columns)
+            {
+                if (col.Key.EndsWith("Id", StringComparison.OrdinalIgnoreCase) || col.Key == "IsBaseUnit")
+                {
+                    col.ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
+                }
+                else
+                {
+                    col.ExcludeFromColumnChooser = ExcludeFromColumnChooser.False;
+                }
+            }
+
             // Add or configure "Sl No" Column at VisiblePosition = 0
             if (!band.Columns.Exists("SlNo"))
             {
@@ -1174,6 +1204,12 @@ namespace PosBranch_Win.Reports.InventoryReport
             ConfigureColumn(band, "Balance", "Stock Balance", 100, "#,##0.00", HAlign.Right, 11);
             ConfigureColumn(band, "BranchName", "Branch", 110, null, HAlign.Left, 12);
 
+            ReportGridLayoutHelper.ApplySavedLayout("ItemReport", ultraGridTransactions, userHiddenColumnKeys);
+            if (columnChooserForm != null && columnChooserForm.Visible)
+            {
+                PopulateColumnChooserListBox();
+            }
+
             e.Layout.AutoFitStyle = AutoFitStyle.None;
             e.Layout.ScrollBounds = ScrollBounds.ScrollToFill;
             e.Layout.Scrollbars = Scrollbars.Both;
@@ -1185,6 +1221,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             if (!band.Columns.Exists(key)) return;
 
             UltraGridColumn col = band.Columns[key];
+            col.ExcludeFromColumnChooser = ExcludeFromColumnChooser.False;
             col.Header.Caption = header;
             col.Width = width;
             col.Header.VisiblePosition = visPos;

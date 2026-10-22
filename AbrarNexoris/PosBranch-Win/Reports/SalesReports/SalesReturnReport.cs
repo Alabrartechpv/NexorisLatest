@@ -17,6 +17,7 @@ using System.Drawing.Printing;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
+using PosBranch_Win.Reports;
 
 namespace PosBranch_Win.Reports.SalesReports
 {
@@ -109,6 +110,7 @@ namespace PosBranch_Win.Reports.SalesReports
             InitializeComponent();
             this.Font = new Font("Segoe UI", 9F);
             Load += SalesReturnReport_Load;
+            FormClosing += (s, e) => ReportGridLayoutHelper.SaveLayout("SalesReturnReport", ultraGridMaster, userHiddenColumnKeys);
             FormClosed += SalesReturnReport_FormClosed;
             SetupKeyboardShortcuts();
         }
@@ -122,6 +124,7 @@ namespace PosBranch_Win.Reports.SalesReports
                 return;
             }
 
+            ReportGridLayoutHelper.LoadHiddenColumns("SalesReturnReport", userHiddenColumnKeys);
             InitializeRuntimeAppearance();
             LoadLookupData();
             ResetFilters(false);
@@ -130,6 +133,7 @@ namespace PosBranch_Win.Reports.SalesReports
 
         private void SalesReturnReport_FormClosed(object sender, FormClosedEventArgs e)
         {
+            ReportGridLayoutHelper.SaveLayout("SalesReturnReport", ultraGridMaster, userHiddenColumnKeys);
             if (columnChooserForm != null && !columnChooserForm.IsDisposed)
             {
                 columnChooserForm.Close();
@@ -424,6 +428,7 @@ namespace PosBranch_Win.Reports.SalesReports
                 CreateFooterCells();
                 UpdateFooterCellPositions();
                 UpdateFooterValues();
+                ReportGridLayoutHelper.SaveLayout("SalesReturnReport", ultraGridMaster, userHiddenColumnKeys);
             };
             targetGrid.AfterColRegionScroll += (s, e) => UpdateFooterCellPositions();
             targetGrid.AfterRowRegionScroll += (s, e) => UpdateFooterCellPositions();
@@ -786,11 +791,7 @@ namespace PosBranch_Win.Reports.SalesReports
                 {
                     foreach (var col in band.Columns)
                     {
-                        if (col.IsChaptered || string.Equals(col.Key, "MasterDetail", StringComparison.OrdinalIgnoreCase) ||
-                            string.Equals(col.Key, "DetailID", StringComparison.OrdinalIgnoreCase))
-                        {
-                            col.ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
-                        }
+                        col.ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
                     }
                 }
 
@@ -805,6 +806,30 @@ namespace PosBranch_Win.Reports.SalesReports
                 {
                     ConfigureDetailBandColumns(e.Layout.Bands[1]);
                 }
+
+                foreach (var band in e.Layout.Bands)
+                {
+                    foreach (var col in band.Columns)
+                    {
+                        if (col.IsChaptered || string.Equals(col.Key, "MasterDetail", StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(col.Key, "DetailID", StringComparison.OrdinalIgnoreCase) ||
+                            (band.Index > 0 && string.Equals(col.Key, "SReturnNo", StringComparison.OrdinalIgnoreCase)))
+                        {
+                            col.Hidden = true;
+                            col.ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
+                        }
+                    }
+                }
+
+                ReportGridLayoutHelper.ApplySavedLayout("SalesReturnReport", ultraGridMaster, userHiddenColumnKeys);
+
+                CreateFooterCells();
+                UpdateFooterCellPositions();
+                UpdateFooterValues();
+                if (columnChooserForm != null && columnChooserForm.Visible)
+                {
+                    PopulateColumnChooserListBox();
+                }
             }
             catch (Exception ex)
             {
@@ -816,86 +841,33 @@ namespace PosBranch_Win.Reports.SalesReports
         {
             int pos = 0;
 
-            if (masterBand.Columns.Exists("SlNo"))
+            void SetupMasterCol(string key, string caption, int width, HAlign align, string format = null, Color? foreColor = null, bool bold = false)
             {
-                masterBand.Columns["SlNo"].Header.Caption = "S.No";
-                masterBand.Columns["SlNo"].Width = 55;
-                masterBand.Columns["SlNo"].CellAppearance.TextHAlign = HAlign.Center;
-                masterBand.Columns["SlNo"].Header.VisiblePosition = pos++;
+                if (masterBand.Columns.Exists(key))
+                {
+                    var col = masterBand.Columns[key];
+                    col.ExcludeFromColumnChooser = ExcludeFromColumnChooser.False;
+                    col.Hidden = userHiddenColumnKeys.Contains(key) || userHiddenColumnKeys.Contains($"0:{key}");
+                    col.Header.Caption = caption;
+                    col.Width = width;
+                    col.CellAppearance.TextHAlign = align;
+                    if (!string.IsNullOrEmpty(format)) col.Format = format;
+                    if (foreColor.HasValue) col.CellAppearance.ForeColor = foreColor.Value;
+                    if (bold) col.CellAppearance.FontData.Bold = DefaultableBoolean.True;
+                    col.Header.VisiblePosition = pos++;
+                }
             }
-            if (masterBand.Columns.Exists("SReturnNo"))
-            {
-                masterBand.Columns["SReturnNo"].Header.Caption = "Return No";
-                masterBand.Columns["SReturnNo"].Width = 90;
-                masterBand.Columns["SReturnNo"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
-                masterBand.Columns["SReturnNo"].CellAppearance.ForeColor = Color.FromArgb(21, 101, 192);
-                masterBand.Columns["SReturnNo"].CellAppearance.TextHAlign = HAlign.Center;
-                masterBand.Columns["SReturnNo"].Header.VisiblePosition = pos++;
-            }
-            if (masterBand.Columns.Exists("SReturnDate"))
-            {
-                masterBand.Columns["SReturnDate"].Header.Caption = "Return Date";
-                masterBand.Columns["SReturnDate"].Format = "dd/MM/yyyy hh:mm tt";
-                masterBand.Columns["SReturnDate"].Width = 145;
-                masterBand.Columns["SReturnDate"].CellAppearance.TextHAlign = HAlign.Center;
-                masterBand.Columns["SReturnDate"].Header.VisiblePosition = pos++;
-            }
-            if (masterBand.Columns.Exists("InvoiceNo"))
-            {
-                masterBand.Columns["InvoiceNo"].Header.Caption = "Invoice No";
-                masterBand.Columns["InvoiceNo"].Width = 100;
-                masterBand.Columns["InvoiceNo"].CellAppearance.TextHAlign = HAlign.Center;
-                masterBand.Columns["InvoiceNo"].Header.VisiblePosition = pos++;
-            }
-            if (masterBand.Columns.Exists("InvoiceDate"))
-            {
-                masterBand.Columns["InvoiceDate"].Header.Caption = "Invoice Date";
-                masterBand.Columns["InvoiceDate"].Format = "dd/MM/yyyy";
-                masterBand.Columns["InvoiceDate"].Width = 110;
-                masterBand.Columns["InvoiceDate"].CellAppearance.TextHAlign = HAlign.Center;
-                masterBand.Columns["InvoiceDate"].Header.VisiblePosition = pos++;
-            }
-            if (masterBand.Columns.Exists("CustomerName"))
-            {
-                masterBand.Columns["CustomerName"].Header.Caption = "Customer";
-                masterBand.Columns["CustomerName"].Width = 220;
-                masterBand.Columns["CustomerName"].Header.VisiblePosition = pos++;
-            }
-            if (masterBand.Columns.Exists("Paymode"))
-            {
-                masterBand.Columns["Paymode"].Header.Caption = "Pay Mode";
-                masterBand.Columns["Paymode"].Width = 95;
-                masterBand.Columns["Paymode"].CellAppearance.TextHAlign = HAlign.Center;
-                masterBand.Columns["Paymode"].Header.VisiblePosition = pos++;
-            }
-            if (masterBand.Columns.Exists("SubTotal"))
-            {
-                masterBand.Columns["SubTotal"].Header.Caption = "Sub Total";
-                masterBand.Columns["SubTotal"].Format = "₹ #,##0.00";
-                masterBand.Columns["SubTotal"].Width = 125;
-                masterBand.Columns["SubTotal"].CellAppearance.TextHAlign = HAlign.Right;
-                masterBand.Columns["SubTotal"].CellAppearance.ForeColor = Color.FromArgb(13, 71, 161);
-                masterBand.Columns["SubTotal"].Header.VisiblePosition = pos++;
-            }
-            if (masterBand.Columns.Exists("TaxAmt"))
-            {
-                masterBand.Columns["TaxAmt"].Header.Caption = "Tax Amount";
-                masterBand.Columns["TaxAmt"].Format = "₹ #,##0.00";
-                masterBand.Columns["TaxAmt"].Width = 115;
-                masterBand.Columns["TaxAmt"].CellAppearance.TextHAlign = HAlign.Right;
-                masterBand.Columns["TaxAmt"].CellAppearance.ForeColor = Color.FromArgb(211, 84, 0);
-                masterBand.Columns["TaxAmt"].Header.VisiblePosition = pos++;
-            }
-            if (masterBand.Columns.Exists("GrandTotal"))
-            {
-                masterBand.Columns["GrandTotal"].Header.Caption = "Grand Total";
-                masterBand.Columns["GrandTotal"].Format = "₹ #,##0.00";
-                masterBand.Columns["GrandTotal"].Width = 135;
-                masterBand.Columns["GrandTotal"].CellAppearance.TextHAlign = HAlign.Right;
-                masterBand.Columns["GrandTotal"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
-                masterBand.Columns["GrandTotal"].CellAppearance.ForeColor = Color.FromArgb(27, 94, 32);
-                masterBand.Columns["GrandTotal"].Header.VisiblePosition = pos++;
-            }
+
+            SetupMasterCol("SlNo", "S.No", 55, HAlign.Center);
+            SetupMasterCol("SReturnNo", "Return No", 90, HAlign.Center, foreColor: Color.FromArgb(21, 101, 192), bold: true);
+            SetupMasterCol("SReturnDate", "Return Date", 145, HAlign.Center, format: "dd/MM/yyyy hh:mm tt");
+            SetupMasterCol("InvoiceNo", "Invoice No", 100, HAlign.Center);
+            SetupMasterCol("InvoiceDate", "Invoice Date", 110, HAlign.Center, format: "dd/MM/yyyy");
+            SetupMasterCol("CustomerName", "Customer", 220, HAlign.Default);
+            SetupMasterCol("Paymode", "Pay Mode", 95, HAlign.Center);
+            SetupMasterCol("SubTotal", "Sub Total", 125, HAlign.Right, format: "₹ #,##0.00", foreColor: Color.FromArgb(13, 71, 161));
+            SetupMasterCol("TaxAmt", "Tax Amount", 115, HAlign.Right, format: "₹ #,##0.00", foreColor: Color.FromArgb(211, 84, 0));
+            SetupMasterCol("GrandTotal", "Grand Total", 135, HAlign.Right, format: "₹ #,##0.00", foreColor: Color.FromArgb(27, 94, 32), bold: true);
         }
 
         private void ConfigureDetailBandColumns(UltraGridBand detailBand)
@@ -921,99 +893,40 @@ namespace PosBranch_Win.Reports.SalesReports
             }
 
             int pos = 0;
-            if (detailBand.Columns.Exists("SlNo"))
+            void SetupDetailCol(string key, string caption, int width, HAlign align, string format = null, Color? foreColor = null, bool bold = false)
             {
-                detailBand.Columns["SlNo"].Header.Caption = "S.No";
-                detailBand.Columns["SlNo"].Width = 45;
-                detailBand.Columns["SlNo"].CellAppearance.TextHAlign = HAlign.Center;
-                detailBand.Columns["SlNo"].Header.VisiblePosition = pos++;
+                if (detailBand.Columns.Exists(key))
+                {
+                    var col = detailBand.Columns[key];
+                    col.ExcludeFromColumnChooser = ExcludeFromColumnChooser.False;
+                    col.Hidden = userHiddenColumnKeys.Contains(key) || userHiddenColumnKeys.Contains($"1:{key}");
+                    col.Header.Caption = caption;
+                    col.Width = width;
+                    col.CellAppearance.TextHAlign = align;
+                    if (!string.IsNullOrEmpty(format)) col.Format = format;
+                    if (foreColor.HasValue) col.CellAppearance.ForeColor = foreColor.Value;
+                    if (bold) col.CellAppearance.FontData.Bold = DefaultableBoolean.True;
+                    col.Header.VisiblePosition = pos++;
+                }
             }
-            if (detailBand.Columns.Exists("ItemName"))
-            {
-                detailBand.Columns["ItemName"].Header.Caption = "Item Name";
-                detailBand.Columns["ItemName"].Width = 200;
-                detailBand.Columns["ItemName"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
-                detailBand.Columns["ItemName"].Header.VisiblePosition = pos++;
-            }
-            if (detailBand.Columns.Exists("Unit"))
-            {
-                detailBand.Columns["Unit"].Header.Caption = "Unit";
-                detailBand.Columns["Unit"].Width = 60;
-                detailBand.Columns["Unit"].CellAppearance.TextHAlign = HAlign.Center;
-                detailBand.Columns["Unit"].Header.VisiblePosition = pos++;
-            }
-            if (detailBand.Columns.Exists("Packing"))
-            {
-                detailBand.Columns["Packing"].Header.Caption = "Packing";
-                detailBand.Columns["Packing"].Width = 70;
-                detailBand.Columns["Packing"].CellAppearance.TextHAlign = HAlign.Center;
-                detailBand.Columns["Packing"].Header.VisiblePosition = pos++;
-            }
-            if (detailBand.Columns.Exists("Qty"))
-            {
-                detailBand.Columns["Qty"].Header.Caption = "Quantity";
-                detailBand.Columns["Qty"].Format = "0.00";
-                detailBand.Columns["Qty"].Width = 70;
-                detailBand.Columns["Qty"].CellAppearance.TextHAlign = HAlign.Right;
-                detailBand.Columns["Qty"].Header.VisiblePosition = pos++;
-            }
-            if (detailBand.Columns.Exists("SalesPrice"))
-            {
-                detailBand.Columns["SalesPrice"].Header.Caption = "Price";
-                detailBand.Columns["SalesPrice"].Format = "₹ #,##0.00";
-                detailBand.Columns["SalesPrice"].Width = 90;
-                detailBand.Columns["SalesPrice"].CellAppearance.TextHAlign = HAlign.Right;
-                detailBand.Columns["SalesPrice"].Header.VisiblePosition = pos++;
-            }
-            if (detailBand.Columns.Exists("TaxPer"))
-            {
-                detailBand.Columns["TaxPer"].Header.Caption = "Tax %";
-                detailBand.Columns["TaxPer"].Format = "0.00 %";
-                detailBand.Columns["TaxPer"].Width = 65;
-                detailBand.Columns["TaxPer"].CellAppearance.TextHAlign = HAlign.Center;
-                detailBand.Columns["TaxPer"].Header.VisiblePosition = pos++;
-            }
-            if (detailBand.Columns.Exists("TaxAmt"))
-            {
-                detailBand.Columns["TaxAmt"].Header.Caption = "Tax Amt";
-                detailBand.Columns["TaxAmt"].Format = "₹ #,##0.00";
-                detailBand.Columns["TaxAmt"].Width = 90;
-                detailBand.Columns["TaxAmt"].CellAppearance.TextHAlign = HAlign.Right;
-                detailBand.Columns["TaxAmt"].Header.VisiblePosition = pos++;
-            }
-            if (detailBand.Columns.Exists("Amount"))
-            {
-                detailBand.Columns["Amount"].Header.Caption = "Amount";
-                detailBand.Columns["Amount"].Format = "₹ #,##0.00";
-                detailBand.Columns["Amount"].Width = 100;
-                detailBand.Columns["Amount"].CellAppearance.TextHAlign = HAlign.Right;
-                detailBand.Columns["Amount"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
-                detailBand.Columns["Amount"].CellAppearance.ForeColor = Color.FromArgb(27, 94, 32);
-                detailBand.Columns["Amount"].Header.VisiblePosition = pos++;
-            }
-            if (detailBand.Columns.Exists("Reason"))
-            {
-                detailBand.Columns["Reason"].Header.Caption = "Return Reason";
-                detailBand.Columns["Reason"].Width = 160;
-                detailBand.Columns["Reason"].Header.VisiblePosition = pos++;
-            }
+
+            SetupDetailCol("SlNo", "S.No", 45, HAlign.Center);
+            SetupDetailCol("ItemName", "Item Name", 200, HAlign.Default, bold: true);
+            SetupDetailCol("Unit", "Unit", 60, HAlign.Center);
+            SetupDetailCol("Packing", "Packing", 70, HAlign.Center);
+            SetupDetailCol("Qty", "Quantity", 70, HAlign.Right, format: "0.00");
+            SetupDetailCol("SalesPrice", "Price", 90, HAlign.Right, format: "₹ #,##0.00");
+            SetupDetailCol("TaxPer", "Tax %", 65, HAlign.Center, format: "0.00 %");
+            SetupDetailCol("TaxAmt", "Tax Amt", 90, HAlign.Right, format: "₹ #,##0.00");
+            SetupDetailCol("Amount", "Amount", 100, HAlign.Right, format: "₹ #,##0.00", foreColor: Color.FromArgb(27, 94, 32), bold: true);
+            SetupDetailCol("Reason", "Return Reason", 160, HAlign.Default);
         }
 
         private void ApplyUserHiddenColumns()
         {
             if (ultraGridMaster.DisplayLayout == null || ultraGridMaster.DisplayLayout.Bands.Count == 0) return;
 
-            foreach (var key in userHiddenColumnKeys)
-            {
-                for (int b = 0; b < ultraGridMaster.DisplayLayout.Bands.Count; b++)
-                {
-                    var band = ultraGridMaster.DisplayLayout.Bands[b];
-                    if (band.Columns.Exists(key))
-                    {
-                        band.Columns[key].Hidden = true;
-                    }
-                }
-            }
+            ReportGridLayoutHelper.ApplySavedLayout("SalesReturnReport", ultraGridMaster, userHiddenColumnKeys);
         }
         #endregion
 
@@ -1563,11 +1476,13 @@ namespace PosBranch_Win.Reports.SalesReports
             }
 
             userHiddenColumnKeys.Add(col.Key);
+            userHiddenColumnKeys.Add($"{bandIdx}:{col.Key}");
             col.Hidden = true;
 
             CreateFooterCells();
             UpdateFooterCellPositions();
             UpdateFooterValues();
+            ReportGridLayoutHelper.SaveLayout("SalesReturnReport", ultraGridMaster, userHiddenColumnKeys);
             if (columnChooserForm != null && columnChooserForm.Visible)
             {
                 PopulateColumnChooserListBox();
@@ -1597,7 +1512,7 @@ namespace PosBranch_Win.Reports.SalesReports
 
         private bool IsCustomizableColumn(UltraGridColumn col, int bandIndex)
         {
-            if (col == null || col.IsChaptered) return false;
+            if (col == null || col.IsChaptered || col.ExcludeFromColumnChooser == ExcludeFromColumnChooser.True) return false;
             if (string.Equals(col.Key, "MasterDetail", StringComparison.OrdinalIgnoreCase)) return false;
             if (string.Equals(col.Key, "DetailID", StringComparison.OrdinalIgnoreCase)) return false;
             if (bandIndex > 0 && string.Equals(col.Key, "SReturnNo", StringComparison.OrdinalIgnoreCase)) return false;
@@ -1695,7 +1610,7 @@ namespace PosBranch_Win.Reports.SalesReports
 
                 foreach (UltraGridColumn col in band.Columns)
                 {
-                    if (col.Hidden && IsCustomizableColumn(col, b))
+                    if (col.Hidden && IsCustomizableColumn(col, b) && col.ExcludeFromColumnChooser != ExcludeFromColumnChooser.True)
                     {
                         string caption = !string.IsNullOrEmpty(col.Header.Caption) ? col.Header.Caption : col.Key;
                         string display = bandPrefix + caption;
@@ -1720,6 +1635,7 @@ namespace PosBranch_Win.Reports.SalesReports
         private void UnhideColumn(string columnKey, int bandIndex, int? targetVisiblePosition = null)
         {
             userHiddenColumnKeys.Remove(columnKey);
+            userHiddenColumnKeys.Remove($"{bandIndex}:{columnKey}");
             if (ultraGridMaster.DisplayLayout.Bands.Count > bandIndex && ultraGridMaster.DisplayLayout.Bands[bandIndex].Columns.Exists(columnKey))
             {
                 UltraGridColumn col = ultraGridMaster.DisplayLayout.Bands[bandIndex].Columns[columnKey];
@@ -1731,6 +1647,7 @@ namespace PosBranch_Win.Reports.SalesReports
                 CreateFooterCells();
                 UpdateFooterCellPositions();
                 UpdateFooterValues();
+                ReportGridLayoutHelper.SaveLayout("SalesReturnReport", ultraGridMaster, userHiddenColumnKeys);
                 PopulateColumnChooserListBox();
             }
         }
@@ -1743,7 +1660,7 @@ namespace PosBranch_Win.Reports.SalesReports
                 UltraGridBand band = ultraGridMaster.DisplayLayout.Bands[b];
                 foreach (UltraGridColumn col in band.Columns)
                 {
-                    if (IsCustomizableColumn(col, b))
+                    if (IsCustomizableColumn(col, b) && col.ExcludeFromColumnChooser != ExcludeFromColumnChooser.True)
                     {
                         col.Hidden = false;
                     }
@@ -1752,6 +1669,7 @@ namespace PosBranch_Win.Reports.SalesReports
             CreateFooterCells();
             UpdateFooterCellPositions();
             UpdateFooterValues();
+            ReportGridLayoutHelper.SaveLayout("SalesReturnReport", ultraGridMaster, userHiddenColumnKeys);
             PopulateColumnChooserListBox();
         }
 

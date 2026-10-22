@@ -14,6 +14,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
+using PosBranch_Win.Reports;
 using WinFormsToolTip = System.Windows.Forms.ToolTip;
 
 namespace PosBranch_Win.Reports.SalesReports
@@ -52,6 +53,8 @@ namespace PosBranch_Win.Reports.SalesReports
         private Point _dragStartPoint;
         private bool _isDraggingColumn;
         private readonly Dictionary<string, int> _savedColumnWidths = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _summaryHiddenColumnKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _detailHiddenColumnKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly WinFormsToolTip _columnToolTip = new WinFormsToolTip();
         private List<LookupItem> _salesmanLookupItems = new List<LookupItem>();
         private List<LookupItem> _userLookupItems = new List<LookupItem>();
@@ -86,6 +89,9 @@ namespace PosBranch_Win.Reports.SalesReports
             KeyDown += frmSalesmanIncentiveReport_KeyDown;
             FormClosing += frmSalesmanIncentiveReport_FormClosing;
             Load += frmSalesmanIncentiveReport_Load;
+
+            ReportGridLayoutHelper.LoadHiddenColumns("SalesmanIncentiveReport_Summary", _summaryHiddenColumnKeys);
+            ReportGridLayoutHelper.LoadHiddenColumns("SalesmanIncentiveReport_Details", _detailHiddenColumnKeys);
 
             InitializePanels();
             StyleButtons();
@@ -317,6 +323,8 @@ namespace PosBranch_Win.Reports.SalesReports
             gridSummary.InitializeLayout += gridSummary_InitializeLayout;
             gridDetails.InitializeLayout += gridDetails_InitializeLayout;
             gridSummary.AfterRowActivate += gridSummary_AfterRowActivate;
+            gridSummary.AfterColPosChanged += (s, e) => ReportGridLayoutHelper.SaveLayout("SalesmanIncentiveReport_Summary", gridSummary, _summaryHiddenColumnKeys);
+            gridDetails.AfterColPosChanged += (s, e) => ReportGridLayoutHelper.SaveLayout("SalesmanIncentiveReport_Details", gridDetails, _detailHiddenColumnKeys);
             SetupColumnChooserMenu(gridSummary);
             SetupColumnChooserMenu(gridDetails);
         }
@@ -692,8 +700,25 @@ namespace PosBranch_Win.Reports.SalesReports
             if (e.Layout.Bands.Count == 0) return;
             UltraGridBand band = e.Layout.Bands[0];
 
-            if (band.Columns.Exists("SalesmanId")) band.Columns["SalesmanId"].Hidden = true;
-            if (band.Columns.Exists("BranchId")) band.Columns["BranchId"].Hidden = true;
+            foreach (UltraGridColumn col in band.Columns)
+            {
+                col.ExcludeFromColumnChooser = ExcludeFromColumnChooser.False;
+                if (_summaryHiddenColumnKeys.Contains(col.Key))
+                {
+                    col.Hidden = true;
+                }
+            }
+
+            if (band.Columns.Exists("SalesmanId"))
+            {
+                band.Columns["SalesmanId"].Hidden = true;
+                band.Columns["SalesmanId"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
+            }
+            if (band.Columns.Exists("BranchId"))
+            {
+                band.Columns["BranchId"].Hidden = true;
+                band.Columns["BranchId"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
+            }
 
             ConfigureNumberColumn(band, "SalesQty", "Sales Qty");
             ConfigureNumberColumn(band, "IncentivePercent", "Incentive %");
@@ -715,6 +740,12 @@ namespace PosBranch_Win.Reports.SalesReports
                 band.Columns["IncentiveAmount"].CellAppearance.ForeColor = Color.FromArgb(191, 54, 12);
             }
 
+            ReportGridLayoutHelper.ApplySavedLayout("SalesmanIncentiveReport_Summary", gridSummary, _summaryHiddenColumnKeys);
+            if (_columnChooserTargetGrid == gridSummary)
+            {
+                PopulateColumnChooserListBox(gridSummary);
+            }
+
             e.Layout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
         }
 
@@ -723,9 +754,30 @@ namespace PosBranch_Win.Reports.SalesReports
             if (e.Layout.Bands.Count == 0) return;
             UltraGridBand band = e.Layout.Bands[0];
 
-            if (band.Columns.Exists("SalesmanId")) band.Columns["SalesmanId"].Hidden = true;
-            if (band.Columns.Exists("BranchId")) band.Columns["BranchId"].Hidden = true;
-            if (band.Columns.Exists("ItemId")) band.Columns["ItemId"].Hidden = true;
+            foreach (UltraGridColumn col in band.Columns)
+            {
+                col.ExcludeFromColumnChooser = ExcludeFromColumnChooser.False;
+                if (_detailHiddenColumnKeys.Contains(col.Key))
+                {
+                    col.Hidden = true;
+                }
+            }
+
+            if (band.Columns.Exists("SalesmanId"))
+            {
+                band.Columns["SalesmanId"].Hidden = true;
+                band.Columns["SalesmanId"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
+            }
+            if (band.Columns.Exists("BranchId"))
+            {
+                band.Columns["BranchId"].Hidden = true;
+                band.Columns["BranchId"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
+            }
+            if (band.Columns.Exists("ItemId"))
+            {
+                band.Columns["ItemId"].Hidden = true;
+                band.Columns["ItemId"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
+            }
 
             ConfigureNumberColumn(band, "Qty", "Qty");
             ConfigureNumberColumn(band, "CostPerUnit", "Cost/Unit");
@@ -743,6 +795,12 @@ namespace PosBranch_Win.Reports.SalesReports
             {
                 band.Columns["ProfitValue"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
                 band.Columns["ProfitValue"].CellAppearance.ForeColor = Color.FromArgb(27, 94, 32);
+            }
+
+            ReportGridLayoutHelper.ApplySavedLayout("SalesmanIncentiveReport_Details", gridDetails, _detailHiddenColumnKeys);
+            if (_columnChooserTargetGrid == gridDetails)
+            {
+                PopulateColumnChooserListBox(gridDetails);
             }
 
             e.Layout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
@@ -973,48 +1031,25 @@ namespace PosBranch_Win.Reports.SalesReports
         private void LoadGridLayouts()
         {
             if (_gridLayoutsLoaded) return;
-            TryLoadGridLayout(gridSummary, SummaryGridLayoutPath);
-            TryLoadGridLayout(gridDetails, DetailGridLayoutPath);
+            ReportGridLayoutHelper.ApplySavedLayout("SalesmanIncentiveReport_Summary", gridSummary, _summaryHiddenColumnKeys);
+            ReportGridLayoutHelper.ApplySavedLayout("SalesmanIncentiveReport_Details", gridDetails, _detailHiddenColumnKeys);
             _gridLayoutsLoaded = true;
         }
 
         private void SaveGridLayouts()
         {
-            TrySaveGridLayout(gridSummary, SummaryGridLayoutPath);
-            TrySaveGridLayout(gridDetails, DetailGridLayoutPath);
-        }
-
-        private static void TryLoadGridLayout(UltraGrid grid, string layoutPath)
-        {
-            try
-            {
-                if (grid != null && File.Exists(layoutPath))
-                {
-                    grid.DisplayLayout.LoadFromXml(layoutPath);
-                }
-            }
-            catch
-            {
-            }
-        }
-
-        private static void TrySaveGridLayout(UltraGrid grid, string layoutPath)
-        {
-            try
-            {
-                if (grid != null)
-                {
-                    grid.DisplayLayout.SaveAsXml(layoutPath);
-                }
-            }
-            catch
-            {
-            }
+            ReportGridLayoutHelper.SaveLayout("SalesmanIncentiveReport_Summary", gridSummary, _summaryHiddenColumnKeys);
+            ReportGridLayoutHelper.SaveLayout("SalesmanIncentiveReport_Details", gridDetails, _detailHiddenColumnKeys);
         }
 
         private void frmSalesmanIncentiveReport_FormClosing(object sender, FormClosingEventArgs e)
         {
             SaveGridLayouts();
+            if (_columnChooserForm != null && !_columnChooserForm.IsDisposed)
+            {
+                _columnChooserForm.Dispose();
+                _columnChooserForm = null;
+            }
         }
 
         private void SetupColumnChooserMenu(UltraGrid grid)
@@ -1073,6 +1108,29 @@ namespace PosBranch_Win.Reports.SalesReports
             _columnChooserListBox.MouseDown += ColumnChooserListBox_MouseDown;
             _columnChooserListBox.DragOver += ColumnChooserListBox_DragOver;
             _columnChooserListBox.DragDrop += ColumnChooserListBox_DragDrop;
+            _columnChooserListBox.DoubleClick += (s, e) =>
+            {
+                if (_columnChooserListBox.SelectedItem is ColumnItem item)
+                {
+                    UltraGrid grid = string.Equals(item.GridName, "gridDetails", StringComparison.OrdinalIgnoreCase) ? gridDetails : gridSummary;
+                    if (grid != null && grid.DisplayLayout.Bands.Count > 0 && grid.DisplayLayout.Bands[0].Columns.Exists(item.ColumnKey))
+                    {
+                        UltraGridColumn col = grid.DisplayLayout.Bands[0].Columns[item.ColumnKey];
+                        col.Hidden = false;
+                        if (grid == gridSummary)
+                        {
+                            _summaryHiddenColumnKeys.Remove(item.ColumnKey);
+                            ReportGridLayoutHelper.SaveLayout("SalesmanIncentiveReport_Summary", gridSummary, _summaryHiddenColumnKeys);
+                        }
+                        else if (grid == gridDetails)
+                        {
+                            _detailHiddenColumnKeys.Remove(item.ColumnKey);
+                            ReportGridLayoutHelper.SaveLayout("SalesmanIncentiveReport_Details", gridDetails, _detailHiddenColumnKeys);
+                        }
+                        PopulateColumnChooserListBox(grid);
+                    }
+                }
+            };
 
             _columnChooserForm.Controls.Add(_columnChooserListBox);
         }
@@ -1151,7 +1209,7 @@ namespace PosBranch_Win.Reports.SalesReports
 
             foreach (UltraGridColumn col in grid.DisplayLayout.Bands[0].Columns)
             {
-                if (col.Hidden)
+                if (col.Hidden && col.ExcludeFromColumnChooser != ExcludeFromColumnChooser.True)
                 {
                     string displayText = !string.IsNullOrEmpty(col.Header.Caption) ? col.Header.Caption : col.Key;
                     _columnChooserListBox.Items.Add(new ColumnItem(col.Key, displayText, grid.Name));
@@ -1258,6 +1316,16 @@ namespace PosBranch_Win.Reports.SalesReports
             _savedColumnWidths[grid.Name + "|" + column.Key] = column.Width;
             grid.SuspendLayout();
             column.Hidden = true;
+            if (grid == gridSummary)
+            {
+                _summaryHiddenColumnKeys.Add(column.Key);
+                ReportGridLayoutHelper.SaveLayout("SalesmanIncentiveReport_Summary", gridSummary, _summaryHiddenColumnKeys);
+            }
+            else if (grid == gridDetails)
+            {
+                _detailHiddenColumnKeys.Add(column.Key);
+                ReportGridLayoutHelper.SaveLayout("SalesmanIncentiveReport_Details", gridDetails, _detailHiddenColumnKeys);
+            }
             foreach (UltraGridColumn col in grid.DisplayLayout.Bands[0].Columns)
             {
                 string widthKey = grid.Name + "|" + col.Key;
@@ -1320,6 +1388,16 @@ namespace PosBranch_Win.Reports.SalesReports
             if (grid == null) return;
 
             column.Hidden = true;
+            if (grid == gridSummary)
+            {
+                _summaryHiddenColumnKeys.Add(column.Key);
+                ReportGridLayoutHelper.SaveLayout("SalesmanIncentiveReport_Summary", gridSummary, _summaryHiddenColumnKeys);
+            }
+            else if (grid == gridDetails)
+            {
+                _detailHiddenColumnKeys.Add(column.Key);
+                ReportGridLayoutHelper.SaveLayout("SalesmanIncentiveReport_Details", gridDetails, _detailHiddenColumnKeys);
+            }
             PopulateColumnChooserListBox(grid);
         }
 
@@ -1338,6 +1416,16 @@ namespace PosBranch_Win.Reports.SalesReports
             {
                 UltraGridColumn column = grid.DisplayLayout.Bands[0].Columns[item.ColumnKey];
                 column.Hidden = false;
+                if (grid == gridSummary)
+                {
+                    _summaryHiddenColumnKeys.Remove(item.ColumnKey);
+                    ReportGridLayoutHelper.SaveLayout("SalesmanIncentiveReport_Summary", gridSummary, _summaryHiddenColumnKeys);
+                }
+                else if (grid == gridDetails)
+                {
+                    _detailHiddenColumnKeys.Remove(item.ColumnKey);
+                    ReportGridLayoutHelper.SaveLayout("SalesmanIncentiveReport_Details", gridDetails, _detailHiddenColumnKeys);
+                }
                 string widthKey = grid.Name + "|" + item.ColumnKey;
                 if (_savedColumnWidths.ContainsKey(widthKey))
                 {
