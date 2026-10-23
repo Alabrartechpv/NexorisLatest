@@ -1130,6 +1130,29 @@ namespace PosBranch_Win.Accounts
                 return false;
             }
 
+            // Validate cash-in-hand balance when paying via Cash
+            int paymentMethodId = CmboPayment.Value != null ? Convert.ToInt32(CmboPayment.Value) : 0;
+            string paymentMethodName = (CmboPayment.Text ?? "").Trim();
+            if (paymentRepo.IsCashPaymentMethod(paymentMethodId, paymentMethodName))
+            {
+                double availableCash = paymentRepo.GetAvailableCashBalance(GetBranchId());
+                if ((double)totalPaymentAmount > availableCash)
+                {
+                    double shortfall = (double)totalPaymentAmount - availableCash;
+                    MessageBox.Show(
+                        $"Insufficient CASH-IN-HAND balance!\n\n" +
+                        $"Current Cash-In-Hand Balance: {availableCash:N2}\n" +
+                        $"Payment Amount: {totalPaymentAmount:N2}\n" +
+                        $"Shortfall: {shortfall:N2}\n\n" +
+                        "Transaction cannot be completed with Cash because drawer cash cannot be negative.\n" +
+                        "Please record a Receipt first, or choose a Bank / Transfer payment method.",
+                        "Insufficient Cash Balance",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Warning);
+                    return false;
+                }
+            }
+
             var selectedRows = ultraGrid1.Rows.Where(row =>
                 row.Cells.Exists("Select") && row.Cells["Select"].Value != null && Convert.ToBoolean(row.Cells["Select"].Value)).ToList();
             if (!selectedRows.Any())

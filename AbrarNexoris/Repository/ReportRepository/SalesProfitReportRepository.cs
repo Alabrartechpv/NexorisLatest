@@ -191,7 +191,7 @@ WITH CleanGroup AS (
 SELECT 
     lm.LedgerName,
     ag.GroupName,
-    ISNULL(SUM(v.Debit), 0) AS Amount
+    ISNULL(SUM(v.Debit) - SUM(v.Credit), 0) AS Amount
 FROM Vouchers v
 INNER JOIN LedgerMaster lm ON lm.LedgerID = v.LedgerID
 INNER JOIN CleanGroup ag ON ag.GroupID = lm.GroupID
@@ -200,7 +200,7 @@ WHERE (ag.GroupID IN (10, 12) OR ag.GroupName LIKE '%Expense%')
   AND (@BranchId = 0 OR v.BranchID = @BranchId)
   AND ISNULL(v.CancelFlag, 0) = 0
 GROUP BY lm.LedgerName, ag.GroupName
-HAVING ISNULL(SUM(v.Debit), 0) <> 0
+HAVING ISNULL(SUM(v.Debit) - SUM(v.Credit), 0) <> 0
 ORDER BY ag.GroupName, lm.LedgerName;";
 
                 using (SqlCommand cmd = new SqlCommand(sql, (SqlConnection)DataConnection))

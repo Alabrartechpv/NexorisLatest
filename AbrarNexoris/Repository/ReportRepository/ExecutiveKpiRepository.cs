@@ -455,13 +455,11 @@ namespace Repository.ReportRepository
                     if (expenseSummaries != null)
                     {
                         decimal direct = expenseSummaries
-                            .Where(x => string.Equals(x.ExpenseType, "Direct Expense", StringComparison.OrdinalIgnoreCase) ||
-                                        (x.ExpenseType != null && x.ExpenseType.IndexOf("Direct", StringComparison.OrdinalIgnoreCase) >= 0 && x.ExpenseType.IndexOf("Indirect", StringComparison.OrdinalIgnoreCase) < 0))
+                            .Where(x => string.Equals(x.ExpenseType, "Direct Expense", StringComparison.OrdinalIgnoreCase))
                             .Sum(x => x.NetAmount);
 
                         decimal indirect = expenseSummaries
-                            .Where(x => string.Equals(x.ExpenseType, "Indirect Expense", StringComparison.OrdinalIgnoreCase) ||
-                                        (x.ExpenseType != null && x.ExpenseType.IndexOf("Indirect", StringComparison.OrdinalIgnoreCase) >= 0))
+                            .Where(x => string.Equals(x.ExpenseType, "Indirect Expense", StringComparison.OrdinalIgnoreCase))
                             .Sum(x => x.NetAmount);
 
                         model.DirectExpenses = direct;
@@ -603,9 +601,10 @@ namespace Repository.ReportRepository
                     if (plReport.TradingItems != null)
                     {
                         var directItems = plReport.TradingItems
-                            .Where(x => string.Equals(x.Category, "Expenses", StringComparison.OrdinalIgnoreCase) ||
-                                        (x.GroupName != null && x.GroupName.IndexOf("Direct", StringComparison.OrdinalIgnoreCase) >= 0) ||
-                                        (x.GroupName != null && x.GroupName.IndexOf("Expense", StringComparison.OrdinalIgnoreCase) >= 0 && x.GroupName.IndexOf("Indirect", StringComparison.OrdinalIgnoreCase) < 0));
+                            .Where(x => string.Equals(x.Category, "Direct Expense", StringComparison.OrdinalIgnoreCase) ||
+                                        (string.Equals(x.Category, "Expenses", StringComparison.OrdinalIgnoreCase) && (x.GroupName == null || x.GroupName.IndexOf("Income", StringComparison.OrdinalIgnoreCase) < 0)) ||
+                                        (x.GroupName != null && x.GroupName.IndexOf("Direct Expense", StringComparison.OrdinalIgnoreCase) >= 0) ||
+                                        (x.GroupName != null && x.GroupName.IndexOf("Expense", StringComparison.OrdinalIgnoreCase) >= 0 && x.GroupName.IndexOf("Indirect", StringComparison.OrdinalIgnoreCase) < 0 && x.GroupName.IndexOf("Income", StringComparison.OrdinalIgnoreCase) < 0));
 
                         foreach (var item in directItems)
                         {
@@ -633,9 +632,10 @@ namespace Repository.ReportRepository
                     if (plReport.ProfitLossItems != null)
                     {
                         var indirectItems = plReport.ProfitLossItems
-                            .Where(x => string.Equals(x.Category, "Expenses", StringComparison.OrdinalIgnoreCase) ||
-                                        (x.GroupName != null && x.GroupName.IndexOf("Indirect", StringComparison.OrdinalIgnoreCase) >= 0) ||
-                                        (x.GroupName != null && x.GroupName.IndexOf("Expense", StringComparison.OrdinalIgnoreCase) >= 0));
+                            .Where(x => string.Equals(x.Category, "Indirect Expense", StringComparison.OrdinalIgnoreCase) ||
+                                        (string.Equals(x.Category, "Expenses", StringComparison.OrdinalIgnoreCase) && (x.GroupName == null || x.GroupName.IndexOf("Income", StringComparison.OrdinalIgnoreCase) < 0)) ||
+                                        (x.GroupName != null && x.GroupName.IndexOf("Indirect Expense", StringComparison.OrdinalIgnoreCase) >= 0) ||
+                                        (x.GroupName != null && x.GroupName.IndexOf("Expense", StringComparison.OrdinalIgnoreCase) >= 0 && x.GroupName.IndexOf("Income", StringComparison.OrdinalIgnoreCase) < 0));
 
                         foreach (var item in indirectItems)
                         {

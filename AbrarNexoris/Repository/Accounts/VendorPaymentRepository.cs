@@ -31,6 +31,7 @@ namespace Repository.Accounts
                 SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_VendorPyamentInfo, (SqlConnection)DataConnection);
                 cmd.CommandType = CommandType.StoredProcedure;
                 cmd.Parameters.AddWithValue("@LedgerId", LedgerId);
+                cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId > 0 ? SessionContext.BranchId : 1);
 
                 SqlDataAdapter adapt = new SqlDataAdapter(cmd);
                 DataSet ds = new DataSet();
@@ -305,6 +306,18 @@ namespace Repository.Accounts
                 throw new InvalidOperationException("Payment amount must be greater than zero.");
             }
 
+            int paymentMethodId = GetPaymentMethodId(master);
+            if (IsCashPaymentMethod(paymentMethodId, master.PaymentMethod))
+            {
+                int branchId = master.BranchId > 0 ? master.BranchId : SessionContext.BranchId;
+                double availableCash = GetAvailableCashBalance(branchId);
+                if ((double)master.TotalPaymentAmount > availableCash)
+                {
+                    throw new InvalidOperationException(
+                        $"Insufficient Cash-In-Hand balance! Available cash is {availableCash:N2}, but payment amount is {master.TotalPaymentAmount:N2}. Cash balance cannot be negative.");
+                }
+            }
+
             decimal detailTotal = Math.Round(details.Where(d => d != null).Sum(d => d.AdjustedAmount), 2);
             decimal paymentTotal = Math.Round(master.TotalPaymentAmount, 2);
             if (detailTotal != paymentTotal)
@@ -565,6 +578,7 @@ namespace Repository.Accounts
                     {
                         cmd.CommandType = CommandType.StoredProcedure;
                         cmd.Parameters.AddWithValue("@LedgerId", vendorLedgerId);
+                        cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId > 0 ? SessionContext.BranchId : 1);
 
                         using (SqlDataAdapter da = new SqlDataAdapter(cmd))
                         {
@@ -1734,6 +1748,88 @@ namespace Repository.Accounts
             finally
             {
                 if (DataConnection.State == ConnectionState.Open)
+                    DataConnection.Close();
+            }
+        }
+
+        /// <summary>
+        /// Returns the current CASH-IN-HAND balance (Debit - Credit) for the given branch.
+        /// </summary>
+        public double GetAvailableCashBalance(int branchId)
+        {
+            bool wasClosed = DataConnection.State == ConnectionState.Closed;
+            try
+            {
+                if (wasClosed) DataConnection.Open();
+                string query = @"
+                    SELECT ISNULL(SUM(ISNULL(v.Debit, 0)) - SUM(ISNULL(v.Credit, 0)), 0)
+                    FROM Vouchers v
+                    LEFT JOIN LedgerMaster lm ON v.LedgerID = lm.LedgerId
+                    WHERE v.BranchID = @BranchId
+                      AND ISNULL(v.CancelFlag, 0) = 0
+                      AND (v.GroupID = 14 OR lm.AccountGroupID = 14
+                           OR v.LedgerName = 'CASH' OR lm.LedgerName = 'CASH');";
+
+                using (SqlCommand cmd = new SqlCommand(query, (SqlConnection)DataConnection))
+                {
+                    cmd.Parameters.AddWithValue("@BranchId", branchId);
+                    object res = cmd.ExecuteScalar();
+                    if (res != null && res != DBNull.Value)
+                    {
+                        return Convert.ToDouble(res);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"VendorPaymentRepository.GetAvailableCashBalance error: {ex.Message}");
+            }
+            finally
+            {
+                if (wasClosed && DataConnection.State == ConnectionState.Open)
+                    DataConnection.Close();
+            }
+            return 0;
+        }
+
+        /// <summary>
+        /// Checks whether a given payment method corresponds to Cash.
+        /// </summary>
+        public bool IsCashPaymentMethod(int paymentMethodId, string paymentMethodName)
+        {
+            string name = (paymentMethodName ?? "").Trim();
+            if (name.Equals("Cash", StringComparison.OrdinalIgnoreCase) || name.ToLower().Contains("cash"))
+                return true;
+
+            if (paymentMethodId <= 0)
+                return false;
+
+            bool wasClosed = DataConnection.State == ConnectionState.Closed;
+            try
+            {
+                if (wasClosed) DataConnection.Open();
+                string query = @"
+                    SELECT COUNT(1)
+                    FROM PayMode pm
+                    LEFT JOIN LedgerMaster lm ON pm.LedgerID = lm.LedgerId
+                    WHERE pm.PayModeID = @PayModeId
+                      AND (pm.PayModeName LIKE '%CASH%' OR lm.AccountGroupID = 14 OR lm.LedgerName LIKE '%CASH%');";
+
+                using (SqlCommand cmd = new SqlCommand(query, (SqlConnection)DataConnection))
+                {
+                    cmd.Parameters.AddWithValue("@PayModeId", paymentMethodId);
+                    int count = Convert.ToInt32(cmd.ExecuteScalar());
+                    return count > 0;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"VendorPaymentRepository.IsCashPaymentMethod error: {ex.Message}");
+                return false;
+            }
+            finally
+            {
+                if (wasClosed && DataConnection.State == ConnectionState.Open)
                     DataConnection.Close();
             }
         }
