@@ -1912,12 +1912,15 @@ namespace Repository.TransactionRepository
                     cashLedgerId = objLedgerRepository.GetLedgerId("CASH", (int)AccountGroup.CASH_IN_HAND, branchId);
 
                 string query = @"
-                    SELECT ISNULL(SUM(ISNULL(Debit,0)) - SUM(ISNULL(Credit,0)), 0)
-                    FROM Vouchers
-                    WHERE BranchID = @BranchId
-                      AND ISNULL(CancelFlag,0) = 0
-                      AND (GroupID = @GroupId OR LedgerID = @LedgerId
-                           OR LedgerName = @LedgerName OR LedgerName = 'CASH')";
+                    SELECT ISNULL(SUM(ISNULL(v.Debit,0)) - SUM(ISNULL(v.Credit,0)), 0)
+                    FROM Vouchers v
+                    LEFT JOIN LedgerMaster lm ON v.LedgerID = lm.LedgerId
+                    WHERE v.BranchID = @BranchId
+                      AND ISNULL(v.CancelFlag,0) = 0
+                      AND (v.GroupID = @GroupId OR v.LedgerID = @LedgerId
+                           OR lm.AccountGroupID = @GroupId
+                           OR v.LedgerName = @LedgerName OR v.LedgerName = 'CASH'
+                           OR lm.LedgerName = @LedgerName OR lm.LedgerName = 'CASH')";
 
                 var p = new { BranchId = branchId, GroupId = (int)AccountGroup.CASH_IN_HAND,
                               LedgerId = cashLedgerId, LedgerName = DefaultLedgers.CASH };

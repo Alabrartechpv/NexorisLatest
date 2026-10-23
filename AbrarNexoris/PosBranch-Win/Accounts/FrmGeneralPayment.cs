@@ -149,6 +149,32 @@ namespace PosBranch_Win.Accounts
             return false;
         }
 
+        private bool IsCashLedger(long ledgerId)
+        {
+            if (ledgerId <= 0) return false;
+            var table = cashBankTable ?? ledgerTable;
+            if (table != null)
+            {
+                var row = table.AsEnumerable().FirstOrDefault(r => GetLongValue(r["LedgerID"]) == ledgerId);
+                if (row != null)
+                {
+                    if (row.Table.Columns.Contains("GroupID") && row["GroupID"] != DBNull.Value)
+                    {
+                        if (int.TryParse(row["GroupID"].ToString(), out int gid) && gid == (int)AccountGroup.CASH_IN_HAND)
+                            return true;
+                    }
+                    string groupName = (Convert.ToString(row["GroupName"]) ?? string.Empty).ToUpperInvariant();
+                    string ledgerName = (Convert.ToString(row["LedgerName"]) ?? string.Empty).ToUpperInvariant();
+                    if ((groupName.Contains("CASH") || ledgerName.Contains("CASH")) &&
+                        !ledgerName.Contains("DISCOUNT") && !ledgerName.Contains("EXCESS") && !ledgerName.Contains("SHORT"))
+                    {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
         private void EnsureCashBankLedgerPresent(long ledgerId)
         {
             if (ledgerId <= 0 || cashBankTable == null || ledgerTable == null) return;
@@ -1024,15 +1050,32 @@ namespace PosBranch_Win.Accounts
                 return false;
             }
 
-            // Negative cash balance warning
+            // Cash / Bank balance validation
             decimal availableCash = GetCashBankCurrentBalance(cashBankId);
-            if (availableCash <= 0 || totalAmount > availableCash)
+            bool isCash = IsCashLedger(cashBankId);
+
+            if (isCash && (availableCash <= 0 || totalAmount > availableCash))
+            {
+                decimal shortfall = totalAmount - availableCash;
+                MessageBox.Show(
+                    $"Insufficient CASH-IN-HAND balance!\n\n" +
+                    $"Current Cash-In-Hand Balance: ₹ {availableCash:N2}\n" +
+                    $"Payment Amount: ₹ {totalAmount:N2}\n" +
+                    $"Shortfall: ₹ {shortfall:N2}\n\n" +
+                    "Transaction cannot be completed with Cash because drawer cash cannot be negative.\n" +
+                    "Please record a Receipt first, or select a Bank account.",
+                    "Insufficient Cash Balance",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Warning);
+                return false;
+            }
+            else if (!isCash && (availableCash <= 0 || totalAmount > availableCash))
             {
                 string warnMsg = availableCash <= 0
-                    ? $"The selected Cash/Bank account currently has zero or negative balance (₹ {availableCash:N2}).\n\nSaving this voucher of ₹ {totalAmount:N2} will result in negative cash.\n\nDo you want to proceed anyway?"
-                    : $"The payment amount (₹ {totalAmount:N2}) exceeds the available cash balance (₹ {availableCash:N2}).\n\nRemaining balance will be negative (₹ {availableCash - totalAmount:N2}).\n\nDo you want to proceed anyway?";
+                    ? $"The selected Bank account currently has zero or negative balance (₹ {availableCash:N2}).\n\nSaving this voucher of ₹ {totalAmount:N2} will result in negative balance.\n\nDo you want to proceed anyway?"
+                    : $"The payment amount (₹ {totalAmount:N2}) exceeds the available bank balance (₹ {availableCash:N2}).\n\nRemaining balance will be negative (₹ {availableCash - totalAmount:N2}).\n\nDo you want to proceed anyway?";
 
-                DialogResult warnResult = MessageBox.Show(warnMsg, "Negative Cash Warning", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
+                DialogResult warnResult = MessageBox.Show(warnMsg, "Negative Bank Balance Warning", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
                 if (warnResult != DialogResult.Yes)
                 {
                     return false;
