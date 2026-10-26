@@ -830,9 +830,10 @@ namespace PosBranch_Win.Reports.FinancialReports
                     if (dialog.ShowDialog() == DialogResult.OK)
                     {
                         Cursor.Current = Cursors.WaitCursor;
+                        if (ReportPdfExporter.CheckAndExportPdf(dialog, ultraGridTransactions, "Day Book Report", $"Period: {dtFromDate.DateTime:dd/MM/yyyy} to {dtToDate.DateTime:dd/MM/yyyy}")) return;
                         using (StreamWriter writer = new StreamWriter(dialog.FileName))
                         {
-                        if (ReportPdfExporter.CheckAndExportPdf(dialog, ultraGridDayBook, "Day Book Report", $"Period: {dtFromDate.DateTime:dd/MM/yyyy} to {dtToDate.DateTime:dd/MM/yyyy}")) return;
+
 
                             writer.WriteLine("Date,Voucher ID,Type,Particulars,Narration,Debit (Dr),Credit (Cr)");
 

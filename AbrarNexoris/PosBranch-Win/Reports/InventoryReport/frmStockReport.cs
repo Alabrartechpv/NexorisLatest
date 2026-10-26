@@ -2322,7 +2322,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                 if (dlg.ShowDialog(this) != DialogResult.OK) return;
 
                 StringBuilder sb = new StringBuilder();
-                if (ReportPdfExporter.CheckAndExportPdf(dlg, ultraGridStock, "Stock Report")) return;
+                if (ReportPdfExporter.CheckAndExportPdf(dlg, gridReport, "Stock Report")) return;
 
                 sb.AppendLine("Category,Group,Barcode,Description,Cost,Selling Price,UOM,Stock,Hold,Available,Stock Value,Future Sales Value");
                 foreach (StockReportItem row in exportList)

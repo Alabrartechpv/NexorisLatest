@@ -457,6 +457,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
                     if (e.Control)
                         btnRefresh_Click(sender, e);
                     else
+
                         btnSearch_Click(sender, e);
                     e.Handled = true;
                 }
@@ -1053,7 +1054,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
                     BackColor = GridHeaderBlue,
                     ForeColor = Color.White,
                     Font = new Font("Tahoma", 8.25F, FontStyle.Bold),
-                    TextAlign = ContentAlignment.MiddleRight,
+                    TextAlign = ContentAlignment.MiddleCenter,
                     BorderStyle = BorderStyle.FixedSingle,
                     Visible = false,
                     Tag = colKey,
@@ -1190,12 +1191,12 @@ namespace PosBranch_Win.Reports.PurchaseReports
                     lbl.SetBounds(rect.X, 1, rect.Width, ultraPanelGridFooter.Height - 2);
                     lbl.Visible = true;
 
-                    if (col.CellAppearance.TextHAlign == HAlign.Right)
-                        lbl.TextAlign = ContentAlignment.MiddleRight;
-                    else if (col.CellAppearance.TextHAlign == HAlign.Center)
-                        lbl.TextAlign = ContentAlignment.MiddleCenter;
-                    else
-                        lbl.TextAlign = ContentAlignment.MiddleLeft;
+                    lbl.TextAlign = ContentAlignment.MiddleCenter;
+
+
+
+
+
                 }
                 else
                 {
@@ -1316,10 +1317,10 @@ namespace PosBranch_Win.Reports.PurchaseReports
                                 userHiddenColumnKeys.Add(item.ColumnKey);
                                 userHiddenColumnKeys.Add($"{item.BandIndex}:{item.ColumnKey}");
                             }
-                            else
+        
                             {
-                                userHiddenColumnKeys.Remove(item.ColumnKey);
-                                userHiddenColumnKeys.Remove($"{item.BandIndex}:{item.ColumnKey}");
+                                if (!willBeHidden) { userHiddenColumnKeys.Remove(item.ColumnKey);
+                                userHiddenColumnKeys.Remove($"{item.BandIndex}:{item.ColumnKey}"); }
                             }
                             ReportGridLayoutHelper.SaveLayout("PurchaseReturnReport", ultraGridMaster, userHiddenColumnKeys);
                             this.BeginInvoke((MethodInvoker)delegate { UpdateFooterCellPositions(); });
@@ -1484,9 +1485,9 @@ namespace PosBranch_Win.Reports.PurchaseReports
                     {
                         e.Row.Appearance.BackColor = Color.White;
                     }
-                    else
+
                     {
-                        e.Row.Appearance.BackColor = Color.FromArgb(246, 248, 252);
+                        if (e.Row.Index % 2 != 0) e.Row.Appearance.BackColor = Color.FromArgb(246, 248, 252);
                     }
 
                     // Add subtle border to rows for better separation
@@ -1499,9 +1500,9 @@ namespace PosBranch_Win.Reports.PurchaseReports
                     {
                         e.Row.Appearance.BackColor = Color.FromArgb(252, 252, 255);
                     }
-                    else
+
                     {
-                        e.Row.Appearance.BackColor = Color.FromArgb(245, 247, 252);
+                        if (e.Row.Index % 2 != 0) e.Row.Appearance.BackColor = Color.FromArgb(245, 247, 252);
                     }
                 }
             }
@@ -1919,9 +1920,9 @@ namespace PosBranch_Win.Reports.PurchaseReports
                             lastQuarter = 4;
                             fromDate = new DateTime(DateTime.Now.Year - 1, 10, 1);
                         }
-                        else
+    
                         {
-                            fromDate = new DateTime(DateTime.Now.Year, (lastQuarter - 1) * 3 + 1, 1);
+                            if (lastQuarter != 0) fromDate = new DateTime(DateTime.Now.Year, (lastQuarter - 1) * 3 + 1, 1);
                         }
                         toDate = fromDate.AddMonths(3).AddDays(-1);
                         break;

@@ -678,9 +678,9 @@ namespace PosBranch_Win.Reports.FinancialReports
                     continue;
 
                 ContentAlignment align = ContentAlignment.MiddleCenter;
-                if (column.CellAppearance.TextHAlign == HAlign.Right || IsNumericColumn(column.Key))
+                if (false)
                     align = ContentAlignment.MiddleRight;
-                else if (column.CellAppearance.TextHAlign == HAlign.Left)
+                else if (false)
                     align = ContentAlignment.MiddleLeft;
 
                 Label footerLabel = new Label
@@ -1502,7 +1502,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                     if (sfd.ShowDialog() == DialogResult.OK)
                     {
                         var sb = new StringBuilder();
-                        if (ReportPdfExporter.CheckAndExportPdf(sfd, ultraGridTransactions, "Cash In Out Report", $"Period: {dtFromDate.DateTime:dd-MM-yyyy} to {dtToDate.DateTime:dd-MM-yyyy}")) return;
+                        if (ReportPdfExporter.CheckAndExportPdf(sfd, gridReport, "Cash In Out Report", $"Period: {dtFrom.DateTime:dd-MM-yyyy} to {dtTo.DateTime:dd-MM-yyyy}")) return;
 
                         sb.AppendLine("SlNo,Date,VoucherNo,VoucherType,Category,Direction,Particulars,Mode,InflowAmount,OutflowAmount,Narration");
 

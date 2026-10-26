@@ -720,11 +720,11 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 if (column.Hidden || column.IsChaptered)
                     continue;
 
-                ContentAlignment align = ContentAlignment.MiddleLeft;
-                if (column.CellAppearance.TextHAlign == HAlign.Right || IsSummableColumn(column))
-                    align = ContentAlignment.MiddleRight;
-                else if (column.CellAppearance.TextHAlign == HAlign.Center)
-                    align = ContentAlignment.MiddleCenter;
+                ContentAlignment align = ContentAlignment.MiddleCenter;
+                // if (column.CellAppearance.TextHAlign == HAlign.Right || IsSummableColumn(column))
+                //     align = ContentAlignment.MiddleRight;
+                // else if (column.CellAppearance.TextHAlign == HAlign.Center)
+                //     align = ContentAlignment.MiddleCenter;
 
                 Label footerLabel = new Label
                 {

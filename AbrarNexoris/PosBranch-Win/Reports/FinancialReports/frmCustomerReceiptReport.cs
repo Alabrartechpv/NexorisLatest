@@ -550,11 +550,11 @@ namespace PosBranch_Win.Reports.FinancialReports
                 if (column.Hidden)
                     continue;
 
-                ContentAlignment align = ContentAlignment.MiddleLeft;
-                if (column.CellAppearance.TextHAlign == HAlign.Right || IsSummableColumn(column))
-                    align = ContentAlignment.MiddleRight;
-                else if (column.CellAppearance.TextHAlign == HAlign.Center)
-                    align = ContentAlignment.MiddleCenter;
+                ContentAlignment align = ContentAlignment.MiddleCenter;
+                // align middle
+
+
+
 
                 Label footerLabel = new Label
                 {
@@ -1437,7 +1437,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                     return;
 
                 StringBuilder builder = new StringBuilder();
-                if (ReportPdfExporter.CheckAndExportPdf(dialog, ultraGridReport, "Customer Receipt Report")) return;
+                if (ReportPdfExporter.CheckAndExportPdf(dialog, gridReport, "Customer Receipt Report")) return;
 
                 builder.AppendLine("Date,Receipt No,Bill No,Customer ID,Customer,Total Amount,Receipt Amount,Balance,Status");
 

@@ -600,11 +600,11 @@ namespace PosBranch_Win.Reports.SalesReports
                 {
                     Name = $"lblSummary_{col.Key}",
                     AutoSize = false,
-                    TextAlign = ContentAlignment.MiddleRight,
+                    TextAlign = ContentAlignment.MiddleCenter,
                     ForeColor = Color.White,
                     BackColor = Color.Transparent,
                     Font = new Font("Segoe UI", 8.5F, FontStyle.Bold),
-                    Padding = new Padding(0, 0, 4, 0),
+                    Padding = new Padding(0),
                     Height = ultraPanelGridFooter.Height - 6,
                     ContextMenuStrip = CreateFooterLabelMenu(col.Key)
                 };

@@ -717,8 +717,8 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 if (column.Hidden || column.IsChaptered)
                     continue;
 
-                ContentAlignment align = ContentAlignment.MiddleLeft;
-                if (column.CellAppearance.TextHAlign == HAlign.Right || IsSummableColumn(column))
+                ContentAlignment align = ContentAlignment.MiddleCenter;
+                if (false && (column.CellAppearance.TextHAlign == HAlign.Right || IsSummableColumn(column)))
                     align = ContentAlignment.MiddleRight;
                 else if (column.CellAppearance.TextHAlign == HAlign.Center)
                     align = ContentAlignment.MiddleCenter;

@@ -673,9 +673,9 @@ namespace PosBranch_Win.Reports.SalesReports
                 {
                     Name = "footer_" + column.Key,
                     Text = string.Empty,
-                    TextAlign = (column.CellAppearance.TextHAlign == HAlign.Right || IsNumericColumn(column))
-                        ? ContentAlignment.MiddleRight
-                        : ContentAlignment.MiddleCenter,
+                    TextAlign = ContentAlignment.MiddleCenter,
+
+
                     BackColor = GridHeaderBlue,
                     BorderStyle = BorderStyle.None,
                     AutoSize = false,

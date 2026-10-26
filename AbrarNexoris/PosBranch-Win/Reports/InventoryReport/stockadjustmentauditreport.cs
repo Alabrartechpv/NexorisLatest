@@ -713,11 +713,11 @@ namespace PosBranch_Win.Reports.InventoryReport
                 if (column.Hidden || column.IsChaptered)
                     continue;
 
-                ContentAlignment align = ContentAlignment.MiddleLeft;
-                if (column.CellAppearance.TextHAlign == HAlign.Right || IsSummableColumn(column))
-                    align = ContentAlignment.MiddleRight;
-                else if (column.CellAppearance.TextHAlign == HAlign.Center)
-                    align = ContentAlignment.MiddleCenter;
+                ContentAlignment align = ContentAlignment.MiddleCenter;
+                // align middle
+
+
+
 
                 Label footerLabel = new Label
                 {

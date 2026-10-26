@@ -371,7 +371,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                     return;
 
                 StringBuilder builder = new StringBuilder();
-                if (ReportPdfExporter.CheckAndExportPdf(dialog, ultraGridReport, "Combined Party Balance Report")) return;
+                if (ReportPdfExporter.CheckAndExportPdf(dialog, _gridReport, "Combined Party Balance Report")) return;
 
                 builder.AppendLine("Party Type,Party Name,Old Balance,Current Outstanding,Net Total,Old Rows,Current Rows,Last Old,Last Current,Status");
 

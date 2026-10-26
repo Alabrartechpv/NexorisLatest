@@ -853,7 +853,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                     dialog.FileName = $"Govt_GST_Return_Report_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
                     if (dialog.ShowDialog() == DialogResult.OK)
                     {
-                        if (ReportPdfExporter.CheckAndExportPdf(dialog, ultraGridReport, "Govt GST Return Report")) return;
+                        if (ReportPdfExporter.CheckAndExportPdf(dialog, gridReport, "Govt GST Return Report")) return;
                         MessageBox.Show("Export process initialized.", "Export", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                 }

@@ -831,7 +831,7 @@ namespace PosBranch_Win.Reports.SalesReports
                     {
                         AutoSize = false,
                         Height = 22,
-                        TextAlign = ContentAlignment.MiddleRight,
+                        TextAlign = ContentAlignment.MiddleCenter,
                         Font = new Font("Tahoma", 9f, FontStyle.Bold),
                         ForeColor = Color.White,
                         BackColor = Color.Transparent,

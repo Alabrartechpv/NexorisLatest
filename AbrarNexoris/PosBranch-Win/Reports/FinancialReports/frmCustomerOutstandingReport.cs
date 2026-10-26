@@ -767,10 +767,10 @@ namespace PosBranch_Win.Reports.FinancialReports
                     continue;
 
                 ContentAlignment align = ContentAlignment.MiddleCenter;
-                if (column.CellAppearance.TextHAlign == HAlign.Right)
-                    align = ContentAlignment.MiddleRight;
-                else if (column.CellAppearance.TextHAlign == HAlign.Left)
-                    align = ContentAlignment.MiddleLeft;
+                // align middle
+
+
+
 
                 Label footerLabel = new Label
                 {
@@ -1483,7 +1483,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                 try
                 {
                     StringBuilder sb = new StringBuilder();
-                    if (ReportPdfExporter.CheckAndExportPdf(dialog, ultraGridReport, "Customer Outstanding Report")) return;
+                    if (ReportPdfExporter.CheckAndExportPdf(dialog, gridReport, "Customer Outstanding Report")) return;
 
                     sb.AppendLine("Cust ID,Customer Name,Salesperson,Bill No,Date,Due Date,Invoice Amount,Received Amount,Balance");
 

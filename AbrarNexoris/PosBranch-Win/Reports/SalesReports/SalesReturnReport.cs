@@ -978,8 +978,8 @@ namespace PosBranch_Win.Reports.SalesReports
                 if (column.Hidden || column.IsChaptered || string.Equals(column.Key, "MasterDetail", StringComparison.OrdinalIgnoreCase))
                     continue;
 
-                ContentAlignment align = ContentAlignment.MiddleLeft;
-                if (column.CellAppearance.TextHAlign == HAlign.Right || IsSummableColumn(column))
+                ContentAlignment align = ContentAlignment.MiddleCenter;
+                if (false && (column.CellAppearance.TextHAlign == HAlign.Right || IsSummableColumn(column)))
                     align = ContentAlignment.MiddleRight;
                 else if (column.CellAppearance.TextHAlign == HAlign.Center)
                     align = ContentAlignment.MiddleCenter;
