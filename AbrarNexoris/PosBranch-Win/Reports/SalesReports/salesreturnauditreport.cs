@@ -89,6 +89,7 @@ namespace PosBranch_Win.Reports.SalesReports
         private Point headerDragStartPoint;
         private readonly System.Windows.Forms.ToolTip headerToolTip = new System.Windows.Forms.ToolTip();
         private static readonly Cursor blackXCursor = CreateBlackXCursor();
+        private ReportColumnFilterManager _filterManager;
         #endregion
 
         #region Helper Classes
@@ -169,6 +170,7 @@ namespace PosBranch_Win.Reports.SalesReports
             gridReport.AfterColPosChanged += (s, e) =>
             {
                 CreateFooterCells();
+            _filterManager?.UpdateHeaderFilterIcons();
                 UpdateFooterCellPositions();
                 UpdateFooterValues();
                 ReportGridLayoutHelper.SaveLayout("SalesReturnAuditReport", gridReport, userHiddenColumnKeys);
@@ -232,6 +234,7 @@ namespace PosBranch_Win.Reports.SalesReports
                 LoadCustomers();
                 InitializeGridFooter();
                 SetupHeaderDragToHideAndColumnChooser();
+                _filterManager = new ReportColumnFilterManager(gridReport, () => { UpdateFooterCellPositions(); UpdateFooterValues(); });
             }
             finally
             {
@@ -704,6 +707,7 @@ namespace PosBranch_Win.Reports.SalesReports
             }
 
             CreateFooterCells();
+            _filterManager?.UpdateHeaderFilterIcons();
             UpdateFooterCellPositions();
             UpdateFooterValues();
         }
@@ -984,7 +988,7 @@ namespace PosBranch_Win.Reports.SalesReports
 
             foreach (UltraGridRow row in gridReport.Rows)
             {
-                if (row.IsFilteredOut || !row.IsDataRow)
+                if (row.IsFilteredOut || !row.IsDataRow || row.Hidden)
                     continue;
 
                 yield return row;
@@ -1041,6 +1045,7 @@ namespace PosBranch_Win.Reports.SalesReports
                 return;
             }
 
+            if (e.Button == MouseButtons.Left && _filterManager != null && _filterManager.HandleMouseDown(e)) { isDraggingHeaderToHide = false; columnBeingDragged = null; return; }
             if (e.Button == MouseButtons.Left)
             {
                 UIElement element = gridReport.DisplayLayout.UIElement.ElementFromPoint(e.Location);
@@ -1059,6 +1064,7 @@ namespace PosBranch_Win.Reports.SalesReports
 
         private void GridReport_MouseMove(object sender, MouseEventArgs e)
         {
+            if (!isDraggingHeaderToHide && _filterManager != null && _filterManager.HandleMouseMove(e, headerToolTip)) return;
             if (columnBeingDragged != null && e.Button == MouseButtons.Left)
             {
                 int dy = Math.Abs(e.Y - headerDragStartPoint.Y);
@@ -1108,6 +1114,7 @@ namespace PosBranch_Win.Reports.SalesReports
             column.Hidden = true;
 
             CreateFooterCells();
+            _filterManager?.UpdateHeaderFilterIcons();
             UpdateFooterCellPositions();
             UpdateFooterValues();
             ReportGridLayoutHelper.SaveLayout("SalesReturnAuditReport", gridReport, userHiddenColumnKeys);
@@ -1142,7 +1149,7 @@ namespace PosBranch_Win.Reports.SalesReports
             }
         }
 
-        private void ShowHeaderContextMenu(UltraGridColumn column, Point location)
+        private void ShowHeaderContextMenu(UltraGridColumn column, Point location) { ContextMenuStrip menu = new ContextMenuStrip { Font = new Font("Segoe UI", 9F) }; _filterManager?.AddFilterContextMenuItems(menu, column, location); ToolStripMenuItem itemHide = new ToolStripMenuItem($"Hide Column '{column.Header.Caption}'"); itemHide.Click += (s, e) => HideColumnWithAnimation(column); menu.Items.Add(itemHide); ToolStripMenuItem itemChooser = new ToolStripMenuItem("Column Chooser..."); itemChooser.Click += (s, e) => ShowColumnChooser(autoOpenIfClosed: true); menu.Items.Add(itemChooser); ToolStripMenuItem itemRestoreAll = new ToolStripMenuItem("Restore All Columns"); itemRestoreAll.Click += (s, e) => UnhideAllColumns(); menu.Items.Add(itemRestoreAll); menu.Show(gridReport, location); } private void DummyContextMenu(UltraGridColumn column, Point location)
         {
             ContextMenuStrip menu = new ContextMenuStrip();
             ToolStripMenuItem itemHide = new ToolStripMenuItem($"Hide Column '{column.Header.Caption}'");
@@ -1392,6 +1399,7 @@ namespace PosBranch_Win.Reports.SalesReports
                     col.Header.VisiblePosition = targetPosition;
                 }
                 CreateFooterCells();
+            _filterManager?.UpdateHeaderFilterIcons();
                 UpdateFooterCellPositions();
                 UpdateFooterValues();
                 ReportGridLayoutHelper.SaveLayout("SalesReturnAuditReport", gridReport, userHiddenColumnKeys);
@@ -1416,6 +1424,7 @@ namespace PosBranch_Win.Reports.SalesReports
                 }
             }
             CreateFooterCells();
+            _filterManager?.UpdateHeaderFilterIcons();
             UpdateFooterCellPositions();
             UpdateFooterValues();
             ReportGridLayoutHelper.SaveLayout("SalesReturnAuditReport", gridReport, userHiddenColumnKeys);
@@ -1707,6 +1716,7 @@ namespace PosBranch_Win.Reports.SalesReports
 
             gridReport.DataSource = null;
             gridReport.DataMember = null;
+            _filterManager?.ClearFilters();
 
             if (_currentDataSet != null)
             {
@@ -1749,6 +1759,7 @@ namespace PosBranch_Win.Reports.SalesReports
             }
 
             CreateFooterCells();
+            _filterManager?.UpdateHeaderFilterIcons();
             UpdateFooterCellPositions();
             UpdateFooterValues();
             if (columnChooserForm != null && columnChooserForm.Visible)
@@ -2073,6 +2084,7 @@ namespace PosBranch_Win.Reports.SalesReports
             ReportGridLayoutHelper.ApplySavedLayout("SalesReturnAuditReport", gridReport, userHiddenColumnKeys);
 
             CreateFooterCells();
+            _filterManager?.UpdateHeaderFilterIcons();
             UpdateFooterCellPositions();
             UpdateFooterValues();
             if (columnChooserForm != null && columnChooserForm.Visible)

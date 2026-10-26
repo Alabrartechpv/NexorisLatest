@@ -10,6 +10,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
+using PosBranch_Win.Reports;
 
 namespace PosBranch_Win.Reports.FinancialReports
 {
@@ -35,6 +36,8 @@ namespace PosBranch_Win.Reports.FinancialReports
         // ── State ───────────────────────────────────────────────────
         private bool     _isLoading;
         private DateTime _lastRefreshed;
+        private ReportColumnFilterManager _filterManager;
+        private readonly System.Windows.Forms.ToolTip headerToolTip = new System.Windows.Forms.ToolTip();
 
         // ── Theme palette ────────────────────────────────────────────
         private static readonly Color FormBackColor        = Color.FromArgb(232, 246, 255);
@@ -78,6 +81,9 @@ namespace PosBranch_Win.Reports.FinancialReports
             txtSearch.TextChanged            += txtSearch_TextChanged;
             gridReport.InitializeLayout      += gridReport_InitializeLayout;
             gridReport.InitializeRow         += gridReport_InitializeRow;
+            gridReport.MouseDown += GridReport_MouseDown;
+            gridReport.MouseMove += GridReport_MouseMove;
+            _filterManager = new ReportColumnFilterManager(gridReport, () => UpdateSummaryCards());
 
             KeyPreview = true;
             KeyDown    += frmCustomerLedgerReport_KeyDown;
@@ -526,7 +532,9 @@ namespace PosBranch_Win.Reports.FinancialReports
             bindingList.AddRange(filteredList);
 
             _reportRows = bindingList;
+            _filterManager?.ClearFilters();
             gridReport.DataSource = _reportRows;
+            _filterManager?.UpdateHeaderFilterIcons();
             UpdateSummaryCards();
 
             string statusSuffix = _lastRefreshed == default
@@ -619,7 +627,9 @@ namespace PosBranch_Win.Reports.FinancialReports
                 txtSearch.Text        = string.Empty;
                 _allFetchedRows       = new List<CustomerLedgerReportRow>();
                 _reportRows           = new List<CustomerLedgerReportRow>();
+                _filterManager?.ClearFilters();
                 gridReport.DataSource = null;
+                _filterManager?.UpdateHeaderFilterIcons();
 
                 _openingBalance = 0; _totalDebit = 0; _totalCredit = 0; _closingBalance = 0;
                 InitializeDateControls();
@@ -655,7 +665,8 @@ namespace PosBranch_Win.Reports.FinancialReports
                     var sb = new StringBuilder();
                     sb.AppendLine("Date,Voucher No,Voucher Type,Particulars,Narration,Debit (Dr),Credit (Cr),Running Balance");
 
-                    foreach (var row in _reportRows)
+                    foreach (UltraGridRow gridRow in gridReport.Rows.GetFilteredInNonGroupByRows())
+                    if (gridRow != null && gridRow.IsDataRow && !gridRow.Hidden && gridRow.ListObject is CustomerLedgerReportRow row)
                     {
                         sb.AppendLine(string.Join(",",
                             CsvCell(row.VoucherDate.ToString("yyyy-MM-dd")),
@@ -778,6 +789,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             SetCol(band, "ReceiptAmount",  "Debit (Dr)",      115, "N2",         HAlign.Right,  5);
             SetCol(band, "PaymentAmount",  "Credit (Cr)",     115, "N2",         HAlign.Right,  6);
             SetCol(band, "RunningBalance", "Running Balance", 135, "N2",         HAlign.Right,  7);
+            _filterManager?.UpdateHeaderFilterIcons();
         }
 
         private static void SetCol(UltraGridBand band, string key, string caption,
@@ -791,6 +803,44 @@ namespace PosBranch_Win.Reports.FinancialReports
             col.CellAppearance.TextHAlign = align;
             if (!string.IsNullOrEmpty(fmt))
                 col.Format = fmt;
+        }
+
+        private void GridReport_MouseDown(object sender, MouseEventArgs e)
+        {
+            if (gridReport?.DisplayLayout == null) return;
+            UIElement element = gridReport.DisplayLayout.UIElement?.ElementFromPoint(e.Location);
+            HeaderUIElement headerUI = element as HeaderUIElement ?? element?.GetAncestor(typeof(HeaderUIElement)) as HeaderUIElement;
+
+            if (headerUI != null && headerUI.Header?.Column != null)
+            {
+                UltraGridColumn col = headerUI.Header.Column;
+                if (e.Button == MouseButtons.Right)
+                {
+                    ShowHeaderContextMenu(col, e.Location);
+                    return;
+                }
+                if (e.Button == MouseButtons.Left && _filterManager != null && _filterManager.HandleMouseDown(e))
+                {
+                    return;
+                }
+            }
+        }
+
+        private void GridReport_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (_filterManager != null && e.Button != MouseButtons.Left && _filterManager.HandleMouseMove(e, headerToolTip))
+                return;
+        }
+
+        private void ShowHeaderContextMenu(UltraGridColumn col, Point location)
+        {
+            if (col == null) return;
+            ContextMenuStrip menu = new ContextMenuStrip { Font = new Font("Segoe UI", 9F) };
+            _filterManager?.AddFilterContextMenuItems(menu, col, location);
+            if (menu.Items.Count > 0)
+            {
+                menu.Show(gridReport, location);
+            }
         }
 
         private void gridReport_InitializeRow(object sender, InitializeRowEventArgs e)

@@ -75,6 +75,7 @@ namespace PosBranch_Win.Reports.InventoryReport
 
         // ─── Header Drag-to-Hide & Column Chooser State ──────────────────────────────
         private bool _isDraggingHeaderToHide;
+        private ReportColumnFilterManager _filterManager;
         private UltraGridColumn _columnBeingDragged;
         private Point _headerDragStartPoint;
 
@@ -129,6 +130,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             LoadLookupData();
             SetupGridMenu();
             SetupHeaderDragToHideAndColumnChooser();
+            _filterManager = new ReportColumnFilterManager(ultraGridMaster, () => { UpdateFooterCellPositions(); UpdateFooterValues(); });
             LoadData();
         }
 
@@ -383,7 +385,8 @@ namespace PosBranch_Win.Reports.InventoryReport
             };
             MouseEventHandler mouseDownHandler = (s, e) =>
             {
-                if (e.Button == MouseButtons.Left)
+
+            if (e.Button == MouseButtons.Left)
                 {
                     ApplyPanelButtonStyle(panel, true, true);
                 }
@@ -824,6 +827,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             }
 
             ultraGridMaster.DataSource = new BindingList<SmartReorderItemModel>(filtered.ToList());
+            _filterManager?.ClearFilters();
 
             if (!_layoutLoaded)
             {
@@ -831,6 +835,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             }
 
             CreateFooterCells();
+            _filterManager?.UpdateHeaderFilterIcons();
             UpdateFooterCellPositions();
             UpdateFooterValues();
             UpdateSummary();
@@ -1108,7 +1113,7 @@ namespace PosBranch_Win.Reports.InventoryReport
         {
             foreach (UltraGridRow row in ultraGridMaster.Rows)
             {
-                if (row != null && row.IsDataRow && !row.IsFilteredOut)
+                if (row != null && row.IsDataRow && !row.IsFilteredOut && !row.Hidden)
                     yield return row;
             }
         }
@@ -1294,6 +1299,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             ultraGridMaster.AfterHeaderCheckStateChanged += UltraGridMaster_AfterHeaderCheckStateChanged;
 
             CreateFooterCells();
+            _filterManager?.UpdateHeaderFilterIcons();
             UpdateFooterCellPositions();
             UpdateFooterValues();
         }
@@ -1855,6 +1861,7 @@ namespace PosBranch_Win.Reports.InventoryReport
 
         private void UltraGridMaster_MouseDown(object sender, MouseEventArgs e)
         {
+            if (e.Button == MouseButtons.Right) { Infragistics.Win.UIElement elem = ultraGridMaster.DisplayLayout.UIElement?.ElementFromPoint(e.Location); Infragistics.Win.UltraWinGrid.HeaderUIElement hElem = elem as Infragistics.Win.UltraWinGrid.HeaderUIElement ?? elem?.GetAncestor(typeof(Infragistics.Win.UltraWinGrid.HeaderUIElement)) as Infragistics.Win.UltraWinGrid.HeaderUIElement; if (hElem != null && hElem.Header is Infragistics.Win.UltraWinGrid.ColumnHeader ch && ch.Column != null) { ContextMenuStrip headerMenu = new ContextMenuStrip { Font = new Font("Segoe UI", 9F) }; _filterManager?.AddFilterContextMenuItems(headerMenu, ch.Column, e.Location); ToolStripMenuItem hideItem = new ToolStripMenuItem($"🙈 Hide Column '{ch.Column.Header.Caption ?? ch.Column.Key}'", null, (s, ev) => { ch.Column.Hidden = true; _userHiddenColumnKeys.Add(ch.Column.Key); ReportGridLayoutHelper.SaveLayout("SmartReorderDashboard", ultraGridMaster, _userHiddenColumnKeys); CreateFooterCells(); UpdateFooterCellPositions(); UpdateFooterValues(); RefreshColumnChooser(); }); headerMenu.Items.Add(hideItem); headerMenu.Items.Add(new ToolStripSeparator()); ToolStripMenuItem chooserItem = new ToolStripMenuItem("📋 Field/Column Chooser", null, (s, ev) => ShowColumnChooser()); headerMenu.Items.Add(chooserItem); headerMenu.Show(ultraGridMaster, e.Location); return; } }
             if (e.Button == MouseButtons.Right)
             {
                 if (_gridMenu != null)
@@ -1864,6 +1871,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                 return;
             }
 
+            if (e.Button == MouseButtons.Left && _filterManager != null && _filterManager.HandleMouseDown(e)) { _isDraggingHeaderToHide = false; _columnBeingDragged = null; return; }
             if (e.Button == MouseButtons.Left)
             {
                 Infragistics.Win.UIElement element = ultraGridMaster.DisplayLayout.UIElement?.ElementFromPoint(e.Location);
@@ -1880,6 +1888,7 @@ namespace PosBranch_Win.Reports.InventoryReport
 
         private void UltraGridMaster_MouseMove(object sender, MouseEventArgs e)
         {
+            if (!_isDraggingHeaderToHide && _filterManager != null && _filterManager.HandleMouseMove(e, _toolTip)) return;
             if (e.Button == MouseButtons.Left && _columnBeingDragged != null)
             {
                 int dragYDelta = e.Y - _headerDragStartPoint.Y;
@@ -1897,8 +1906,9 @@ namespace PosBranch_Win.Reports.InventoryReport
             }
         }
 
-        private void UltraGridMaster_MouseUp(object sender, MouseEventArgs e)
+        private void UltraGridMaster_MouseUp(object sender, MouseEventArgs e) { if (e.Button == MouseButtons.Left && _columnBeingDragged != null) { if (_isDraggingHeaderToHide) { _columnBeingDragged.Hidden = true; _userHiddenColumnKeys.Add(_columnBeingDragged.Key); ReportGridLayoutHelper.SaveLayout("SmartReorderDashboard", ultraGridMaster, _userHiddenColumnKeys); CreateFooterCells(); UpdateFooterCellPositions(); UpdateFooterValues(); RefreshColumnChooser(); } _columnBeingDragged = null; _isDraggingHeaderToHide = false; Cursor.Current = Cursors.Default; } return; } private void DummyMouseUp(object sender, MouseEventArgs e)
         {
+            if (!_isDraggingHeaderToHide && _filterManager != null && _filterManager.HandleMouseMove(e, _toolTip)) return;
             if (e.Button == MouseButtons.Left && _columnBeingDragged != null)
             {
                 if (_isDraggingHeaderToHide)
@@ -1907,6 +1917,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                     _userHiddenColumnKeys.Add(_columnBeingDragged.Key);
                     ReportGridLayoutHelper.SaveLayout("SmartReorderDashboard", ultraGridMaster, _userHiddenColumnKeys);
                     CreateFooterCells();
+            _filterManager?.UpdateHeaderFilterIcons();
                     UpdateFooterCellPositions();
                     UpdateFooterValues();
                     RefreshColumnChooser();
@@ -2015,6 +2026,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                 ReportGridLayoutHelper.SaveLayout("SmartReorderDashboard", ultraGridMaster, _userHiddenColumnKeys);
 
                 CreateFooterCells();
+            _filterManager?.UpdateHeaderFilterIcons();
                 UpdateFooterCellPositions();
                 UpdateFooterValues();
             }));

@@ -82,6 +82,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
         private UltraGridColumn columnToHideByDrag;
         private bool isDraggingHeaderColumn;
         private readonly Dictionary<string, int> savedColumnWidths = new Dictionary<string, int>();
+        private ReportColumnFilterManager _filterManager;
         #endregion
 
         #region Constructor
@@ -617,6 +618,10 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 ultraGridMaster.AfterRowFilterChanged += UltraGridMaster_AfterRowFilterChanged;
                 ultraGridMaster.AfterSortChange += UltraGridMaster_AfterSortChange;
                 ultraGridMaster.Resize += UltraGridMaster_Resize;
+                _filterManager = new ReportColumnFilterManager(ultraGridMaster, () => {
+                    UpdateFooterCellPositions();
+                    UpdateFooterValues();
+                });
 
                 System.Diagnostics.Debug.WriteLine("Hierarchical grid setup completed");
             }
@@ -718,6 +723,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 e.Layout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
 
                 ReportGridLayoutHelper.ApplySavedLayout("PurchaseReportDetails", ultraGridMaster, userHiddenColumnKeys);
+                _filterManager?.UpdateHeaderFilterIcons();
                 RefreshColumnChooserList();
             }
             catch (Exception ex)
@@ -1190,7 +1196,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
         {
             foreach (UltraGridRow row in ultraGridMaster.Rows)
             {
-                if (row != null && row.IsDataRow && !row.IsFilteredOut)
+                if (row != null && row.IsDataRow && !row.IsFilteredOut && !row.Hidden)
                     yield return row;
             }
         }
@@ -1311,6 +1317,11 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 int bIdx = clickedColumn.Band != null ? clickedColumn.Band.Index : 0;
                 if (IsCustomizableColumn(clickedColumn, bIdx))
                 {
+                    if (_filterManager != null)
+                    {
+                        _filterManager.AddFilterContextMenuItems(menu, clickedColumn, ultraGridMaster.PointToClient(Cursor.Position));
+                        menu.Items.Add(new ToolStripSeparator());
+                    }
                     ToolStripMenuItem hideItem = new ToolStripMenuItem($"Hide '{clickedColumn.Header.Caption}'");
                     hideItem.Click += (s, ev) => HideGridColumn(clickedColumn);
                     menu.Items.Add(hideItem);
@@ -1356,6 +1367,13 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
             if (e.Button == MouseButtons.Left)
             {
+                if (_filterManager != null && _filterManager.HandleMouseDown(e))
+                {
+                    isDraggingHeaderColumn = false;
+                    columnToHideByDrag = null;
+                    return;
+                }
+            {
                 if (headerElem?.Header?.Column != null)
                 {
                     UltraGridColumn col = headerElem.Header.Column;
@@ -1370,7 +1388,15 @@ namespace PosBranch_Win.Reports.PurchaseReports
             }
         }
 
+        }
+
         private void GridMaster_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (!isDraggingHeaderColumn && _filterManager != null && e.Button != MouseButtons.Left)
+            {
+                if (_filterManager.HandleMouseMove(e, gridToolTip))
+                    return;
+            }
         {
             if (e.Button == MouseButtons.Left && columnToHideByDrag != null)
             {
@@ -1399,6 +1425,8 @@ namespace PosBranch_Win.Reports.PurchaseReports
                     }
                 }
             }
+        }
+
         }
 
         private void GridMaster_MouseUp(object sender, MouseEventArgs e)
@@ -1761,6 +1789,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 dsHierarchical.AcceptChanges();
 
                 // STEP 8: Rebind grid
+                _filterManager?.ClearFilters();
                 ultraGridMaster.DataSource = dsHierarchical;
                 ultraGridMaster.DataMember = "PurchaseMaster";
 
@@ -2363,6 +2392,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 RebuildDataSetWithFilters(fromDate, toDate);
 
                 // Rebind the grid with fresh data
+                _filterManager?.ClearFilters();
                 ultraGridMaster.DataSource = dsHierarchical;
                 ultraGridMaster.DataMember = "PurchaseMaster";
 
@@ -2614,6 +2644,10 @@ namespace PosBranch_Win.Reports.PurchaseReports
             // Flatten the hierarchical data
             foreach (DataRow masterRow in dsHierarchical.Tables["PurchaseMaster"].Rows)
             {
+                int pNo = Convert.ToInt32(masterRow["PurchaseNo"]);
+                UltraGridRow gridRow = ultraGridMaster.Rows.FirstOrDefault(r => r.Cells.Exists("PurchaseNo") && Convert.ToInt32(r.Cells["PurchaseNo"].Value) == pNo);
+                if (gridRow != null && gridRow.Hidden) continue;
+            {
                 DataRow[] detailRows = dsHierarchical.Tables["PurchaseDetail"].Select($"PurchaseNo = {masterRow["PurchaseNo"]}");
 
                 if (detailRows.Length > 0)
@@ -2655,6 +2689,8 @@ namespace PosBranch_Win.Reports.PurchaseReports
                     exportRow["PayedAmount"] = masterRow["PayedAmount"];
                     exportTable.Rows.Add(exportRow);
                 }
+            }
+
             }
 
             return exportTable;

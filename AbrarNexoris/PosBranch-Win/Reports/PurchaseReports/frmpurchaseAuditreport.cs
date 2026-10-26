@@ -88,6 +88,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
         private Point headerDragStartPoint;
         private readonly System.Windows.Forms.ToolTip headerToolTip = new System.Windows.Forms.ToolTip();
         private static readonly Cursor blackXCursor = CreateBlackXCursor();
+        private ReportColumnFilterManager _filterManager;
         #endregion
 
         #region Helper Classes
@@ -979,7 +980,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
             if (gridReport.Rows == null) yield break;
             foreach (UltraGridRow row in gridReport.Rows)
             {
-                if (row != null && row.IsDataRow && !row.IsFilteredOut)
+                if (row != null && row.IsDataRow && !row.IsFilteredOut && !row.Hidden)
                 {
                     yield return row;
                 }
@@ -1067,6 +1068,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
         private void SetupHeaderDragToHideAndColumnChooser()
         {
             gridReport.AllowDrop = true;
+            _filterManager = new ReportColumnFilterManager(gridReport, () => { UpdateFooterCellPositions(); UpdateFooterValues(); });
             gridReport.MouseDown += GridReport_MouseDown;
             gridReport.MouseMove += GridReport_MouseMove;
             gridReport.MouseUp += GridReport_MouseUp;
@@ -1097,6 +1099,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
                 if (headerUI != null && headerUI.Header?.Column != null && IsCustomizableColumn(headerUI.Header.Column))
                 {
+                    if (_filterManager != null && _filterManager.HandleMouseDown(e)) { isDraggingHeaderToHide = false; columnBeingDragged = null; return; }
                     columnBeingDragged = headerUI.Header.Column;
                     headerDragStartPoint = pt;
                     isDraggingHeaderToHide = false;
@@ -1110,6 +1113,8 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
         private void GridReport_MouseMove(object sender, MouseEventArgs e)
         {
+            if (!isDraggingHeaderToHide && _filterManager != null && e.Button != MouseButtons.Left && _filterManager.HandleMouseMove(e, headerToolTip)) return;
+
             if (e.Button == MouseButtons.Left && columnBeingDragged != null)
             {
                 int deltaY = e.Y - headerDragStartPoint.Y;
@@ -1208,6 +1213,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold)
             };
             menu.Items.Add(hideItem);
+            _filterManager?.AddFilterContextMenuItems(menu, col, location);
 
             menu.Items.Add(new ToolStripSeparator());
 
@@ -1709,6 +1715,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
         private void BuildAndBindReportData()
         {
+            _filterManager?.ClearFilters();
             List<FilteredPurchaseRecord> records = GetFilteredPurchaseRecords();
             string viewMode = GetViewMode();
 
@@ -1758,6 +1765,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
             CreateFooterCells();
             UpdateFooterCellPositions();
             UpdateFooterValues();
+            _filterManager?.UpdateHeaderFilterIcons();
             if (columnChooserForm != null && columnChooserForm.Visible)
             {
                 PopulateColumnChooserListBox();
@@ -2086,6 +2094,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
             CreateFooterCells();
             UpdateFooterCellPositions();
             UpdateFooterValues();
+            _filterManager?.UpdateHeaderFilterIcons();
             if (columnChooserForm != null && columnChooserForm.Visible)
             {
                 PopulateColumnChooserListBox();

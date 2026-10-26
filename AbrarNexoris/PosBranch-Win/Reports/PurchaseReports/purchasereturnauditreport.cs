@@ -87,6 +87,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
         private Point headerDragStartPoint;
         private readonly System.Windows.Forms.ToolTip headerToolTip = new System.Windows.Forms.ToolTip();
         private static readonly Cursor blackXCursor = CreateBlackXCursor();
+        private ReportColumnFilterManager _filterManager;
         #endregion
 
         #region Helper Classes
@@ -189,6 +190,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
             gridReport.DragOver += GridReport_DragOver;
             gridReport.DragDrop += GridReport_DragDrop;
             gridReport.AllowDrop = true;
+            _filterManager = new ReportColumnFilterManager(gridReport, () => { UpdateFooterCellPositions(); UpdateFooterValues(); });
         }
 
         private void purchasereturnauditreport_Load(object sender, EventArgs e)
@@ -238,6 +240,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 if (_currentDataSet != null)
                 {
                     _currentDataSet.Dispose();
+                _filterManager?.ClearFilters();
                 }
             }
             catch (Exception ex)
@@ -855,7 +858,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 return;
 
             UltraGridBand band = gridReport.DisplayLayout.Bands[0];
-            List<UltraGridRow> visibleRows = gridReport.Rows.GetFilteredInNonGroupByRows().ToList();
+            List<UltraGridRow> visibleRows = gridReport.Rows.GetFilteredInNonGroupByRows().Where(r => !r.Hidden).ToList();
 
             foreach (var kvp in _footerLabels)
             {
@@ -1001,6 +1004,13 @@ namespace PosBranch_Win.Reports.PurchaseReports
                     return;
                 }
 
+                if (e.Button == MouseButtons.Left && _filterManager != null && _filterManager.HandleMouseDown(e))
+                {
+                    isDraggingHeaderToHide = false;
+                    columnBeingDragged = null;
+                    return;
+                }
+
                 if (e.Button == MouseButtons.Left && IsCustomizableColumn(col))
                 {
                     columnBeingDragged = col;
@@ -1016,6 +1026,9 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
         private void GridReport_MouseMove(object sender, MouseEventArgs e)
         {
+            if (!isDraggingHeaderToHide && _filterManager != null && e.Button != MouseButtons.Left && _filterManager.HandleMouseMove(e, headerToolTip))
+                return;
+
             if (e.Button == MouseButtons.Left && columnBeingDragged != null)
             {
                 int deltaY = e.Y - headerDragStartPoint.Y;
@@ -1038,6 +1051,9 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
         private void GridReport_MouseUp(object sender, MouseEventArgs e)
         {
+            if (!isDraggingHeaderToHide && _filterManager != null && e.Button != MouseButtons.Left && _filterManager.HandleMouseMove(e, headerToolTip))
+                return;
+
             if (e.Button == MouseButtons.Left && columnBeingDragged != null)
             {
                 if (isDraggingHeaderToHide)
@@ -1123,6 +1139,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
             ToolStripMenuItem showAllItem = new ToolStripMenuItem("🔓 Show / Unhide All Columns", null, (s, e) => UnhideAllColumns());
             menu.Items.Add(showAllItem);
 
+            _filterManager?.AddFilterContextMenuItems(menu, col, location);
             menu.Show(gridReport, location);
         }
 
@@ -1599,6 +1616,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
             if (_currentDataSet != null)
             {
                 _currentDataSet.Dispose();
+                _filterManager?.ClearFilters();
                 _currentDataSet = null;
             }
 
@@ -1973,6 +1991,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 }
 
                 ReportGridLayoutHelper.ApplySavedLayout("PurchaseReturnAuditReport", gridReport, userHiddenColumnKeys);
+                _filterManager?.UpdateHeaderFilterIcons();
 
                 CreateFooterCells();
                 UpdateFooterCellPositions();
@@ -2565,7 +2584,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 // Data rows
                 foreach (UltraGridRow row in grid.Rows.GetFilteredInNonGroupByRows())
                 {
-                    if (row.IsDataRow)
+                    if (row.IsDataRow && !row.Hidden)
                     {
                         var cellValues = visibleCols.Select(c =>
                         {
@@ -2581,7 +2600,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
                             {
                                 foreach (UltraGridRow childRow in childBand.Rows)
                                 {
-                                    if (childRow.IsDataRow)
+                                    if (childRow.IsDataRow && !childRow.Hidden)
                                     {
                                         var childCols = childBand.Band.Columns.Cast<UltraGridColumn>()
                                             .Where(cc => !cc.Hidden && !cc.IsChaptered)

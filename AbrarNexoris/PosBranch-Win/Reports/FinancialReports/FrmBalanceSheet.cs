@@ -9,6 +9,7 @@ using Infragistics.Win;
 using Infragistics.Win.UltraWinGrid;
 using ModelClass.Report;
 using Repository.ReportRepository;
+using PosBranch_Win.Reports;
 
 namespace PosBranch_Win.Reports.FinancialReports
 {
@@ -39,6 +40,9 @@ namespace PosBranch_Win.Reports.FinancialReports
         #region Private Fields
         private BalanceSheetRepository reportRepository;
         private BalanceSheetReport currentReport;
+        private ReportColumnFilterManager _filterManagerLiabilities;
+        private ReportColumnFilterManager _filterManagerAssets;
+        private readonly System.Windows.Forms.ToolTip headerToolTip = new System.Windows.Forms.ToolTip();
         #endregion
 
         #region Constructor
@@ -54,7 +58,11 @@ namespace PosBranch_Win.Reports.FinancialReports
             ultraComboPresetDates.Value = "CURRENT_FY";
             ApplyDatePreset("CURRENT_FY");
             currentReport = null;
+            _filterManagerLiabilities?.ClearFilters();
+            _filterManagerAssets?.ClearFilters();
             ultraGridLiabilities.DataSource = null;
+            _filterManagerLiabilities?.UpdateHeaderFilterIcons();
+            _filterManagerAssets?.UpdateHeaderFilterIcons();
             ultraGridAssets.DataSource = null;
             ClearSummary();
         }
@@ -304,6 +312,9 @@ namespace PosBranch_Win.Reports.FinancialReports
             ultraGridLiabilities.DisplayLayout.Override.SelectedRowAppearance.FontData.Bold = DefaultableBoolean.True;
             
             ultraGridLiabilities.InitializeLayout += UltraGridLiabilities_InitializeLayout;
+            ultraGridLiabilities.MouseDown += UltraGridLiabilities_MouseDown;
+            ultraGridLiabilities.MouseMove += UltraGridLiabilities_MouseMove;
+            _filterManagerLiabilities = new ReportColumnFilterManager(ultraGridLiabilities, null);
         }
 
         private void SetupAssetsGrid()
@@ -325,6 +336,9 @@ namespace PosBranch_Win.Reports.FinancialReports
             ultraGridAssets.DisplayLayout.Override.SelectedRowAppearance.FontData.Bold = DefaultableBoolean.True;
             
             ultraGridAssets.InitializeLayout += UltraGridAssets_InitializeLayout;
+            ultraGridAssets.MouseDown += UltraGridAssets_MouseDown;
+            ultraGridAssets.MouseMove += UltraGridAssets_MouseMove;
+            _filterManagerAssets = new ReportColumnFilterManager(ultraGridAssets, null);
         }
 
         private void ApplyGridBaseSettings(UltraGrid grid)
@@ -353,6 +367,82 @@ namespace PosBranch_Win.Reports.FinancialReports
             grid.DisplayLayout.Override.BorderStyleRow = UIElementBorderStyle.Solid;
         }
 
+        private void UltraGridLiabilities_MouseDown(object sender, MouseEventArgs e)
+        {
+            if (ultraGridLiabilities?.DisplayLayout == null) return;
+            UIElement element = ultraGridLiabilities.DisplayLayout.UIElement?.ElementFromPoint(e.Location);
+            HeaderUIElement headerUI = element as HeaderUIElement ?? element?.GetAncestor(typeof(HeaderUIElement)) as HeaderUIElement;
+
+            if (headerUI != null && headerUI.Header?.Column != null)
+            {
+                UltraGridColumn col = headerUI.Header.Column;
+                if (e.Button == MouseButtons.Right)
+                {
+                    ShowLiabilitiesContextMenu(col, e.Location);
+                    return;
+                }
+                if (e.Button == MouseButtons.Left && _filterManagerLiabilities != null && _filterManagerLiabilities.HandleMouseDown(e))
+                {
+                    return;
+                }
+            }
+        }
+
+        private void UltraGridLiabilities_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (_filterManagerLiabilities != null && e.Button != MouseButtons.Left && _filterManagerLiabilities.HandleMouseMove(e, headerToolTip))
+                return;
+        }
+
+        private void ShowLiabilitiesContextMenu(UltraGridColumn col, Point location)
+        {
+            if (col == null) return;
+            ContextMenuStrip menu = new ContextMenuStrip { Font = new Font("Segoe UI", 9F) };
+            _filterManagerLiabilities?.AddFilterContextMenuItems(menu, col, location);
+            if (menu.Items.Count > 0)
+            {
+                menu.Show(ultraGridLiabilities, location);
+            }
+        }
+
+        private void UltraGridAssets_MouseDown(object sender, MouseEventArgs e)
+        {
+            if (ultraGridAssets?.DisplayLayout == null) return;
+            UIElement element = ultraGridAssets.DisplayLayout.UIElement?.ElementFromPoint(e.Location);
+            HeaderUIElement headerUI = element as HeaderUIElement ?? element?.GetAncestor(typeof(HeaderUIElement)) as HeaderUIElement;
+
+            if (headerUI != null && headerUI.Header?.Column != null)
+            {
+                UltraGridColumn col = headerUI.Header.Column;
+                if (e.Button == MouseButtons.Right)
+                {
+                    ShowAssetsContextMenu(col, e.Location);
+                    return;
+                }
+                if (e.Button == MouseButtons.Left && _filterManagerAssets != null && _filterManagerAssets.HandleMouseDown(e))
+                {
+                    return;
+                }
+            }
+        }
+
+        private void UltraGridAssets_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (_filterManagerAssets != null && e.Button != MouseButtons.Left && _filterManagerAssets.HandleMouseMove(e, headerToolTip))
+                return;
+        }
+
+        private void ShowAssetsContextMenu(UltraGridColumn col, Point location)
+        {
+            if (col == null) return;
+            ContextMenuStrip menu = new ContextMenuStrip { Font = new Font("Segoe UI", 9F) };
+            _filterManagerAssets?.AddFilterContextMenuItems(menu, col, location);
+            if (menu.Items.Count > 0)
+            {
+                menu.Show(ultraGridAssets, location);
+            }
+        }
+
         private void UltraGridLiabilities_InitializeLayout(object sender, InitializeLayoutEventArgs e)
         {
             var band = e.Layout.Bands[0];
@@ -372,6 +462,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             band.Columns["ClosingBalance"].Format = "N2";
             band.Columns["ClosingBalance"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
             band.Columns["ClosingBalance"].CellAppearance.ForeColor = Color.FromArgb(198, 40, 40);
+            _filterManagerLiabilities?.UpdateHeaderFilterIcons();
             band.Columns["ClosingBalance"].Header.Appearance.TextHAlign = HAlign.Right;
             
             band.Override.AllowColSizing = AllowColSizing.Free;
@@ -397,6 +488,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             band.Columns["ClosingBalance"].Format = "N2";
             band.Columns["ClosingBalance"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
             band.Columns["ClosingBalance"].CellAppearance.ForeColor = Color.FromArgb(27, 94, 32);
+            _filterManagerAssets?.UpdateHeaderFilterIcons();
             band.Columns["ClosingBalance"].Header.Appearance.TextHAlign = HAlign.Right;
             
             band.Override.AllowColSizing = AllowColSizing.Free;
@@ -434,17 +526,25 @@ namespace PosBranch_Win.Reports.FinancialReports
 
                 if (currentReport != null)
                 {
+                    _filterManagerLiabilities?.ClearFilters();
+                    _filterManagerAssets?.ClearFilters();
                     ultraGridLiabilities.DataSource = currentReport.LiabilitiesItems;
                     ultraGridLiabilities.DataBind();
 
                     ultraGridAssets.DataSource = currentReport.AssetsItems;
                     ultraGridAssets.DataBind();
+                    _filterManagerLiabilities?.UpdateHeaderFilterIcons();
+                    _filterManagerAssets?.UpdateHeaderFilterIcons();
 
                     UpdateSummary();
                 }
                 else
                 {
-                    ultraGridLiabilities.DataSource = null;
+                    _filterManagerLiabilities?.ClearFilters();
+            _filterManagerAssets?.ClearFilters();
+            ultraGridLiabilities.DataSource = null;
+            _filterManagerLiabilities?.UpdateHeaderFilterIcons();
+            _filterManagerAssets?.UpdateHeaderFilterIcons();
                     ultraGridAssets.DataSource = null;
                     ClearSummary();
                     MessageBox.Show("No data found for the selected period.", "Information",
@@ -587,7 +687,8 @@ namespace PosBranch_Win.Reports.FinancialReports
                         // Liabilities 
                         sb.AppendLine("=== LIABILITIES & CAPITAL ===");
                         sb.AppendLine("Category,Account Group,Particulars,Amount");
-                        foreach (var item in currentReport.LiabilitiesItems)
+                        foreach (UltraGridRow gridRow in ultraGridLiabilities.Rows.GetFilteredInNonGroupByRows())
+                        if (gridRow != null && gridRow.IsDataRow && !gridRow.Hidden && gridRow.ListObject is BalanceSheetLineItem item)
                         {
                             sb.AppendLine($"\"{item.ParentGroupName}\",\"{item.GroupName}\",\"{item.LedgerName}\",{item.ClosingBalance:N2}");
                         }
@@ -598,7 +699,8 @@ namespace PosBranch_Win.Reports.FinancialReports
                         // Assets
                         sb.AppendLine("=== ASSETS ===");
                         sb.AppendLine("Category,Account Group,Particulars,Amount");
-                        foreach (var item in currentReport.AssetsItems)
+                        foreach (UltraGridRow gridRow in ultraGridAssets.Rows.GetFilteredInNonGroupByRows())
+                        if (gridRow != null && gridRow.IsDataRow && !gridRow.Hidden && gridRow.ListObject is BalanceSheetLineItem item)
                         {
                             sb.AppendLine($"\"{item.ParentGroupName}\",\"{item.GroupName}\",\"{item.LedgerName}\",{item.ClosingBalance:N2}");
                         }

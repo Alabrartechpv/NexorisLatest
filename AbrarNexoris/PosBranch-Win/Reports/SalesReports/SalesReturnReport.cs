@@ -76,6 +76,7 @@ namespace PosBranch_Win.Reports.SalesReports
         private readonly System.Windows.Forms.ToolTip headerToolTip = new System.Windows.Forms.ToolTip();
         private static readonly Cursor blackXCursor = CreateBlackXCursor();
         private bool isLoading = false;
+        private ReportColumnFilterManager _filterManager;
         #endregion
 
         #region Helper Classes
@@ -261,6 +262,10 @@ namespace PosBranch_Win.Reports.SalesReports
                 }
             }
             SetupHeaderDragToHideAndColumnChooser();
+            _filterManager = new ReportColumnFilterManager(ultraGridMaster, () => {
+                UpdateFooterCellPositions();
+                UpdateFooterValues();
+            });
             LayoutPanels();
         }
 
@@ -762,6 +767,7 @@ namespace PosBranch_Win.Reports.SalesReports
                 dsHierarchical.Relations.Add(relation);
 
                 ultraGridMaster.DataSource = null;
+                _filterManager?.ClearFilters();
                 ultraGridMaster.DataSource = dsHierarchical;
 
                 ApplyUserHiddenColumns();
@@ -822,6 +828,7 @@ namespace PosBranch_Win.Reports.SalesReports
                 }
 
                 ReportGridLayoutHelper.ApplySavedLayout("SalesReturnReport", ultraGridMaster, userHiddenColumnKeys);
+                _filterManager?.UpdateHeaderFilterIcons();
 
                 CreateFooterCells();
                 UpdateFooterCellPositions();
@@ -1173,7 +1180,7 @@ namespace PosBranch_Win.Reports.SalesReports
             if (ultraGridMaster.Rows == null) yield break;
             foreach (UltraGridRow row in ultraGridMaster.Rows.GetFilteredInNonGroupByRows())
             {
-                if (row != null && row.IsDataRow && !row.IsFilteredOut)
+                if (row != null && row.IsDataRow && !row.IsFilteredOut && !row.Hidden)
                     yield return row;
             }
         }
@@ -1360,6 +1367,13 @@ namespace PosBranch_Win.Reports.SalesReports
 
             if (e.Button == MouseButtons.Left)
             {
+                if (_filterManager != null && _filterManager.HandleMouseDown(e))
+                {
+                    isDraggingHeaderToHide = false;
+                    columnBeingDragged = null;
+                    return;
+                }
+            {
                 Point pt = new Point(e.X, e.Y);
                 UIElement element = ultraGridMaster.DisplayLayout.UIElement?.ElementFromPoint(pt);
                 HeaderUIElement headerUI = element as HeaderUIElement ?? element?.GetAncestor(typeof(HeaderUIElement)) as HeaderUIElement;
@@ -1377,7 +1391,15 @@ namespace PosBranch_Win.Reports.SalesReports
             }
         }
 
+        }
+
         private void UltraGridMaster_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (!isDraggingHeaderToHide && _filterManager != null && e.Button != MouseButtons.Left)
+            {
+                if (_filterManager.HandleMouseMove(e, headerToolTip))
+                    return;
+            }
         {
             if (e.Button == MouseButtons.Left && columnBeingDragged != null)
             {
@@ -1397,6 +1419,8 @@ namespace PosBranch_Win.Reports.SalesReports
                     headerToolTip.Hide(ultraGridMaster);
                 }
             }
+        }
+
         }
 
         private void UltraGridMaster_MouseUp(object sender, MouseEventArgs e)
@@ -1498,6 +1522,11 @@ namespace PosBranch_Win.Reports.SalesReports
             ToolStripMenuItem hideItem = new ToolStripMenuItem($"🙈 Hide Column '{colName}'", null, (s, e) => HideGridColumn(col));
             hideItem.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
             menu.Items.Add(hideItem);
+            if (_filterManager != null)
+            {
+                menu.Items.Add(new ToolStripSeparator());
+                _filterManager.AddFilterContextMenuItems(menu, col, location);
+            }
 
             menu.Items.Add(new ToolStripSeparator());
 
@@ -1778,6 +1807,10 @@ namespace PosBranch_Win.Reports.SalesReports
 
                             foreach (DataRow row in mTable.Rows)
                             {
+                                int srNo = mTable.Columns.Contains("SReturnNo") ? Convert.ToInt32(row["SReturnNo"]) : 0;
+                                UltraGridRow gRow = ultraGridMaster.Rows.FirstOrDefault(r => r.Cells.Exists("SReturnNo") && Convert.ToInt32(r.Cells["SReturnNo"].Value) == srNo);
+                                if (gRow != null && gRow.Hidden) continue;
+                            {
                                 var fields = visibleCols.Select(c =>
                                 {
                                     object val = mTable.Columns.Contains(c.Key) ? row[c.Key] : "";
@@ -1794,6 +1827,7 @@ namespace PosBranch_Win.Reports.SalesReports
                     }
 
                     MessageBox.Show("Sales return report exported successfully.", "Export Complete", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
                 }
             }
             catch (Exception ex)

@@ -47,6 +47,7 @@ namespace PosBranch_Win.Reports.FinancialReports
         private readonly System.Windows.Forms.ToolTip headerToolTip = new System.Windows.Forms.ToolTip();
         private static readonly Cursor blackXCursor = CreateBlackXCursor();
         private bool _isLoading;
+        private ReportColumnFilterManager _filterManager;
         private Infragistics.Win.UltraWinEditors.UltraComboEditor comboPeriod;
 
         private sealed class ColumnChooserItem
@@ -497,6 +498,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                     SearchText = txtSearch.Text.Trim()
                 };
 
+                _filterManager?.ClearFilters();
                 gridReport.DataSource = null;
 
                 string rawVal = Convert.ToString(ultraComboReportView.Value ?? "");
@@ -576,6 +578,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             }
 
             ReportGridLayoutHelper.ApplySavedLayout(GetLayoutKey(), gridReport, userHiddenColumnKeys);
+            _filterManager?.UpdateHeaderFilterIcons();
             if (columnChooserForm != null && columnChooserForm.Visible)
             {
                 PopulateColumnChooserListBox();
@@ -786,7 +789,7 @@ namespace PosBranch_Win.Reports.FinancialReports
         {
             foreach (UltraGridRow row in gridReport.Rows)
             {
-                if (row != null && row.IsDataRow && !row.IsFilteredOut)
+                if (row != null && row.IsDataRow && !row.IsFilteredOut && !row.Hidden)
                     yield return row;
             }
         }
@@ -940,6 +943,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             gridReport.MouseUp += GridReport_MouseUp;
             gridReport.DragOver += GridReport_DragOver;
             gridReport.DragDrop += GridReport_DragDrop;
+            _filterManager = new ReportColumnFilterManager(gridReport, () => { UpdateFooterCellPositions(); UpdateFooterValues(); });
         }
 
         private void GridReport_MouseDown(object sender, MouseEventArgs e)
@@ -955,6 +959,13 @@ namespace PosBranch_Win.Reports.FinancialReports
                     ShowHeaderContextMenu(headerUI.Header.Column, pt);
                     return;
                 }
+            }
+
+            if (e.Button == MouseButtons.Left && _filterManager != null && _filterManager.HandleMouseDown(e))
+            {
+                isDraggingHeaderToHide = false;
+                columnBeingDragged = null;
+                return;
             }
 
             if (e.Button == MouseButtons.Left)
@@ -978,6 +989,9 @@ namespace PosBranch_Win.Reports.FinancialReports
 
         private void GridReport_MouseMove(object sender, MouseEventArgs e)
         {
+            if (!isDraggingHeaderToHide && _filterManager != null && e.Button != MouseButtons.Left && _filterManager.HandleMouseMove(e, headerToolTip))
+                return;
+
             if (e.Button == MouseButtons.Left && columnBeingDragged != null)
             {
                 int deltaY = e.Y - headerDragStartPoint.Y;
@@ -1000,6 +1014,9 @@ namespace PosBranch_Win.Reports.FinancialReports
 
         private void GridReport_MouseUp(object sender, MouseEventArgs e)
         {
+            if (!isDraggingHeaderToHide && _filterManager != null && e.Button != MouseButtons.Left && _filterManager.HandleMouseMove(e, headerToolTip))
+                return;
+
             if (e.Button == MouseButtons.Left && columnBeingDragged != null)
             {
                 if (isDraggingHeaderToHide)
@@ -1093,6 +1110,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             ToolStripMenuItem showAllItem = new ToolStripMenuItem("🔓 Show / Unhide All Columns", null, (s, e) => UnhideAllColumns());
             menu.Items.Add(showAllItem);
 
+            _filterManager?.AddFilterContextMenuItems(menu, col, location);
             menu.Show(gridReport, location);
         }
 

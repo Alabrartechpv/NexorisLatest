@@ -81,6 +81,7 @@ namespace PosBranch_Win.Reports.SalesReports
         private bool summaryFooterInitialized;
         private readonly System.Windows.Forms.ToolTip columnChooserToolTip = new System.Windows.Forms.ToolTip();
         private readonly HashSet<string> userHiddenColumnKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private ReportColumnFilterManager _filterManager;
 
         private string GetLayoutKey() => $"SalesHoldReport_{cmbViewMode?.Value?.ToString() ?? "Summary"}";
 
@@ -440,6 +441,10 @@ namespace PosBranch_Win.Reports.SalesReports
             gridHold.MouseDown += GridHold_MouseDown;
             gridHold.MouseMove += GridHold_MouseMove;
             gridHold.MouseUp += GridHold_MouseUp;
+            _filterManager = new ReportColumnFilterManager(gridHold, () => {
+                UpdateSummaryFooterCalculations();
+                UpdateSummaryFooterPositions();
+            });
 
             gridFooterPanel.ClientArea.MouseDown += (s, e) =>
             {
@@ -463,6 +468,8 @@ namespace PosBranch_Win.Reports.SalesReports
         private void ResetFilters(bool reload = true)
         {
             ultraComboDateMode.Value = "ALL";
+            _filterManager?.ClearFilters();
+            _filterManager?.UpdateHeaderFilterIcons();
             dtFromDate.DateTime = DateTime.Today;
             dtToDate.DateTime = DateTime.Today;
             UpdateDateControlsVisibility();
@@ -488,6 +495,8 @@ namespace PosBranch_Win.Reports.SalesReports
             ultraComboDateMode.Items.Add("ALL", "ALL");
             ultraComboDateMode.Items.Add("RANGE", "Date Range");
             ultraComboDateMode.Value = "ALL";
+            _filterManager?.ClearFilters();
+            _filterManager?.UpdateHeaderFilterIcons();
             dtFromDate.DateTime = DateTime.Today;
             dtToDate.DateTime = DateTime.Today;
             UpdateDateControlsVisibility();
@@ -653,6 +662,7 @@ namespace PosBranch_Win.Reports.SalesReports
 
             RestoreSavedWidths(cols);
             ReportGridLayoutHelper.ApplySavedLayout(GetLayoutKey(), gridHold, userHiddenColumnKeys);
+            _filterManager?.UpdateHeaderFilterIcons();
             PopulateColumnChooserItems();
         }
 
@@ -684,6 +694,7 @@ namespace PosBranch_Win.Reports.SalesReports
 
             RestoreSavedWidths(cols);
             ReportGridLayoutHelper.ApplySavedLayout(GetLayoutKey(), gridHold, userHiddenColumnKeys);
+            _filterManager?.UpdateHeaderFilterIcons();
             PopulateColumnChooserItems();
         }
 
@@ -736,7 +747,7 @@ namespace PosBranch_Win.Reports.SalesReports
 
         private void UpdateSummaryFooterCalculations()
         {
-            int rowCount = gridHold.Rows.Count;
+            int rowCount = gridHold.Rows.Cast<UltraGridRow>().Count(r => r != null && r.IsDataRow && !r.Hidden && !r.IsFilteredOut);
             lblCount.Text = $"Count : {rowCount}";
 
             EnsureSummaryFooterLabels();
@@ -777,7 +788,7 @@ namespace PosBranch_Win.Reports.SalesReports
 
             foreach (var row in gridHold.Rows)
             {
-                if (row.IsFilteredOut) continue;
+                if (row.IsFilteredOut || row.Hidden) continue;
                 object cellVal = row.Cells[columnKey].Value;
                 if (cellVal != null && cellVal != DBNull.Value && decimal.TryParse(cellVal.ToString(), out decimal d))
                 {
@@ -948,6 +959,12 @@ namespace PosBranch_Win.Reports.SalesReports
                     ShowHeaderContextMenu(headerUI.Header.Column, e.Location);
                 }
             }
+            else if (e.Button == MouseButtons.Left && _filterManager != null && _filterManager.HandleMouseDown(e))
+            {
+                columnToHideByDrag = null;
+                isDraggingHeaderColumn = false;
+                return;
+            }
             else if (e.Button == MouseButtons.Left)
             {
                 var element = gridHold.DisplayLayout.UIElement.ElementFromPoint(e.Location);
@@ -963,6 +980,9 @@ namespace PosBranch_Win.Reports.SalesReports
 
         private void GridHold_MouseMove(object sender, MouseEventArgs e)
         {
+            if (!isDraggingHeaderColumn && _filterManager != null && e.Button != MouseButtons.Left && _filterManager.HandleMouseMove(e, columnChooserToolTip))
+                return;
+
             if (e.Button == MouseButtons.Left && columnToHideByDrag != null)
             {
                 int dx = Math.Abs(e.X - headerDragStartPoint.X);
@@ -1055,6 +1075,11 @@ namespace PosBranch_Win.Reports.SalesReports
                 UpdateSummaryFooterPositions();
             });
             menu.Items.Add(hideItem);
+            if (_filterManager != null)
+            {
+                menu.Items.Add(new ToolStripSeparator());
+                _filterManager.AddFilterContextMenuItems(menu, column, loc);
+            }
 
             var chooserItem = new ToolStripMenuItem("Field/Column Chooser...", null, (s, e) => ShowColumnChooserDialog());
             menu.Items.Add(chooserItem);
@@ -1253,7 +1278,7 @@ namespace PosBranch_Win.Reports.SalesReports
 
                         foreach (var row in gridHold.Rows)
                         {
-                            if (row.IsFilteredOut) continue;
+                            if (row.IsFilteredOut || row.Hidden) continue;
                             var rowValues = visibleCols.Select(c =>
                             {
                                 object val = row.Cells[c.Key].Value;

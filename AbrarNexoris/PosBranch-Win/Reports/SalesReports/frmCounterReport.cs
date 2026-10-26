@@ -43,6 +43,7 @@ namespace PosBranch_Win.Reports.SalesReports
         private List<CounterReportModel> _allRawData;
         private List<CounterReportModel> _currentData;
         private string _initialPayMode;
+        private ReportColumnFilterManager _filterManager;
 
         // Enhanced Tender Split Summary Panel Controls
         private Infragistics.Win.Misc.UltraLabel lblCashSalesCaption;
@@ -205,6 +206,41 @@ namespace PosBranch_Win.Reports.SalesReports
             
             ultraGridCounterReport.InitializeLayout += ultraGridCounterReport_InitializeLayout;
             ultraGridCounterReport.DoubleClickRow += ultraGridCounterReport_DoubleClickRow;
+            ultraGridCounterReport.MouseDown += GridCounterReport_MouseDown;
+            ultraGridCounterReport.MouseMove += GridCounterReport_MouseMove;
+            _filterManager = new ReportColumnFilterManager(ultraGridCounterReport, () => {
+                UpdateSummary();
+            });
+        }
+
+        private void GridCounterReport_MouseDown(object sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Right)
+            {
+                Point pt = new Point(e.X, e.Y);
+                UIElement elem = ultraGridCounterReport.DisplayLayout.UIElement?.ElementFromPoint(pt);
+                HeaderUIElement hUI = elem as HeaderUIElement ?? elem?.GetAncestor(typeof(HeaderUIElement)) as HeaderUIElement;
+                if (hUI?.Header?.Column != null)
+                {
+                    ContextMenuStrip menu = new ContextMenuStrip { Font = new Font("Segoe UI", 9F) };
+                    _filterManager?.AddFilterContextMenuItems(menu, hUI.Header.Column, pt);
+                    if (menu.Items.Count > 0)
+                    {
+                        menu.Show(ultraGridCounterReport, pt);
+                        return;
+                    }
+                }
+            }
+            if (e.Button == MouseButtons.Left && _filterManager != null && _filterManager.HandleMouseDown(e))
+            {
+                return;
+            }
+        }
+
+        private void GridCounterReport_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (_filterManager != null && e.Button != MouseButtons.Left && _filterManager.HandleMouseMove(e))
+                return;
         }
 
         private void InitializePanels()
@@ -566,6 +602,7 @@ namespace PosBranch_Win.Reports.SalesReports
             }
 
             e.Layout.AutoFitStyle = AutoFitStyle.None;
+            _filterManager?.UpdateHeaderFilterIcons();
         }
 
         private static void ConfigureColumn(UltraGridBand band, string key, string caption, int width)
@@ -712,26 +749,43 @@ namespace PosBranch_Win.Reports.SalesReports
             }
         }
 
+        private List<CounterReportModel> GetVisibleDataRows()
+        {
+            if (ultraGridCounterReport.Rows == null || ultraGridCounterReport.Rows.Count == 0)
+                return _currentData ?? new List<CounterReportModel>();
+
+            var list = new List<CounterReportModel>();
+            foreach (var r in ultraGridCounterReport.Rows)
+            {
+                if (r != null && r.IsDataRow && !r.Hidden && !r.IsFilteredOut && r.ListObject is CounterReportModel item)
+                {
+                    list.Add(item);
+                }
+            }
+            return list;
+        }
+
         private void UpdateSummary()
         {
-            if (_currentData == null || _currentData.Count == 0)
+            var currentData = GetVisibleDataRows();
+            if (currentData == null || currentData.Count == 0)
             {
                 ClearSummary();
                 return;
             }
 
-            int totalBills = _currentData.Count;
-            decimal totalSubTotal = _currentData.Sum(x => x.SubTotal);
-            decimal totalNetSales = _currentData.Sum(x => x.NetAmount);
-            decimal totalTax = _currentData.Sum(x => x.TaxAmt);
-            decimal totalDiscount = _currentData.Sum(x => x.DiscountAmt);
+            int totalBills = currentData.Count;
+            decimal totalSubTotal = currentData.Sum(x => x.SubTotal);
+            decimal totalNetSales = currentData.Sum(x => x.NetAmount);
+            decimal totalTax = currentData.Sum(x => x.TaxAmt);
+            decimal totalDiscount = currentData.Sum(x => x.DiscountAmt);
 
             decimal cashSales = 0;
             decimal bankCardSales = 0;
             decimal upiSales = 0;
             decimal creditSales = 0;
 
-            foreach (var item in _currentData)
+            foreach (var item in currentData)
             {
                 string mode = (item.CashMode ?? "").Trim().ToLowerInvariant();
                 string paymode = (item.PaymodeName ?? "").Trim().ToLowerInvariant();
@@ -967,6 +1021,8 @@ namespace PosBranch_Win.Reports.SalesReports
             _allRawData = null;
             _currentData = null;
             ultraGridCounterReport.DataSource = null;
+            _filterManager?.ClearFilters();
+            _filterManager?.UpdateHeaderFilterIcons();
             ClearSummary();
         }
 
@@ -988,6 +1044,8 @@ namespace PosBranch_Win.Reports.SalesReports
             {
                 _currentData = new List<CounterReportModel>();
                 ultraGridCounterReport.DataSource = null;
+            _filterManager?.ClearFilters();
+            _filterManager?.UpdateHeaderFilterIcons();
                 ClearSummary();
                 return;
             }
@@ -1032,11 +1090,15 @@ namespace PosBranch_Win.Reports.SalesReports
             if (_currentData != null && _currentData.Count > 0)
             {
                 ultraGridCounterReport.DataSource = _currentData;
+                _filterManager?.ClearFilters();
+                _filterManager?.UpdateHeaderFilterIcons();
                 UpdateSummary();
             }
             else
             {
                 ultraGridCounterReport.DataSource = null;
+            _filterManager?.ClearFilters();
+            _filterManager?.UpdateHeaderFilterIcons();
                 ClearSummary();
             }
         }
@@ -1112,7 +1174,8 @@ namespace PosBranch_Win.Reports.SalesReports
 
         private void btnExport_Click(object sender, EventArgs e)
         {
-            if (_currentData == null || _currentData.Count == 0)
+            var currentData = GetVisibleDataRows();
+            if (currentData == null || currentData.Count == 0)
             {
                 MessageBox.Show("No data to export.", "Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
@@ -1128,7 +1191,7 @@ namespace PosBranch_Win.Reports.SalesReports
                     StringBuilder sb = new StringBuilder();
                     sb.AppendLine("Bill No,Date & Time,Counter,Cashier,Customer,Bill Type,Payment Mode,Sub Total,Discount,Tax Amount,Net Amount,Status");
 
-                    foreach (var item in _currentData)
+                    foreach (var item in currentData)
                     {
                         sb.AppendLine(string.Format("\"{0}\",{1:dd/MM/yyyy HH:mm},\"{2}\",\"{3}\",\"{4}\",\"{5}\",\"{6}\",{7:F2},{8:F2},{9:F2},{10:F2},\"{11}\"",
                             item.BillNo, item.BillDate, item.Counter, item.UserName, item.CustomerName, item.PaymodeName, item.CashMode,
@@ -1136,10 +1199,10 @@ namespace PosBranch_Win.Reports.SalesReports
                     }
 
                     sb.AppendLine();
-                    sb.AppendLine("Total Bills:," + _currentData.Count);
-                    sb.AppendLine("Total Net Sales:," + _currentData.Sum(x => x.NetAmount).ToString("F2"));
-                    sb.AppendLine("Total Tax:," + _currentData.Sum(x => x.TaxAmt).ToString("F2"));
-                    sb.AppendLine("Total Discount:," + _currentData.Sum(x => x.DiscountAmt).ToString("F2"));
+                    sb.AppendLine("Total Bills:," + currentData.Count);
+                    sb.AppendLine("Total Net Sales:," + currentData.Sum(x => x.NetAmount).ToString("F2"));
+                    sb.AppendLine("Total Tax:," + currentData.Sum(x => x.TaxAmt).ToString("F2"));
+                    sb.AppendLine("Total Discount:," + currentData.Sum(x => x.DiscountAmt).ToString("F2"));
 
                     File.WriteAllText(sfd.FileName, sb.ToString());
                     MessageBox.Show("Report exported successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);

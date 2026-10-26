@@ -10,6 +10,7 @@ using Infragistics.Win;
 using Infragistics.Win.UltraWinGrid;
 using ModelClass.Report;
 using Repository.ReportRepository;
+using PosBranch_Win.Reports;
 
 namespace PosBranch_Win.Reports.FinancialReports
 {
@@ -40,6 +41,8 @@ namespace PosBranch_Win.Reports.FinancialReports
         private TrialBalanceRepository reportRepository;
         private TrialBalanceReport currentReport;
         private List<TrialBalanceLineItem> displayedLineItems;
+        private ReportColumnFilterManager _filterManager;
+        private readonly System.Windows.Forms.ToolTip headerToolTip = new System.Windows.Forms.ToolTip();
         #endregion
 
         #region Constructor
@@ -57,7 +60,9 @@ namespace PosBranch_Win.Reports.FinancialReports
             txtSearch.Text = string.Empty;
             currentReport = null;
             displayedLineItems = null;
+            _filterManager?.ClearFilters();
             ultraGridTrialBalance.DataSource = null;
+            _filterManager?.UpdateHeaderFilterIcons();
             ClearSummary();
         }
 
@@ -325,6 +330,9 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             ultraGridTrialBalance.InitializeLayout += UltraGridTrialBalance_InitializeLayout;
             ultraGridTrialBalance.InitializeRow += UltraGridTrialBalance_InitializeRow;
+            ultraGridTrialBalance.MouseDown += UltraGridTrialBalance_MouseDown;
+            ultraGridTrialBalance.MouseMove += UltraGridTrialBalance_MouseMove;
+            _filterManager = new ReportColumnFilterManager(ultraGridTrialBalance, null);
         }
 
         private void UltraGridTrialBalance_InitializeRow(object sender, InitializeRowEventArgs e)
@@ -375,6 +383,44 @@ namespace PosBranch_Win.Reports.FinancialReports
                     cell.Appearance.ForeColor = ActiveAmountColor;
                     cell.Appearance.FontData.Bold = DefaultableBoolean.True;
                 }
+            }
+        }
+
+        private void UltraGridTrialBalance_MouseDown(object sender, MouseEventArgs e)
+        {
+            if (ultraGridTrialBalance?.DisplayLayout == null) return;
+            UIElement element = ultraGridTrialBalance.DisplayLayout.UIElement?.ElementFromPoint(e.Location);
+            HeaderUIElement headerUI = element as HeaderUIElement ?? element?.GetAncestor(typeof(HeaderUIElement)) as HeaderUIElement;
+
+            if (headerUI != null && headerUI.Header?.Column != null)
+            {
+                UltraGridColumn col = headerUI.Header.Column;
+                if (e.Button == MouseButtons.Right)
+                {
+                    ShowHeaderContextMenu(col, e.Location);
+                    return;
+                }
+                if (e.Button == MouseButtons.Left && _filterManager != null && _filterManager.HandleMouseDown(e))
+                {
+                    return;
+                }
+            }
+        }
+
+        private void UltraGridTrialBalance_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (_filterManager != null && e.Button != MouseButtons.Left && _filterManager.HandleMouseMove(e, headerToolTip))
+                return;
+        }
+
+        private void ShowHeaderContextMenu(UltraGridColumn col, Point location)
+        {
+            if (col == null) return;
+            ContextMenuStrip menu = new ContextMenuStrip { Font = new Font("Segoe UI", 9F) };
+            _filterManager?.AddFilterContextMenuItems(menu, col, location);
+            if (menu.Items.Count > 0)
+            {
+                menu.Show(ultraGridTrialBalance, location);
             }
         }
 
@@ -434,6 +480,7 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             band.Override.AllowColSizing = AllowColSizing.Free;
             e.Layout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
+            _filterManager?.UpdateHeaderFilterIcons();
         }
 
         private void ConfigureAmountColumn(UltraGridBand band, string key, string headerText, int visiblePosition)
@@ -482,7 +529,9 @@ namespace PosBranch_Win.Reports.FinancialReports
             }
             catch (Exception ex)
             {
-                ultraGridTrialBalance.DataSource = null;
+                _filterManager?.ClearFilters();
+            ultraGridTrialBalance.DataSource = null;
+            _filterManager?.UpdateHeaderFilterIcons();
                 displayedLineItems = null;
                 ClearSummary();
                 MessageBox.Show($"Error loading report: {ex.Message}", "Error",
@@ -499,7 +548,9 @@ namespace PosBranch_Win.Reports.FinancialReports
             if (currentReport == null)
             {
                 displayedLineItems = null;
-                ultraGridTrialBalance.DataSource = null;
+                _filterManager?.ClearFilters();
+            ultraGridTrialBalance.DataSource = null;
+            _filterManager?.UpdateHeaderFilterIcons();
                 ClearSummary();
                 UpdateSearchStatus(0, 0);
                 return;
@@ -518,7 +569,9 @@ namespace PosBranch_Win.Reports.FinancialReports
             }
 
             displayedLineItems = query.ToList();
+            _filterManager?.ClearFilters();
             ultraGridTrialBalance.DataSource = displayedLineItems;
+            _filterManager?.UpdateHeaderFilterIcons();
             ultraGridTrialBalance.DataBind();
             UpdateSummary(displayedLineItems);
             UpdateSearchStatus(displayedLineItems.Count, currentReport.LineItems.Count);
@@ -641,7 +694,8 @@ namespace PosBranch_Win.Reports.FinancialReports
                         sb.AppendLine();
                         sb.AppendLine("Particulars / Ledger,Account Group,Category,Opening Dr,Opening Cr,Transaction Dr,Transaction Cr,Closing Dr,Closing Cr");
 
-                        foreach (var item in exportItems)
+                        foreach (UltraGridRow gridRow in ultraGridTrialBalance.Rows.GetFilteredInNonGroupByRows())
+                        if (gridRow != null && gridRow.IsDataRow && !gridRow.Hidden && gridRow.ListObject is TrialBalanceLineItem item)
                         {
                             sb.AppendLine($"\"{item.LedgerName}\",\"{item.GroupName}\",\"{item.GroupType}\",{item.OpeningDebit:N2},{item.OpeningCredit:N2},{item.TransactionDebit:N2},{item.TransactionCredit:N2},{item.ClosingDebit:N2},{item.ClosingCredit:N2}");
                         }

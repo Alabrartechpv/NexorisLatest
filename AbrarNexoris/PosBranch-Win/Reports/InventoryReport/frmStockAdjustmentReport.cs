@@ -12,6 +12,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
+using PosBranch_Win.Reports;
 
 namespace PosBranch_Win.Reports.InventoryReport
 {
@@ -72,6 +73,7 @@ namespace PosBranch_Win.Reports.InventoryReport
         private readonly System.Windows.Forms.ToolTip headerToolTip = new System.Windows.Forms.ToolTip();
         private readonly HashSet<string> userHiddenColumnKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private static readonly Cursor blackXCursor = CreateBlackXCursor();
+        private ReportColumnFilterManager _filterManager;
 
         public frmStockAdjustmentReport()
         {
@@ -186,6 +188,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             gridReport.AfterColPosChanged += (s, e) =>
             {
                 CreateFooterCells();
+            _filterManager?.UpdateHeaderFilterIcons();
                 UpdateFooterCellPositions();
                 UpdateFooterValues();
                 ReportGridLayoutHelper.SaveLayout("StockAdjustmentReport", gridReport, userHiddenColumnKeys);
@@ -206,6 +209,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             }
 
             SetupHeaderDragToHideAndColumnChooser();
+            _filterManager = new ReportColumnFilterManager(gridReport, () => { UpdateFooterCellPositions(); UpdateFooterValues(); });
             InitializeGridFooter();
 
             btnSearch.Click += BtnSearch_Click;
@@ -561,6 +565,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             }
 
             CreateFooterCells();
+            _filterManager?.UpdateHeaderFilterIcons();
             UpdateFooterCellPositions();
             UpdateFooterValues();
         }
@@ -664,6 +669,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             if (gridReport.DisplayLayout == null || gridReport.DisplayLayout.Bands.Count == 0)
                 return;
 
+            if (e.Button == MouseButtons.Left && _filterManager != null && _filterManager.HandleMouseDown(e)) { isDraggingHeaderToHide = false; columnBeingDragged = null; return; }
             UIElement element = gridReport.DisplayLayout.UIElement?.ElementFromPoint(new Point(e.X, e.Y));
             HeaderUIElement headerUI = element as HeaderUIElement ?? element?.GetAncestor(typeof(HeaderUIElement)) as HeaderUIElement;
 
@@ -687,6 +693,7 @@ namespace PosBranch_Win.Reports.InventoryReport
 
         private void Grid_MouseMove(object sender, MouseEventArgs e)
         {
+            if (!isDraggingHeaderToHide && _filterManager != null && _filterManager.HandleMouseMove(e, headerToolTip)) return;
             if (!isDraggingHeaderToHide || columnBeingDragged == null || e.Button != MouseButtons.Left)
                 return;
 
@@ -774,6 +781,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             userHiddenColumnKeys.Add(col.Key);
             col.Hidden = true;
             CreateFooterCells();
+            _filterManager?.UpdateHeaderFilterIcons();
             UpdateFooterCellPositions();
             UpdateFooterValues();
             ReportGridLayoutHelper.SaveLayout("StockAdjustmentReport", gridReport, userHiddenColumnKeys);
@@ -789,6 +797,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             ContextMenuStrip menu = new ContextMenuStrip { Font = new Font("Segoe UI", 9F) };
             string colName = !string.IsNullOrEmpty(col.Header.Caption) ? col.Header.Caption : col.Key;
 
+            _filterManager?.AddFilterContextMenuItems(menu, col, location);
             ToolStripMenuItem hideItem = new ToolStripMenuItem($"🙈 Hide Column '{colName}'", null, (s, e) => HideColumn(col));
             hideItem.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
             menu.Items.Add(hideItem);
@@ -909,6 +918,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                     col.Header.VisiblePosition = targetVisiblePosition.Value;
                 }
                 CreateFooterCells();
+            _filterManager?.UpdateHeaderFilterIcons();
                 UpdateFooterCellPositions();
                 UpdateFooterValues();
                 ReportGridLayoutHelper.SaveLayout("StockAdjustmentReport", gridReport, userHiddenColumnKeys);
@@ -929,6 +939,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                 }
             }
             CreateFooterCells();
+            _filterManager?.UpdateHeaderFilterIcons();
             UpdateFooterCellPositions();
             UpdateFooterValues();
             ReportGridLayoutHelper.SaveLayout("StockAdjustmentReport", gridReport, userHiddenColumnKeys);
@@ -1047,6 +1058,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             }
 
             CreateFooterCells();
+            _filterManager?.UpdateHeaderFilterIcons();
             UpdateFooterCellPositions();
             UpdateFooterValues(new List<StockAdjustmentReportRow>());
         }
@@ -1260,7 +1272,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             if (gridReport.Rows == null) yield break;
             foreach (UltraGridRow row in gridReport.Rows)
             {
-                if (row != null && row.IsDataRow && !row.IsFilteredOut)
+                if (row != null && row.IsDataRow && !row.IsFilteredOut && !row.Hidden)
                     yield return row;
             }
         }
@@ -1388,8 +1400,10 @@ namespace PosBranch_Win.Reports.InventoryReport
             txtSearch.Text = string.Empty;
             _allRows.Clear();
             gridReport.DataSource = null;
+            _filterManager?.ClearFilters();
             CalculateSummaryValues(new List<StockAdjustmentReportRow>());
             CreateFooterCells();
+            _filterManager?.UpdateHeaderFilterIcons();
             UpdateFooterCellPositions();
             UpdateFooterValues(new List<StockAdjustmentReportRow>());
             lblStatus.Text = "Ready | Select filters and press Search (F5)";
@@ -1503,8 +1517,10 @@ namespace PosBranch_Win.Reports.InventoryReport
             }
 
             gridReport.DataSource = filtered;
+            _filterManager?.ClearFilters();
             CalculateSummaryValues(filtered);
             CreateFooterCells();
+            _filterManager?.UpdateHeaderFilterIcons();
             UpdateFooterCellPositions();
             UpdateFooterValues(filtered);
             lblStatus.Text = $"Ready | Found {filtered.Count} records.";
@@ -1553,7 +1569,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                     StringBuilder sb = new StringBuilder();
                     sb.AppendLine("S.No,Adj No,Date,Type,Barcode,Item Name,Unit,System Stock,Physical Stock,Diff Qty,Cost,Value,Reason,Ledger,User");
 
-                    foreach (StockAdjustmentReportRow r in rows)
+                    foreach (StockAdjustmentReportRow r in GetVisibleDataRows().Select(row => row.ListObject as StockAdjustmentReportRow).Where(x => x != null))
                     {
                         sb.AppendLine(string.Join(",",
                             CsvCell(r.SlNo.ToString()),
@@ -1585,9 +1601,9 @@ namespace PosBranch_Win.Reports.InventoryReport
                         "",
                         "",
                         "",
-                        rows.Sum(r => r.QtyDifference).ToString("F2"),
+                        GetVisibleDataRows().Select(row => row.ListObject as StockAdjustmentReportRow).Where(x => x != null).Sum(r => r.QtyDifference).ToString("F2"),
                         "",
-                        rows.Sum(r => r.AdjustmentValue).ToString("F2"),
+                        GetVisibleDataRows().Select(row => row.ListObject as StockAdjustmentReportRow).Where(x => x != null).Sum(r => r.AdjustmentValue).ToString("F2"),
                         "",
                         "",
                         ""

@@ -56,6 +56,8 @@ namespace PosBranch_Win.Reports.SalesReports
         private readonly HashSet<string> _summaryHiddenColumnKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _detailHiddenColumnKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly WinFormsToolTip _columnToolTip = new WinFormsToolTip();
+        private ReportColumnFilterManager _summaryFilterManager;
+        private ReportColumnFilterManager _detailFilterManager;
         private List<LookupItem> _salesmanLookupItems = new List<LookupItem>();
         private List<LookupItem> _userLookupItems = new List<LookupItem>();
         private List<LookupItem> _groupLookupItems = new List<LookupItem>();
@@ -327,6 +329,12 @@ namespace PosBranch_Win.Reports.SalesReports
             gridDetails.AfterColPosChanged += (s, e) => ReportGridLayoutHelper.SaveLayout("SalesmanIncentiveReport_Details", gridDetails, _detailHiddenColumnKeys);
             SetupColumnChooserMenu(gridSummary);
             SetupColumnChooserMenu(gridDetails);
+            _summaryFilterManager = new ReportColumnFilterManager(gridSummary, () => {
+                UpdateFooterCalculations();
+            });
+            _detailFilterManager = new ReportColumnFilterManager(gridDetails, () => {
+                UpdateFooterCalculations();
+            });
         }
 
         private static void ConfigureGrid(UltraGrid grid)
@@ -615,6 +623,10 @@ namespace PosBranch_Win.Reports.SalesReports
                 _activeDetails = _currentReport.Details ?? new List<SalesmanIncentiveDetail>();
                 gridDetails.DataSource = _activeDetails;
                 LoadGridLayouts();
+                _summaryFilterManager?.ClearFilters();
+                _summaryFilterManager?.UpdateHeaderFilterIcons();
+                _detailFilterManager?.ClearFilters();
+                _detailFilterManager?.UpdateHeaderFilterIcons();
                 UpdateFooter(_currentReport.Summary, _activeDetails);
             }
             catch (Exception ex)
@@ -625,6 +637,33 @@ namespace PosBranch_Win.Reports.SalesReports
             {
                 Cursor = Cursors.Default;
             }
+        }
+
+        private List<SalesmanIncentiveSummary> GetVisibleSummaryRows()
+        {
+            if (gridSummary.Rows == null || gridSummary.Rows.Count == 0)
+                return _currentReport?.Summary ?? new List<SalesmanIncentiveSummary>();
+
+            return gridSummary.Rows
+                .Where(r => r != null && r.IsDataRow && !r.Hidden && !r.IsFilteredOut && r.ListObject is SalesmanIncentiveSummary)
+                .Select(r => (SalesmanIncentiveSummary)r.ListObject)
+                .ToList();
+        }
+
+        private List<SalesmanIncentiveDetail> GetVisibleDetailRows()
+        {
+            if (gridDetails.Rows == null || gridDetails.Rows.Count == 0)
+                return _activeDetails ?? new List<SalesmanIncentiveDetail>();
+
+            return gridDetails.Rows
+                .Where(r => r != null && r.IsDataRow && !r.Hidden && !r.IsFilteredOut && r.ListObject is SalesmanIncentiveDetail)
+                .Select(r => (SalesmanIncentiveDetail)r.ListObject)
+                .ToList();
+        }
+
+        private void UpdateFooterCalculations()
+        {
+            UpdateFooter(GetVisibleSummaryRows(), GetVisibleDetailRows());
         }
 
         private void UpdateFooter(IEnumerable<SalesmanIncentiveSummary> summary, IEnumerable<SalesmanIncentiveDetail> details)
@@ -741,6 +780,7 @@ namespace PosBranch_Win.Reports.SalesReports
             }
 
             ReportGridLayoutHelper.ApplySavedLayout("SalesmanIncentiveReport_Summary", gridSummary, _summaryHiddenColumnKeys);
+            _summaryFilterManager?.UpdateHeaderFilterIcons();
             if (_columnChooserTargetGrid == gridSummary)
             {
                 PopulateColumnChooserListBox(gridSummary);
@@ -798,6 +838,7 @@ namespace PosBranch_Win.Reports.SalesReports
             }
 
             ReportGridLayoutHelper.ApplySavedLayout("SalesmanIncentiveReport_Details", gridDetails, _detailHiddenColumnKeys);
+            _detailFilterManager?.UpdateHeaderFilterIcons();
             if (_columnChooserTargetGrid == gridDetails)
             {
                 PopulateColumnChooserListBox(gridDetails);
@@ -856,7 +897,7 @@ namespace PosBranch_Win.Reports.SalesReports
 
         private void ExportCsv()
         {
-            List<SalesmanIncentiveSummary> rows = gridSummary.DataSource as List<SalesmanIncentiveSummary>;
+            List<SalesmanIncentiveSummary> rows = GetVisibleSummaryRows();
             if (rows == null || rows.Count == 0)
             {
                 MessageBox.Show("There is no data to export.", "Export", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -910,7 +951,7 @@ namespace PosBranch_Win.Reports.SalesReports
 
         private void ShowReportPreview()
         {
-            List<SalesmanIncentiveSummary> rows = gridSummary.DataSource as List<SalesmanIncentiveSummary>;
+            List<SalesmanIncentiveSummary> rows = GetVisibleSummaryRows();
             if (rows == null || rows.Count == 0)
             {
                 MessageBox.Show("There is no data to preview. Click View Grid first.", "Preview", MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -1032,7 +1073,9 @@ namespace PosBranch_Win.Reports.SalesReports
         {
             if (_gridLayoutsLoaded) return;
             ReportGridLayoutHelper.ApplySavedLayout("SalesmanIncentiveReport_Summary", gridSummary, _summaryHiddenColumnKeys);
+            _summaryFilterManager?.UpdateHeaderFilterIcons();
             ReportGridLayoutHelper.ApplySavedLayout("SalesmanIncentiveReport_Details", gridDetails, _detailHiddenColumnKeys);
+            _detailFilterManager?.UpdateHeaderFilterIcons();
             _gridLayoutsLoaded = true;
         }
 
@@ -1239,6 +1282,36 @@ namespace PosBranch_Win.Reports.SalesReports
             _isDraggingColumn = false;
             _columnToMove = null;
             _columnChooserTargetGrid = grid;
+            var filterMgr = grid == gridSummary ? _summaryFilterManager : _detailFilterManager;
+            if (e.Button == MouseButtons.Right)
+            {
+                Point pt = new Point(e.X, e.Y);
+                UIElement elem = grid.DisplayLayout.UIElement?.ElementFromPoint(pt);
+                HeaderUIElement hUI = elem as HeaderUIElement ?? elem?.GetAncestor(typeof(HeaderUIElement)) as HeaderUIElement;
+                if (hUI?.Header?.Column != null)
+                {
+                    ContextMenuStrip menu = new ContextMenuStrip { Font = new Font("Segoe UI", 9F) };
+                    UltraGridColumn col = hUI.Header.Column;
+                    ToolStripMenuItem hideItem = new ToolStripMenuItem($"Hide '{col.Header.Caption}'", null, (s, ev) => HideColumn(grid, col));
+                    menu.Items.Add(hideItem);
+                    if (filterMgr != null)
+                    {
+                        menu.Items.Add(new ToolStripSeparator());
+                        filterMgr.AddFilterContextMenuItems(menu, col, pt);
+                    }
+                    menu.Items.Add(new ToolStripSeparator());
+                    ToolStripMenuItem chooserItem = new ToolStripMenuItem("Field/Column Chooser...", null, (s, ev) => ShowColumnChooser(grid));
+                    menu.Items.Add(chooserItem);
+                    menu.Show(grid, pt);
+                    return;
+                }
+            }
+            if (e.Button == MouseButtons.Left && filterMgr != null && filterMgr.HandleMouseDown(e))
+            {
+                _isDraggingColumn = false;
+                _columnToMove = null;
+                return;
+            }
             _dragStartPoint = new Point(e.X, e.Y);
 
             if (grid == null || e.Y >= 40 || grid.DisplayLayout.Bands.Count <= 0) return;
@@ -1267,7 +1340,12 @@ namespace PosBranch_Win.Reports.SalesReports
         private void Grid_MouseMove(object sender, MouseEventArgs e)
         {
             UltraGrid grid = sender as UltraGrid;
-            if (!_isDraggingColumn || _columnToMove == null || grid == null || e.Button != MouseButtons.Left) return;
+            if (grid == null) return;
+            var filterMgr = grid == gridSummary ? _summaryFilterManager : _detailFilterManager;
+            if (!_isDraggingColumn && filterMgr != null && e.Button != MouseButtons.Left && filterMgr.HandleMouseMove(e, _columnToolTip))
+                return;
+
+            if (!_isDraggingColumn || _columnToMove == null || e.Button != MouseButtons.Left) return;
 
             int deltaX = Math.Abs(e.X - _dragStartPoint.X);
             int deltaY = Math.Abs(e.Y - _dragStartPoint.Y);

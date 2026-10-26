@@ -74,6 +74,7 @@ namespace PosBranch_Win.Reports.SalesReports
         private Point headerDragStartPoint;
         private readonly System.Windows.Forms.ToolTip headerToolTip = new System.Windows.Forms.ToolTip();
         private static readonly Cursor blackXCursor = CreateBlackXCursor();
+        private ReportColumnFilterManager _filterManager;
         #endregion
 
         #region Helper Classes
@@ -132,6 +133,8 @@ namespace PosBranch_Win.Reports.SalesReports
                 comboPeriod.Items.Add("This Year", "This Year");
                 comboPeriod.Items.Add("Custom", "Custom Range");
                 comboPeriod.Value = "This Month";
+            _filterManager?.ClearFilters();
+            _filterManager?.UpdateHeaderFilterIcons();
 
                 // Initialize dates
                 InitializeDateControls();
@@ -469,6 +472,7 @@ namespace PosBranch_Win.Reports.SalesReports
             }
 
             ReportGridLayoutHelper.ApplySavedLayout("CustomerwiseSalesSummaryReport", gridReport, userHiddenColumnKeys);
+            _filterManager?.UpdateHeaderFilterIcons();
 
             CreateFooterCells();
             UpdateFooterCellPositions();
@@ -864,7 +868,7 @@ namespace PosBranch_Win.Reports.SalesReports
             if (gridReport.Rows == null) yield break;
             foreach (UltraGridRow row in gridReport.Rows)
             {
-                if (row != null && row.IsDataRow && !row.IsFilteredOut)
+                if (row != null && row.IsDataRow && !row.IsFilteredOut && !row.Hidden)
                     yield return row;
             }
         }
@@ -1013,6 +1017,11 @@ namespace PosBranch_Win.Reports.SalesReports
             gridReport.MouseUp += GridReport_MouseUp;
             gridReport.DragOver += GridReport_DragOver;
             gridReport.DragDrop += GridReport_DragDrop;
+            _filterManager = new ReportColumnFilterManager(gridReport, () => {
+                UpdateFooterCellPositions();
+                UpdateFooterValues();
+                UpdateSummaryCardValues();
+            });
         }
 
         private void GridReport_MouseDown(object sender, MouseEventArgs e)
@@ -1028,6 +1037,13 @@ namespace PosBranch_Win.Reports.SalesReports
                     ShowHeaderContextMenu(headerUI.Header.Column, pt);
                     return;
                 }
+            }
+
+            if (e.Button == MouseButtons.Left && _filterManager != null && _filterManager.HandleMouseDown(e))
+            {
+                isDraggingHeaderToHide = false;
+                columnBeingDragged = null;
+                return;
             }
 
             if (e.Button == MouseButtons.Left)
@@ -1051,6 +1067,9 @@ namespace PosBranch_Win.Reports.SalesReports
 
         private void GridReport_MouseMove(object sender, MouseEventArgs e)
         {
+            if (!isDraggingHeaderToHide && _filterManager != null && e.Button != MouseButtons.Left && _filterManager.HandleMouseMove(e, headerToolTip))
+                return;
+
             if (e.Button == MouseButtons.Left && columnBeingDragged != null)
             {
                 int deltaY = e.Y - headerDragStartPoint.Y;
@@ -1073,6 +1092,9 @@ namespace PosBranch_Win.Reports.SalesReports
 
         private void GridReport_MouseUp(object sender, MouseEventArgs e)
         {
+            if (!isDraggingHeaderToHide && _filterManager != null && e.Button != MouseButtons.Left && _filterManager.HandleMouseMove(e, headerToolTip))
+                return;
+
             if (e.Button == MouseButtons.Left && columnBeingDragged != null)
             {
                 if (isDraggingHeaderToHide)
@@ -1159,6 +1181,11 @@ namespace PosBranch_Win.Reports.SalesReports
             ToolStripMenuItem hideItem = new ToolStripMenuItem($"🙈 Hide Column '{colName}'", null, (s, e) => HideColumn(col));
             hideItem.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
             menu.Items.Add(hideItem);
+            if (_filterManager != null)
+            {
+                menu.Items.Add(new ToolStripSeparator());
+                _filterManager.AddFilterContextMenuItems(menu, col, location);
+            }
 
             menu.Items.Add(new ToolStripSeparator());
 
@@ -1474,6 +1501,8 @@ namespace PosBranch_Win.Reports.SalesReports
             gridReport.DataSource = resultList;
 
             ApplyUserHiddenColumns();
+            _filterManager?.ClearFilters();
+            _filterManager?.UpdateHeaderFilterIcons();
 
             UpdateSummaryCardValues();
             UpdateFooterValues();
@@ -1525,6 +1554,8 @@ namespace PosBranch_Win.Reports.SalesReports
 
             InitializeDateControls();
             comboPeriod.Value = "This Month";
+            _filterManager?.ClearFilters();
+            _filterManager?.UpdateHeaderFilterIcons();
 
             FetchFromDatabase();
         }
@@ -1680,7 +1711,7 @@ namespace PosBranch_Win.Reports.SalesReports
                     var sb = new StringBuilder();
                     sb.AppendLine(string.Join(",", visibleCols.Select(c => $"\"{c.Header.Caption}\"")));
 
-                    foreach (var row in gridReport.Rows.GetFilteredInNonGroupByRows())
+                    foreach (var row in gridReport.Rows.GetFilteredInNonGroupByRows().Where(r => !r.Hidden))
                     {
                         var cells = visibleCols.Select(c =>
                         {
