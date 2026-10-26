@@ -1,4 +1,4 @@
-﻿-- ====================================================================================
+-- ====================================================================================
 -- NEXORIS CLIENT-SIDE UPDATE & RECONCILIATION PATCH
 -- Target: SQL Server 2012, 2014, 2016, 2019, 2022+ (All Editions)
 -- Safe & Idempotent: Can be executed multiple times on any client database.
@@ -270,7 +270,9 @@ BEGIN
     BEGIN
         SELECT @ClosingStock = ISNULL(SUM(ISNULL(Stock, 0) * ISNULL(Cost, 0)), 0)
         FROM PriceSettings
-        WHERE (@BranchId = 0 OR BranchId = @BranchId) AND ISNULL(Stock, 0) > 0;
+        WHERE (@BranchId = 0 OR BranchId = @BranchId) 
+          AND ISNULL(Stock, 0) > 0
+          AND ISNULL(IsBaseUnit, 'N') = 'Y';
     END
     ELSE IF OBJECT_ID('StockMaster', 'U') IS NOT NULL
     BEGIN
