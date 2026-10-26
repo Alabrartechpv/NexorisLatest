@@ -1495,13 +1495,15 @@ namespace PosBranch_Win.Reports.FinancialReports
 
                 using (SaveFileDialog sfd = new SaveFileDialog
                 {
-                    Filter = "CSV File (*.csv)|*.csv",
+                    Filter = ReportPdfExporter.CsvAndPdfFilter,
                     FileName = $"CashInOutReport_{DateTime.Now:yyyyMMdd_HHmm}.csv"
                 })
                 {
                     if (sfd.ShowDialog() == DialogResult.OK)
                     {
                         var sb = new StringBuilder();
+                        if (ReportPdfExporter.CheckAndExportPdf(sfd, ultraGridTransactions, "Cash In Out Report", $"Period: {dtFromDate.DateTime:dd-MM-yyyy} to {dtToDate.DateTime:dd-MM-yyyy}")) return;
+
                         sb.AppendLine("SlNo,Date,VoucherNo,VoucherType,Category,Direction,Particulars,Mode,InflowAmount,OutflowAmount,Narration");
 
                         foreach (var t in _filteredTransactions)

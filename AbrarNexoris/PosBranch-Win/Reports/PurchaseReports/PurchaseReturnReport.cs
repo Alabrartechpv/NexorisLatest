@@ -2166,12 +2166,13 @@ namespace PosBranch_Win.Reports.PurchaseReports
             try
             {
                 SaveFileDialog saveDialog = new SaveFileDialog();
-                saveDialog.Filter = "Excel Files (*.xlsx)|*.xlsx|Excel Files (*.xls)|*.xls";
+                saveDialog.Filter = "Excel Files (*.xlsx)|*.xlsx|Excel Files (*.xls)|*.xls|PDF Documents (*.pdf)|*.pdf";
                 saveDialog.FileName = $"PurchaseReturnReport_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
 
                 if (saveDialog.ShowDialog() == DialogResult.OK)
                 {
                     DataTable exportTable = CreateExportTable();
+                    if (ReportPdfExporter.CheckAndExportPdf(saveDialog, exportTable, "Purchase Return Report")) return;
                     ExportToCSV(exportTable, saveDialog.FileName);
 
                     MessageBox.Show($"Report exported successfully to:\n{saveDialog.FileName}", "Export Complete",

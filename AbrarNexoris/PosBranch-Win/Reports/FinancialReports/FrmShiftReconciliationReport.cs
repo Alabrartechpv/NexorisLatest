@@ -536,12 +536,13 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             using (SaveFileDialog dialog = new SaveFileDialog())
             {
-                dialog.Filter = "CSV files (*.csv)|*.csv";
+                dialog.Filter = ReportPdfExporter.CsvAndPdfFilter;
                 dialog.FileName = $"ShiftReconciliation_{DateTime.Now:yyyyMMdd_HHmmss}";
 
                 if (dialog.ShowDialog(this) != DialogResult.OK)
                     return;
 
+                if (ReportPdfExporter.CheckAndExportPdf(dialog, gridReport, "Shift Reconciliation & Z-Report Audit")) return;
                 Cursor previousCursor = Cursor;
                 Cursor = Cursors.WaitCursor;
 

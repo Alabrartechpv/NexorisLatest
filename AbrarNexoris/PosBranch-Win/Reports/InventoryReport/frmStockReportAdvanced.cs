@@ -1760,12 +1760,13 @@ namespace PosBranch_Win.Reports.InventoryReport
             {
                 SaveFileDialog saveFileDialog = new SaveFileDialog
                 {
-                    Filter = "CSV Files|*.csv",
+                    Filter = ReportPdfExporter.CsvAndPdfFilter,
                     Title = "Save Stock Report"
                 };
 
                 if (saveFileDialog.ShowDialog() == DialogResult.OK)
                 {
+                    if (ReportPdfExporter.CheckAndExportPdf(saveFileDialog, ultraGridStock, "Stock Report (Advanced)")) return;
                     if (ultraGridStock.Rows.Count > 0)
                     {
                         ExportToCSV(ultraGridStock, saveFileDialog.FileName);

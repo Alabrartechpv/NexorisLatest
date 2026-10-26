@@ -1489,7 +1489,7 @@ namespace PosBranch_Win.Reports.SalesReports
 
             using (SaveFileDialog sfd = new SaveFileDialog())
             {
-                sfd.Filter = "CSV Files (*.csv)|*.csv|All Files (*.*)|*.*";
+                sfd.Filter = "CSV Files (*.csv)|*.csv|PDF Documents (*.pdf)|*.pdf|All Files (*.*)|*.*";
                 sfd.FileName = $"SalesProfitReport_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
 
                 if (sfd.ShowDialog() == DialogResult.OK)
@@ -1497,6 +1497,8 @@ namespace PosBranch_Win.Reports.SalesReports
                     try
                     {
                         StringBuilder sb = new StringBuilder();
+                        if (ReportPdfExporter.CheckAndExportPdf(sfd, ultraGridProfit, "Sales Profit Report")) return;
+
                         sb.AppendLine("Bill No,Bill Date,Sales Amount,Cost Amount (COGS),Profit Amount,Profit Margin %,Pay Mode,Cash Mode");
 
                         foreach (var item in visibleData)

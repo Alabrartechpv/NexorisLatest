@@ -823,7 +823,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             {
                 using (SaveFileDialog dialog = new SaveFileDialog())
                 {
-                    dialog.Filter = "CSV Files|*.csv";
+                    dialog.Filter = "CSV Files (*.csv)|*.csv|PDF Documents (*.pdf)|*.pdf";
                     dialog.Title = "Save Day Book Export";
                     dialog.FileName = $"DayBook_{dtFromDate.DateTime:ddMMyyyy}_to_{dtToDate.DateTime:ddMMyyyy}.csv";
 
@@ -832,6 +832,8 @@ namespace PosBranch_Win.Reports.FinancialReports
                         Cursor.Current = Cursors.WaitCursor;
                         using (StreamWriter writer = new StreamWriter(dialog.FileName))
                         {
+                        if (ReportPdfExporter.CheckAndExportPdf(dialog, ultraGridDayBook, "Day Book Report", $"Period: {dtFromDate.DateTime:dd/MM/yyyy} to {dtToDate.DateTime:dd/MM/yyyy}")) return;
+
                             writer.WriteLine("Date,Voucher ID,Type,Particulars,Narration,Debit (Dr),Credit (Cr)");
 
                             foreach (var t in transactions)

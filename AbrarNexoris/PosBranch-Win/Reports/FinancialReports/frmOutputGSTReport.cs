@@ -859,10 +859,11 @@ namespace PosBranch_Win.Reports.FinancialReports
             {
                 using (SaveFileDialog dialog = new SaveFileDialog())
                 {
-                    dialog.Filter = "CSV File (*.csv)|*.csv";
+                    dialog.Filter = ReportPdfExporter.CsvAndPdfFilter;
                     dialog.FileName = $"Output_GST_Report_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
                     if (dialog.ShowDialog() == DialogResult.OK)
                     {
+                        if (ReportPdfExporter.CheckAndExportPdf(dialog, gridReport, "Output GST Report")) return;
                         MessageBox.Show("Export process initialized.", "Export", MessageBoxButtons.OK, MessageBoxIcon.Information);
                     }
                 }

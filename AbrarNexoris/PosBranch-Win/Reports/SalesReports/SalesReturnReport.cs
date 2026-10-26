@@ -1786,12 +1786,13 @@ namespace PosBranch_Win.Reports.SalesReports
             {
                 SaveFileDialog sfd = new SaveFileDialog
                 {
-                    Filter = "CSV (Comma delimited) (*.csv)|*.csv",
+                    Filter = ReportPdfExporter.CsvAndPdfFilter,
                     FileName = $"SalesReturnReport_{DateTime.Now:yyyyMMdd_HHmmss}.csv"
                 };
 
                 if (sfd.ShowDialog() == DialogResult.OK)
                 {
+                    if (ReportPdfExporter.CheckAndExportPdf(sfd, ultraGridMaster, "Sales Return Report")) return;
                     using (StreamWriter sw = new StreamWriter(sfd.FileName))
                     {
                         if (ultraGridMaster.DataSource is DataSet ds && ds.Tables.Contains("SalesReturnMaster"))

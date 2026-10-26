@@ -613,12 +613,13 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             using (SaveFileDialog dialog = new SaveFileDialog())
             {
-                dialog.Filter = "CSV files (*.csv)|*.csv";
+                dialog.Filter = ReportPdfExporter.CsvAndPdfFilter;
                 dialog.FileName = string.Format("VendorPayment_{0:yyyyMMdd_HHmmss}.csv", DateTime.Now);
 
                 if (dialog.ShowDialog(this) != DialogResult.OK)
                     return;
 
+                if (ReportPdfExporter.CheckAndExportPdf(dialog, gridReport, "Vendor Payment Report")) return;
                 StringBuilder builder = new StringBuilder();
                 builder.AppendLine("Date,Doc No,Vendor,Company - Vendor Name,Amount,Balance,Mode,Remark,Status,Payment Ref");
 

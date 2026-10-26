@@ -1648,11 +1648,12 @@ namespace PosBranch_Win.Reports.SalesReports
             {
                 using (var saveDlg = new SaveFileDialog())
                 {
-                    saveDlg.Filter = "CSV Files (*.csv)|*.csv";
+                    saveDlg.Filter = ReportPdfExporter.CsvAndPdfFilter;
                     saveDlg.FileName = $"SalesmanwiseSalesSummary_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
 
                     if (saveDlg.ShowDialog() != DialogResult.OK) return;
 
+                    if (ReportPdfExporter.CheckAndExportPdf(saveDlg, gridReport, "Salesman-wise Sales Summary Report")) return;
                     var sb = new StringBuilder();
                     sb.AppendLine("S.No,Salesman Name,Email Address,Invoice Count,Total Qty Sold,Total Sales,Commission %,Commission Earned");
 

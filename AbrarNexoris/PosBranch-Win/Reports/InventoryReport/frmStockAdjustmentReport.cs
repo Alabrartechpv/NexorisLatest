@@ -1561,11 +1561,12 @@ namespace PosBranch_Win.Reports.InventoryReport
             {
                 using (SaveFileDialog saveDlg = new SaveFileDialog())
                 {
-                    saveDlg.Filter = "CSV Files (*.csv)|*.csv";
+                    saveDlg.Filter = ReportPdfExporter.CsvAndPdfFilter;
                     saveDlg.FileName = $"StockAdjustments_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
 
                     if (saveDlg.ShowDialog() != DialogResult.OK) return;
 
+                    if (ReportPdfExporter.CheckAndExportPdf(saveDlg, gridReport, "Stock Adjustment Report")) return;
                     StringBuilder sb = new StringBuilder();
                     sb.AppendLine("S.No,Adj No,Date,Type,Barcode,Item Name,Unit,System Stock,Physical Stock,Diff Qty,Cost,Value,Reason,Ledger,User");
 

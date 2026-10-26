@@ -1526,12 +1526,13 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             using (SaveFileDialog dialog = new SaveFileDialog())
             {
-                dialog.Filter = "CSV files (*.csv)|*.csv";
+                dialog.Filter = ReportPdfExporter.CsvAndPdfFilter;
                 dialog.FileName = string.Format("VendorOutstandingListing_{0:yyyyMMdd_HHmmss}.csv", DateTime.Now);
 
                 if (dialog.ShowDialog(this) != DialogResult.OK)
                     return;
 
+                if (ReportPdfExporter.CheckAndExportPdf(dialog, gridReport, "Vendor Outstanding Report")) return;
                 StringBuilder builder = new StringBuilder();
                 string docNoHeader = _getUnallocatedReturnsOnly ? "Return No" : "Doc No";
                 string dateHeader = _getUnallocatedReturnsOnly ? "Return Date" : "Date";

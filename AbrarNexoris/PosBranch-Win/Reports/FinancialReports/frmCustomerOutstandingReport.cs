@@ -1475,7 +1475,7 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             using (SaveFileDialog dialog = new SaveFileDialog())
             {
-                dialog.Filter = "CSV Files (*.csv)|*.csv|All Files (*.*)|*.*";
+                dialog.Filter = "CSV Files (*.csv)|*.csv|PDF Documents (*.pdf)|*.pdf|All Files (*.*)|*.*";
                 dialog.FileName = $"CustomerOutstandingListing_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
                 if (dialog.ShowDialog(this) != DialogResult.OK)
                     return;
@@ -1483,6 +1483,8 @@ namespace PosBranch_Win.Reports.FinancialReports
                 try
                 {
                     StringBuilder sb = new StringBuilder();
+                    if (ReportPdfExporter.CheckAndExportPdf(dialog, ultraGridReport, "Customer Outstanding Report")) return;
+
                     sb.AppendLine("Cust ID,Customer Name,Salesperson,Bill No,Date,Due Date,Invoice Amount,Received Amount,Balance");
 
                     foreach (var row in rows)

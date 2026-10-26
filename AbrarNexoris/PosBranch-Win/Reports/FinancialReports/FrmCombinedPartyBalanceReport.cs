@@ -364,13 +364,15 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             using (SaveFileDialog dialog = new SaveFileDialog())
             {
-                dialog.Filter = "CSV files (*.csv)|*.csv";
+                dialog.Filter = ReportPdfExporter.CsvAndPdfFilter;
                 dialog.FileName = $"CombinedPartyBalance_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
 
                 if (dialog.ShowDialog(this) != DialogResult.OK)
                     return;
 
                 StringBuilder builder = new StringBuilder();
+                if (ReportPdfExporter.CheckAndExportPdf(dialog, ultraGridReport, "Combined Party Balance Report")) return;
+
                 builder.AppendLine("Party Type,Party Name,Old Balance,Current Outstanding,Net Total,Old Rows,Current Rows,Last Old,Last Current,Status");
 
                 foreach (CombinedPartyBalanceReportRow row in rows)

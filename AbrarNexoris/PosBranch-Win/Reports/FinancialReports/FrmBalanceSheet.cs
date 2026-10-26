@@ -672,7 +672,7 @@ namespace PosBranch_Win.Reports.FinancialReports
 
                 using (SaveFileDialog sfd = new SaveFileDialog())
                 {
-                    sfd.Filter = "CSV Files (*.csv)|*.csv";
+                    sfd.Filter = ReportPdfExporter.CsvAndPdfFilter;
                     sfd.FileName = $"BalanceSheet_{ultraDateTimeFrom.DateTime:yyyyMMdd}_to_{ultraDateTimeTo.DateTime:yyyyMMdd}.csv";
 
                     if (sfd.ShowDialog() == DialogResult.OK)
@@ -708,6 +708,8 @@ namespace PosBranch_Win.Reports.FinancialReports
                         sb.AppendLine();
 
                         sb.AppendLine($"Difference:,{currentReport.Summary.Difference:N2}");
+
+                        if (ReportPdfExporter.CheckAndExportPdf(sfd, sb.ToString(), "Balance Sheet", $"Period: {ultraDateTimeFrom.DateTime:dd/MM/yyyy} to {ultraDateTimeTo.DateTime:dd/MM/yyyy}")) return;
 
                         File.WriteAllText(sfd.FileName, sb.ToString());
                         MessageBox.Show("Report exported successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);

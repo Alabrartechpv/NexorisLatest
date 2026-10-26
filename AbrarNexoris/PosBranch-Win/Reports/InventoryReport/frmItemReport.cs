@@ -1744,12 +1744,13 @@ namespace PosBranch_Win.Reports.InventoryReport
             {
                 SaveFileDialog saveFileDialog = new SaveFileDialog
                 {
-                    Filter = "CSV Files|*.csv",
+                    Filter = ReportPdfExporter.CsvAndPdfFilter,
                     Title = "Save Report"
                 };
 
                 if (saveFileDialog.ShowDialog() == DialogResult.OK)
                 {
+                    if (ReportPdfExporter.CheckAndExportPdf(saveFileDialog, ultraGridTransactions, "Item Movement Report", $"Item: {selectedItemName}")) return;
                     if (ultraGridTransactions.Rows.Count > 0)
                     {
                         ExportToCSV(ultraGridTransactions, saveFileDialog.FileName);

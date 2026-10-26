@@ -1331,11 +1331,12 @@ namespace PosBranch_Win.Reports.InventoryReport
 
                 using (SaveFileDialog sfd = new SaveFileDialog())
                 {
-                    sfd.Filter = "CSV File (*.csv)|*.csv|All Files (*.*)|*.*";
+                    sfd.Filter = ReportPdfExporter.CsvAndPdfFilter;
                     sfd.FileName = $"Inactive_Items_Report_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
 
                     if (sfd.ShowDialog() == DialogResult.OK)
                     {
+                        if (ReportPdfExporter.CheckAndExportPdf(sfd, gridReport, "Inactive Items Report")) return;
                         StringBuilder sb = new StringBuilder();
                         sb.AppendLine("Item Code,Barcode,Item Description,Category,Group,Brand,Unit,Stock Qty,Unit Cost,Retail Price,Selling Price,Inactivated Date,Inactivation Reason,Inactivated By User,Counter,Branch");
 

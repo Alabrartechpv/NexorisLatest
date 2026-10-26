@@ -2868,12 +2868,13 @@ namespace PosBranch_Win.Reports.SalesReports
 
             using (SaveFileDialog dialog = new SaveFileDialog())
             {
-                dialog.Filter = "CSV files (*.csv)|*.csv";
+                dialog.Filter = ReportPdfExporter.CsvAndPdfFilter;
                 dialog.FileName = string.Format("SalesReturnAuditReport_{0:yyyyMMdd_HHmmss}.csv", DateTime.Now);
 
                 if (dialog.ShowDialog(this) != DialogResult.OK)
                     return;
 
+                if (ReportPdfExporter.CheckAndExportPdf(dialog, gridReport, "Sales Return Audit Report", BuildPreviewSubtitle())) return;
                 StringBuilder builder = new StringBuilder();
                 builder.AppendLine("Period,ReturnNo,ReturnDate,InvoiceNo,InvoiceDate,Customer,Paymode,SlNo,ItemName,Unit,Packing,Qty,SalesPrice,TaxPer,TaxAmt,ItemAmount,Reason,ReturnSubTotal,ReturnGrandTotal");
 

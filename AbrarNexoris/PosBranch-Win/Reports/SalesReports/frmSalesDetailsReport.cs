@@ -5,6 +5,7 @@ using Infragistics.Win.UltraWinGrid;
 using ModelClass;
 using ModelClass.Master;
 using ModelClass.Report;
+using PosBranch_Win.DialogBox;
 using PosBranch_Win.Reports;
 using Repository;
 using Repository.ReportRepository;
@@ -73,6 +74,17 @@ namespace PosBranch_Win.Reports.SalesReports
         private static readonly Cursor blackXCursor = CreateBlackXCursor();
         private bool isLoading = false;
         private DataTable _currentDataTable;
+        private DataSet _fullDataSet;
+        private string _selectedGroup = string.Empty;
+        private string _selectedCategory = string.Empty;
+        private Dictionary<string, ItemGroupCategoryInfo> _itemGroupCategoryCache;
+        private Dictionary<string, ItemGroupCategoryInfo> _itemGroupCategoryByNameCache;
+
+        private class ItemGroupCategoryInfo
+        {
+            public string Group { get; set; } = string.Empty;
+            public string Category { get; set; } = string.Empty;
+        }
         private ReportColumnFilterManager _filterManager;
         #endregion
 
@@ -211,6 +223,35 @@ namespace PosBranch_Win.Reports.SalesReports
 
             // Setup Column Drag-To-Hide & Chooser
             SetupHeaderDragToHideAndColumnChooser();
+            // Style Group & Category Controls
+            if (chkActiveGroupCategory != null)
+            {
+                chkActiveGroupCategory.Appearance.ForeColor = ControlTextColor;
+                chkActiveGroupCategory.Appearance.FontData.Name = "Tahoma";
+                chkActiveGroupCategory.Appearance.FontData.SizeInPoints = 9;
+                chkActiveGroupCategory.Appearance.FontData.Bold = DefaultableBoolean.True;
+            }
+
+            StyleTextEditor(txt_Group);
+            StyleTextEditor(txt_Category);
+            StyleClassicButton(btn_Group);
+            StyleClassicButton(btn_Category);
+            StyleClassicButton(btnClearGroupCategory);
+
+            if (txt_Group != null)
+            {
+                txt_Group.KeyDown += Txt_Group_KeyDown;
+                txt_Group.Leave += Txt_Group_Leave;
+            }
+            if (txt_Category != null)
+            {
+                txt_Category.KeyDown += Txt_Category_KeyDown;
+                txt_Category.Leave += Txt_Category_Leave;
+            }
+
+            SetupGroupCategoryAutoComplete();
+            UpdateGroupCategoryControlVisibility();
+
             _filterManager = new ReportColumnFilterManager(ultraGridMaster, () => {
                 UpdateFooterCellPositions();
                 UpdateFooterValues();
@@ -276,6 +317,20 @@ namespace PosBranch_Win.Reports.SalesReports
             dtEditor.Appearance.FontData.Name = "Tahoma";
             dtEditor.Appearance.FontData.SizeInPoints = 9;
             dtEditor.ButtonStyle = UIElementButtonStyle.Office2003ToolbarButton;
+        }
+
+        private static void StyleTextEditor(Infragistics.Win.UltraWinEditors.UltraTextEditor editor)
+        {
+            if (editor == null) return;
+            editor.UseAppStyling = false;
+            editor.UseOsThemes = DefaultableBoolean.False;
+            editor.DisplayStyle = EmbeddableElementDisplayStyle.Office2013;
+            editor.BorderStyle = UIElementBorderStyle.Solid;
+            editor.Appearance.BackColor = ControlBackColor;
+            editor.Appearance.BorderColor = BorderBlue;
+            editor.Appearance.ForeColor = ControlTextColor;
+            editor.Appearance.FontData.Name = "Tahoma";
+            editor.Appearance.FontData.SizeInPoints = 9;
         }
 
         private void SetupGridAppearance(UltraGrid grid)
@@ -394,6 +449,8 @@ namespace PosBranch_Win.Reports.SalesReports
                 UpdateFooterCellPositions();
             };
             grid.AfterSortChange += (s, e) => UpdateFooterValues();
+            grid.ClickCellButton += UltraGridMaster_ClickCellButton;
+            grid.DoubleClickCell += (s, e) => { if (e.Cell != null && e.Cell.Column != null) UltraGridMaster_ClickCellButton(s, new CellEventArgs(e.Cell)); };
         }
 
         private void LoadLookupData()
@@ -472,6 +529,13 @@ namespace PosBranch_Win.Reports.SalesReports
             cmbPaymentMode.Value = "ALL";
             cmbSalesType.Value = "ALL";
             cmbCustomer.Value = "";
+
+            if (chkActiveGroupCategory != null) chkActiveGroupCategory.Checked = false;
+            if (txt_Group != null) txt_Group.Text = string.Empty;
+            if (txt_Category != null) txt_Category.Text = string.Empty;
+            _selectedGroup = string.Empty;
+            _selectedCategory = string.Empty;
+            UpdateGroupCategoryControlVisibility();
 
             if (reload)
             {
@@ -654,6 +718,8 @@ namespace PosBranch_Win.Reports.SalesReports
                 detailTable.Columns.Add("SlNo", typeof(int));
                 detailTable.Columns.Add("ItemName", typeof(string));
                 detailTable.Columns.Add("Barcode", typeof(string));
+                detailTable.Columns.Add("Group", typeof(string));
+                detailTable.Columns.Add("Category", typeof(string));
                 detailTable.Columns.Add("Unit", typeof(string));
                 detailTable.Columns.Add("Packing", typeof(string));
                 detailTable.Columns.Add("Qty", typeof(decimal));
@@ -694,6 +760,7 @@ namespace PosBranch_Win.Reports.SalesReports
                                 dRow["SlNo"] = detailSerial++;
                                 dRow["ItemName"] = d.ItemName ?? "";
                                 dRow["Barcode"] = d.Barcode ?? "";
+                                PopulateDetailRowGroupAndCategory(dRow, d);
                                 dRow["Unit"] = d.Unit ?? "";
                                 dRow["Packing"] = d.Packing ?? "";
                                 dRow["Qty"] = Convert.ToDecimal(d.Qty);
@@ -726,7 +793,9 @@ namespace PosBranch_Win.Reports.SalesReports
                 );
                 dsHierarchical.Relations.Add(relation);
 
-                _currentDataTable = masterTable;
+                _fullDataSet = dsHierarchical;
+                FilterAndBindDataSet();
+                return;
                 ultraGridMaster.DataSource = null;
                 _filterManager?.ClearFilters();
                 ultraGridMaster.DataSource = dsHierarchical;
@@ -776,6 +845,7 @@ namespace PosBranch_Win.Reports.SalesReports
                                     dRow["SlNo"] = detailSerial++;
                                     dRow["ItemName"] = d.ItemName ?? "";
                                     dRow["Barcode"] = d.Barcode ?? "";
+                                PopulateDetailRowGroupAndCategory(dRow, d);
                                     dRow["Unit"] = d.Unit ?? "";
                                     dRow["Packing"] = d.Packing ?? "";
                                     dRow["Qty"] = Convert.ToDecimal(d.Qty);
@@ -842,6 +912,7 @@ namespace PosBranch_Win.Reports.SalesReports
                 }
 
                 ReportGridLayoutHelper.ApplySavedLayout("SalesDetailsReport", ultraGridMaster, userHiddenColumnKeys);
+                UpdateGroupCategoryColumnVisibility();
                 _filterManager?.UpdateHeaderFilterIcons();
 
                 CreateFooterCells();
@@ -1016,6 +1087,34 @@ namespace PosBranch_Win.Reports.SalesReports
                 detailBand.Columns["Barcode"].CellAppearance.ForeColor = Color.FromArgb(84, 110, 122);
                 detailBand.Columns["Barcode"].Header.VisiblePosition = pos++;
             }
+            if (detailBand.Columns.Exists("Group"))
+            {
+                detailBand.Columns["Group"].Header.Caption = "Group";
+                detailBand.Columns["Group"].Width = 120;
+                detailBand.Columns["Group"].CellAppearance.TextHAlign = HAlign.Left;
+                detailBand.Columns["Group"].CellAppearance.TextVAlign = VAlign.Middle;
+                detailBand.Columns["Group"].Style = Infragistics.Win.UltraWinGrid.ColumnStyle.EditButton;
+                detailBand.Columns["Group"].ButtonDisplayStyle = Infragistics.Win.UltraWinGrid.ButtonDisplayStyle.Always;
+                detailBand.Columns["Group"].CellActivation = Activation.ActivateOnly;
+                detailBand.Columns["Group"].CellClickAction = CellClickAction.CellSelect;
+                detailBand.Columns["Group"].Header.VisiblePosition = pos++;
+                detailBand.Columns["Group"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.False;
+                detailBand.Columns["Group"].Hidden = !(chkActiveGroupCategory != null && chkActiveGroupCategory.Checked);
+            }
+            if (detailBand.Columns.Exists("Category"))
+            {
+                detailBand.Columns["Category"].Header.Caption = "Category";
+                detailBand.Columns["Category"].Width = 120;
+                detailBand.Columns["Category"].CellAppearance.TextHAlign = HAlign.Left;
+                detailBand.Columns["Category"].CellAppearance.TextVAlign = VAlign.Middle;
+                detailBand.Columns["Category"].Style = Infragistics.Win.UltraWinGrid.ColumnStyle.EditButton;
+                detailBand.Columns["Category"].ButtonDisplayStyle = Infragistics.Win.UltraWinGrid.ButtonDisplayStyle.Always;
+                detailBand.Columns["Category"].CellActivation = Activation.ActivateOnly;
+                detailBand.Columns["Category"].CellClickAction = CellClickAction.CellSelect;
+                detailBand.Columns["Category"].Header.VisiblePosition = pos++;
+                detailBand.Columns["Category"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.False;
+                detailBand.Columns["Category"].Hidden = !(chkActiveGroupCategory != null && chkActiveGroupCategory.Checked);
+            }
             if (detailBand.Columns.Exists("Unit"))
             {
                 detailBand.Columns["Unit"].Header.Caption = "Unit";
@@ -1112,6 +1211,402 @@ namespace PosBranch_Win.Reports.SalesReports
                 detailBand.Columns["TotalAmount"].Header.VisiblePosition = pos++;
             }
         }
+
+        #region Group and Category Feature (Filter & Grid Cells)
+        private void PopulateDetailRowGroupAndCategory(DataRow dRow, SalesReportDetail d)
+        {
+            string groupName = !string.IsNullOrEmpty(d.GroupName) ? d.GroupName : string.Empty;
+            string categoryName = !string.IsNullOrEmpty(d.CategoryName) ? d.CategoryName : string.Empty;
+
+            if (string.IsNullOrEmpty(groupName) || string.IsNullOrEmpty(categoryName))
+            {
+                EnsureItemGroupCategoryCache();
+                if (!string.IsNullOrEmpty(d.Barcode) && _itemGroupCategoryCache != null && _itemGroupCategoryCache.TryGetValue(d.Barcode.Trim(), out var gc))
+                {
+                    if (string.IsNullOrEmpty(groupName)) groupName = gc.Group;
+                    if (string.IsNullOrEmpty(categoryName)) categoryName = gc.Category;
+                }
+                else if (!string.IsNullOrEmpty(d.ItemName) && _itemGroupCategoryByNameCache != null && _itemGroupCategoryByNameCache.TryGetValue(d.ItemName.Trim(), out var gcName))
+                {
+                    if (string.IsNullOrEmpty(groupName)) groupName = gcName.Group;
+                    if (string.IsNullOrEmpty(categoryName)) categoryName = gcName.Category;
+                }
+            }
+
+            dRow["Group"] = groupName ?? string.Empty;
+            dRow["Category"] = categoryName ?? string.Empty;
+        }
+
+        private void EnsureItemGroupCategoryCache()
+        {
+            if (_itemGroupCategoryCache != null && _itemGroupCategoryCache.Count > 0) return;
+            try
+            {
+                if (_dropdowns == null) _dropdowns = new Dropdowns();
+                var itemGrid = _dropdowns.ItemlistgridDDl();
+                if (itemGrid?.List != null)
+                {
+                    _itemGroupCategoryCache = new Dictionary<string, ItemGroupCategoryInfo>(StringComparer.OrdinalIgnoreCase);
+                    _itemGroupCategoryByNameCache = new Dictionary<string, ItemGroupCategoryInfo>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var itm in itemGrid.List)
+                    {
+                        var info = new ItemGroupCategoryInfo
+                        {
+                            Group = itm.GroupName ?? string.Empty,
+                            Category = itm.CategoryName ?? string.Empty
+                        };
+                        if (!string.IsNullOrWhiteSpace(itm.Barcode) && !_itemGroupCategoryCache.ContainsKey(itm.Barcode.Trim()))
+                        {
+                            _itemGroupCategoryCache[itm.Barcode.Trim()] = info;
+                        }
+                        if (!string.IsNullOrWhiteSpace(itm.Description) && !_itemGroupCategoryByNameCache.ContainsKey(itm.Description.Trim()))
+                        {
+                            _itemGroupCategoryByNameCache[itm.Description.Trim()] = info;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to load item group/category cache: {ex.Message}");
+            }
+        }
+
+        private void SetupGroupCategoryAutoComplete()
+        {
+            try
+            {
+                if (_dropdowns == null) _dropdowns = new Dropdowns();
+
+                if (txt_Group != null)
+                {
+                    var groups = _dropdowns.getGroupDDl()?.List?.ToList();
+                    if (groups != null)
+                    {
+                        var groupSource = new AutoCompleteStringCollection();
+                        groupSource.AddRange(groups.Select(g => g.GroupName ?? string.Empty).Where(s => !string.IsNullOrEmpty(s)).ToArray());
+                        TextBox innerTb = txt_Group.Controls.Count > 0 ? txt_Group.Controls[0] as TextBox : null;
+                        if (innerTb != null)
+                        {
+                            innerTb.AutoCompleteCustomSource = groupSource;
+                            innerTb.AutoCompleteMode = System.Windows.Forms.AutoCompleteMode.SuggestAppend;
+                            innerTb.AutoCompleteSource = System.Windows.Forms.AutoCompleteSource.CustomSource;
+                        }
+                    }
+                }
+
+                if (txt_Category != null)
+                {
+                    var cats = _dropdowns.getCategoryDDl(string.Empty)?.List?.ToList();
+                    if (cats != null)
+                    {
+                        var catSource = new AutoCompleteStringCollection();
+                        catSource.AddRange(cats.Select(c => c.CategoryName ?? string.Empty).Where(s => !string.IsNullOrEmpty(s)).ToArray());
+                        TextBox innerTb = txt_Category.Controls.Count > 0 ? txt_Category.Controls[0] as TextBox : null;
+                        if (innerTb != null)
+                        {
+                            innerTb.AutoCompleteCustomSource = catSource;
+                            innerTb.AutoCompleteMode = System.Windows.Forms.AutoCompleteMode.SuggestAppend;
+                            innerTb.AutoCompleteSource = System.Windows.Forms.AutoCompleteSource.CustomSource;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error setting up group/category autocomplete: {ex.Message}");
+            }
+        }
+
+        private void UpdateGroupCategoryControlVisibility()
+        {
+            bool isActive = chkActiveGroupCategory != null && chkActiveGroupCategory.Checked;
+            if (lblGroup != null) lblGroup.Visible = isActive;
+            if (txt_Group != null) txt_Group.Visible = isActive;
+            if (btn_Group != null) btn_Group.Visible = isActive;
+            if (lblCategory != null) lblCategory.Visible = isActive;
+            if (txt_Category != null) txt_Category.Visible = isActive;
+            if (btn_Category != null) btn_Category.Visible = isActive;
+            if (btnClearGroupCategory != null) btnClearGroupCategory.Visible = isActive;
+
+            if (ultraPanelSelection != null)
+            {
+                ultraPanelSelection.Height = isActive ? 110 : 80;
+                if (ultraPanelActionBar != null)
+                {
+                    ultraPanelActionBar.Location = new Point(0, ultraPanelSelection.Height);
+                }
+            }
+
+            UpdateGroupCategoryColumnVisibility();
+        }
+
+        private void UpdateGroupCategoryColumnVisibility()
+        {
+            if (ultraGridMaster.DisplayLayout == null || ultraGridMaster.DisplayLayout.Bands.Count < 2)
+                return;
+
+            bool show = chkActiveGroupCategory != null && chkActiveGroupCategory.Checked;
+            UltraGridBand detailBand = ultraGridMaster.DisplayLayout.Bands[1];
+
+            if (detailBand.Columns.Exists("Group"))
+            {
+                detailBand.Columns["Group"].Hidden = !show;
+            }
+            if (detailBand.Columns.Exists("Category"))
+            {
+                detailBand.Columns["Category"].Hidden = !show;
+            }
+        }
+
+        private void ChkActiveGroupCategory_CheckedChanged(object sender, EventArgs e)
+        {
+            UpdateGroupCategoryControlVisibility();
+
+            if (chkActiveGroupCategory != null && !chkActiveGroupCategory.Checked)
+            {
+                if (txt_Group != null) txt_Group.Text = string.Empty;
+                if (txt_Category != null) txt_Category.Text = string.Empty;
+                _selectedGroup = string.Empty;
+                _selectedCategory = string.Empty;
+                FilterAndBindDataSet();
+            }
+        }
+
+        private void Btn_Group_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                using (var groupDialog = new frmGroupDialog())
+                {
+                    groupDialog.StartPosition = FormStartPosition.CenterParent;
+                    if (groupDialog.ShowDialog(this) == DialogResult.OK)
+                    {
+                        string selGroup = groupDialog.SelectedGroupName ?? string.Empty;
+                        if (txt_Group != null) txt_Group.Text = selGroup;
+                        ApplyGroupCategoryFilter(selGroup, txt_Category?.Text?.Trim());
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error showing frmGroupDialog: {ex.Message}");
+            }
+        }
+
+        private void Btn_Category_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                using (var catDialog = new frmCategoryDialog("frmSalesDetailsReport"))
+                {
+                    catDialog.StartPosition = FormStartPosition.CenterParent;
+                    if (catDialog.ShowDialog(this) == DialogResult.OK)
+                    {
+                        string selCat = catDialog.SelectedCategoryName ?? string.Empty;
+                        if (txt_Category != null) txt_Category.Text = selCat;
+                        ApplyGroupCategoryFilter(txt_Group?.Text?.Trim(), selCat);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error showing frmCategoryDialog: {ex.Message}");
+            }
+        }
+
+        private void BtnClearGroupCategory_Click(object sender, EventArgs e)
+        {
+            if (txt_Group != null) txt_Group.Text = string.Empty;
+            if (txt_Category != null) txt_Category.Text = string.Empty;
+            ApplyGroupCategoryFilter(string.Empty, string.Empty);
+        }
+
+        private void Txt_Group_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+                ApplyGroupCategoryFilter(txt_Group?.Text?.Trim(), txt_Category?.Text?.Trim());
+            }
+        }
+
+        private void Txt_Category_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.Enter)
+            {
+                e.Handled = true;
+                e.SuppressKeyPress = true;
+                ApplyGroupCategoryFilter(txt_Group?.Text?.Trim(), txt_Category?.Text?.Trim());
+            }
+        }
+
+        private void Txt_Group_Leave(object sender, EventArgs e)
+        {
+            string current = txt_Group?.Text?.Trim() ?? string.Empty;
+            if (!string.Equals(current, _selectedGroup, StringComparison.OrdinalIgnoreCase))
+            {
+                ApplyGroupCategoryFilter(current, txt_Category?.Text?.Trim());
+            }
+        }
+
+        private void Txt_Category_Leave(object sender, EventArgs e)
+        {
+            string current = txt_Category?.Text?.Trim() ?? string.Empty;
+            if (!string.Equals(current, _selectedCategory, StringComparison.OrdinalIgnoreCase))
+            {
+                ApplyGroupCategoryFilter(txt_Group?.Text?.Trim(), current);
+            }
+        }
+
+        private void UltraGridMaster_ClickCellButton(object sender, CellEventArgs e)
+        {
+            if (e.Cell == null || e.Cell.Column == null) return;
+
+            string colKey = e.Cell.Column.Key;
+            if (string.Equals(colKey, "Group", StringComparison.OrdinalIgnoreCase))
+            {
+                using (var groupDialog = new frmGroupDialog())
+                {
+                    groupDialog.StartPosition = FormStartPosition.CenterParent;
+                    if (groupDialog.ShowDialog(this) == DialogResult.OK)
+                    {
+                        string selGroup = groupDialog.SelectedGroupName ?? string.Empty;
+                        if (txt_Group != null) txt_Group.Text = selGroup;
+                        ApplyGroupCategoryFilter(selGroup, txt_Category?.Text?.Trim());
+                    }
+                }
+            }
+            else if (string.Equals(colKey, "Category", StringComparison.OrdinalIgnoreCase))
+            {
+                using (var catDialog = new frmCategoryDialog("frmSalesDetailsReport"))
+                {
+                    catDialog.StartPosition = FormStartPosition.CenterParent;
+                    if (catDialog.ShowDialog(this) == DialogResult.OK)
+                    {
+                        string selCat = catDialog.SelectedCategoryName ?? string.Empty;
+                        if (txt_Category != null) txt_Category.Text = selCat;
+                        ApplyGroupCategoryFilter(txt_Group?.Text?.Trim(), selCat);
+                    }
+                }
+            }
+        }
+
+        private void ApplyGroupCategoryFilter(string group, string category)
+        {
+            _selectedGroup = group ?? string.Empty;
+            _selectedCategory = category ?? string.Empty;
+            FilterAndBindDataSet();
+        }
+
+        private void FilterAndBindDataSet()
+        {
+            if (_fullDataSet == null || !_fullDataSet.Tables.Contains("SalesMaster") || !_fullDataSet.Tables.Contains("SalesDetails"))
+                return;
+
+            string groupFilter = _selectedGroup?.Trim() ?? string.Empty;
+            string categoryFilter = _selectedCategory?.Trim() ?? string.Empty;
+
+            bool hasGroupFilter = !string.IsNullOrEmpty(groupFilter) && !string.Equals(groupFilter, "ALL", StringComparison.OrdinalIgnoreCase);
+            bool hasCategoryFilter = !string.IsNullOrEmpty(categoryFilter) && !string.Equals(categoryFilter, "ALL", StringComparison.OrdinalIgnoreCase);
+
+            DataSet dsToBind;
+
+            if (!hasGroupFilter && !hasCategoryFilter)
+            {
+                dsToBind = _fullDataSet.Copy();
+            }
+            else
+            {
+                DataTable rawMaster = _fullDataSet.Tables["SalesMaster"];
+                DataTable rawDetail = _fullDataSet.Tables["SalesDetails"];
+
+                DataTable filteredMaster = rawMaster.Clone();
+                DataTable filteredDetail = rawDetail.Clone();
+
+                var matchingDetailRows = rawDetail.AsEnumerable().Where(r =>
+                {
+                    string g = r["Group"]?.ToString() ?? string.Empty;
+                    string c = r["Category"]?.ToString() ?? string.Empty;
+
+                    bool matchG = !hasGroupFilter || string.Equals(g, groupFilter, StringComparison.OrdinalIgnoreCase);
+                    bool matchC = !hasCategoryFilter || string.Equals(c, categoryFilter, StringComparison.OrdinalIgnoreCase);
+
+                    return matchG && matchC;
+                }).ToList();
+
+                HashSet<int> matchingBillNos = new HashSet<int>(matchingDetailRows.Select(r => Convert.ToInt32(r["BillNo"])));
+
+                int masterSerial = 1;
+                foreach (DataRow mRow in rawMaster.Rows)
+                {
+                    int billNo = Convert.ToInt32(mRow["BillNo"]);
+                    if (matchingBillNos.Contains(billNo))
+                    {
+                        DataRow newMRow = filteredMaster.NewRow();
+                        newMRow.ItemArray = mRow.ItemArray;
+                        newMRow["SlNo"] = masterSerial++;
+
+                        var billDetails = matchingDetailRows.Where(d => Convert.ToInt32(d["BillNo"]) == billNo).ToList();
+                        if (billDetails.Count > 0)
+                        {
+                            decimal subTotal = billDetails.Sum(d => Convert.ToDecimal(d["Amount"]));
+                            decimal taxAmt = billDetails.Sum(d => Convert.ToDecimal(d["TaxAmt"]));
+                            decimal netAmount = billDetails.Sum(d => Convert.ToDecimal(d["TotalAmount"]));
+                            decimal profit = billDetails.Sum(d => Convert.ToDecimal(d["Profit"]));
+
+                            newMRow["SubTotal"] = subTotal;
+                            newMRow["TaxAmt"] = taxAmt;
+                            newMRow["NetAmount"] = netAmount;
+                            newMRow["Profit"] = profit;
+                        }
+
+                        filteredMaster.Rows.Add(newMRow);
+                    }
+                }
+
+                var groupedDetails = matchingDetailRows.GroupBy(r => Convert.ToInt32(r["BillNo"]));
+                foreach (var group in groupedDetails)
+                {
+                    int dSerial = 1;
+                    foreach (var dRow in group)
+                    {
+                        DataRow newDRow = filteredDetail.NewRow();
+                        newDRow.ItemArray = dRow.ItemArray;
+                        newDRow["SlNo"] = dSerial++;
+                        filteredDetail.Rows.Add(newDRow);
+                    }
+                }
+
+                dsToBind = new DataSet("SalesMasterDetail");
+                dsToBind.Tables.Add(filteredMaster);
+                dsToBind.Tables.Add(filteredDetail);
+
+                DataRelation relation = new DataRelation(
+                    "BillDetails",
+                    filteredMaster.Columns["BillNo"],
+                    filteredDetail.Columns["BillNo"],
+                    false
+                );
+                dsToBind.Relations.Add(relation);
+            }
+
+            _currentDataTable = dsToBind.Tables["SalesMaster"];
+            ultraGridMaster.DataSource = null;
+            _filterManager?.ClearFilters();
+            ultraGridMaster.DataSource = dsToBind;
+
+            UpdateGroupCategoryColumnVisibility();
+
+            ApplyUserHiddenColumns();
+
+            CreateFooterCells();
+            UpdateFooterCellPositions();
+            UpdateFooterValues();
+            PopulateColumnChooserListBox();
+        }
+        #endregion
 
         private void ApplyUserHiddenColumns()
         {
@@ -1981,10 +2476,12 @@ namespace PosBranch_Win.Reports.SalesReports
 
                 using (SaveFileDialog sfd = new SaveFileDialog())
                 {
-                    sfd.Filter = "CSV File (*.csv)|*.csv";
+                    sfd.Filter = ReportPdfExporter.CsvAndPdfFilter;
                     sfd.FileName = $"SalesDetailsReport_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
                     if (sfd.ShowDialog() == DialogResult.OK)
                     {
+                        if (ReportPdfExporter.CheckAndExportPdf(sfd, ultraGridMaster, "Sales Details Report", $"Period: {dtFromDate.DateTime:dd/MM/yyyy} to {dtToDate.DateTime:dd/MM/yyyy}")) return;
+
                         var visibleCols = ultraGridMaster.DisplayLayout.Bands[0].Columns
                             .Cast<UltraGridColumn>()
                             .Where(c => !c.Hidden && !c.IsChaptered && !string.Equals(c.Key, "BillDetails", StringComparison.OrdinalIgnoreCase))

@@ -739,12 +739,14 @@ namespace PosBranch_Win.Reports.FinancialReports
                 return;
             }
 
-            using (SaveFileDialog sfd = new SaveFileDialog { Filter = "CSV Files (*.csv)|*.csv", FileName = $"CashBankBook_{DateTime.Now:yyyyMMdd_HHmm}.csv" })
+            using (SaveFileDialog sfd = new SaveFileDialog { Filter = ReportPdfExporter.CsvAndPdfFilter, FileName = $"CashBankBook_{DateTime.Now:yyyyMMdd_HHmm}.csv" })
             {
                 if (sfd.ShowDialog() == DialogResult.OK)
                 {
                     try
                     {
+                        if (ReportPdfExporter.CheckAndExportPdf(sfd, ultraGridTransactions, "Cash / Bank Book Report")) return;
+
                         var csv = new StringBuilder();
 
                         // Header

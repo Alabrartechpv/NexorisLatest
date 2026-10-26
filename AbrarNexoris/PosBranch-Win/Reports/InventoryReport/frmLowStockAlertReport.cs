@@ -1540,11 +1540,12 @@ namespace PosBranch_Win.Reports.InventoryReport
             {
                 using (var saveDlg = new SaveFileDialog())
                 {
-                    saveDlg.Filter = "CSV Files (*.csv)|*.csv";
+                    saveDlg.Filter = ReportPdfExporter.CsvAndPdfFilter;
                     saveDlg.FileName = $"LowStockAlerts_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
 
                     if (saveDlg.ShowDialog() != DialogResult.OK) return;
 
+                    if (ReportPdfExporter.CheckAndExportPdf(saveDlg, gridReport, "Low Stock Alert Report")) return;
                     var sb = new StringBuilder();
                     sb.AppendLine("S.No,Barcode,Product Name,Group,Category,Unit,Cost Price,Retail Price,Reorder Level,Current Stock,Shortage Qty");
 

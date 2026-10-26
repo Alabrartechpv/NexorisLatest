@@ -119,7 +119,9 @@ namespace Repository.ReportRepository
                                     Profit = Convert.ToDouble(detailRow["MarginAmt"]),  // Renamed from MarginAmt to Profit
                                     TaxPer = Convert.ToDouble(detailRow["TaxPer"]) / 100,
                                     TaxAmt = Convert.ToDouble(detailRow["TaxAmt"]),
-                                    TotalAmount = Convert.ToDouble(detailRow["TotalAmount"])
+                                    TotalAmount = Convert.ToDouble(detailRow["TotalAmount"]),
+                                    GroupName = detailRow.Table.Columns.Contains("GroupName") ? detailRow["GroupName"]?.ToString() : (detailRow.Table.Columns.Contains("Group") ? detailRow["Group"]?.ToString() : string.Empty),
+                                    CategoryName = detailRow.Table.Columns.Contains("CategoryName") ? detailRow["CategoryName"]?.ToString() : (detailRow.Table.Columns.Contains("Category") ? detailRow["Category"]?.ToString() : string.Empty)
                                 };
                                 reportData.Details.Add(detail);
                             }

@@ -1767,6 +1767,7 @@ namespace PosBranch_Win.Reports.InventoryReport
 
         private void ExportToPdf(string filePath, List<UltraGridRow> rows)
         {
+            ReportPdfExporter.ExportGridToPdf(filePath, ultraGridMaster, "Smart Reorder Dashboard Report"); return;
             byte[] pdfData = BuildPdfDocument("Smart Reorder Dashboard Report", GetExportableColumns(), rows);
             File.WriteAllBytes(filePath, pdfData);
         }

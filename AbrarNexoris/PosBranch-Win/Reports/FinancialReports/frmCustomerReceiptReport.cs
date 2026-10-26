@@ -1430,13 +1430,15 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             using (SaveFileDialog dialog = new SaveFileDialog())
             {
-                dialog.Filter = "CSV files (*.csv)|*.csv";
+                dialog.Filter = ReportPdfExporter.CsvAndPdfFilter;
                 dialog.FileName = string.Format("CustomerReceipt_{0:yyyyMMdd_HHmmss}.csv", DateTime.Now);
 
                 if (dialog.ShowDialog(this) != DialogResult.OK)
                     return;
 
                 StringBuilder builder = new StringBuilder();
+                if (ReportPdfExporter.CheckAndExportPdf(dialog, ultraGridReport, "Customer Receipt Report")) return;
+
                 builder.AppendLine("Date,Receipt No,Bill No,Customer ID,Customer,Total Amount,Receipt Amount,Balance,Status");
 
                 foreach (CustomerReceiptReportRow row in rows)

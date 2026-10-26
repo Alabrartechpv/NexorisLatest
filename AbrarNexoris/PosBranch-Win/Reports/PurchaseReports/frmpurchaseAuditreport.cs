@@ -2890,12 +2890,13 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
             using (SaveFileDialog dialog = new SaveFileDialog())
             {
-                dialog.Filter = "CSV files (*.csv)|*.csv";
+                dialog.Filter = ReportPdfExporter.CsvAndPdfFilter;
                 dialog.FileName = string.Format("PurchaseAuditReport_{0:yyyyMMdd_HHmmss}.csv", DateTime.Now);
 
                 if (dialog.ShowDialog(this) != DialogResult.OK)
                     return;
 
+                if (ReportPdfExporter.CheckAndExportPdf(dialog, gridReport, "Purchase Audit Report", BuildPreviewSubtitle())) return;
                 StringBuilder builder = new StringBuilder();
                 builder.AppendLine("Period,PurchaseNo,PurchaseDate,InvoiceNo,InvoiceDate,Vendor,PaymentMode,SlNo,ItemName,Barcode,Unit,Packing,Qty,FreeQty,Cost,ItemAmount,BillSubTotal,BillGrandTotal,BillPaidAmount,BillBalance,BilledBy");
 

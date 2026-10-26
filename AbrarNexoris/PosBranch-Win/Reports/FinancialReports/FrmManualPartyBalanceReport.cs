@@ -385,13 +385,14 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             using (var dialog = new SaveFileDialog())
             {
-                dialog.Filter = "CSV files (*.csv)|*.csv";
+                dialog.Filter = ReportPdfExporter.CsvAndPdfFilter;
                 dialog.FileName = $"ManualPartyBalanceReport_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
                 if (dialog.ShowDialog(this) != DialogResult.OK)
                 {
                     return;
                 }
 
+                if (ReportPdfExporter.CheckAndExportPdf(dialog, gridReport, "Manual Party Balance Report")) return;
                 var builder = new StringBuilder();
                 builder.AppendLine("Date,Party Type,Party Name,Balance Type,Amount,Settled,Remaining,Status,Remarks");
 

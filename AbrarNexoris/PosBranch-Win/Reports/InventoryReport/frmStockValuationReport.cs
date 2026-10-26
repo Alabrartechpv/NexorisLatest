@@ -1702,10 +1702,11 @@ namespace PosBranch_Win.Reports.InventoryReport
             {
                 var dlg = new SaveFileDialog
                 {
-                    Filter = "CSV Files|*.csv",
+                    Filter = ReportPdfExporter.CsvAndPdfFilter,
                     FileName = $"StockValuation_{DateTime.Now:yyyyMMdd_HHmm}.csv"
                 };
                 if (dlg.ShowDialog() != DialogResult.OK) return;
+                if (ReportPdfExporter.CheckAndExportPdf(dlg, gridReport, "Stock Valuation Report")) return;
                 if (gridReport.Rows.Count == 0)
                 {
                     MessageBox.Show("No data to export.", "Info",

@@ -2927,12 +2927,13 @@ namespace PosBranch_Win.Reports.SalesReports
 
             using (SaveFileDialog dialog = new SaveFileDialog())
             {
-                dialog.Filter = "CSV files (*.csv)|*.csv";
+                dialog.Filter = ReportPdfExporter.CsvAndPdfFilter;
                 dialog.FileName = string.Format("SalesAuditReport_{0:yyyyMMdd_HHmmss}.csv", DateTime.Now);
 
                 if (dialog.ShowDialog(this) != DialogResult.OK)
                     return;
 
+                if (ReportPdfExporter.CheckAndExportPdf(dialog, gridReport, "Sales Audit Report", BuildPreviewSubtitle())) return;
                 StringBuilder builder = new StringBuilder();
                 builder.AppendLine("Period,BillNo,BillDate,Customer,Paymode,SalesType,SlNo,ItemName,Barcode,Unit,Packing,Qty,UnitPrice,Amount,MarginPer,Profit,TaxPer,TaxAmt,TotalAmount,BillSubTotal,BillTaxAmt,BillNetAmount,BillProfit");
 

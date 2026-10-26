@@ -61,6 +61,8 @@ namespace ModelClass.Report
         public double TaxPer { get; set; }
         public double TaxAmt { get; set; }
         public double TotalAmount { get; set; }
+        public string GroupName { get; set; }
+        public string CategoryName { get; set; }
 
         // Foreign key reference
         public int BillNo { get; set; }

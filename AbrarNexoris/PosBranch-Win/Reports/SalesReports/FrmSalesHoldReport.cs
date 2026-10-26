@@ -1263,11 +1263,12 @@ namespace PosBranch_Win.Reports.SalesReports
             {
                 using (SaveFileDialog sfd = new SaveFileDialog())
                 {
-                    sfd.Filter = "CSV (Comma delimited) (*.csv)|*.csv|All Files (*.*)|*.*";
+                    sfd.Filter = ReportPdfExporter.CsvAndPdfFilter;
                     sfd.FileName = $"SalesHoldReport_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
 
                     if (sfd.ShowDialog(this) == DialogResult.OK)
                     {
+                        if (ReportPdfExporter.CheckAndExportPdf(sfd, gridHold, "Sales Hold Report")) return;
                         var visibleCols = gridHold.DisplayLayout.Bands[0].Columns.Cast<UltraGridColumn>()
                             .Where(c => !c.Hidden && !internalGridColumns.Contains(c.Key))
                             .OrderBy(c => c.Header.VisiblePosition)

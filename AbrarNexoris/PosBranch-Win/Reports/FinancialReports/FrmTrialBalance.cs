@@ -683,11 +683,12 @@ namespace PosBranch_Win.Reports.FinancialReports
 
                 using (SaveFileDialog sfd = new SaveFileDialog())
                 {
-                    sfd.Filter = "CSV Files (*.csv)|*.csv";
+                    sfd.Filter = ReportPdfExporter.CsvAndPdfFilter;
                     sfd.FileName = $"TrialBalance_{ultraDateTimeFrom.DateTime:yyyyMMdd}_to_{ultraDateTimeTo.DateTime:yyyyMMdd}.csv";
 
                     if (sfd.ShowDialog() == DialogResult.OK)
                     {
+                        if (ReportPdfExporter.CheckAndExportPdf(sfd, ultraGridTrialBalance, "Trial Balance Report", $"Period: {ultraDateTimeFrom.DateTime:dd/MM/yyyy} to {ultraDateTimeTo.DateTime:dd/MM/yyyy}")) return;
                         StringBuilder sb = new StringBuilder();
                         sb.AppendLine("Trial Balance");
                         sb.AppendLine($"Period: {ultraDateTimeFrom.DateTime:dd/MM/yyyy} to {ultraDateTimeTo.DateTime:dd/MM/yyyy}");

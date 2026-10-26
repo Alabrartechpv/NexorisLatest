@@ -1697,10 +1697,11 @@ namespace PosBranch_Win.Reports.SalesReports
 
                 using (var saveDlg = new SaveFileDialog())
                 {
-                    saveDlg.Filter = "CSV File (*.csv)|*.csv";
+                    saveDlg.Filter = ReportPdfExporter.CsvAndPdfFilter;
                     saveDlg.FileName = $"CustomerwiseSalesSummary_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
 
                     if (saveDlg.ShowDialog(this) != DialogResult.OK) return;
+                    if (ReportPdfExporter.CheckAndExportPdf(saveDlg, gridReport, "Customer-wise Sales Summary Report")) return;
 
                     var visibleCols = gridReport.DisplayLayout.Bands[0].Columns
                         .Cast<UltraGridColumn>()

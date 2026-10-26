@@ -2430,13 +2430,14 @@ namespace PosBranch_Win.Reports.InventoryReport
 
             using (SaveFileDialog sfd = new SaveFileDialog())
             {
-                sfd.Filter = "CSV File (*.csv)|*.csv|Excel 97-2003 (*.xls)|*.xls";
+                sfd.Filter = ReportPdfExporter.ExcelCsvPdfFilter;
                 sfd.FileName = $"StockAdjustmentAuditReport_{DateTime.Now:yyyyMMdd_HHmmss}";
                 if (sfd.ShowDialog(this) == DialogResult.OK)
                 {
                     try
                     {
                         Cursor.Current = Cursors.WaitCursor;
+                        if (ReportPdfExporter.CheckAndExportPdf(sfd, gridReport, "Stock Adjustment Audit Report")) return;
                         ExportGridToCsv(gridReport, sfd.FileName);
                         MessageBox.Show("Report successfully exported to:\n" + sfd.FileName, "Export Complete",
                             MessageBoxButtons.OK, MessageBoxIcon.Information);

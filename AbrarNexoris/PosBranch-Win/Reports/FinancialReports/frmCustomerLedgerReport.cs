@@ -657,12 +657,14 @@ namespace PosBranch_Win.Reports.FinancialReports
                 string safeCustomer = SanitizeFileName(_selectedCustomerName);
                 using (var dlg = new SaveFileDialog())
                 {
-                    dlg.Filter   = "CSV Files (*.csv)|*.csv";
+                    dlg.Filter = ReportPdfExporter.CsvAndPdfFilter;
                     dlg.FileName = $"CustomerLedger_{safeCustomer}_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
 
                     if (dlg.ShowDialog() != DialogResult.OK) return;
 
                     var sb = new StringBuilder();
+                    if (ReportPdfExporter.CheckAndExportPdf(dlg, gridReport, "Customer Ledger Report", $"Customer: {_selectedCustomerName}")) return;
+
                     sb.AppendLine("Date,Voucher No,Voucher Type,Particulars,Narration,Debit (Dr),Credit (Cr),Running Balance");
 
                     foreach (UltraGridRow gridRow in gridReport.Rows.GetFilteredInNonGroupByRows())

@@ -47,6 +47,14 @@ namespace PosBranch_Win.Reports.SalesReports
             this.cmbPaymentMode = new Infragistics.Win.UltraWinEditors.UltraComboEditor();
             this.lblSalesType = new Infragistics.Win.Misc.UltraLabel();
             this.cmbSalesType = new Infragistics.Win.UltraWinEditors.UltraComboEditor();
+            this.chkActiveGroupCategory = new Infragistics.Win.UltraWinEditors.UltraCheckEditor();
+            this.lblGroup = new Infragistics.Win.Misc.UltraLabel();
+            this.txt_Group = new Infragistics.Win.UltraWinEditors.UltraTextEditor();
+            this.btn_Group = new Infragistics.Win.Misc.UltraButton();
+            this.lblCategory = new Infragistics.Win.Misc.UltraLabel();
+            this.txt_Category = new Infragistics.Win.UltraWinEditors.UltraTextEditor();
+            this.btn_Category = new Infragistics.Win.Misc.UltraButton();
+            this.btnClearGroupCategory = new Infragistics.Win.Misc.UltraButton();
 
             this.ultraPanelActionBar = new Infragistics.Win.Misc.UltraPanel();
             this.btnViewGrid = new Infragistics.Win.Misc.UltraButton();
@@ -68,6 +76,9 @@ namespace PosBranch_Win.Reports.SalesReports
             ((System.ComponentModel.ISupportInitialize)(this.cmbCustomer)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.cmbPaymentMode)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.cmbSalesType)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.chkActiveGroupCategory)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.txt_Group)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.txt_Category)).BeginInit();
 
             this.ultraPanelActionBar.ClientArea.SuspendLayout();
             this.ultraPanelActionBar.SuspendLayout();
@@ -101,10 +112,18 @@ namespace PosBranch_Win.Reports.SalesReports
             this.ultraPanelSelection.ClientArea.Controls.Add(this.cmbPaymentMode);
             this.ultraPanelSelection.ClientArea.Controls.Add(this.lblSalesType);
             this.ultraPanelSelection.ClientArea.Controls.Add(this.cmbSalesType);
+            this.ultraPanelSelection.ClientArea.Controls.Add(this.chkActiveGroupCategory);
+            this.ultraPanelSelection.ClientArea.Controls.Add(this.lblGroup);
+            this.ultraPanelSelection.ClientArea.Controls.Add(this.txt_Group);
+            this.ultraPanelSelection.ClientArea.Controls.Add(this.btn_Group);
+            this.ultraPanelSelection.ClientArea.Controls.Add(this.lblCategory);
+            this.ultraPanelSelection.ClientArea.Controls.Add(this.txt_Category);
+            this.ultraPanelSelection.ClientArea.Controls.Add(this.btn_Category);
+            this.ultraPanelSelection.ClientArea.Controls.Add(this.btnClearGroupCategory);
             this.ultraPanelSelection.Dock = System.Windows.Forms.DockStyle.Top;
             this.ultraPanelSelection.Location = new System.Drawing.Point(0, 0);
             this.ultraPanelSelection.Name = "ultraPanelSelection";
-            this.ultraPanelSelection.Size = new System.Drawing.Size(1280, 80);
+            this.ultraPanelSelection.Size = new System.Drawing.Size(1280, 110);
             this.ultraPanelSelection.TabIndex = 0;
 
             // 
@@ -210,6 +229,87 @@ namespace PosBranch_Win.Reports.SalesReports
             this.dtToDate.Value = new global::System.DateTime(2026, 1, 1, 0, 0, 0, 0);
 
             // 
+            // chkActiveGroupCategory
+            // 
+            this.chkActiveGroupCategory.Location = new System.Drawing.Point(585, 46);
+            this.chkActiveGroupCategory.Name = "chkActiveGroupCategory";
+            this.chkActiveGroupCategory.Size = new System.Drawing.Size(200, 20);
+            this.chkActiveGroupCategory.TabIndex = 12;
+            this.chkActiveGroupCategory.Text = "Active Group and Category";
+            this.chkActiveGroupCategory.CheckedChanged += new System.EventHandler(this.ChkActiveGroupCategory_CheckedChanged);
+
+            // 
+            // lblGroup
+            // 
+            this.lblGroup.Location = new System.Drawing.Point(20, 78);
+            this.lblGroup.Name = "lblGroup";
+            this.lblGroup.Size = new System.Drawing.Size(65, 20);
+            this.lblGroup.TabIndex = 13;
+            this.lblGroup.Text = "Group";
+            this.lblGroup.Visible = false;
+
+            // 
+            // txt_Group
+            // 
+            this.txt_Group.Location = new System.Drawing.Point(90, 76);
+            this.txt_Group.Name = "txt_Group";
+            this.txt_Group.Size = new System.Drawing.Size(185, 24);
+            this.txt_Group.TabIndex = 14;
+            this.txt_Group.Visible = false;
+
+            // 
+            // btn_Group
+            // 
+            this.btn_Group.Location = new System.Drawing.Point(280, 76);
+            this.btn_Group.Name = "btn_Group";
+            this.btn_Group.Size = new System.Drawing.Size(30, 24);
+            this.btn_Group.TabIndex = 15;
+            this.btn_Group.Text = "...";
+            this.btn_Group.Visible = false;
+            this.btn_Group.Click += new System.EventHandler(this.Btn_Group_Click);
+
+            // 
+            // lblCategory
+            // 
+            this.lblCategory.Location = new System.Drawing.Point(330, 78);
+            this.lblCategory.Name = "lblCategory";
+            this.lblCategory.Size = new System.Drawing.Size(90, 20);
+            this.lblCategory.TabIndex = 16;
+            this.lblCategory.Text = "Category";
+            this.lblCategory.Visible = false;
+
+            // 
+            // txt_Category
+            // 
+            this.txt_Category.Location = new System.Drawing.Point(425, 76);
+            this.txt_Category.Name = "txt_Category";
+            this.txt_Category.Size = new System.Drawing.Size(185, 24);
+            this.txt_Category.TabIndex = 17;
+            this.txt_Category.Visible = false;
+
+            // 
+            // btn_Category
+            // 
+            this.btn_Category.Location = new System.Drawing.Point(615, 76);
+            this.btn_Category.Name = "btn_Category";
+            this.btn_Category.Size = new System.Drawing.Size(30, 24);
+            this.btn_Category.TabIndex = 18;
+            this.btn_Category.Text = "...";
+            this.btn_Category.Visible = false;
+            this.btn_Category.Click += new System.EventHandler(this.Btn_Category_Click);
+
+            // 
+            // btnClearGroupCategory
+            // 
+            this.btnClearGroupCategory.Location = new System.Drawing.Point(660, 76);
+            this.btnClearGroupCategory.Name = "btnClearGroupCategory";
+            this.btnClearGroupCategory.Size = new System.Drawing.Size(70, 24);
+            this.btnClearGroupCategory.TabIndex = 19;
+            this.btnClearGroupCategory.Text = "Clear";
+            this.btnClearGroupCategory.Visible = false;
+            this.btnClearGroupCategory.Click += new System.EventHandler(this.BtnClearGroupCategory_Click);
+
+            // 
             // ultraPanelActionBar
             // 
             appearanceActionBar.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(206)))), ((int)(((byte)(223)))), ((int)(((byte)(238)))));
@@ -226,7 +326,7 @@ namespace PosBranch_Win.Reports.SalesReports
             this.ultraPanelActionBar.ClientArea.Controls.Add(this.btnClearFilters);
             this.ultraPanelActionBar.ClientArea.Controls.Add(this.btnHideSelection);
             this.ultraPanelActionBar.Dock = System.Windows.Forms.DockStyle.Top;
-            this.ultraPanelActionBar.Location = new System.Drawing.Point(0, 80);
+            this.ultraPanelActionBar.Location = new System.Drawing.Point(0, 110);
             this.ultraPanelActionBar.Name = "ultraPanelActionBar";
             this.ultraPanelActionBar.Size = new System.Drawing.Size(1280, 45);
             this.ultraPanelActionBar.TabIndex = 1;
@@ -305,7 +405,7 @@ namespace PosBranch_Win.Reports.SalesReports
             this.ultraPanelGrid.ClientArea.Controls.Add(this.ultraGridMaster);
             this.ultraPanelGrid.ClientArea.Controls.Add(this.gridFooterPanel);
             this.ultraPanelGrid.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.ultraPanelGrid.Location = new System.Drawing.Point(0, 125);
+            this.ultraPanelGrid.Location = new System.Drawing.Point(0, 155);
             this.ultraPanelGrid.Name = "ultraPanelGrid";
             this.ultraPanelGrid.Size = new System.Drawing.Size(1280, 595);
             this.ultraPanelGrid.TabIndex = 2;
@@ -368,6 +468,9 @@ namespace PosBranch_Win.Reports.SalesReports
             ((System.ComponentModel.ISupportInitialize)(this.cmbCustomer)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.cmbPaymentMode)).EndInit();
             ((System.ComponentModel.ISupportInitialize)(this.cmbSalesType)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.chkActiveGroupCategory)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.txt_Group)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.txt_Category)).EndInit();
 
             this.ultraPanelActionBar.ClientArea.ResumeLayout(false);
             this.ultraPanelActionBar.ResumeLayout(false);
@@ -407,5 +510,13 @@ namespace PosBranch_Win.Reports.SalesReports
         private Infragistics.Win.Misc.UltraPanel ultraPanelGrid;
         private Infragistics.Win.UltraWinGrid.UltraGrid ultraGridMaster;
         private Infragistics.Win.Misc.UltraPanel gridFooterPanel;
+        private Infragistics.Win.UltraWinEditors.UltraCheckEditor chkActiveGroupCategory;
+        private Infragistics.Win.Misc.UltraLabel lblGroup;
+        private Infragistics.Win.UltraWinEditors.UltraTextEditor txt_Group;
+        private Infragistics.Win.Misc.UltraButton btn_Group;
+        private Infragistics.Win.Misc.UltraLabel lblCategory;
+        private Infragistics.Win.UltraWinEditors.UltraTextEditor txt_Category;
+        private Infragistics.Win.Misc.UltraButton btn_Category;
+        private Infragistics.Win.Misc.UltraButton btnClearGroupCategory;
     }
 }

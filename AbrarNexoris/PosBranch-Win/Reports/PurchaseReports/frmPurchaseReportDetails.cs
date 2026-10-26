@@ -2594,13 +2594,14 @@ namespace PosBranch_Win.Reports.PurchaseReports
             try
             {
                 SaveFileDialog saveDialog = new SaveFileDialog();
-                saveDialog.Filter = "Excel Files (*.xlsx)|*.xlsx|Excel Files (*.xls)|*.xls";
+                saveDialog.Filter = "Excel Files (*.xlsx)|*.xlsx|Excel Files (*.xls)|*.xls|PDF Documents (*.pdf)|*.pdf";
                 saveDialog.FileName = $"PurchaseReport_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
 
                 if (saveDialog.ShowDialog() == DialogResult.OK)
                 {
                     // Create a new DataTable for export with flattened data
                     DataTable exportTable = CreateExportTable();
+                    if (ReportPdfExporter.CheckAndExportPdf(saveDialog, exportTable, "Purchase Details Report")) return;
 
                     // Export to Excel using simple CSV approach
                     ExportToCSV(exportTable, saveDialog.FileName);

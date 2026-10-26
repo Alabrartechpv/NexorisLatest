@@ -875,12 +875,14 @@ namespace PosBranch_Win.Reports.FinancialReports
             {
                 SaveFileDialog sfd = new SaveFileDialog
                 {
-                    Filter = "CSV Files (*.csv)|*.csv",
+                    Filter = ReportPdfExporter.CsvAndPdfFilter,
                     FileName = $"Business_Expenses_Report_{DateTime.Now:yyyyMMdd_HHmmss}.csv"
                 };
 
                 if (sfd.ShowDialog() == DialogResult.OK)
                 {
+                    if (ReportPdfExporter.CheckAndExportPdf(sfd, ultraGridExpenses, "Business Expenses Report", $"Period: {dtFromDate.DateTime:dd-MM-yyyy} to {dtToDate.DateTime:dd-MM-yyyy}")) return;
+
                     StringBuilder sb = new StringBuilder();
                     string viewMode = cmbViewMode.Value?.ToString() ?? "SUMMARY";
 

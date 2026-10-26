@@ -714,12 +714,14 @@ namespace PosBranch_Win.Reports.FinancialReports
                 return;
             }
 
-            using (SaveFileDialog sfd = new SaveFileDialog { Filter = "CSV Files (*.csv)|*.csv", FileName = $"BankStatement_{DateTime.Now:yyyyMMdd_HHmm}.csv" })
+            using (SaveFileDialog sfd = new SaveFileDialog { Filter = ReportPdfExporter.CsvAndPdfFilter, FileName = $"BankStatement_{DateTime.Now:yyyyMMdd_HHmm}.csv" })
             {
                 if (sfd.ShowDialog() == DialogResult.OK)
                 {
                     try
                     {
+                        if (ReportPdfExporter.CheckAndExportPdf(sfd, ultraGridTransactions, "Bank Statement Report")) return;
+
                         var csv = new StringBuilder();
 
                         var visibleCols = ultraGridTransactions.DisplayLayout.Bands[0].Columns

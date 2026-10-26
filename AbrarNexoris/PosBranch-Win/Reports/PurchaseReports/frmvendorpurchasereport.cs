@@ -1691,11 +1691,12 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
             using (SaveFileDialog dialog = new SaveFileDialog())
             {
-                dialog.Filter = "CSV files (*.csv)|*.csv";
+                dialog.Filter = ReportPdfExporter.CsvAndPdfFilter;
                 dialog.FileName = "VendorPurchaseReport_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".csv";
                 if (dialog.ShowDialog(this) != DialogResult.OK)
                     return;
 
+                if (ReportPdfExporter.CheckAndExportPdf(dialog, gridReport, "Vendor Purchase Report")) return;
                 File.WriteAllText(dialog.FileName, BuildCsv(currentData), Encoding.UTF8);
                 MessageBox.Show("Report exported successfully.", "Vendor Purchase Report", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }

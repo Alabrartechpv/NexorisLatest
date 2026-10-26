@@ -906,10 +906,11 @@ namespace PosBranch_Win.Reports.SalesReports
 
             using (SaveFileDialog dialog = new SaveFileDialog())
             {
-                dialog.Filter = "CSV files (*.csv)|*.csv";
+                dialog.Filter = ReportPdfExporter.CsvAndPdfFilter;
                 dialog.FileName = string.Format("SalesmanIncentiveReport_{0:yyyyMMdd_HHmmss}.csv", DateTime.Now);
 
                 if (dialog.ShowDialog(this) != DialogResult.OK) return;
+                if (ReportPdfExporter.CheckAndExportPdf(dialog, gridSummary, "Salesman Incentive Report")) return;
 
                 StringBuilder builder = new StringBuilder();
                 builder.AppendLine("BranchName,SalesmanName,SalesQty,SalesAmount,GrossProfit,ReturnLoss,NetProfit,IncentivePercent,IncentiveAmount");

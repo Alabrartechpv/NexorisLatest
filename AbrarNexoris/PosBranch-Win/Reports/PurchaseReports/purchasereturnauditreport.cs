@@ -1476,6 +1476,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
             {
                 if (!_detailsCache.ContainsKey(ret.PReturnNo))
                 {
+
                     try
                     {
                         var data = _reportRepository.GetPurchaseReturnReportDetails(ret.PReturnNo);
@@ -2506,6 +2507,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 };
                 btnPrint.Click += (s, e) =>
                 {
+
                     try
                     {
                         previewGrid.Print();
@@ -2542,13 +2544,15 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
             using (SaveFileDialog sfd = new SaveFileDialog())
             {
-                sfd.Filter = "CSV File (*.csv)|*.csv|Excel 97-2003 (*.xls)|*.xls";
+                sfd.Filter = ReportPdfExporter.ExcelCsvPdfFilter;
                 sfd.FileName = $"PurchaseReturnAuditReport_{DateTime.Now:yyyyMMdd_HHmmss}";
                 if (sfd.ShowDialog(this) == DialogResult.OK)
                 {
+
                     try
                     {
                         Cursor.Current = Cursors.WaitCursor;
+                        if (ReportPdfExporter.CheckAndExportPdf(sfd, gridReport, "Purchase Return Audit Report")) return;
                         ExportGridToCsv(gridReport, sfd.FileName);
                         MessageBox.Show("Report successfully exported to:\n" + sfd.FileName, "Export Complete",
                             MessageBoxButtons.OK, MessageBoxIcon.Information);

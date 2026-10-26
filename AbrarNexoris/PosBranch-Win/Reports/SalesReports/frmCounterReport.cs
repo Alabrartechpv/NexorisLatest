@@ -1183,11 +1183,12 @@ namespace PosBranch_Win.Reports.SalesReports
 
             using (SaveFileDialog sfd = new SaveFileDialog())
             {
-                sfd.Filter = "CSV Files (*.csv)|*.csv";
+                sfd.Filter = ReportPdfExporter.CsvAndPdfFilter;
                 sfd.FileName = "CounterReport_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".csv";
 
                 if (sfd.ShowDialog() == DialogResult.OK)
                 {
+                    if (ReportPdfExporter.CheckAndExportPdf(sfd, ultraGridCounterReport, "Counter Sales Report")) return;
                     StringBuilder sb = new StringBuilder();
                     sb.AppendLine("Bill No,Date & Time,Counter,Cashier,Customer,Bill Type,Payment Mode,Sub Total,Discount,Tax Amount,Net Amount,Status");
 
