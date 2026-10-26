@@ -9,6 +9,7 @@ using Infragistics.Win;
 using Infragistics.Win.UltraWinGrid;
 using ModelClass.Report;
 using Repository.ReportRepository;
+using PosBranch_Win.Reports;
 
 namespace PosBranch_Win.Reports.FinancialReports
 {
@@ -34,6 +35,8 @@ namespace PosBranch_Win.Reports.FinancialReports
         #region Private Fields
         private TradingPLRepository reportRepository;
         private TradingPLReport currentReport;
+        private ReportColumnFilterManager _filterManager;
+        private readonly System.Windows.Forms.ToolTip headerToolTip = new System.Windows.Forms.ToolTip();
         #endregion
 
         #region Constructor
@@ -59,7 +62,9 @@ namespace PosBranch_Win.Reports.FinancialReports
             ultraComboPresetDates.Value = "CURRENT_FY";
             ApplyDatePreset("CURRENT_FY");
             currentReport = null;
+            _filterManager?.ClearFilters();
             ultraGridProfitLoss.DataSource = null;
+            _filterManager?.UpdateHeaderFilterIcons();
             ClearSummary();
         }
 
@@ -300,6 +305,9 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             ultraGridProfitLoss.InitializeLayout += UltraGridProfitLoss_InitializeLayout;
             ultraGridProfitLoss.InitializeRow += UltraGridProfitLoss_InitializeRow;
+            ultraGridProfitLoss.MouseDown += UltraGridProfitLoss_MouseDown;
+            ultraGridProfitLoss.MouseMove += UltraGridProfitLoss_MouseMove;
+            _filterManager = new ReportColumnFilterManager(ultraGridProfitLoss, null);
         }
 
         private void UltraGridProfitLoss_InitializeRow(object sender, InitializeRowEventArgs e)
@@ -323,6 +331,44 @@ namespace PosBranch_Win.Reports.FinancialReports
                     e.Row.Cells["LedgerName"].Appearance.ForeColor = Color.FromArgb(198, 40, 40); // Dark Red
                     e.Row.Cells["EffectiveAmount"].Appearance.ForeColor = Color.FromArgb(198, 40, 40);
                 }
+            }
+        }
+
+        private void UltraGridProfitLoss_MouseDown(object sender, MouseEventArgs e)
+        {
+            if (ultraGridProfitLoss?.DisplayLayout == null) return;
+            UIElement element = ultraGridProfitLoss.DisplayLayout.UIElement?.ElementFromPoint(e.Location);
+            HeaderUIElement headerUI = element as HeaderUIElement ?? element?.GetAncestor(typeof(HeaderUIElement)) as HeaderUIElement;
+
+            if (headerUI != null && headerUI.Header?.Column != null)
+            {
+                UltraGridColumn col = headerUI.Header.Column;
+                if (e.Button == MouseButtons.Right)
+                {
+                    ShowHeaderContextMenu(col, e.Location);
+                    return;
+                }
+                if (e.Button == MouseButtons.Left && _filterManager != null && _filterManager.HandleMouseDown(e))
+                {
+                    return;
+                }
+            }
+        }
+
+        private void UltraGridProfitLoss_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (_filterManager != null && e.Button != MouseButtons.Left && _filterManager.HandleMouseMove(e, headerToolTip))
+                return;
+        }
+
+        private void ShowHeaderContextMenu(UltraGridColumn col, Point location)
+        {
+            if (col == null) return;
+            ContextMenuStrip menu = new ContextMenuStrip { Font = new Font("Segoe UI", 9F) };
+            _filterManager?.AddFilterContextMenuItems(menu, col, location);
+            if (menu.Items.Count > 0)
+            {
+                menu.Show(ultraGridProfitLoss, location);
             }
         }
 
@@ -391,6 +437,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             
             band.Override.AllowColSizing = AllowColSizing.Free;
             e.Layout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
+            _filterManager?.UpdateHeaderFilterIcons();
         }
 
         private void ConfigureColumn(UltraGridBand band, string key, string headerText, int width, HAlign align)
@@ -488,7 +535,9 @@ namespace PosBranch_Win.Reports.FinancialReports
                     }
 
                     // Bind Profit & Loss grid
+                    _filterManager?.ClearFilters();
                     ultraGridProfitLoss.DataSource = plItems;
+                    _filterManager?.UpdateHeaderFilterIcons();
                     ultraGridProfitLoss.DataBind();
 
                     // Update summary
@@ -496,7 +545,9 @@ namespace PosBranch_Win.Reports.FinancialReports
                 }
                 else
                 {
-                    ultraGridProfitLoss.DataSource = null;
+                    _filterManager?.ClearFilters();
+            ultraGridProfitLoss.DataSource = null;
+            _filterManager?.UpdateHeaderFilterIcons();
                     ClearSummary();
                     MessageBox.Show("No data found for the selected period.", "Information",
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -609,7 +660,8 @@ namespace PosBranch_Win.Reports.FinancialReports
                         sb.AppendLine();
 
                         sb.AppendLine("Category,Particulars,Account Group,Debit,Credit,Amount");
-                        foreach (var item in items)
+                        foreach (UltraGridRow gridRow in ultraGridProfitLoss.Rows.GetFilteredInNonGroupByRows())
+                        if (gridRow != null && gridRow.IsDataRow && !gridRow.Hidden && gridRow.ListObject is TradingPLLineItem item)
                         {
                             sb.AppendLine($"\"{item.Category}\",\"{item.LedgerName}\",\"{item.GroupName}\",{item.TotalDebit:N2},{item.TotalCredit:N2},{item.EffectiveAmount:N2}");
                         }

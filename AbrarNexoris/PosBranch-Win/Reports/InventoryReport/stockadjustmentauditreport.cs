@@ -20,6 +20,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
+using PosBranch_Win.Reports;
 
 namespace PosBranch_Win.Reports.InventoryReport
 {
@@ -89,6 +90,7 @@ namespace PosBranch_Win.Reports.InventoryReport
         private Point headerDragStartPoint;
         private readonly System.Windows.Forms.ToolTip headerToolTip = new System.Windows.Forms.ToolTip();
         private static readonly Cursor blackXCursor = CreateBlackXCursor();
+        private ReportColumnFilterManager _filterManager;
         #endregion
 
         #region Helper Classes
@@ -180,6 +182,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                 CreateFooterCells();
                 UpdateFooterCellPositions();
                 UpdateFooterValues();
+                _filterManager?.UpdateHeaderFilterIcons();
                 ReportGridLayoutHelper.SaveLayout("StockAdjustmentAuditReport", gridReport, userHiddenColumnKeys);
             };
             gridReport.AfterColRegionScroll += (s, e) => UpdateFooterCellPositions();
@@ -188,11 +191,13 @@ namespace PosBranch_Win.Reports.InventoryReport
             gridReport.AfterRowFilterChanged += (s, e) =>
             {
                 UpdateFooterValues();
+                _filterManager?.UpdateHeaderFilterIcons();
                 UpdateFooterCellPositions();
             };
             gridReport.AfterSortChange += (s, e) =>
             {
                 UpdateFooterValues();
+                _filterManager?.UpdateHeaderFilterIcons();
                 UpdateFooterCellPositions();
             };
             gridReport.MouseDown += GridReport_MouseDown;
@@ -219,6 +224,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                 SetupGrid();
                 InitializeFilterControls();
                 InitializeGridFooter();
+                _filterManager = new ReportColumnFilterManager(gridReport, () => { UpdateFooterCellPositions(); UpdateFooterValues(); });
 
                 ReportGridLayoutHelper.LoadHiddenColumns("StockAdjustmentAuditReport", userHiddenColumnKeys);
 
@@ -767,6 +773,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                 {
                     _columnAggregations[columnKey] = op;
                     UpdateFooterValues();
+                _filterManager?.UpdateHeaderFilterIcons();
                 };
                 menu.Items.Add(item);
             }
@@ -848,7 +855,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                 return;
 
             UltraGridBand band = gridReport.DisplayLayout.Bands[0];
-            List<UltraGridRow> visibleRows = gridReport.Rows.GetFilteredInNonGroupByRows().ToList();
+            List<UltraGridRow> visibleRows = gridReport.Rows.GetFilteredInNonGroupByRows().Where(r => !r.Hidden).ToList();
 
             foreach (var kvp in _footerLabels)
             {
@@ -981,6 +988,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             if (gridReport.DisplayLayout == null || gridReport.DisplayLayout.Bands.Count == 0)
                 return;
 
+            if (e.Button == MouseButtons.Left && _filterManager != null && _filterManager.HandleMouseDown(e)) { isDraggingHeaderToHide = false; columnBeingDragged = null; return; }
             UIElement element = gridReport.DisplayLayout.UIElement?.ElementFromPoint(e.Location);
             HeaderUIElement headerUI = element as HeaderUIElement ?? element?.GetAncestor(typeof(HeaderUIElement)) as HeaderUIElement;
 
@@ -1009,6 +1017,7 @@ namespace PosBranch_Win.Reports.InventoryReport
 
         private void GridReport_MouseMove(object sender, MouseEventArgs e)
         {
+            if (!isDraggingHeaderToHide && _filterManager != null && _filterManager.HandleMouseMove(e, headerToolTip)) return;
             if (e.Button == MouseButtons.Left && columnBeingDragged != null)
             {
                 int deltaY = e.Y - headerDragStartPoint.Y;
@@ -1029,8 +1038,9 @@ namespace PosBranch_Win.Reports.InventoryReport
             }
         }
 
-        private void GridReport_MouseUp(object sender, MouseEventArgs e)
+        private void GridReport_MouseUp(object sender, MouseEventArgs e) { if (e.Button == MouseButtons.Left && columnBeingDragged != null) { if (isDraggingHeaderToHide) { HideColumn(columnBeingDragged); headerToolTip.Hide(gridReport); } columnBeingDragged = null; isDraggingHeaderToHide = false; Cursor.Current = Cursors.Default; } return; } private void DummyMouseUp(object sender, MouseEventArgs e)
         {
+            if (!isDraggingHeaderToHide && _filterManager != null && _filterManager.HandleMouseMove(e, headerToolTip)) return;
             if (e.Button == MouseButtons.Left && columnBeingDragged != null)
             {
                 if (isDraggingHeaderToHide)
@@ -1102,6 +1112,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             ContextMenuStrip menu = new ContextMenuStrip { Font = new Font("Segoe UI", 9F) };
             string colName = !string.IsNullOrEmpty(col.Header.Caption) ? col.Header.Caption : col.Key;
 
+            _filterManager?.AddFilterContextMenuItems(menu, col, location);
             ToolStripMenuItem hideItem = new ToolStripMenuItem($"🙈 Hide Column '{colName}'", null, (s, e) => HideColumn(col))
             {
                 Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold)
@@ -1309,6 +1320,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                 CreateFooterCells();
                 UpdateFooterCellPositions();
                 UpdateFooterValues();
+                _filterManager?.UpdateHeaderFilterIcons();
                 ReportGridLayoutHelper.SaveLayout("StockAdjustmentAuditReport", gridReport, userHiddenColumnKeys);
                 PopulateColumnChooserListBox();
             }
@@ -1518,6 +1530,7 @@ namespace PosBranch_Win.Reports.InventoryReport
 
             gridReport.DataSource = null;
             gridReport.DataMember = null;
+            _filterManager?.ClearFilters();
 
             if (_currentDataSet != null)
             {
@@ -1912,6 +1925,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                 CreateFooterCells();
                 UpdateFooterCellPositions();
                 UpdateFooterValues();
+                _filterManager?.UpdateHeaderFilterIcons();
                 if (columnChooserForm != null && columnChooserForm.Visible)
                 {
                     PopulateColumnChooserListBox();
@@ -2458,7 +2472,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                 // Data rows
                 foreach (UltraGridRow row in grid.Rows.GetFilteredInNonGroupByRows())
                 {
-                    if (row.IsDataRow)
+                    if (row.IsDataRow && !row.Hidden)
                     {
                         var cellValues = visibleCols.Select(c =>
                         {
@@ -2474,7 +2488,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                             {
                                 foreach (UltraGridRow childRow in childBand.Rows)
                                 {
-                                    if (childRow.IsDataRow)
+                                    if (childRow.IsDataRow && !childRow.Hidden)
                                     {
                                         var childCols = childBand.Band.Columns.Cast<UltraGridColumn>()
                                             .Where(cc => !cc.Hidden && !cc.IsChaptered)

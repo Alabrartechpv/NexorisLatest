@@ -111,17 +111,21 @@ namespace PosBranch_Win.Reports.FinancialReports
             // 
             // ultraDateTimeEditor2
             // 
+            this.ultraDateTimeEditor2.DateTime = new System.DateTime(2026, 10, 22, 0, 0, 0, 0);
             this.ultraDateTimeEditor2.Location = new System.Drawing.Point(516, 69);
             this.ultraDateTimeEditor2.Name = "ultraDateTimeEditor2";
             this.ultraDateTimeEditor2.Size = new System.Drawing.Size(120, 21);
             this.ultraDateTimeEditor2.TabIndex = 21;
+            this.ultraDateTimeEditor2.Value = new System.DateTime(2026, 10, 22, 0, 0, 0, 0);
             // 
             // ultraDateTimeEditor1
             // 
+            this.ultraDateTimeEditor1.DateTime = new System.DateTime(2026, 10, 22, 0, 0, 0, 0);
             this.ultraDateTimeEditor1.Location = new System.Drawing.Point(360, 69);
             this.ultraDateTimeEditor1.Name = "ultraDateTimeEditor1";
             this.ultraDateTimeEditor1.Size = new System.Drawing.Size(120, 21);
             this.ultraDateTimeEditor1.TabIndex = 19;
+            this.ultraDateTimeEditor1.Value = new System.DateTime(2026, 10, 22, 0, 0, 0, 0);
             // 
             // ultraLabel1
             // 
@@ -245,17 +249,21 @@ namespace PosBranch_Win.Reports.FinancialReports
             // 
             // dtFrom
             // 
+            this.dtFrom.DateTime = new System.DateTime(2026, 10, 22, 0, 0, 0, 0);
             this.dtFrom.Location = new System.Drawing.Point(360, 45);
             this.dtFrom.Name = "dtFrom";
             this.dtFrom.Size = new System.Drawing.Size(120, 21);
             this.dtFrom.TabIndex = 10;
+            this.dtFrom.Value = new System.DateTime(2026, 10, 22, 0, 0, 0, 0);
             // 
             // dtTo
             // 
+            this.dtTo.DateTime = new System.DateTime(2026, 10, 22, 0, 0, 0, 0);
             this.dtTo.Location = new System.Drawing.Point(516, 45);
             this.dtTo.Name = "dtTo";
             this.dtTo.Size = new System.Drawing.Size(120, 21);
             this.dtTo.TabIndex = 11;
+            this.dtTo.Value = new System.DateTime(2026, 10, 22, 0, 0, 0, 0);
             // 
             // chkPaymentDueOnly
             // 
@@ -406,6 +414,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             this.KeyPreview = true;
             this.Name = "frmVendorOutstandingReport";
             this.Text = "Vendor Outstanding Listing";
+
             this.ultraPanelControls.ClientArea.ResumeLayout(false);
             this.ultraPanelControls.ClientArea.PerformLayout();
             this.ultraPanelControls.ResumeLayout(false);

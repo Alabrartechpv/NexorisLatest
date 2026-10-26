@@ -66,7 +66,6 @@ namespace PosBranch_Win.Reports.SalesReports
         // Column Chooser & Drag-Down to Hide
         private ListBox columnChooserListBox;
         private Form columnChooserForm;
-        private TextBox txtColumnSearch;
         private bool isDraggingHeaderToHide;
         private UltraGridColumn columnBeingDragged;
         private Point headerDragStartPoint;
@@ -74,6 +73,7 @@ namespace PosBranch_Win.Reports.SalesReports
         private static readonly Cursor blackXCursor = CreateBlackXCursor();
         private bool isLoading = false;
         private DataTable _currentDataTable;
+        private ReportColumnFilterManager _filterManager;
         #endregion
 
         #region Helper Classes
@@ -211,6 +211,10 @@ namespace PosBranch_Win.Reports.SalesReports
 
             // Setup Column Drag-To-Hide & Chooser
             SetupHeaderDragToHideAndColumnChooser();
+            _filterManager = new ReportColumnFilterManager(ultraGridMaster, () => {
+                UpdateFooterCellPositions();
+                UpdateFooterValues();
+            });
         }
 
         private static void StyleClassicButton(Infragistics.Win.Misc.UltraButton button)
@@ -380,6 +384,7 @@ namespace PosBranch_Win.Reports.SalesReports
                 UpdateFooterCellPositions();
                 ReportGridLayoutHelper.SaveLayout("SalesDetailsReport", ultraGridMaster, userHiddenColumnKeys);
             };
+
             grid.AfterColRegionScroll += (s, e) => UpdateFooterCellPositions();
             grid.AfterRowRegionScroll += (s, e) => UpdateFooterCellPositions();
             grid.Paint += (s, e) => UpdateFooterCellPositions();
@@ -723,6 +728,7 @@ namespace PosBranch_Win.Reports.SalesReports
 
                 _currentDataTable = masterTable;
                 ultraGridMaster.DataSource = null;
+                _filterManager?.ClearFilters();
                 ultraGridMaster.DataSource = dsHierarchical;
 
                 ApplyUserHiddenColumns();
@@ -836,6 +842,7 @@ namespace PosBranch_Win.Reports.SalesReports
                 }
 
                 ReportGridLayoutHelper.ApplySavedLayout("SalesDetailsReport", ultraGridMaster, userHiddenColumnKeys);
+                _filterManager?.UpdateHeaderFilterIcons();
 
                 CreateFooterCells();
                 UpdateFooterCellPositions();
@@ -1246,6 +1253,12 @@ namespace PosBranch_Win.Reports.SalesReports
             menu.Items.Add(itemAverage);
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(itemNone);
+            menu.Items.Add(new ToolStripSeparator());
+            ToolStripMenuItem itemChooser = new ToolStripMenuItem("📋 Field / Column Chooser...", null, (s, e) => ShowColumnChooserForm());
+            itemChooser.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
+            menu.Items.Add(itemChooser);
+            ToolStripMenuItem itemShowAll = new ToolStripMenuItem("🔓 Show / Unhide All Columns", null, (s, e) => UnhideAllColumns());
+            menu.Items.Add(itemShowAll);
 
             menu.Opening += (sender, e) =>
             {
@@ -1261,7 +1274,6 @@ namespace PosBranch_Win.Reports.SalesReports
                     }
                 }
             };
-
             return menu;
         }
 
@@ -1366,7 +1378,7 @@ namespace PosBranch_Win.Reports.SalesReports
             if (ultraGridMaster.Rows == null) yield break;
             foreach (UltraGridRow row in ultraGridMaster.Rows)
             {
-                if (row != null && row.IsDataRow && !row.IsFilteredOut)
+                if (row != null && row.IsDataRow && !row.IsFilteredOut && !row.Hidden)
                     yield return row;
             }
         }
@@ -1514,6 +1526,16 @@ namespace PosBranch_Win.Reports.SalesReports
             ultraGridMaster.MouseUp += Grid_MouseUp;
             ultraGridMaster.DragOver += Grid_DragOver;
             ultraGridMaster.DragDrop += Grid_DragDrop;
+
+            ContextMenuStrip defaultMenu = new ContextMenuStrip { Font = new Font("Segoe UI", 9F) };
+            ToolStripMenuItem chooserItem = new ToolStripMenuItem("📋 Field / Column Chooser...", null, (s, e) => ShowColumnChooserForm());
+            chooserItem.Font = new Font("Segoe UI Semibold", 9.5F, FontStyle.Bold);
+            defaultMenu.Items.Add(chooserItem);
+
+            ToolStripMenuItem showAllItem = new ToolStripMenuItem("🔓 Show / Unhide All Columns", null, (s, e) => UnhideAllColumns());
+            defaultMenu.Items.Add(showAllItem);
+
+            ultraGridMaster.ContextMenuStrip = defaultMenu;
         }
 
         private void Grid_MouseDown(object sender, MouseEventArgs e)
@@ -1524,14 +1546,27 @@ namespace PosBranch_Win.Reports.SalesReports
                 UIElement element = ultraGridMaster.DisplayLayout.UIElement?.ElementFromPoint(pt);
                 HeaderUIElement headerUI = element as HeaderUIElement ?? element?.GetAncestor(typeof(HeaderUIElement)) as HeaderUIElement;
 
-                if (headerUI != null && headerUI.Header?.Column != null)
+                UltraGridColumn col = headerUI?.Header?.Column;
+                if (col == null)
                 {
-                    ShowHeaderContextMenu(headerUI.Header.Column, pt);
+                    CellUIElement cellUI = element as CellUIElement ?? element?.GetAncestor(typeof(CellUIElement)) as CellUIElement;
+                    col = cellUI?.Cell?.Column;
+                }
+                if (true)
+                {
+                    ShowHeaderContextMenu(col, pt);
                     return;
                 }
             }
 
             if (e.Button == MouseButtons.Left)
+            {
+                if (_filterManager != null && _filterManager.HandleMouseDown(e))
+                {
+                    isDraggingHeaderToHide = false;
+                    columnBeingDragged = null;
+                    return;
+                }
             {
                 Point pt = new Point(e.X, e.Y);
                 UIElement element = ultraGridMaster.DisplayLayout.UIElement?.ElementFromPoint(pt);
@@ -1550,7 +1585,15 @@ namespace PosBranch_Win.Reports.SalesReports
             }
         }
 
+        }
+
         private void Grid_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (!isDraggingHeaderToHide && _filterManager != null && e.Button != MouseButtons.Left)
+            {
+                if (_filterManager.HandleMouseMove(e, headerToolTip))
+                    return;
+            }
         {
             if (e.Button == MouseButtons.Left && columnBeingDragged != null)
             {
@@ -1570,6 +1613,8 @@ namespace PosBranch_Win.Reports.SalesReports
                     headerToolTip.Hide(ultraGridMaster);
                 }
             }
+        }
+
         }
 
         private void Grid_MouseUp(object sender, MouseEventArgs e)
@@ -1668,17 +1713,27 @@ namespace PosBranch_Win.Reports.SalesReports
 
         private void ShowHeaderContextMenu(UltraGridColumn col, Point location)
         {
-            if (col == null) return;
+            // ShowHeaderContextMenu
             ContextMenuStrip menu = new ContextMenuStrip { Font = new Font("Segoe UI", 9F) };
-            string colName = !string.IsNullOrEmpty(col.Header.Caption) ? col.Header.Caption : col.Key;
+            bool hasColumn = col != null && IsCustomizableColumn(col, col.Band != null ? col.Band.Index : 0);
+            if (hasColumn)
+            {
+                string colName = !string.IsNullOrEmpty(col.Header.Caption) ? col.Header.Caption : col.Key;
 
-            ToolStripMenuItem hideItem = new ToolStripMenuItem($"🙈 Hide Column '{colName}'", null, (s, e) => HideColumn(col));
-            hideItem.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
-            menu.Items.Add(hideItem);
-
-            menu.Items.Add(new ToolStripSeparator());
+                ToolStripMenuItem hideItem = new ToolStripMenuItem($"🙈 Hide Column '{colName}'", null, (s, e) => HideColumn(col));
+                hideItem.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
+                menu.Items.Add(hideItem);
+                if (_filterManager != null)
+                {
+                    menu.Items.Add(new ToolStripSeparator());
+                    _filterManager.AddFilterContextMenuItems(menu, col, location);
+                }
+            }
+            if (hasColumn)
+                menu.Items.Add(new ToolStripSeparator());
 
             ToolStripMenuItem chooserItem = new ToolStripMenuItem("📋 Field / Column Chooser...", null, (s, e) => ShowColumnChooserForm());
+            chooserItem.Font = new Font("Segoe UI Semibold", 9.5F, FontStyle.Bold);
             menu.Items.Add(chooserItem);
 
             ToolStripMenuItem showAllItem = new ToolStripMenuItem("🔓 Show / Unhide All Columns", null, (s, e) => UnhideAllColumns());
@@ -1721,14 +1776,6 @@ namespace PosBranch_Win.Reports.SalesReports
                 columnChooserForm.Hide();
             };
 
-            txtColumnSearch = new TextBox
-            {
-                Dock = DockStyle.Top,
-                Font = new Font("Segoe UI", 9F),
-                BorderStyle = BorderStyle.FixedSingle
-            };
-            txtColumnSearch.TextChanged += (s, e) => PopulateColumnChooserListBox();
-
             columnChooserListBox = new ListBox
             {
                 Dock = DockStyle.Fill,
@@ -1745,7 +1792,9 @@ namespace PosBranch_Win.Reports.SalesReports
             columnChooserListBox.MouseDown += ColumnChooserListBox_MouseDown;
 
             columnChooserForm.Controls.Add(columnChooserListBox);
-            columnChooserForm.Controls.Add(txtColumnSearch);
+
+            this.LocationChanged += (s, e) => PositionColumnChooser();
+            this.SizeChanged += (s, e) => PositionColumnChooser();
         }
 
         private void ColumnChooserListBox_MouseDown(object sender, MouseEventArgs e)
@@ -1769,7 +1818,6 @@ namespace PosBranch_Win.Reports.SalesReports
                 return;
 
             columnChooserListBox.Items.Clear();
-            string filterText = txtColumnSearch?.Text?.Trim() ?? "";
 
             for (int b = 0; b < ultraGridMaster.DisplayLayout.Bands.Count; b++)
             {
@@ -1782,11 +1830,7 @@ namespace PosBranch_Win.Reports.SalesReports
                     {
                         string caption = !string.IsNullOrEmpty(col.Header.Caption) ? col.Header.Caption : col.Key;
                         string display = bandPrefix + caption;
-
-                        if (string.IsNullOrEmpty(filterText) || display.IndexOf(filterText, StringComparison.OrdinalIgnoreCase) >= 0)
-                        {
-                            columnChooserListBox.Items.Add(new ColumnChooserItem(col.Key, display, b));
-                        }
+                        columnChooserListBox.Items.Add(new ColumnChooserItem(col.Key, display, b));
                     }
                 }
             }
@@ -1816,7 +1860,10 @@ namespace PosBranch_Win.Reports.SalesReports
                 UpdateFooterCellPositions();
                 UpdateFooterValues();
                 ReportGridLayoutHelper.SaveLayout("SalesDetailsReport", ultraGridMaster, userHiddenColumnKeys);
-                PopulateColumnChooserListBox();
+                if (columnChooserForm != null && columnChooserForm.Visible)
+                {
+                    PopulateColumnChooserListBox();
+                }
             }
         }
 
@@ -1845,9 +1892,16 @@ namespace PosBranch_Win.Reports.SalesReports
         {
             if (columnChooserForm != null && !columnChooserForm.IsDisposed && columnChooserForm.Visible)
             {
-                columnChooserForm.Location = new Point(
-                    Right - columnChooserForm.Width - 30,
-                    Bottom - columnChooserForm.Height - 30);
+                Point screenPoint = this.PointToScreen(Point.Empty);
+                int targetX = screenPoint.X + this.Width - columnChooserForm.Width - 30;
+                int targetY = screenPoint.Y + this.Height - columnChooserForm.Height - 50;
+                Rectangle screenBounds = Screen.FromControl(this).WorkingArea;
+                if (targetX + columnChooserForm.Width > screenBounds.Right) targetX = screenBounds.Right - columnChooserForm.Width - 10;
+                if (targetX < screenBounds.Left) targetX = screenBounds.Left + 10;
+                if (targetY + columnChooserForm.Height > screenBounds.Bottom) targetY = screenBounds.Bottom - columnChooserForm.Height - 10;
+                if (targetY < screenBounds.Top) targetY = screenBounds.Top + 10;
+                columnChooserForm.Location = new Point(targetX, targetY);
+
                 columnChooserForm.BringToFront();
             }
         }
@@ -1860,6 +1914,7 @@ namespace PosBranch_Win.Reports.SalesReports
             if (!(columnChooserListBox.Items[e.Index] is ColumnChooserItem item))
                 return;
 
+            using (SolidBrush backBrush = new SolidBrush(columnChooserListBox.BackColor)) { e.Graphics.FillRectangle(backBrush, e.Bounds); }
             Rectangle rect = e.Bounds;
             rect.Inflate(-4, -3);
 
@@ -1880,6 +1935,7 @@ namespace PosBranch_Win.Reports.SalesReports
                     LineAlignment = StringAlignment.Center,
                     Alignment = StringAlignment.Center
                 };
+    
                 using (Font textFont = new Font("Segoe UI", 9F, FontStyle.Bold))
                 {
                     e.Graphics.DrawString(item.DisplayText, textFont, textBrush, rect, sf);
@@ -1940,6 +1996,7 @@ namespace PosBranch_Win.Reports.SalesReports
 
                         foreach (var row in ultraGridMaster.Rows.GetFilteredInNonGroupByRows())
                         {
+                            if (row.Hidden) continue;
                             var cells = visibleCols.Select(c =>
                             {
                                 object v = row.Cells.Exists(c.Key) ? row.Cells[c.Key].Value : "";

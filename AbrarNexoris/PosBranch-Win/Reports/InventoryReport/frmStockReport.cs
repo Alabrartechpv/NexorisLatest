@@ -57,6 +57,15 @@ namespace PosBranch_Win.Reports.InventoryReport
         private readonly HashSet<string> userHiddenColumnKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private static readonly Cursor blackXCursor = CreateBlackXCursor();
 
+        // ─── Column Header Filtering State ──────────────────────────────────────────
+        private readonly Dictionary<string, HashSet<string>> _activeColumnFilters = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Bitmap _filterIconNormal = CreateFilterIcon(false);
+        private static readonly Bitmap _filterIconActive = CreateFilterIcon(true);
+        private bool _suppressSorting = false;
+        private ColumnFilterDropdownForm _activeDropdownForm = null;
+        private DateTime _lastDropdownCloseTime = DateTime.MinValue;
+        private string _lastClosedColumnKey = null;
+
         // ─── Secondary Filter Buttons (controls 8-15 are declared in Designer.cs) ────
         // ─── Constructor ─────────────────────────────────────────────────────────────
         public frmStockReport()
@@ -75,16 +84,24 @@ namespace PosBranch_Win.Reports.InventoryReport
             btnToggleSelection.Click   += btnToggleSelection_Click;
             gridReport.InitializeLayout += gridReport_InitializeLayout;
             gridReport.InitializeRow    += gridReport_InitializeRow;
+            gridReport.BeforeSortChange += (s, e) =>
+            {
+                if (_suppressSorting)
+                {
+                    e.Cancel = true;
+                    _suppressSorting = false;
+                }
+            };
 
             // Register footer cell sync and column drag-to-hide handlers matching frmPurchaseReturn
-            gridReport.Resize += (s, e) => UpdateFooterCellPositions();
+            gridReport.Resize += (s, e) => { CloseActiveFilterDropdown(); UpdateFooterCellPositions(); };
             gridReport.AfterColPosChanged += (s, e) =>
             {
                 UpdateFooterCellPositions();
                 ReportGridLayoutHelper.SaveLayout("StockReport", gridReport, userHiddenColumnKeys);
             };
-            gridReport.AfterColRegionScroll += (s, e) => UpdateFooterCellPositions();
-            gridReport.AfterRowRegionScroll += (s, e) => UpdateFooterCellPositions();
+            gridReport.AfterColRegionScroll += (s, e) => { CloseActiveFilterDropdown(); UpdateFooterCellPositions(); };
+            gridReport.AfterRowRegionScroll += (s, e) => { CloseActiveFilterDropdown(); UpdateFooterCellPositions(); };
             gridReport.Paint += (s, e) => UpdateFooterCellPositions();
 
             SetupHeaderDragToHideAndColumnChooser();
@@ -94,6 +111,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             FormClosing += (s, e) =>
             {
                 ReportGridLayoutHelper.SaveLayout("StockReport", gridReport, userHiddenColumnKeys);
+                CloseActiveFilterDropdown();
                 if (columnChooserForm != null && !columnChooserForm.IsDisposed)
                 {
                     columnChooserForm.Dispose();
@@ -1076,6 +1094,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             e.Layout.AutoFitStyle = AutoFitStyle.None;
             e.Layout.ScrollBounds = ScrollBounds.ScrollToFill;
             e.Layout.Scrollbars   = Scrollbars.Both;
+            UpdateHeaderFilterIcons();
         }
 
         private void ConfigureColumn(UltraGridBand band, string key, string header,
@@ -1279,6 +1298,11 @@ namespace PosBranch_Win.Reports.InventoryReport
         private void BindGrid(List<StockReportItem> rows)
         {
             gridReport.DataSource = rows;
+            UpdateHeaderFilterIcons();
+            if (_activeColumnFilters.Count > 0)
+            {
+                ApplyActiveColumnFilters();
+            }
             CreateFooterCells();
             UpdateFooterCellPositions();
             UpdateFooterValues(rows);
@@ -1322,7 +1346,9 @@ namespace PosBranch_Win.Reports.InventoryReport
                 ToggleGroupFilters();
                 ToggleCategoryFilters();
                 ToggleBrandFilters();
+                _activeColumnFilters.Clear();
                 _reportRows = new List<StockReportItem>();
+                UpdateHeaderFilterIcons();
                 ResetReportView();
                 txtBarcodeSearch.Focus();
             }
@@ -1514,6 +1540,17 @@ namespace PosBranch_Win.Reports.InventoryReport
                 if (e.Button == MouseButtons.Left)
                 {
                     isDraggingHeaderToHide = true;
+                    // Check if clicked the filter button (the image or rightmost 24 pixels of header)
+                    ImageUIElement imgElem = element as ImageUIElement ?? element?.GetAncestor(typeof(ImageUIElement)) as ImageUIElement;
+                    if (imgElem != null || e.X >= headerUI.Rect.Right - 24)
+                    {
+                        _suppressSorting = true;
+                        isDraggingHeaderToHide = false;
+                        columnBeingDragged = null;
+                        ShowColumnFilterPopup(col, headerUI.Rect);
+                        return;
+                    }
+
                     columnBeingDragged = col;
                     headerDragStartPoint = new Point(e.X, e.Y);
                 }
@@ -1522,6 +1559,27 @@ namespace PosBranch_Win.Reports.InventoryReport
 
         private void Grid_MouseMove(object sender, MouseEventArgs e)
         {
+            if (!isDraggingHeaderToHide)
+            {
+                UIElement elem = gridReport.DisplayLayout.UIElement?.ElementFromPoint(new Point(e.X, e.Y));
+                HeaderUIElement hUI = elem as HeaderUIElement ?? elem?.GetAncestor(typeof(HeaderUIElement)) as HeaderUIElement;
+                if (hUI != null && hUI.Header?.Column != null)
+                {
+                    if (e.X >= hUI.Rect.Right - 24)
+                    {
+                        gridReport.Cursor = Cursors.Hand;
+                        string colCaption = !string.IsNullOrEmpty(hUI.Header.Column.Header.Caption) ? hUI.Header.Column.Header.Caption : hUI.Header.Column.Key;
+                        headerToolTip.SetToolTip(gridReport, $"Filter by '{colCaption}'");
+                        return;
+                    }
+                    else
+                    {
+                        gridReport.Cursor = Cursors.Default;
+                        headerToolTip.SetToolTip(gridReport, string.Empty);
+                    }
+                }
+            }
+
             if (!isDraggingHeaderToHide || columnBeingDragged == null || e.Button != MouseButtons.Left)
                 return;
 
@@ -1630,6 +1688,34 @@ namespace PosBranch_Win.Reports.InventoryReport
 
             menu.Items.Add(new ToolStripSeparator());
 
+            ToolStripMenuItem filterItem = new ToolStripMenuItem($"🔍 Filter '{colName}'...", null, (s, e) => {
+                var headerUI = col.Header.GetUIElement();
+                Rectangle r = headerUI != null ? headerUI.Rect : new Rectangle(location.X, location.Y, 20, 20);
+                ShowColumnFilterPopup(col, r);
+            });
+            filterItem.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
+            menu.Items.Add(filterItem);
+
+            if (_activeColumnFilters.ContainsKey(col.Key))
+            {
+                ToolStripMenuItem clearColFilterItem = new ToolStripMenuItem($"❌ Clear Filter on '{colName}'", null, (s, e) => {
+                    _activeColumnFilters.Remove(col.Key);
+                    ApplyActiveColumnFilters();
+                });
+                menu.Items.Add(clearColFilterItem);
+            }
+
+            if (_activeColumnFilters.Count > 0)
+            {
+                ToolStripMenuItem clearAllFiltersItem = new ToolStripMenuItem("❌ Clear All Column Filters", null, (s, e) => {
+                    _activeColumnFilters.Clear();
+                    ApplyActiveColumnFilters();
+                });
+                menu.Items.Add(clearAllFiltersItem);
+            }
+
+            menu.Items.Add(new ToolStripSeparator());
+
             ToolStripMenuItem chooserItem = new ToolStripMenuItem("📋 Field / Column Chooser...", null, (s, e) => ShowColumnChooserForm());
             menu.Items.Add(chooserItem);
 
@@ -1719,6 +1805,9 @@ namespace PosBranch_Win.Reports.InventoryReport
                 if (col.Hidden && !col.Key.EndsWith("Id", StringComparison.OrdinalIgnoreCase) && col.ExcludeFromColumnChooser != ExcludeFromColumnChooser.True)
                 {
                     string caption = !string.IsNullOrEmpty(col.Header.Caption) ? col.Header.Caption : col.Key;
+
+
+
                     columnChooserListBox.Items.Add(new ColumnChooserItem(col.Key, caption));
                 }
             }
@@ -1742,6 +1831,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                 if (targetVisiblePosition.HasValue)
                 {
                     col.Header.VisiblePosition = targetVisiblePosition.Value;
+                UpdateHeaderFilterIcons();
                 }
                 ReportGridLayoutHelper.SaveLayout("StockReport", gridReport, userHiddenColumnKeys);
                 CreateFooterCells();
@@ -1754,6 +1844,7 @@ namespace PosBranch_Win.Reports.InventoryReport
         private void UnhideAllColumns()
         {
             userHiddenColumnKeys.Clear();
+            UpdateHeaderFilterIcons();
             if (gridReport.DisplayLayout.Bands.Count == 0) return;
             UltraGridBand band = gridReport.DisplayLayout.Bands[0];
             foreach (UltraGridColumn col in band.Columns)
@@ -2099,7 +2190,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             if (gridReport.Rows == null) yield break;
             foreach (UltraGridRow row in gridReport.Rows)
             {
-                if (row != null && row.IsDataRow && !row.IsFilteredOut)
+                if (row != null && row.IsDataRow && !row.IsFilteredOut && !row.Hidden)
                     yield return row;
             }
         }
@@ -2211,7 +2302,13 @@ namespace PosBranch_Win.Reports.InventoryReport
         // ─── Export ───────────────────────────────────────────────────────────────────
         private void ExportCsv()
         {
-            if (_reportRows == null || _reportRows.Count == 0)
+            var visibleItems = GetVisibleDataRows()
+                .Select(r => r.ListObject as StockReportItem)
+                .Where(x => x != null)
+                .ToList();
+            var exportList = visibleItems.Count > 0 ? visibleItems : _reportRows;
+
+            if (exportList == null || exportList.Count == 0)
             {
                 MessageBox.Show("There is no data to export.", "Export",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -2226,7 +2323,7 @@ namespace PosBranch_Win.Reports.InventoryReport
 
                 StringBuilder sb = new StringBuilder();
                 sb.AppendLine("Category,Group,Barcode,Description,Cost,Selling Price,UOM,Stock,Hold,Available,Stock Value,Future Sales Value");
-                foreach (StockReportItem row in _reportRows)
+                foreach (StockReportItem row in exportList)
                 {
                     sb.AppendLine(string.Join(",",
                         Escape(row.CategoryName),
@@ -2257,7 +2354,11 @@ namespace PosBranch_Win.Reports.InventoryReport
         // ─── Preview (grid print preview) ─────────────────────────────────────────────
         private void ShowReportPreview()
         {
-            List<StockReportItem> rows = gridReport.DataSource as List<StockReportItem>;
+            var visibleItems = GetVisibleDataRows()
+                .Select(r => r.ListObject as StockReportItem)
+                .Where(x => x != null)
+                .ToList();
+            List<StockReportItem> rows = visibleItems.Count > 0 ? visibleItems : (gridReport.DataSource as List<StockReportItem>);
             if (rows == null || rows.Count == 0)
             {
                 MessageBox.Show("There is no data to preview. Click View Grid first.", "Preview",
@@ -2427,6 +2528,648 @@ namespace PosBranch_Win.Reports.InventoryReport
         {
 
         }
+
+        #region Column Header Dropdown Filtering & Popup Window
+        private static Bitmap CreateFilterIcon(bool isActive)
+        {
+            Bitmap bmp = new Bitmap(18, 16);
+            using (Graphics g = Graphics.FromImage(bmp))
+            {
+                g.SmoothingMode = SmoothingMode.AntiAlias;
+                g.PixelOffsetMode = PixelOffsetMode.HighQuality;
+                g.Clear(Color.Transparent);
+
+                Rectangle btnRect = new Rectangle(0, 0, 17, 15);
+
+                if (isActive)
+                {
+                    // Active filter: Golden / amber highlight badge
+                    using (SolidBrush bgBrush = new SolidBrush(Color.FromArgb(255, 179, 0)))
+                    using (Pen borderPen = new Pen(Color.FromArgb(180, 120, 0), 1f))
+                    using (GraphicsPath path = RoundedRect(btnRect, 3))
+                    {
+                        g.FillPath(bgBrush, path);
+                        g.DrawPath(borderPen, path);
+                    }
+
+                    // Dark navy funnel
+                    using (SolidBrush funnelBrush = new SolidBrush(Color.FromArgb(15, 35, 75)))
+                    {
+                        PointF[] funnel = new PointF[]
+                        {
+                            new PointF(3.5f, 3.5f),
+                            new PointF(10.5f, 3.5f),
+                            new PointF(7.5f, 7.5f),
+                            new PointF(7.5f, 11.5f),
+                            new PointF(6.5f, 10.5f),
+                            new PointF(6.5f, 7.5f)
+                        };
+                        g.FillPolygon(funnelBrush, funnel);
+                    }
+
+                    // Small indicator dot
+                    using (SolidBrush dotBrush = new SolidBrush(Color.FromArgb(15, 35, 75)))
+                    {
+                        g.FillEllipse(dotBrush, 11.5f, 8.5f, 3.5f, 3.5f);
+                    }
+                }
+                else
+                {
+                    // Inactive filter: Subtle light button outline
+                    using (SolidBrush bgBrush = new SolidBrush(Color.FromArgb(50, 255, 255, 255)))
+                    using (Pen borderPen = new Pen(Color.FromArgb(120, 255, 255, 255), 1f))
+                    using (GraphicsPath path = RoundedRect(btnRect, 3))
+                    {
+                        g.FillPath(bgBrush, path);
+                        g.DrawPath(borderPen, path);
+                    }
+
+                    // Crisp white funnel
+                    using (SolidBrush funnelBrush = new SolidBrush(Color.White))
+                    {
+                        PointF[] funnel = new PointF[]
+                        {
+                            new PointF(3.0f, 3.5f),
+                            new PointF(10.0f, 3.5f),
+                            new PointF(7.0f, 7.5f),
+                            new PointF(7.0f, 11.5f),
+                            new PointF(6.0f, 10.5f),
+                            new PointF(6.0f, 7.5f)
+                        };
+                        g.FillPolygon(funnelBrush, funnel);
+
+                        // Down arrow
+                        PointF[] arrow = new PointF[]
+                        {
+                            new PointF(11.5f, 6.0f),
+                            new PointF(15.5f, 6.0f),
+                            new PointF(13.5f, 8.5f)
+                        };
+                        g.FillPolygon(funnelBrush, arrow);
+                    }
+                }
+            }
+            return bmp;
+        }
+
+        private void UpdateHeaderFilterIcons()
+        {
+            if (gridReport.DisplayLayout == null || gridReport.DisplayLayout.Bands.Count == 0) return;
+            UltraGridBand band = gridReport.DisplayLayout.Bands[0];
+
+            foreach (UltraGridColumn col in band.Columns)
+            {
+                if (col.Hidden || col.Key.EndsWith("Id", StringComparison.OrdinalIgnoreCase)) continue;
+
+                bool isFiltered = _activeColumnFilters.ContainsKey(col.Key);
+                col.Header.Appearance.Image = isFiltered ? _filterIconActive : _filterIconNormal;
+                col.Header.Appearance.ImageHAlign = HAlign.Right;
+                col.Header.Appearance.ImageVAlign = VAlign.Middle;
+            }
+        }
+
+        private void CloseActiveFilterDropdown()
+        {
+            if (_activeDropdownForm != null && !_activeDropdownForm.IsDisposed)
+            {
+                _activeDropdownForm.Close();
+                _activeDropdownForm = null;
+            }
+        }
+
+        private void ShowColumnFilterPopup(UltraGridColumn col, Rectangle headerRect)
+        {
+            if (_activeDropdownForm != null && !_activeDropdownForm.IsDisposed)
+            {
+                _activeDropdownForm.Close();
+                _activeDropdownForm = null;
+            }
+
+            if (string.Equals(_lastClosedColumnKey, col.Key, StringComparison.OrdinalIgnoreCase) && 
+                (DateTime.Now - _lastDropdownCloseTime).TotalMilliseconds < 250)
+            {
+                _lastClosedColumnKey = null;
+                return;
+            }
+
+            if (col == null || gridReport.Rows == null || gridReport.Rows.Count == 0)
+            {
+                MessageBox.Show("No data loaded in the grid to filter.", "Filter", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            // Collect distinct values for this column
+            HashSet<string> seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            List<string> allValues = new List<string>();
+
+            foreach (UltraGridRow row in gridReport.Rows)
+            {
+                if (!row.IsDataRow) continue;
+                string text = row.Cells.Exists(col.Key) ? (row.Cells[col.Key].Text?.Trim() ?? "") : "";
+                if (string.IsNullOrEmpty(text)) text = "(Blanks)";
+                if (seen.Add(text))
+                {
+                    allValues.Add(text);
+                }
+            }
+
+            // Sort values nicely
+            allValues.Sort((a, b) =>
+            {
+                if (a == "(Blanks)") return 1;
+                if (b == "(Blanks)") return -1;
+                if (decimal.TryParse(a, out decimal da) && decimal.TryParse(b, out decimal db))
+                    return da.CompareTo(db);
+                return string.Compare(a, b, StringComparison.OrdinalIgnoreCase);
+            });
+
+            // Currently active selection
+            HashSet<string> currentSelected = null;
+            if (_activeColumnFilters.ContainsKey(col.Key))
+            {
+                currentSelected = _activeColumnFilters[col.Key];
+            }
+
+            string caption = !string.IsNullOrEmpty(col.Header.Caption) ? col.Header.Caption : col.Key;
+
+
+
+            int dropWidth = Math.Max(230, Math.Min(Math.Max(headerRect.Width, 230), 300));
+            int itemsHeight = Math.Min(Math.Max(allValues.Count * 22, 44), 190);
+            int dropHeight = 90 + itemsHeight;
+            var popup = new ColumnFilterDropdownForm(col.Key, caption, allValues, currentSelected, dropWidth, dropHeight, (newSelected) =>
+            {
+                if (newSelected == null || newSelected.Count == allValues.Count)
+                {
+                    _activeColumnFilters.Remove(col.Key);
+                }
+                else
+                {
+                    _activeColumnFilters[col.Key] = new HashSet<string>(newSelected, StringComparer.OrdinalIgnoreCase);
+                }
+
+                ApplyActiveColumnFilters();
+            });
+
+            // Position popup right below header
+            Point screenPt = gridReport.PointToScreen(new Point(headerRect.Left, headerRect.Bottom));
+            Rectangle screenArea = Screen.FromControl(gridReport).WorkingArea;
+
+            if (screenPt.X + dropWidth > screenArea.Right)
+                screenPt.X = screenArea.Right - dropWidth - 6;
+            if (screenPt.X < screenArea.Left)
+                screenPt.X = screenArea.Left + 6;
+
+            if (screenPt.Y + dropHeight > screenArea.Bottom)
+                screenPt.Y = screenPt.Y - headerRect.Height - dropHeight;
+
+            popup.Location = screenPt;
+            _activeDropdownForm = popup;
+            popup.FormClosed += (s, e) =>
+            {
+                _lastClosedColumnKey = col.Key;
+                _lastDropdownCloseTime = DateTime.Now;
+                if (_activeDropdownForm == popup)
+                    _activeDropdownForm = null;
+            };
+            popup.Show(this);
+        }
+
+        private void ApplyActiveColumnFilters()
+        {
+            gridReport.BeginUpdate();
+            try
+            {
+                bool hasFilters = _activeColumnFilters.Count > 0;
+
+                foreach (UltraGridRow row in gridReport.Rows)
+                {
+                    if (!row.IsDataRow) continue;
+
+                    if (!hasFilters)
+                    {
+                        row.Hidden = false;
+                        continue;
+                    }
+
+                    bool visible = true;
+                    foreach (var kvp in _activeColumnFilters)
+                    {
+                        string colKey = kvp.Key;
+                        HashSet<string> allowed = kvp.Value;
+
+                        string cellText = row.Cells.Exists(colKey) ? (row.Cells[colKey].Text?.Trim() ?? "") : "";
+                        if (string.IsNullOrEmpty(cellText)) cellText = "(Blanks)";
+
+                        if (!allowed.Contains(cellText))
+                        {
+                            visible = false;
+                            break;
+                        }
+                    }
+
+                    row.Hidden = !visible;
+                }
+            }
+            finally
+            {
+                gridReport.EndUpdate();
+            }
+
+            UpdateHeaderFilterIcons();
+            UpdateFooterCellPositions();
+            UpdateFooterValues();
+        }
+
+        private sealed class ColumnFilterDropdownForm : Form
+        {
+            private readonly string _columnKey;
+            private readonly string _columnTitle;
+            private readonly List<string> _allValues;
+            private readonly HashSet<string> _selectedValues;
+            private readonly Action<HashSet<string>> _onApply;
+
+            private Panel pnlHeader;
+            private Label lblTitle;
+            private Label btnCloseX;
+            private Panel pnlSearch;
+            private TextBox txtSearch;
+            private Panel pnlSelectAll;
+            private CheckBox chkSelectAll;
+            private CheckedListBox clbItems;
+            private Panel pnlBottom;
+            private Button btnOK;
+            private Button btnCancel;
+            private Button btnClear;
+
+            private List<string> _visibleValues = new List<string>();
+            private bool _isUpdatingCheckState = false;
+
+            protected override CreateParams CreateParams
+            {
+                get
+                {
+                    const int CS_DROPSHADOW = 0x00020000;
+                    CreateParams cp = base.CreateParams;
+                    cp.ClassStyle |= CS_DROPSHADOW;
+                    return cp;
+                }
+            }
+
+            public ColumnFilterDropdownForm(string columnKey, string columnTitle, List<string> allValues, HashSet<string> currentSelected, int width, int height, Action<HashSet<string>> onApply)
+            {
+                _columnKey = columnKey;
+                _columnTitle = columnTitle;
+                _allValues = allValues ?? new List<string>();
+                _selectedValues = currentSelected != null 
+                    ? new HashSet<string>(currentSelected, StringComparer.OrdinalIgnoreCase)
+                    : new HashSet<string>(_allValues, StringComparer.OrdinalIgnoreCase);
+                _onApply = onApply;
+
+                InitializePopupUi(width, height);
+                PopulateItems(string.Empty);
+            }
+
+            private void InitializePopupUi(int width, int height)
+            {
+                FormBorderStyle = FormBorderStyle.None;
+                StartPosition = FormStartPosition.Manual;
+                ShowInTaskbar = false;
+                TopMost = true;
+                Size = new Size(width, height);
+                BackColor = Color.White;
+                KeyPreview = true;
+                DoubleBuffered = true;
+
+
+                pnlHeader = new Panel
+                {
+                    Dock = DockStyle.Top,
+                    Height = 0, Visible = false,
+                    BackColor = Color.FromArgb(67, 118, 184)
+                };
+
+                lblTitle = new Label
+                {
+                    Text = "Filter: " + _columnTitle,
+                    Dock = DockStyle.Fill,
+                    ForeColor = Color.White,
+                    Font = new Font("Segoe UI", 9.5F, FontStyle.Bold),
+                    TextAlign = ContentAlignment.MiddleLeft,
+                    Padding = new Padding(8, 0, 0, 0)
+                };
+
+                btnCloseX = new Label
+                {
+                    Text = "✕",
+                    Dock = DockStyle.Right,
+                    Width = 32,
+                    ForeColor = Color.White,
+                    Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                    TextAlign = ContentAlignment.MiddleCenter,
+                    Cursor = Cursors.Hand
+                };
+                btnCloseX.MouseEnter += (s, e) => { btnCloseX.BackColor = Color.FromArgb(220, 53, 69); };
+                btnCloseX.MouseLeave += (s, e) => { btnCloseX.BackColor = Color.Transparent; };
+                btnCloseX.Click += (s, e) => Close();
+
+                // pnlHeader omitted
+                // btnCloseX omitted
+
+                // ── Search Panel ──
+                pnlSearch = new Panel
+                {
+                    Dock = DockStyle.Top,
+                    Height = 28,
+                    BackColor = Color.FromArgb(240, 244, 248),
+                    Padding = new Padding(4, 3, 4, 3)
+                };
+
+                txtSearch = new TextBox
+                {
+                    Dock = DockStyle.Fill,
+                    Font = new Font("Segoe UI", 9F),
+                    BorderStyle = BorderStyle.FixedSingle
+                };
+                txtSearch.TextChanged += (s, e) => PopulateItems(txtSearch.Text);
+
+                Label lblSearchIcon = new Label
+                {
+                    Text = "🔍",
+                    Dock = DockStyle.Left,
+                    Width = 20,
+                    TextAlign = ContentAlignment.MiddleCenter,
+                    ForeColor = Color.FromArgb(120, 140, 160),
+                    Font = new Font("Segoe UI", 8F)
+                };
+                pnlSearch.Controls.Add(txtSearch);
+                pnlSearch.Controls.Add(lblSearchIcon);
+
+                txtSearch.KeyDown += (s, e) =>
+                {
+                    if (e.KeyCode == Keys.Escape) { Close(); e.Handled = true; }
+                    else if (e.KeyCode == Keys.Enter) { ApplyAndClose(); e.Handled = true; }
+                    else if (e.KeyCode == Keys.Down && clbItems.Items.Count > 0) { clbItems.Focus(); e.Handled = true; }
+                };
+
+                // ── Select All Panel ──
+                pnlSelectAll = new Panel
+                {
+                    Dock = DockStyle.Top,
+                    Height = 28,
+                    BackColor = Color.FromArgb(248, 250, 252),
+                    Padding = new Padding(6, 2, 6, 2)
+                };
+
+                chkSelectAll = new CheckBox
+                {
+                    Text = "(Select All)",
+                    Dock = DockStyle.Fill,
+                    Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                    ForeColor = Color.FromArgb(15, 35, 75),
+                    ThreeState = true
+                };
+                chkSelectAll.Click += ChkSelectAll_Click;
+                pnlSelectAll.Controls.Add(chkSelectAll);
+
+                // ── Bottom Buttons Panel ──
+                pnlBottom = new Panel
+                {
+                    Dock = DockStyle.Bottom,
+                    Height = 34,
+                    BackColor = Color.FromArgb(246, 248, 252),
+                    Padding = new Padding(4, 4, 4, 4)
+                };
+
+                btnOK = new Button
+                {
+                    Text = "OK",
+                    Size = new Size(54, 24),
+                    Location = new Point(5, 5),
+                    BackColor = Color.FromArgb(67, 118, 184),
+                    ForeColor = Color.White,
+                    FlatStyle = FlatStyle.Flat,
+                    Font = new Font("Segoe UI", 9F, FontStyle.Bold),
+                    Cursor = Cursors.Hand
+                };
+                btnOK.FlatAppearance.BorderSize = 0;
+                btnOK.MouseEnter += (s, e) => { btnOK.BackColor = Color.FromArgb(50, 95, 155); };
+                btnOK.MouseLeave += (s, e) => { btnOK.BackColor = Color.FromArgb(67, 118, 184); };
+                btnOK.Click += (s, e) => ApplyAndClose();
+
+                btnCancel = new Button
+                {
+                    Text = "Cancel",
+                    Size = new Size(54, 24),
+                    Location = new Point(64, 5),
+                    BackColor = Color.White,
+                    ForeColor = Color.FromArgb(30, 41, 59),
+                    FlatStyle = FlatStyle.Flat,
+                    Font = new Font("Segoe UI", 9F),
+                    Cursor = Cursors.Hand
+                };
+                btnCancel.FlatAppearance.BorderColor = Color.FromArgb(180, 200, 220);
+                btnCancel.MouseEnter += (s, e) => { btnCancel.BackColor = Color.FromArgb(241, 245, 249); };
+                btnCancel.MouseLeave += (s, e) => { btnCancel.BackColor = Color.White; };
+                btnCancel.Click += (s, e) => Close();
+
+                btnClear = new Button
+                {
+                    Text = "Clear",
+                    Size = new Size(54, 24),
+                    Location = new Point(124, 5),
+                    BackColor = Color.White,
+                    ForeColor = Color.FromArgb(180, 40, 40),
+                    FlatStyle = FlatStyle.Flat,
+                    Font = new Font("Segoe UI", 8.5F),
+                    Cursor = Cursors.Hand
+                };
+                btnClear.FlatAppearance.BorderColor = Color.FromArgb(210, 160, 160);
+                btnClear.MouseEnter += (s, e) => { btnClear.BackColor = Color.FromArgb(254, 242, 242); };
+                btnClear.MouseLeave += (s, e) => { btnClear.BackColor = Color.White; };
+                btnClear.Click += (s, e) => ClearAndClose();
+
+                pnlBottom.Controls.Add(btnOK);
+                pnlBottom.Controls.Add(btnCancel);
+                pnlBottom.Controls.Add(btnClear);
+
+                // ── CheckedListBox ──
+                clbItems = new CheckedListBox
+                {
+                    Dock = DockStyle.Fill,
+                    CheckOnClick = true,
+                    BorderStyle = BorderStyle.None,
+                    Font = new Font("Segoe UI", 9F),
+                    BackColor = Color.White,
+                    IntegralHeight = false
+                };
+                clbItems.ItemCheck += ClbItems_ItemCheck;
+                clbItems.DoubleClick += (s, e) =>
+                {
+                    int index = clbItems.SelectedIndex;
+                    if (index >= 0 && index < _visibleValues.Count)
+                    {
+                        string val = _visibleValues[index];
+                        _selectedValues.Clear();
+                        _selectedValues.Add(val);
+                        ApplyAndClose();
+                    }
+                };
+
+                Controls.Add(clbItems);
+                Controls.Add(pnlSelectAll);
+                Controls.Add(pnlSearch);
+                // Controls.Add(pnlHeader) omitted for dropdown list appearance
+                Controls.Add(pnlBottom);
+
+                Deactivate += (s, e) => { if (!IsDisposed) Close(); };
+                KeyDown += (s, e) =>
+                {
+                    if (e.KeyCode == Keys.Escape) Close();
+                    else if (e.KeyCode == Keys.Enter && !txtSearch.Focused) ApplyAndClose();
+                };
+            }
+
+            protected override void OnPaint(PaintEventArgs e)
+            {
+                base.OnPaint(e);
+                using (Pen p = new Pen(Color.FromArgb(160, 178, 200), 1))
+                {
+                    e.Graphics.DrawRectangle(p, 0, 0, Width - 1, Height - 1);
+                }
+            }
+
+            private void PopulateItems(string filterText)
+            {
+                _isUpdatingCheckState = true;
+                clbItems.BeginUpdate();
+                try
+                {
+                    clbItems.Items.Clear();
+                    _visibleValues.Clear();
+
+                    string query = (filterText ?? "").Trim();
+                    bool hasQuery = !string.IsNullOrEmpty(query);
+
+                    foreach (string val in _allValues)
+                    {
+                        if (!hasQuery || val.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            _visibleValues.Add(val);
+                            bool isChecked = _selectedValues.Contains(val);
+                            clbItems.Items.Add(val, isChecked);
+                        }
+                    }
+                }
+                finally
+                {
+                    clbItems.EndUpdate();
+                    _isUpdatingCheckState = false;
+                }
+
+                UpdateSelectAllState();
+            }
+
+            private void ClbItems_ItemCheck(object sender, ItemCheckEventArgs e)
+            {
+                if (_isUpdatingCheckState) return;
+
+                if (e.Index >= 0 && e.Index < _visibleValues.Count)
+                {
+                    string itemValue = _visibleValues[e.Index];
+                    if (e.NewValue == CheckState.Checked)
+                    {
+                        _selectedValues.Add(itemValue);
+                    }
+                    else
+                    {
+                        _selectedValues.Remove(itemValue);
+                    }
+                }
+
+                BeginInvoke(new Action(UpdateSelectAllState));
+            }
+
+            private void UpdateSelectAllState()
+            {
+                if (_visibleValues.Count == 0)
+                {
+                    chkSelectAll.CheckState = CheckState.Unchecked;
+                    return;
+                }
+
+                int checkedCount = 0;
+                foreach (string val in _visibleValues)
+                {
+                    if (_selectedValues.Contains(val))
+                        checkedCount++;
+                }
+
+                _isUpdatingCheckState = true;
+                try
+                {
+                    if (checkedCount == _visibleValues.Count)
+                    {
+                        chkSelectAll.CheckState = CheckState.Checked;
+                    }
+                    else if (checkedCount == 0)
+                    {
+                        chkSelectAll.CheckState = CheckState.Unchecked;
+                    }
+                    else
+                    {
+                        chkSelectAll.CheckState = CheckState.Indeterminate;
+                    }
+                }
+                finally
+                {
+                    _isUpdatingCheckState = false;
+                }
+            }
+
+            private void ChkSelectAll_Click(object sender, EventArgs e)
+            {
+                bool targetState = (chkSelectAll.CheckState == CheckState.Checked);
+
+                _isUpdatingCheckState = true;
+                clbItems.BeginUpdate();
+                try
+                {
+                    for (int i = 0; i < _visibleValues.Count; i++)
+                    {
+                        string val = _visibleValues[i];
+                        if (targetState)
+                        {
+                            _selectedValues.Add(val);
+                            clbItems.SetItemChecked(i, true);
+                        }
+                        else
+                        {
+                            _selectedValues.Remove(val);
+                            clbItems.SetItemChecked(i, false);
+                        }
+                    }
+                }
+                finally
+                {
+                    clbItems.EndUpdate();
+                    _isUpdatingCheckState = false;
+                }
+            }
+
+            private void ApplyAndClose()
+            {
+                _onApply?.Invoke(_selectedValues);
+                Close();
+            }
+
+            private void ClearAndClose()
+            {
+                _onApply?.Invoke(null);
+                Close();
+            }
+        }
+        #endregion
 
         private void ultraComboEditor14_ValueChanged(object sender, EventArgs e)
         {

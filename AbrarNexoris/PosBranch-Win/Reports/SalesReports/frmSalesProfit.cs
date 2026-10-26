@@ -67,6 +67,7 @@ namespace PosBranch_Win.Reports.SalesReports
         private readonly System.Windows.Forms.ToolTip gridToolTip = new System.Windows.Forms.ToolTip();
         private readonly Dictionary<string, int> savedColumnWidths = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> userHiddenColumnKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private ReportColumnFilterManager _filterManager;
         #endregion
 
         #region Helper Classes
@@ -110,6 +111,10 @@ namespace PosBranch_Win.Reports.SalesReports
             InitializePanels();
             InitializeSummaryFooter();
             InitializeGridContextMenuAndDragDrop();
+            _filterManager = new ReportColumnFilterManager(ultraGridProfit, () => {
+                AlignSummaryLabels();
+                UpdateFooterValues();
+            });
 
             _reportRepository = new SalesProfitReportRepository();
 
@@ -155,6 +160,7 @@ namespace PosBranch_Win.Reports.SalesReports
             {
                 ultraComboPresetDates.Value = "THIS_MONTH";
                 ApplyDatePreset("THIS_MONTH");
+            _filterManager?.ClearFilters();
             }
             LoadData();
         }
@@ -176,6 +182,7 @@ namespace PosBranch_Win.Reports.SalesReports
             {
                 ultraComboPresetDates.Value = "THIS_MONTH";
                 ApplyDatePreset("THIS_MONTH");
+            _filterManager?.ClearFilters();
             }
             else if (fromDate.Date == new DateTime(now.Year, 1, 1) && toDate.Date == now)
             {
@@ -325,6 +332,7 @@ namespace PosBranch_Win.Reports.SalesReports
             ultraNumericBillNo.Value = null;
             ultraComboPresetDates.Value = "THIS_MONTH";
             ApplyDatePreset("THIS_MONTH");
+            _filterManager?.ClearFilters();
             _rawData.Clear();
             _filteredData.Clear();
             ultraGridProfit.DataSource = null;
@@ -339,6 +347,7 @@ namespace PosBranch_Win.Reports.SalesReports
             ultraNumericBillNo.Value = null;
             ultraComboPresetDates.Value = "THIS_MONTH";
             ApplyDatePreset("THIS_MONTH");
+            _filterManager?.ClearFilters();
             LoadData();
         }
         #endregion
@@ -609,9 +618,26 @@ namespace PosBranch_Win.Reports.SalesReports
             AlignSummaryLabels();
         }
 
+        private List<SalesProfitViewModel> GetVisibleReportData()
+        {
+            if (ultraGridProfit == null || ultraGridProfit.Rows == null || ultraGridProfit.Rows.Count == 0)
+                return _filteredData ?? new List<SalesProfitViewModel>();
+
+            var list = new List<SalesProfitViewModel>();
+            foreach (var r in ultraGridProfit.Rows)
+            {
+                if (r != null && r.IsDataRow && !r.Hidden && !r.IsFilteredOut && r.ListObject is SalesProfitViewModel vm)
+                {
+                    list.Add(vm);
+                }
+            }
+            return list;
+        }
+
         private void UpdateFooterValues()
         {
-            if (_filteredData == null || _filteredData.Count == 0)
+            var visibleData = GetVisibleReportData();
+            if (visibleData == null || visibleData.Count == 0)
             {
                 lblCount.Text = "Bills: 0";
                 foreach (var lbl in summaryLabels.Values) lbl.Text = "";
@@ -619,11 +645,11 @@ namespace PosBranch_Win.Reports.SalesReports
                 return;
             }
 
-            int count = _filteredData.Count;
+            int count = visibleData.Count;
             lblCount.Text = $"Bills: {count:N0}";
 
-            if (_rawData.Count != _filteredData.Count)
-                lblSearchStatus.Text = $"Showing {_filteredData.Count:N0} of {_rawData.Count:N0} bills";
+            if (_rawData.Count != visibleData.Count)
+                lblSearchStatus.Text = $"Showing {visibleData.Count:N0} of {_rawData.Count:N0} bills";
             else
                 lblSearchStatus.Text = $"{_rawData.Count:N0} bills loaded";
 
@@ -639,7 +665,7 @@ namespace PosBranch_Win.Reports.SalesReports
                     continue;
                 }
 
-                List<double> values = GetColumnValues(colKey);
+                List<double> values = GetColumnValues(colKey, visibleData);
                 bool isPercent = string.Equals(colKey, "ProfitMarginPercent", StringComparison.OrdinalIgnoreCase);
 
                 if (values.Count == 0)
@@ -654,8 +680,8 @@ namespace PosBranch_Win.Reports.SalesReports
                     case "Weighted":
                         if (isPercent)
                         {
-                            double totalSales = _filteredData.Sum(x => x.BillAmount > 0 ? x.BillAmount : x.SubTotal);
-                            double totalProfit = _filteredData.Sum(x => x.Profit);
+                            double totalSales = visibleData.Sum(x => x.BillAmount > 0 ? x.BillAmount : x.SubTotal);
+                            double totalProfit = visibleData.Sum(x => x.Profit);
                             double weightedMargin = totalSales > 0 ? (totalProfit / totalSales) * 100 : 0;
                             text = weightedMargin.ToString("N2") + " %";
                         }
@@ -668,8 +694,8 @@ namespace PosBranch_Win.Reports.SalesReports
                     case "Sum":
                         if (isPercent)
                         {
-                            double totalSales = _filteredData.Sum(x => x.BillAmount > 0 ? x.BillAmount : x.SubTotal);
-                            double totalProfit = _filteredData.Sum(x => x.Profit);
+                            double totalSales = visibleData.Sum(x => x.BillAmount > 0 ? x.BillAmount : x.SubTotal);
+                            double totalProfit = visibleData.Sum(x => x.Profit);
                             double weightedMargin = totalSales > 0 ? (totalProfit / totalSales) * 100 : 0;
                             text = weightedMargin.ToString("N2") + " %";
                         }
@@ -699,8 +725,8 @@ namespace PosBranch_Win.Reports.SalesReports
             }
 
             // Update Net Profit Summary Badge
-            double filteredTotalSales = _filteredData != null && _filteredData.Count > 0 ? _filteredData.Sum(x => x.BillAmount > 0 ? x.BillAmount : x.SubTotal) : 0;
-            double grossProfit = _filteredData != null && _filteredData.Count > 0 ? _filteredData.Sum(x => x.Profit) : 0;
+            double filteredTotalSales = visibleData != null && visibleData.Count > 0 ? visibleData.Sum(x => x.BillAmount > 0 ? x.BillAmount : x.SubTotal) : 0;
+            double grossProfit = visibleData != null && visibleData.Count > 0 ? visibleData.Sum(x => x.Profit) : 0;
             double grossMargin = filteredTotalSales > 0 ? (grossProfit / filteredTotalSales) * 100 : 0;
             double netProfit = grossProfit - _periodExpenses;
             double netMargin = filteredTotalSales > 0 ? (netProfit / filteredTotalSales) * 100 : 0;
@@ -713,16 +739,17 @@ namespace PosBranch_Win.Reports.SalesReports
             }
         }
 
-        private List<double> GetColumnValues(string colKey)
+        private List<double> GetColumnValues(string colKey, List<SalesProfitViewModel> visibleData = null)
         {
+            var data = visibleData ?? GetVisibleReportData();
             switch (colKey)
             {
-                case "BillAmount": return _filteredData.Select(x => x.BillAmount).ToList();
-                case "CostAmount": return _filteredData.Select(x => x.CostAmount).ToList();
-                case "Profit": return _filteredData.Select(x => x.Profit).ToList();
-                case "ProfitMarginPercent": return _filteredData.Select(x => x.ProfitMarginPercent).ToList();
-                case "SubTotal": return _filteredData.Select(x => x.SubTotal).ToList();
-                case "TaxAmt": return _filteredData.Select(x => x.TaxAmt).ToList();
+                case "BillAmount": return data.Select(x => x.BillAmount).ToList();
+                case "CostAmount": return data.Select(x => x.CostAmount).ToList();
+                case "Profit": return data.Select(x => x.Profit).ToList();
+                case "ProfitMarginPercent": return data.Select(x => x.ProfitMarginPercent).ToList();
+                case "SubTotal": return data.Select(x => x.SubTotal).ToList();
+                case "TaxAmt": return data.Select(x => x.TaxAmt).ToList();
                 default: return new List<double>();
             }
         }
@@ -850,6 +877,11 @@ namespace PosBranch_Win.Reports.SalesReports
                         ToolStripMenuItem hideItem = new ToolStripMenuItem($"Hide '{col.Header.Caption}'");
                         hideItem.Click += (s, ev) => HideGridColumn(col);
                         menu.Items.Add(hideItem);
+                        if (_filterManager != null)
+                        {
+                            menu.Items.Add(new ToolStripSeparator());
+                            _filterManager.AddFilterContextMenuItems(menu, col, e.Location);
+                        }
                     }
                 }
 
@@ -858,6 +890,13 @@ namespace PosBranch_Win.Reports.SalesReports
                 menu.Items.Add(chooserItem);
 
                 menu.Show(ultraGridProfit, e.Location);
+                return;
+            }
+
+            if (e.Button == MouseButtons.Left && _filterManager != null && _filterManager.HandleMouseDown(e))
+            {
+                isDraggingHeaderColumn = false;
+                columnToHideByDrag = null;
                 return;
             }
 
@@ -875,6 +914,9 @@ namespace PosBranch_Win.Reports.SalesReports
 
         private void GridProfit_MouseMove(object sender, MouseEventArgs e)
         {
+            if (!isDraggingHeaderColumn && _filterManager != null && _filterManager.HandleMouseMove(e, gridToolTip))
+                return;
+
             if (e.Button == MouseButtons.Left && columnToHideByDrag != null)
             {
                 int dx = Math.Abs(e.X - headerDragStartPoint.X);
@@ -1288,6 +1330,8 @@ namespace PosBranch_Win.Reports.SalesReports
 
             ultraGridProfit.DataSource = null;
             ultraGridProfit.DataSource = _filteredData;
+            _filterManager?.ClearFilters();
+            _filterManager?.UpdateHeaderFilterIcons();
 
             UpdateSummaryFooter();
         }
@@ -1336,6 +1380,7 @@ namespace PosBranch_Win.Reports.SalesReports
             e.Layout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
 
             ReportGridLayoutHelper.ApplySavedLayout("SalesProfit", ultraGridProfit, userHiddenColumnKeys);
+            _filterManager?.UpdateHeaderFilterIcons();
             RefreshColumnChooserList();
         }
 
@@ -1411,7 +1456,8 @@ namespace PosBranch_Win.Reports.SalesReports
         #region Actions & Exports
         private void PreviewGrid()
         {
-            if (_filteredData == null || _filteredData.Count == 0)
+            var visibleData = GetVisibleReportData();
+            if (visibleData == null || visibleData.Count == 0)
             {
                 MessageBox.Show("No data available to preview.", "Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
@@ -1422,7 +1468,8 @@ namespace PosBranch_Win.Reports.SalesReports
 
         private void PrintReport()
         {
-            if (_filteredData == null || _filteredData.Count == 0)
+            var visibleData = GetVisibleReportData();
+            if (visibleData == null || visibleData.Count == 0)
             {
                 MessageBox.Show("No data available to print.", "Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
@@ -1433,7 +1480,8 @@ namespace PosBranch_Win.Reports.SalesReports
 
         private void ExportCsv()
         {
-            if (_filteredData == null || _filteredData.Count == 0)
+            var visibleData = GetVisibleReportData();
+            if (visibleData == null || visibleData.Count == 0)
             {
                 MessageBox.Show("No data available to export.", "Information", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
@@ -1451,7 +1499,7 @@ namespace PosBranch_Win.Reports.SalesReports
                         StringBuilder sb = new StringBuilder();
                         sb.AppendLine("Bill No,Bill Date,Sales Amount,Cost Amount (COGS),Profit Amount,Profit Margin %,Pay Mode,Cash Mode");
 
-                        foreach (var item in _filteredData)
+                        foreach (var item in visibleData)
                         {
                             sb.AppendLine(string.Format("{0},{1:dd-MM-yyyy},{2:F2},{3:F2},{4:F2},{5:F2}%,\"{6}\",\"{7}\"",
                                 item.BillNo,
@@ -1465,12 +1513,12 @@ namespace PosBranch_Win.Reports.SalesReports
                         }
 
                         sb.AppendLine();
-                        sb.AppendLine($"Total Bills,{_filteredData.Count}");
-                        sb.AppendLine($"Total Sales Amount,{_filteredData.Sum(x => x.BillAmount):F2}");
-                        sb.AppendLine($"Total Cost Amount (COGS),{_filteredData.Sum(x => x.CostAmount):F2}");
-                        sb.AppendLine($"Total Profit Amount,{_filteredData.Sum(x => x.Profit):F2}");
-                        double totalSales = _filteredData.Sum(x => x.SubTotal > 0 ? x.SubTotal : x.BillAmount);
-                        double totalProfit = _filteredData.Sum(x => x.Profit);
+                        sb.AppendLine($"Total Bills,{visibleData.Count}");
+                        sb.AppendLine($"Total Sales Amount,{visibleData.Sum(x => x.BillAmount):F2}");
+                        sb.AppendLine($"Total Cost Amount (COGS),{visibleData.Sum(x => x.CostAmount):F2}");
+                        sb.AppendLine($"Total Profit Amount,{visibleData.Sum(x => x.Profit):F2}");
+                        double totalSales = visibleData.Sum(x => x.SubTotal > 0 ? x.SubTotal : x.BillAmount);
+                        double totalProfit = visibleData.Sum(x => x.Profit);
                         double margin = totalSales > 0 ? (totalProfit / totalSales) * 100 : 0;
                         sb.AppendLine($"Overall Profit Margin %,{margin:F2}%");
 
@@ -1498,11 +1546,13 @@ namespace PosBranch_Win.Reports.SalesReports
         }
         #endregion
 
+        private List<SalesProfitViewModel> visibleData => GetVisibleReportData();
+
         #region Net Profit Audit Breakdown Dialog
         private void ShowNetProfitBreakdownDialog()
         {
-            double filteredTotalSales = _filteredData != null && _filteredData.Count > 0 ? _filteredData.Sum(x => x.BillAmount > 0 ? x.BillAmount : x.SubTotal) : 0;
-            double grossProfit = _filteredData != null && _filteredData.Count > 0 ? _filteredData.Sum(x => x.Profit) : 0;
+            double filteredTotalSales = visibleData != null && visibleData.Count > 0 ? visibleData.Sum(x => x.BillAmount > 0 ? x.BillAmount : x.SubTotal) : 0;
+            double grossProfit = visibleData != null && visibleData.Count > 0 ? visibleData.Sum(x => x.Profit) : 0;
             double cogs = filteredTotalSales - grossProfit;
             double grossMargin = filteredTotalSales > 0 ? (grossProfit / filteredTotalSales) * 100 : 0;
             double netProfit = grossProfit - _periodExpenses;

@@ -11,6 +11,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
+using PosBranch_Win.Reports;
 
 namespace PosBranch_Win.Reports.InventoryReport
 {
@@ -51,6 +52,7 @@ namespace PosBranch_Win.Reports.InventoryReport
         private readonly System.Windows.Forms.ToolTip headerToolTip = new System.Windows.Forms.ToolTip();
         private readonly HashSet<string> userHiddenColumnKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private static readonly Cursor blackXCursor = CreateBlackXCursor();
+        private ReportColumnFilterManager _filterManager;
 
         public frmInactiveItemsReport()
         {
@@ -127,6 +129,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                 StyleFilterControls();
                 SetupGrid();
                 InitializeGridFooter();
+                _filterManager = new ReportColumnFilterManager(gridReport, () => { UpdateFooterCellPositions(); UpdateFooterValues(); });
                 LoadReportData();
             }
             finally
@@ -435,6 +438,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             if (gridReport.DisplayLayout == null || gridReport.DisplayLayout.Bands.Count == 0)
                 return;
 
+            if (e.Button == MouseButtons.Left && _filterManager != null && _filterManager.HandleMouseDown(e)) { isDraggingHeaderToHide = false; columnBeingDragged = null; return; }
             UIElement element = gridReport.DisplayLayout.UIElement?.ElementFromPoint(new Point(e.X, e.Y));
             HeaderUIElement headerUI = element as HeaderUIElement ?? element?.GetAncestor(typeof(HeaderUIElement)) as HeaderUIElement;
 
@@ -458,6 +462,7 @@ namespace PosBranch_Win.Reports.InventoryReport
 
         private void Grid_MouseMove(object sender, MouseEventArgs e)
         {
+            if (!isDraggingHeaderToHide && _filterManager != null && _filterManager.HandleMouseMove(e, headerToolTip)) return;
             if (!isDraggingHeaderToHide || columnBeingDragged == null || e.Button != MouseButtons.Left)
                 return;
 
@@ -546,6 +551,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             col.Hidden = true;
             ReportGridLayoutHelper.SaveLayout("InactiveItemsReport", gridReport, userHiddenColumnKeys);
             CreateFooterCells();
+            _filterManager?.UpdateHeaderFilterIcons();
             UpdateFooterCellPositions();
             UpdateFooterValues();
             if (columnChooserForm != null && columnChooserForm.Visible)
@@ -560,6 +566,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             ContextMenuStrip menu = new ContextMenuStrip { Font = new Font("Segoe UI", 9F) };
             string colName = !string.IsNullOrEmpty(col.Header.Caption) ? col.Header.Caption : col.Key;
 
+            _filterManager?.AddFilterContextMenuItems(menu, col, location);
             ToolStripMenuItem hideItem = new ToolStripMenuItem($"🙈 Hide Column '{colName}'", null, (s, e) => HideColumn(col));
             hideItem.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
             menu.Items.Add(hideItem);
@@ -681,6 +688,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                 }
                 ReportGridLayoutHelper.SaveLayout("InactiveItemsReport", gridReport, userHiddenColumnKeys);
                 CreateFooterCells();
+            _filterManager?.UpdateHeaderFilterIcons();
                 UpdateFooterCellPositions();
                 UpdateFooterValues();
                 PopulateColumnChooserListBox();
@@ -701,6 +709,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             }
             ReportGridLayoutHelper.SaveLayout("InactiveItemsReport", gridReport, userHiddenColumnKeys);
             CreateFooterCells();
+            _filterManager?.UpdateHeaderFilterIcons();
             UpdateFooterCellPositions();
             UpdateFooterValues();
             PopulateColumnChooserListBox();
@@ -802,6 +811,7 @@ namespace PosBranch_Win.Reports.InventoryReport
         private void InitializeGridFooter()
         {
             CreateFooterCells();
+            _filterManager?.UpdateHeaderFilterIcons();
             UpdateFooterCellPositions();
             UpdateFooterValues();
         }
@@ -1037,7 +1047,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             if (gridReport.Rows == null) yield break;
             foreach (UltraGridRow row in gridReport.Rows)
             {
-                if (row != null && row.IsDataRow && !row.IsFilteredOut)
+                if (row != null && row.IsDataRow && !row.IsFilteredOut && !row.Hidden)
                     yield return row;
             }
         }
@@ -1201,6 +1211,8 @@ namespace PosBranch_Win.Reports.InventoryReport
             gridReport.DataSource = null;
             SetupGrid();
             gridReport.DataSource = _filteredRows;
+            _filterManager?.ClearFilters();
+            _filterManager?.UpdateHeaderFilterIcons();
             UpdateFooterValues();
         }
 
@@ -1252,6 +1264,7 @@ namespace PosBranch_Win.Reports.InventoryReport
 
             e.Layout.AutoFitStyle = AutoFitStyle.None;
             CreateFooterCells();
+            _filterManager?.UpdateHeaderFilterIcons();
             UpdateFooterCellPositions();
             UpdateFooterValues();
         }
@@ -1326,7 +1339,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                         StringBuilder sb = new StringBuilder();
                         sb.AppendLine("Item Code,Barcode,Item Description,Category,Group,Brand,Unit,Stock Qty,Unit Cost,Retail Price,Selling Price,Inactivated Date,Inactivation Reason,Inactivated By User,Counter,Branch");
 
-                        foreach (var row in _filteredRows)
+                        foreach (var row in GetVisibleDataRows().Select(r => r.ListObject as InactiveItemsReportRow).Where(x => x != null))
                         {
                             string dateStr = row.StatusDate.HasValue ? row.StatusDate.Value.ToString("dd/MM/yyyy HH:mm") : "";
                             sb.AppendLine($"\"{EscapeCsv(row.ItemNo)}\",\"{EscapeCsv(row.Barcode)}\",\"{EscapeCsv(row.ItemName)}\",\"{EscapeCsv(row.CategoryName)}\",\"{EscapeCsv(row.GroupName)}\",\"{EscapeCsv(row.BrandName)}\",\"{EscapeCsv(row.Unit)}\",{row.Stock:F2},{row.UnitCost:F2},{row.RetailPrice:F2},{row.WalkinPrice:F2},\"{dateStr}\",\"{EscapeCsv(row.StatusReason)}\",\"{EscapeCsv(row.InactivatedByUser)}\",\"{EscapeCsv(row.CounterName)}\",\"{EscapeCsv(row.BranchName)}\"");

@@ -10,6 +10,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
+using PosBranch_Win.Reports;
 
 namespace PosBranch_Win.Reports.FinancialReports
 {
@@ -40,6 +41,8 @@ namespace PosBranch_Win.Reports.FinancialReports
         private readonly ClosingRepo _repository;
         private List<ClosingModel> _closingRecords;
         private bool _isLoading;
+        private ReportColumnFilterManager _filterManager;
+        private readonly System.Windows.Forms.ToolTip headerToolTip = new System.Windows.Forms.ToolTip();
 
         public FrmShiftReconciliationReport()
         {
@@ -368,6 +371,47 @@ namespace PosBranch_Win.Reports.FinancialReports
             layout.ScrollStyle = ScrollStyle.Immediate;
 
             gridReport.BackColor = FormBackColor;
+            gridReport.MouseDown += GridReport_MouseDown;
+            gridReport.MouseMove += GridReport_MouseMove;
+            _filterManager = new ReportColumnFilterManager(gridReport, null);
+        }
+
+        private void GridReport_MouseDown(object sender, MouseEventArgs e)
+        {
+            if (gridReport?.DisplayLayout == null) return;
+            UIElement element = gridReport.DisplayLayout.UIElement?.ElementFromPoint(e.Location);
+            HeaderUIElement headerUI = element as HeaderUIElement ?? element?.GetAncestor(typeof(HeaderUIElement)) as HeaderUIElement;
+
+            if (headerUI != null && headerUI.Header?.Column != null)
+            {
+                UltraGridColumn col = headerUI.Header.Column;
+                if (e.Button == MouseButtons.Right)
+                {
+                    ShowHeaderContextMenu(col, e.Location);
+                    return;
+                }
+                if (e.Button == MouseButtons.Left && _filterManager != null && _filterManager.HandleMouseDown(e))
+                {
+                    return;
+                }
+            }
+        }
+
+        private void GridReport_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (_filterManager != null && e.Button != MouseButtons.Left && _filterManager.HandleMouseMove(e, headerToolTip))
+                return;
+        }
+
+        private void ShowHeaderContextMenu(UltraGridColumn col, Point location)
+        {
+            if (col == null) return;
+            ContextMenuStrip menu = new ContextMenuStrip { Font = new Font("Segoe UI", 9F) };
+            _filterManager?.AddFilterContextMenuItems(menu, col, location);
+            if (menu.Items.Count > 0)
+            {
+                menu.Show(gridReport, location);
+            }
         }
 
         private void LoadReport()
@@ -415,7 +459,9 @@ namespace PosBranch_Win.Reports.FinancialReports
             }
 
             List<ClosingModel> boundRows = filtered.OrderByDescending(x => x.TransactionDate).ToList();
+            _filterManager?.ClearFilters();
             gridReport.DataSource = boundRows;
+            _filterManager?.UpdateHeaderFilterIcons();
             UpdateSummary(boundRows);
         }
 
@@ -522,7 +568,8 @@ namespace PosBranch_Win.Reports.FinancialReports
             StringBuilder builder = new StringBuilder();
             builder.AppendLine("Closing Date,Counter,Gross Sales,Returns,Net Sales,Expected Cash,Physical Cash,Difference,Status");
 
-            foreach (var row in rows)
+            foreach (UltraGridRow gridRow in gridReport.Rows.GetFilteredInNonGroupByRows())
+            if (gridRow != null && gridRow.IsDataRow && !gridRow.Hidden && gridRow.ListObject is ClosingModel row)
             {
                 builder.AppendLine(string.Join(",",
                     EscapeCsv(row.TransactionDate.ToString("yyyy-MM-dd HH:mm:ss")),
@@ -813,7 +860,9 @@ namespace PosBranch_Win.Reports.FinancialReports
             }
 
             _closingRecords = new List<ClosingModel>();
+            _filterManager?.ClearFilters();
             gridReport.DataSource = null;
+            _filterManager?.UpdateHeaderFilterIcons();
             UpdateSummary(new List<ClosingModel>());
             
             // Reload all
@@ -912,6 +961,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             band.Columns["PhysicalCashCounted"].CellAppearance.ForeColor = Color.FromArgb(27, 94, 32);
 
             e.Layout.AutoFitStyle = AutoFitStyle.ResizeAllColumns;
+            _filterManager?.UpdateHeaderFilterIcons();
         }
 
         private void GridReport_InitializeRow(object sender, InitializeRowEventArgs e)

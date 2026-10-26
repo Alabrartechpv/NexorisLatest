@@ -68,6 +68,7 @@ namespace PosBranch_Win.Reports.FinancialReports
         private UltraGridColumn columnBeingDragged;
         private Point headerDragStartPoint;
         private readonly System.Windows.Forms.ToolTip headerToolTip = new System.Windows.Forms.ToolTip();
+        private ReportColumnFilterManager _filterManager;
         private static readonly Cursor blackXCursor = CreateBlackXCursor();
         #endregion
 
@@ -805,7 +806,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             if (gridReport.Rows == null) yield break;
             foreach (UltraGridRow row in gridReport.Rows)
             {
-                if (row != null && row.IsDataRow && !row.IsFilteredOut)
+                if (row != null && row.IsDataRow && !row.IsFilteredOut && !row.Hidden)
                 {
                     yield return row;
                 }
@@ -885,6 +886,10 @@ namespace PosBranch_Win.Reports.FinancialReports
             gridReport.MouseUp += GridReport_MouseUp;
             gridReport.DragOver += GridReport_DragOver;
             gridReport.DragDrop += GridReport_DragDrop;
+            _filterManager = new ReportColumnFilterManager(gridReport, () => {
+                UpdateFooterCellPositions();
+                UpdateFooterValues(_reportRows ?? new List<VendorOutstandingReportRow>());
+            });
         }
 
         private void GridReport_MouseDown(object sender, MouseEventArgs e)
@@ -904,6 +909,13 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             if (e.Button == MouseButtons.Left)
             {
+                if (_filterManager != null && _filterManager.HandleMouseDown(e))
+                {
+                    isDraggingHeaderToHide = false;
+                    columnBeingDragged = null;
+                    return;
+                }
+            {
                 Point pt = new Point(e.X, e.Y);
                 UIElement element = gridReport.DisplayLayout.UIElement?.ElementFromPoint(pt);
                 HeaderUIElement headerUI = element as HeaderUIElement ?? element?.GetAncestor(typeof(HeaderUIElement)) as HeaderUIElement;
@@ -921,7 +933,15 @@ namespace PosBranch_Win.Reports.FinancialReports
             }
         }
 
+        }
+
         private void GridReport_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (!isDraggingHeaderToHide && _filterManager != null && e.Button != MouseButtons.Left)
+            {
+                if (_filterManager.HandleMouseMove(e, headerToolTip))
+                    return;
+            }
         {
             if (e.Button == MouseButtons.Left && columnBeingDragged != null)
             {
@@ -941,6 +961,8 @@ namespace PosBranch_Win.Reports.FinancialReports
                     headerToolTip.Hide(gridReport);
                 }
             }
+        }
+
         }
 
         private void GridReport_MouseUp(object sender, MouseEventArgs e)
@@ -1029,6 +1051,11 @@ namespace PosBranch_Win.Reports.FinancialReports
             ToolStripMenuItem hideItem = new ToolStripMenuItem($"🙈 Hide Column '{colName}'", null, (s, e) => HideColumn(col));
             hideItem.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
             menu.Items.Add(hideItem);
+            if (_filterManager != null)
+            {
+                menu.Items.Add(new ToolStripSeparator());
+                _filterManager.AddFilterContextMenuItems(menu, col, location);
+            }
 
             menu.Items.Add(new ToolStripSeparator());
 
@@ -1261,6 +1288,7 @@ namespace PosBranch_Win.Reports.FinancialReports
         }
         #endregion
 
+
         #region Data Loading & Grid Binding
         private void LoadVendors()
         {
@@ -1389,7 +1417,9 @@ namespace PosBranch_Win.Reports.FinancialReports
                 .ThenBy(x => x.DocNo)
                 .ToList();
 
+            _filterManager?.ClearFilters();
             gridReport.DataSource = boundRows;
+            _filterManager?.UpdateHeaderFilterIcons();
             CreateFooterCells();
             UpdateFooterCellPositions();
             UpdateFooterValues(boundRows);
@@ -1509,7 +1539,8 @@ namespace PosBranch_Win.Reports.FinancialReports
                 string balanceHeader = _getUnallocatedReturnsOnly ? "Unallocated Amt" : "Balance";
                 builder.AppendLine($"AcctCode,Company,Name,Phone,{docNoHeader},{dateHeader},Reference,Invoice Date,Post Date,{docAmtHeader},{balanceHeader}");
 
-                foreach (VendorOutstandingReportRow row in rows)
+                var visibleRows = GetVisibleDataRows().Select(r => r.ListObject as VendorOutstandingReportRow).Where(r => r != null).ToList();
+                foreach (VendorOutstandingReportRow row in visibleRows)
                 {
                     builder.AppendLine(string.Join(",",
                         row.AcctCode.ToString(),
@@ -2318,5 +2349,10 @@ namespace PosBranch_Win.Reports.FinancialReports
             }
         }
         #endregion
+
+        private void frmVendorOutstandingReport_Load_1(object sender, EventArgs e)
+        {
+
+        }
     }
 }

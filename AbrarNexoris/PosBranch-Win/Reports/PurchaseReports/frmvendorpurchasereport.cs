@@ -67,6 +67,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
         private readonly System.Windows.Forms.ToolTip headerToolTip = new System.Windows.Forms.ToolTip();
         private readonly HashSet<string> userHiddenColumnKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private static readonly Cursor blackXCursor = CreateBlackXCursor();
+        private ReportColumnFilterManager _filterManager;
 
         public frmvendorpurchasereport()
         {
@@ -539,6 +540,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
                     PopulateVendorBillOutstanding();
                 }
 
+                _filterManager?.ClearFilters();
                 gridReport.DataSource = currentData;
                 ConfigureGridColumns();
                 ApplyUserHiddenColumns();
@@ -546,6 +548,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 UpdateFooterCellPositions();
                 UpdateFooterValues();
                 UpdateSummary();
+                _filterManager?.UpdateHeaderFilterIcons();
                 UpdateModeButtons();
             }
             catch (Exception ex)
@@ -958,16 +961,17 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
         private void UpdateSummary()
         {
-            int rows = currentData == null ? 0 : currentData.Rows.Count;
+            List<UltraGridRow> visibleRows = GetVisibleDataRows().ToList();
+            int rows = visibleRows.Count;
             lblTotalRows.Text = rows.ToString("N0", culture);
             lblShowing.Text = "Showing " + rows.ToString("N0", culture) + " record(s)";
 
             decimal qty = 0;
             decimal amount = 0;
-            DataView view = currentData == null ? null : currentData.DefaultView;
-            if (view != null)
+            foreach (var r in visibleRows) { if (r.Cells.Exists("Qty")) qty += (GetNumericValue(r.Cells["Qty"].Value) ?? 0m); if (r.Cells.Exists(currentData != null && currentData.Columns.Contains("TotalAmount") ? "TotalAmount" : "Amount")) amount += (GetNumericValue(r.Cells[currentData != null && currentData.Columns.Contains("TotalAmount") ? "TotalAmount" : "Amount"].Value) ?? 0m); }
+            if (false)
             {
-                foreach (DataRowView rowView in view)
+                foreach (DataRowView rowView in new DataRowView[0])
                 {
                     qty += ToDecimal(rowView.Row, "Qty");
                     amount += ToDecimal(rowView.Row, currentData.Columns.Contains("TotalAmount") ? "TotalAmount" : "Amount");
@@ -977,7 +981,8 @@ namespace PosBranch_Win.Reports.PurchaseReports
             lblTotalQty.Text = qty.ToString("N2", culture);
             lblTotalAmount.Text = Money(amount);
 
-            if (currentData != null && currentData.Columns.Contains("PurchaseNo"))
+            lblTotalPurchases.Text = (currentData != null && currentData.Columns.Contains("PurchaseNo")) ? visibleRows.Where(r => r.Cells.Exists("PurchaseNo") && r.Cells["PurchaseNo"].Value != null && r.Cells["PurchaseNo"].Value != DBNull.Value).Select(r => Convert.ToString(r.Cells["PurchaseNo"].Value).Trim()).Where(s => !string.IsNullOrEmpty(s)).Distinct().Count().ToString("N0", culture) : "0";
+            return; if (false && currentData != null && currentData.Columns.Contains("PurchaseNo"))
             {
                 DataView distinct = new DataView(currentData);
                 DataTable bills = distinct.ToTable(true, "PurchaseNo");
@@ -1414,7 +1419,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
         {
             foreach (UltraGridRow row in gridReport.Rows)
             {
-                if (row != null && row.IsDataRow && !row.IsFilteredOut)
+                if (row != null && row.IsDataRow && !row.IsFilteredOut && !row.Hidden)
                     yield return row;
             }
         }
@@ -1599,7 +1604,8 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
         private string BuildPreviewFooterText()
         {
-            int rows = currentData == null ? 0 : currentData.Rows.Count;
+            List<UltraGridRow> visibleRows = GetVisibleDataRows().ToList();
+            int rows = visibleRows.Count;
             string bills = lblTotalPurchases.Text;
             string qty = lblTotalQty.Text;
             string amount = lblTotalAmount.Text;
@@ -1698,6 +1704,19 @@ namespace PosBranch_Win.Reports.PurchaseReports
         private string BuildCsv(DataTable table)
         {
             StringBuilder csv = new StringBuilder();
+            var visibleExportRows = GetVisibleDataRows().ToList();
+            var exportCols = (gridReport.DisplayLayout != null && gridReport.DisplayLayout.Bands.Count > 0) ? gridReport.DisplayLayout.Bands[0].Columns.Cast<UltraGridColumn>().Where(c => !c.Hidden).OrderBy(c => c.Header.VisiblePosition).ToList() : new List<UltraGridColumn>();
+            if (exportCols.Count > 0)
+            {
+                for (int i = 0; i < exportCols.Count; i++) { if (i > 0) csv.Append(','); csv.Append(EscapeCsv(!string.IsNullOrEmpty(exportCols[i].Header.Caption) ? exportCols[i].Header.Caption : exportCols[i].Key)); }
+                csv.AppendLine();
+                foreach (UltraGridRow r in visibleExportRows)
+                {
+                    for (int i = 0; i < exportCols.Count; i++) { if (i > 0) csv.Append(','); object val = r.Cells.Exists(exportCols[i].Key) ? r.Cells[exportCols[i].Key].Value : null; csv.Append(EscapeCsv(Convert.ToString(val))); }
+                    csv.AppendLine();
+                }
+                return csv.ToString();
+            }
             for (int i = 0; i < table.Columns.Count; i++)
             {
                 if (i > 0) csv.Append(',');
@@ -1816,6 +1835,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
         private void SetupHeaderDragToHideAndColumnChooser()
         {
             gridReport.AllowDrop = true;
+            _filterManager = new ReportColumnFilterManager(gridReport, () => { UpdateFooterCellPositions(); UpdateFooterValues(); UpdateSummary(); });
             gridReport.MouseDown += GridReport_MouseDown;
             gridReport.MouseMove += GridReport_MouseMove;
             gridReport.MouseUp += GridReport_MouseUp;
@@ -1853,6 +1873,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 if (e.Button == MouseButtons.Left)
                 {
                     isDraggingHeaderToHide = true;
+                    if (_filterManager != null && _filterManager.HandleMouseDown(e)) { isDraggingHeaderToHide = false; columnBeingDragged = null; return; }
                     columnBeingDragged = col;
                     headerDragStartPoint = new Point(e.X, e.Y);
                 }
@@ -1861,6 +1882,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
         private void GridReport_MouseMove(object sender, MouseEventArgs e)
         {
+            if (!isDraggingHeaderToHide && _filterManager != null && e.Button != MouseButtons.Left && _filterManager.HandleMouseMove(e, headerToolTip)) return;
             if (!isDraggingHeaderToHide || columnBeingDragged == null || e.Button != MouseButtons.Left)
                 return;
 
@@ -1967,6 +1989,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
             string colName = !string.IsNullOrEmpty(col.Header.Caption) ? col.Header.Caption : col.Key;
 
             ToolStripMenuItem hideItem = new ToolStripMenuItem($"🙈 Hide Column '{colName}'", null, (s, e) => HideColumn(col));
+            _filterManager?.AddFilterContextMenuItems(menu, col, location);
             hideItem.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
             menu.Items.Add(hideItem);
 

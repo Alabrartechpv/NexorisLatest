@@ -14,6 +14,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
+using PosBranch_Win.Reports;
 
 namespace PosBranch_Win.Reports.InventoryReport
 {
@@ -74,6 +75,7 @@ namespace PosBranch_Win.Reports.InventoryReport
         private static readonly Cursor blackXCursor = CreateBlackXCursor();
         private GridSideScrollFilter _sideScrollFilter;
         private Label _lblRowSelectorSpacer;
+        private ReportColumnFilterManager _filterManager;
 
         // ════════════════════════════════════════════════════════════
         //  Constructor
@@ -162,11 +164,13 @@ namespace PosBranch_Win.Reports.InventoryReport
                 gridReport.AfterRowFilterChanged += (s, e) =>
                 {
                     UpdateFooterValues();
+            _filterManager?.UpdateHeaderFilterIcons();
                     UpdateFooterCellPositions();
                 };
                 gridReport.AfterSortChange += (s, e) => UpdateFooterValues();
 
                 SetupHeaderDragToHideAndColumnChooser();
+                _filterManager = new ReportColumnFilterManager(gridReport, () => { UpdateFooterCellPositions(); UpdateFooterValues(); });
                 InitializeGridFooter();
 
                 // Keyboard shortcuts
@@ -501,6 +505,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             CreateFooterCells();
             UpdateFooterCellPositions();
             UpdateFooterValues();
+            _filterManager?.UpdateHeaderFilterIcons();
             if (columnChooserForm != null && columnChooserForm.Visible)
             {
                 PopulateColumnChooserListBox();
@@ -612,6 +617,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             if (gridReport.DisplayLayout == null || gridReport.DisplayLayout.Bands.Count == 0)
                 return;
 
+            if (e.Button == MouseButtons.Left && _filterManager != null && _filterManager.HandleMouseDown(e)) { isDraggingHeaderToHide = false; columnBeingDragged = null; return; }
             UIElement element = gridReport.DisplayLayout.UIElement?.ElementFromPoint(new Point(e.X, e.Y));
             HeaderUIElement headerUI = element as HeaderUIElement ?? element?.GetAncestor(typeof(HeaderUIElement)) as HeaderUIElement;
 
@@ -635,6 +641,7 @@ namespace PosBranch_Win.Reports.InventoryReport
 
         private void Grid_MouseMove(object sender, MouseEventArgs e)
         {
+            if (!isDraggingHeaderToHide && _filterManager != null && _filterManager.HandleMouseMove(e, headerToolTip)) return;
             if (!isDraggingHeaderToHide || columnBeingDragged == null || e.Button != MouseButtons.Left)
                 return;
 
@@ -724,6 +731,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             CreateFooterCells();
             UpdateFooterCellPositions();
             UpdateFooterValues();
+            _filterManager?.UpdateHeaderFilterIcons();
             ReportGridLayoutHelper.SaveLayout("StockValuationReport", gridReport, userHiddenColumnKeys);
             if (columnChooserForm != null && columnChooserForm.Visible)
             {
@@ -737,6 +745,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             ContextMenuStrip menu = new ContextMenuStrip { Font = new Font("Segoe UI", 9F) };
             string colName = !string.IsNullOrEmpty(col.Header.Caption) ? col.Header.Caption : col.Key;
 
+            _filterManager?.AddFilterContextMenuItems(menu, col, location);
             ToolStripMenuItem hideItem = new ToolStripMenuItem($"🙈 Hide Column '{colName}'", null, (s, e) => HideColumn(col));
             hideItem.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
             menu.Items.Add(hideItem);
@@ -859,6 +868,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                 CreateFooterCells();
                 UpdateFooterCellPositions();
                 UpdateFooterValues();
+            _filterManager?.UpdateHeaderFilterIcons();
                 ReportGridLayoutHelper.SaveLayout("StockValuationReport", gridReport, userHiddenColumnKeys);
                 PopulateColumnChooserListBox();
             }
@@ -879,6 +889,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             CreateFooterCells();
             UpdateFooterCellPositions();
             UpdateFooterValues();
+            _filterManager?.UpdateHeaderFilterIcons();
             ReportGridLayoutHelper.SaveLayout("StockValuationReport", gridReport, userHiddenColumnKeys);
             PopulateColumnChooserListBox();
         }
@@ -997,6 +1008,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             CreateFooterCells();
             UpdateFooterCellPositions();
             UpdateFooterValues();
+            _filterManager?.UpdateHeaderFilterIcons();
         }
 
         private void CreateFooterCells()
@@ -1177,6 +1189,7 @@ namespace PosBranch_Win.Reports.InventoryReport
 
             _columnAggregations[columnKey] = aggregation;
             UpdateFooterValues();
+            _filterManager?.UpdateHeaderFilterIcons();
         }
 
         private void UpdateFooterCellPositions()
@@ -1264,10 +1277,10 @@ namespace PosBranch_Win.Reports.InventoryReport
 
         private IEnumerable<UltraGridRow> GetVisibleDataRows()
         {
-            if (gridReport.Rows == null) yield break;
-            foreach (UltraGridRow row in gridReport.Rows)
+            if (gridReport.Rows != null) { foreach (UltraGridRow row in gridReport.Rows) { if (row != null && row.IsDataRow && !row.IsFilteredOut && !row.Hidden) yield return row; } } yield break;
+            foreach (UltraGridRow row in GetVisibleDataRows())
             {
-                if (row != null && row.IsDataRow && !row.IsFilteredOut)
+                if (row != null && row.IsDataRow && !row.IsFilteredOut && !row.Hidden)
                     yield return row;
             }
         }
@@ -1547,8 +1560,11 @@ namespace PosBranch_Win.Reports.InventoryReport
                 {
                     _allRows = new List<StockValuationRow>();
                     gridReport.DataSource = null;
+            _filterManager?.ClearFilters();
+            _filterManager?.UpdateHeaderFilterIcons();
                     UpdateSummaryCards();
                     UpdateFooterValues();
+            _filterManager?.UpdateHeaderFilterIcons();
                     SetStatus("No records found for the selected criteria.");
                     MessageBox.Show("No records found.", "No Data",
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -1615,8 +1631,10 @@ namespace PosBranch_Win.Reports.InventoryReport
 
             var result = filtered.ToList();
             gridReport.DataSource = result;
+            _filterManager?.ClearFilters();
             UpdateSummaryCards(result);
             UpdateFooterValues();
+            _filterManager?.UpdateHeaderFilterIcons();
             SetStatus($"Showing {result.Count} of {_allRows.Count} item(s)  |  F5 = Search  |  Ctrl+E = Export  |  Ctrl+P = Print  |  Esc = Close");
         }
 
@@ -1666,8 +1684,11 @@ namespace PosBranch_Win.Reports.InventoryReport
             txtSearch.Text        = "";
             _allRows              = new List<StockValuationRow>();
             gridReport.DataSource = null;
+            _filterManager?.ClearFilters();
+            _filterManager?.UpdateHeaderFilterIcons();
             UpdateSummaryCards();
             UpdateFooterValues();
+            _filterManager?.UpdateHeaderFilterIcons();
             SetStatus("Filters reset.  |  F5 = Search  |  Esc = Close");
         }
 
@@ -1714,7 +1735,8 @@ namespace PosBranch_Win.Reports.InventoryReport
             sb.AppendLine();
             
             // Data
-            foreach (UltraGridRow row in gridReport.Rows)
+
+            foreach (UltraGridRow row in GetVisibleDataRows())
             {
                 foreach (UltraGridColumn col in band.Columns)
                 {
@@ -1732,13 +1754,13 @@ namespace PosBranch_Win.Reports.InventoryReport
             // Summary Row at the bottom
             sb.AppendLine();
             
-            int itemsCount = gridReport.Rows.Count;
+            int itemsCount = GetVisibleDataRows().Count();
             decimal totalQty = 0;
             decimal totalValueCost = 0;
             decimal totalValueRetail = 0;
             decimal totalProfit = 0;
             
-            foreach (UltraGridRow row in gridReport.Rows)
+            foreach (UltraGridRow row in GetVisibleDataRows())
             {
                 totalQty         += Convert.ToDecimal(row.Cells["ClosingStock"].Value ?? 0);
                 totalValueCost   += Convert.ToDecimal(row.Cells["ValueAtCost"].Value ?? 0);

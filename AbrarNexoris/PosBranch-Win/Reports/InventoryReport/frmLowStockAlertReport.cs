@@ -14,6 +14,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Windows.Forms;
+using PosBranch_Win.Reports;
 
 namespace PosBranch_Win.Reports.InventoryReport
 {
@@ -69,6 +70,7 @@ namespace PosBranch_Win.Reports.InventoryReport
         private readonly System.Windows.Forms.ToolTip headerToolTip = new System.Windows.Forms.ToolTip();
         private readonly HashSet<string> userHiddenColumnKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private static readonly Cursor blackXCursor = CreateBlackXCursor();
+        private ReportColumnFilterManager _filterManager;
 
         // ════════════════════════════════════════════════════════════
         //  Constructor
@@ -139,6 +141,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                 gridReport.AfterSortChange += (s, e) => UpdateFooterValues();
 
                 SetupHeaderDragToHideAndColumnChooser();
+                _filterManager = new ReportColumnFilterManager(gridReport, () => { UpdateFooterCellPositions(); UpdateFooterValues(); });
                 InitializeGridFooter();
 
                 // Wire event triggers
@@ -420,6 +423,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             }
 
             CreateFooterCells();
+            _filterManager?.UpdateHeaderFilterIcons();
             UpdateFooterCellPositions();
             UpdateFooterValues();
         }
@@ -516,6 +520,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             if (gridReport.DisplayLayout == null || gridReport.DisplayLayout.Bands.Count == 0)
                 return;
 
+            if (e.Button == MouseButtons.Left && _filterManager != null && _filterManager.HandleMouseDown(e)) { isDraggingHeaderToHide = false; columnBeingDragged = null; return; }
             UIElement element = gridReport.DisplayLayout.UIElement?.ElementFromPoint(new Point(e.X, e.Y));
             HeaderUIElement headerUI = element as HeaderUIElement ?? element?.GetAncestor(typeof(HeaderUIElement)) as HeaderUIElement;
 
@@ -539,6 +544,7 @@ namespace PosBranch_Win.Reports.InventoryReport
 
         private void Grid_MouseMove(object sender, MouseEventArgs e)
         {
+            if (!isDraggingHeaderToHide && _filterManager != null && _filterManager.HandleMouseMove(e, headerToolTip)) return;
             if (!isDraggingHeaderToHide || columnBeingDragged == null || e.Button != MouseButtons.Left)
                 return;
 
@@ -627,6 +633,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             col.Hidden = true;
             ReportGridLayoutHelper.SaveLayout("LowStockAlertReport", gridReport, userHiddenColumnKeys);
             CreateFooterCells();
+            _filterManager?.UpdateHeaderFilterIcons();
             UpdateFooterCellPositions();
             UpdateFooterValues();
             if (columnChooserForm != null && columnChooserForm.Visible)
@@ -641,6 +648,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             ContextMenuStrip menu = new ContextMenuStrip { Font = new Font("Segoe UI", 9F) };
             string colName = !string.IsNullOrEmpty(col.Header.Caption) ? col.Header.Caption : col.Key;
 
+            _filterManager?.AddFilterContextMenuItems(menu, col, location);
             ToolStripMenuItem hideItem = new ToolStripMenuItem($"🙈 Hide Column '{colName}'", null, (s, e) => HideColumn(col));
             hideItem.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
             menu.Items.Add(hideItem);
@@ -762,6 +770,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                 }
                 ReportGridLayoutHelper.SaveLayout("LowStockAlertReport", gridReport, userHiddenColumnKeys);
                 CreateFooterCells();
+            _filterManager?.UpdateHeaderFilterIcons();
                 UpdateFooterCellPositions();
                 UpdateFooterValues();
                 PopulateColumnChooserListBox();
@@ -782,6 +791,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             }
             ReportGridLayoutHelper.SaveLayout("LowStockAlertReport", gridReport, userHiddenColumnKeys);
             CreateFooterCells();
+            _filterManager?.UpdateHeaderFilterIcons();
             UpdateFooterCellPositions();
             UpdateFooterValues();
             PopulateColumnChooserListBox();
@@ -897,6 +907,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             }
 
             CreateFooterCells();
+            _filterManager?.UpdateHeaderFilterIcons();
             UpdateFooterCellPositions();
             UpdateFooterValues();
         }
@@ -1132,7 +1143,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             if (gridReport.Rows == null) yield break;
             foreach (UltraGridRow row in gridReport.Rows)
             {
-                if (row != null && row.IsDataRow && !row.IsFilteredOut)
+                if (row != null && row.IsDataRow && !row.IsFilteredOut && !row.Hidden)
                     yield return row;
             }
         }
@@ -1367,6 +1378,8 @@ namespace PosBranch_Win.Reports.InventoryReport
             comboCategory.Value = null;
             txtSearch.Text      = string.Empty;
             gridReport.DataSource = null;
+            _filterManager?.ClearFilters();
+            _filterManager?.UpdateHeaderFilterIcons();
             _allRows.Clear();
             CalculateSummaryValues(new List<LowStockAlertItem>());
             UpdateFooterValues();
@@ -1485,6 +1498,8 @@ namespace PosBranch_Win.Reports.InventoryReport
             }
 
             gridReport.DataSource = filtered;
+            _filterManager?.ClearFilters();
+            _filterManager?.UpdateHeaderFilterIcons();
             CalculateSummaryValues(filtered);
             UpdateFooterValues();
             lblStatus.Text = $"Ready  |  Found {filtered.Count} records.";
@@ -1533,7 +1548,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                     var sb = new StringBuilder();
                     sb.AppendLine("S.No,Barcode,Product Name,Group,Category,Unit,Cost Price,Retail Price,Reorder Level,Current Stock,Shortage Qty");
 
-                    foreach (var r in rows)
+                    foreach (var r in GetVisibleDataRows().Select(row => row.ListObject as LowStockAlertItem).Where(x => x != null))
                     {
                         sb.AppendLine(string.Join(",",
                             CsvCell(r.SlNo.ToString()),
@@ -1562,8 +1577,8 @@ namespace PosBranch_Win.Reports.InventoryReport
                         "",
                         "",
                         "",
-                        rows.Sum(r => r.CurrentStock).ToString("F2"),
-                        rows.Sum(r => r.ShortageQty).ToString("F2")
+                        GetVisibleDataRows().Select(row => row.ListObject as LowStockAlertItem).Where(x => x != null).Sum(r => r.CurrentStock).ToString("F2"),
+                        GetVisibleDataRows().Select(row => row.ListObject as LowStockAlertItem).Where(x => x != null).Sum(r => r.ShortageQty).ToString("F2")
                     ));
 
                     File.WriteAllText(saveDlg.FileName, sb.ToString(), Encoding.UTF8);
