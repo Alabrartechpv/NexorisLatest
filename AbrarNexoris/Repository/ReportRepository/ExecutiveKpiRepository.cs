@@ -173,6 +173,7 @@ namespace Repository.ReportRepository
                             model.CustomerReceiptsCollected = r.Table.Columns.Contains("CustomerReceiptsCollected") ? GetDecimal(r, "CustomerReceiptsCollected") : GetDecimal(r, "CashInCustomerReceipts");
                             model.CounterCashSales = r.Table.Columns.Contains("CounterCashSales") ? GetDecimal(r, "CounterCashSales") : GetDecimal(r, "CashInCounterCash");
                             model.DigitalSales = r.Table.Columns.Contains("DigitalSales") ? GetDecimal(r, "DigitalSales") : GetDecimal(r, "CashInCounterDigital");
+                            model.DailyCreditSales = r.Table.Columns.Contains("CashInCounterCredit") ? GetDecimal(r, "CashInCounterCredit") : 0;
                             model.CashPurchasesPaid = r.Table.Columns.Contains("CashPurchasesPaid") ? GetDecimal(r, "CashPurchasesPaid") : GetDecimal(r, "CashOutCashPurchases");
                         }
 
@@ -527,7 +528,7 @@ namespace Repository.ReportRepository
                     }
 
                     // Fallback tender lookup via Stored Procedure POS_CounterReport if tender breakdown is still zero
-                    if (model.DailyCashSales == 0 && model.DailyBankSales == 0 && model.TotalSalesRevenue > 0)
+                    if (model.DailyCashSales == 0 && model.DailyBankSales == 0 && model.DailyCreditSales == 0 && model.TotalSalesRevenue > 0)
                     {
                         try
                         {
@@ -557,7 +558,7 @@ namespace Repository.ReportRepository
                         }
                         catch
                         {
-                            if (model.DailyCashSales == 0 && model.DailyBankSales == 0)
+                            if (model.DailyCashSales == 0 && model.DailyBankSales == 0 && model.DailyCreditSales == 0)
                             {
                                 model.DailyCashSales = model.TotalSalesRevenue;
                             }
