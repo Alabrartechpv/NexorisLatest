@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace ModelClass.Report
 {
@@ -17,6 +18,21 @@ namespace ModelClass.Report
         public int? SalesmanId { get; set; }
         public string CategoryName { get; set; }
         public int? CategoryId { get; set; }
+
+        public List<CustomerBillReceiptDetail> ReceiptDetails { get; set; } = new List<CustomerBillReceiptDetail>();
+        public bool HasLoadedReceipts { get; set; }
+    }
+
+    public class CustomerBillReceiptDetail
+    {
+        public long BillNo { get; set; }
+        public DateTime ReceiptDate { get; set; }
+        public string VoucherNo { get; set; }
+        public string PaymentMode { get; set; }
+        public decimal BillAmount { get; set; }
+        public decimal ReceiptAmount { get; set; }
+        public decimal BalanceAmount { get; set; }
+        public string Remarks { get; set; }
     }
 
     public class CustomerOutstandingReportFilter

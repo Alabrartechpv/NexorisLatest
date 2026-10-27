@@ -57,6 +57,7 @@ namespace PosBranch_Win.Reports.FinancialReports
         private readonly HashSet<string> summaryDefaultNumericColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "DocAmt",
+            "PaidAmount",
             "Balance"
         };
 
@@ -121,6 +122,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             // Grid event registrations for footer cell sync and column drag
             gridReport.InitializeLayout += gridReport_InitializeLayout;
             gridReport.InitializeRow += gridReport_InitializeRow;
+            gridReport.BeforeRowExpanded += gridReport_BeforeRowExpanded;
             gridReport.DoubleClickRow += gridReport_DoubleClickRow;
             gridReport.Resize += (s, e) => UpdateFooterCellPositions();
             gridReport.AfterColPosChanged += (s, e) =>
@@ -438,6 +440,8 @@ namespace PosBranch_Win.Reports.FinancialReports
             layout.Override.AllowAddNew = AllowAddNew.No;
             layout.Override.AllowDelete = DefaultableBoolean.False;
             layout.Override.AllowUpdate = DefaultableBoolean.False;
+            layout.Override.ExpansionIndicator = ShowExpansionIndicator.CheckOnDisplay;
+            layout.ViewStyleBand = ViewStyleBand.Vertical;
             layout.Override.CellClickAction = CellClickAction.RowSelect;
             layout.Override.HeaderClickAction = HeaderClickAction.SortMulti;
             layout.Override.SelectTypeRow = SelectType.Single;
@@ -834,6 +838,7 @@ namespace PosBranch_Win.Reports.FinancialReports
         {
             if (column == null) return false;
             return string.Equals(column.Key, "DocAmt", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(column.Key, "PaidAmount", StringComparison.OrdinalIgnoreCase) ||
                    string.Equals(column.Key, "Balance", StringComparison.OrdinalIgnoreCase) ||
                    column.DataType == typeof(decimal) ||
                    column.DataType == typeof(double) ||
@@ -1413,8 +1418,8 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             List<VendorOutstandingReportRow> boundRows = filteredRows
                 .OrderBy(x => x.Company)
-                .ThenBy(x => x.Date)
-                .ThenBy(x => x.DocNo)
+                .ThenByDescending(x => x.Date)
+                .ThenByDescending(x => x.DocNo)
                 .ToList();
 
             _filterManager?.ClearFilters();
@@ -1537,8 +1542,9 @@ namespace PosBranch_Win.Reports.FinancialReports
                 string docNoHeader = _getUnallocatedReturnsOnly ? "Return No" : "Doc No";
                 string dateHeader = _getUnallocatedReturnsOnly ? "Return Date" : "Date";
                 string docAmtHeader = _getUnallocatedReturnsOnly ? "Return Amt" : "Doc Amt";
+                string paidAmtHeader = _getUnallocatedReturnsOnly ? "Adjusted Amt" : "Paid Amt";
                 string balanceHeader = _getUnallocatedReturnsOnly ? "Unallocated Amt" : "Balance";
-                builder.AppendLine($"AcctCode,Company,Name,Phone,{docNoHeader},{dateHeader},Reference,Invoice Date,Post Date,{docAmtHeader},{balanceHeader}");
+                builder.AppendLine($"AcctCode,Company,Name,Phone,{docNoHeader},{dateHeader},Reference,Invoice Date,Post Date,{docAmtHeader},{paidAmtHeader},{balanceHeader}");
 
                 var visibleRows = GetVisibleDataRows().Select(r => r.ListObject as VendorOutstandingReportRow).Where(r => r != null).ToList();
                 foreach (VendorOutstandingReportRow row in visibleRows)
@@ -1554,6 +1560,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                         EscapeCsv(row.InvoiceDate.HasValue ? row.InvoiceDate.Value.ToString("yyyy-MM-dd") : string.Empty),
                         EscapeCsv(row.PostDate.HasValue ? row.PostDate.Value.ToString("yyyy-MM-dd") : string.Empty),
                         row.DocAmt.ToString("F2"),
+                        row.PaidAmount.ToString("F2"),
                         row.Balance.ToString("F2")));
                 }
 
@@ -1595,6 +1602,29 @@ namespace PosBranch_Win.Reports.FinancialReports
             }
         }
 
+        private void ConfigureChildGridColumn(UltraGridBand band, string key, string header, int width, string format, HAlign align, int visiblePosition)
+        {
+            if (!band.Columns.Exists(key))
+                return;
+
+            UltraGridColumn column = band.Columns[key];
+            column.ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
+            column.Hidden = false;
+            column.Header.Caption = header;
+            column.Width = width;
+            column.Header.VisiblePosition = visiblePosition;
+            column.Header.Appearance.BorderColor = GridRowLine;
+            column.CellAppearance.BorderColor = GridRowLine;
+            column.CellAppearance.TextHAlign = align;
+            column.CellAppearance.FontData.Name = "Microsoft Sans Serif";
+            column.CellAppearance.FontData.SizeInPoints = 8.25F;
+
+            if (!string.IsNullOrWhiteSpace(format))
+            {
+                column.Format = format;
+            }
+        }
+
         private void gridReport_InitializeLayout(object sender, InitializeLayoutEventArgs e)
         {
             if (e.Layout.Bands.Count == 0)
@@ -1617,7 +1647,8 @@ namespace PosBranch_Win.Reports.FinancialReports
             ConfigureGridColumn(band, "InvoiceDate", "Invoice Date", 105, "dd-MMM-yyyy", HAlign.Left, 7);
             ConfigureGridColumn(band, "PostDate", "Post Date", 105, "dd-MMM-yyyy", HAlign.Left, 8);
             ConfigureGridColumn(band, "DocAmt", _getUnallocatedReturnsOnly ? "Return Amt" : "Doc Amt", 95, "#,##0.00", HAlign.Right, 9);
-            ConfigureGridColumn(band, "Balance", _getUnallocatedReturnsOnly ? "Unallocated Amt" : "Balance", 95, "#,##0.00", HAlign.Right, 10);
+            ConfigureGridColumn(band, "PaidAmount", _getUnallocatedReturnsOnly ? "Adjusted Amt" : "Paid Amt", 95, "#,##0.00", HAlign.Right, 10);
+            ConfigureGridColumn(band, "Balance", _getUnallocatedReturnsOnly ? "Unallocated Amt" : "Balance", 95, "#,##0.00", HAlign.Right, 11);
 
             if (band.Columns.Exists("Company"))
             {
@@ -1630,9 +1661,58 @@ namespace PosBranch_Win.Reports.FinancialReports
                 band.Columns["DocAmt"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
             }
 
+            if (band.Columns.Exists("PaidAmount"))
+            {
+                band.Columns["PaidAmount"].CellAppearance.ForeColor = Color.FromArgb(13, 71, 161);
+            }
+
             if (band.Columns.Exists("Balance"))
             {
                 band.Columns["Balance"].CellAppearance.ForeColor = Color.FromArgb(191, 54, 12);
+            }
+
+            // Configure Child Band 1 for Payment History drilldown
+            if (e.Layout.Bands.Count > 1)
+            {
+                UltraGridBand childBand = e.Layout.Bands[1];
+                childBand.HeaderVisible = true;
+                childBand.Header.Caption = "Payment History & Adjustments";
+                childBand.Header.Appearance.BackColor = Color.FromArgb(41, 128, 185);
+                childBand.Header.Appearance.ForeColor = Color.White;
+                childBand.Header.Appearance.FontData.Bold = DefaultableBoolean.True;
+                childBand.Override.AllowAddNew = AllowAddNew.No;
+                childBand.Override.AllowDelete = DefaultableBoolean.False;
+                childBand.Override.AllowUpdate = DefaultableBoolean.False;
+                childBand.Override.RowSelectors = DefaultableBoolean.False;
+                childBand.Override.HeaderAppearance.BackColor = Color.FromArgb(70, 130, 180);
+                childBand.Override.HeaderAppearance.ForeColor = Color.White;
+                childBand.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.True;
+                childBand.Override.RowAlternateAppearance.BackColor = Color.FromArgb(246, 250, 255);
+
+                foreach (UltraGridColumn column in childBand.Columns)
+                {
+                    column.Hidden = true;
+                    column.ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
+                }
+
+                ConfigureChildGridColumn(childBand, "PaymentDate", "Payment Date", 105, "dd-MMM-yyyy", HAlign.Left, 0);
+                ConfigureChildGridColumn(childBand, "VoucherNo", "Voucher No", 115, null, HAlign.Left, 1);
+                ConfigureChildGridColumn(childBand, "PaymentMode", "Payment Mode", 125, null, HAlign.Left, 2);
+                ConfigureChildGridColumn(childBand, "BillAmount", "Bill Amount", 100, "#,##0.00", HAlign.Right, 3);
+                ConfigureChildGridColumn(childBand, "PaymentAmount", "Paid / Adjusted", 105, "#,##0.00", HAlign.Right, 4);
+                ConfigureChildGridColumn(childBand, "BalanceAmount", "Balance After", 105, "#,##0.00", HAlign.Right, 5);
+                ConfigureChildGridColumn(childBand, "Remarks", "Remarks / Narration", 220, null, HAlign.Left, 6);
+
+                if (childBand.Columns.Exists("PaymentAmount"))
+                {
+                    childBand.Columns["PaymentAmount"].CellAppearance.ForeColor = Color.FromArgb(27, 94, 32);
+                    childBand.Columns["PaymentAmount"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
+                }
+
+                if (childBand.Columns.Exists("BalanceAmount"))
+                {
+                    childBand.Columns["BalanceAmount"].CellAppearance.ForeColor = Color.FromArgb(191, 54, 12);
+                }
             }
 
             ReportGridLayoutHelper.ApplySavedLayout(GetLayoutKey(), gridReport, userHiddenColumnKeys);
@@ -1649,19 +1729,86 @@ namespace PosBranch_Win.Reports.FinancialReports
 
         private void gridReport_InitializeRow(object sender, InitializeRowEventArgs e)
         {
-            if (!e.Row.Cells.Exists("Balance"))
-                return;
-
-            decimal balance = 0m;
-            if (e.Row.Cells["Balance"].Value != null)
+            if (e.Row.Band.Index == 0)
             {
-                decimal.TryParse(e.Row.Cells["Balance"].Value.ToString(), out balance);
-            }
+                var row = e.Row.ListObject as VendorOutstandingReportRow;
+                if (row != null)
+                {
+                    e.Row.ExpansionIndicator = row.PaidAmount > 0
+                        ? ShowExpansionIndicator.Always
+                        : ShowExpansionIndicator.Never;
+                }
 
-            e.Row.Cells["Balance"].Appearance.FontData.Bold = DefaultableBoolean.True;
-            e.Row.Cells["Balance"].Appearance.ForeColor = balance > 0
-                ? Color.FromArgb(191, 54, 12)
-                : Color.FromArgb(46, 125, 50);
+                if (e.Row.Cells.Exists("Balance"))
+                {
+                    decimal balance = 0m;
+                    if (e.Row.Cells["Balance"].Value != null)
+                    {
+                        decimal.TryParse(e.Row.Cells["Balance"].Value.ToString(), out balance);
+                    }
+
+                    e.Row.Cells["Balance"].Appearance.FontData.Bold = DefaultableBoolean.True;
+                    e.Row.Cells["Balance"].Appearance.ForeColor = balance > 0
+                        ? Color.FromArgb(191, 54, 12)
+                        : Color.FromArgb(46, 125, 50);
+                }
+            }
+        }
+
+        private void gridReport_BeforeRowExpanded(object sender, CancelableRowEventArgs e)
+        {
+            if (e.Row.Band.Index == 0)
+            {
+                var row = e.Row.ListObject as VendorOutstandingReportRow;
+                if (row != null && !row.HasLoadedPayments)
+                {
+                    row.HasLoadedPayments = true;
+                    if (row.PaidAmount > 0)
+                    {
+                        Cursor currentCursor = Cursor;
+                        Cursor = Cursors.WaitCursor;
+                        try
+                        {
+                            int branchId = SessionContext.BranchId;
+                            var payments = _repository.GetBillPaymentHistory(row.AcctCode, row.PurchaseNo, branchId, row.DocAmt, row.Balance);
+                            if (payments != null && payments.Count > 0)
+                            {
+                                row.PaymentDetails.Clear();
+                                row.PaymentDetails.AddRange(payments);
+                            }
+                            else
+                            {
+                                // Synthesize payment summary row if no detailed vouchers found
+                                row.PaymentDetails.Clear();
+                                row.PaymentDetails.Add(new VendorBillPaymentDetail
+                                {
+                                    PurchaseNo = row.PurchaseNo,
+                                    PaymentDate = row.Date,
+                                    VoucherNo = "PAYMENT",
+                                    PaymentMode = "Settlement / Adjustment",
+                                    BillAmount = row.DocAmt,
+                                    PaymentAmount = row.PaidAmount,
+                                    BalanceAmount = row.Balance,
+                                    Remarks = "Direct Settlement / Voucher Adjustment"
+                                });
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Error expanding payment details: {ex.Message}");
+                        }
+                        finally
+                        {
+                            Cursor = currentCursor;
+                        }
+
+                        if (e.Row.ChildBands.Count > 0 && e.Row.ChildBands[0].Rows != null)
+                        {
+                            e.Row.ChildBands[0].Rows.Refresh(RefreshRow.ReloadData);
+                        }
+                    }
+                }
+            }
         }
         #endregion
 
@@ -1943,6 +2090,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                 previewGrid.Font = new Font("Segoe UI", 9F, FontStyle.Regular);
                 previewGrid.InitializeLayout += PreviewGrid_InitializeLayout;
                 previewGrid.InitializeRow += gridReport_InitializeRow;
+                previewGrid.BeforeRowExpanded += gridReport_BeforeRowExpanded;
                 previewGrid.DataSource = rows.ToList();
 
                 footer.Dock = DockStyle.Bottom;
@@ -1951,14 +2099,15 @@ namespace PosBranch_Win.Reports.FinancialReports
                 footer.Padding = new Padding(16, 0, 16, 0);
 
                 decimal documentTotal = rows.Sum(x => x.DocAmt);
+                decimal paidTotal = rows.Sum(x => x.PaidAmount);
                 decimal balanceTotal = rows.Sum(x => x.Balance);
                 Label footerLabel = new Label
                 {
                     Dock = DockStyle.Fill,
                     Text = string.Format(_getUnallocatedReturnsOnly 
-                        ? "Returns: {0:N0}    |    Return Total: {1:N2}    |    Pending Unallocated: {2:N2}"
-                        : "Documents: {0:N0}    |    Document Total: {1:N2}    |    Outstanding Balance: {2:N2}",
-                        rows.Count, documentTotal, balanceTotal),
+                        ? "Returns: {0:N0}    |    Return Total: {1:N2}    |    Adjusted Total: {2:N2}    |    Pending Unallocated: {3:N2}"
+                        : "Documents: {0:N0}    |    Document Total: {1:N2}    |    Paid Total: {2:N2}    |    Outstanding Balance: {3:N2}",
+                        rows.Count, documentTotal, paidTotal, balanceTotal),
                     ForeColor = Color.White,
                     BackColor = Color.Transparent,
                     Font = new Font("Segoe UI", 9F, FontStyle.Bold),
@@ -2184,6 +2333,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             try
             {
                 if (e.Row == null || !e.Row.IsDataRow) return;
+                if (e.Row.Band != null && e.Row.Band.Index != 0) return;
 
                 var row = e.Row.ListObject as VendorOutstandingReportRow;
                 if (row == null) return;

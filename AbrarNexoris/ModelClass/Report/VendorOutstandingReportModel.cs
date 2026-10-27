@@ -14,6 +14,12 @@ namespace ModelClass.Report
         public DateTime? InvoiceDate { get; set; }
         public DateTime? PostDate { get; set; }
         public decimal DocAmt { get; set; }
+        private decimal? _paidAmount;
+        public decimal PaidAmount
+        {
+            get { return _paidAmount ?? Math.Max(0m, DocAmt - Balance); }
+            set { _paidAmount = value; }
+        }
         public decimal Balance { get; set; }
         public int IsPR { get; set; }
 
@@ -52,9 +58,37 @@ namespace ModelClass.Report
 
         public decimal TotalPaid
         {
-            get { return DocAmt - Balance; }
-            set { Balance = DocAmt - value; }
+            get { return PaidAmount; }
+            set { PaidAmount = value; }
         }
+
+        private System.Collections.Generic.List<VendorBillPaymentDetail> _paymentDetails;
+        public System.Collections.Generic.List<VendorBillPaymentDetail> PaymentDetails
+        {
+            get
+            {
+                if (_paymentDetails == null)
+                {
+                    _paymentDetails = new System.Collections.Generic.List<VendorBillPaymentDetail>();
+                }
+                return _paymentDetails;
+            }
+            set { _paymentDetails = value; }
+        }
+
+        public bool HasLoadedPayments { get; set; }
+    }
+
+    public class VendorBillPaymentDetail
+    {
+        public long PurchaseNo { get; set; }
+        public DateTime PaymentDate { get; set; }
+        public string VoucherNo { get; set; }
+        public string PaymentMode { get; set; }
+        public decimal BillAmount { get; set; }
+        public decimal PaymentAmount { get; set; }
+        public decimal BalanceAmount { get; set; }
+        public string Remarks { get; set; }
     }
 
     public class VendorOutstandingReportFilter

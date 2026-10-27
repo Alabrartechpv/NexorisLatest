@@ -92,6 +92,7 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             gridReport.InitializeLayout += gridReport_InitializeLayout;
             gridReport.InitializeRow += gridReport_InitializeRow;
+            gridReport.BeforeRowExpanded += gridReport_BeforeRowExpanded;
             gridReport.Resize += gridReport_Resize;
             gridReport.DoubleClickRow += gridReport_DoubleClickRow;
             gridReport.AfterColPosChanged += (s, ev) =>
@@ -555,8 +556,8 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             List<CustomerOutstandingReportRow> boundRows = filteredRows
                 .OrderBy(x => x.LedgerName)
-                .ThenBy(x => x.BillDate)
-                .ThenBy(x => x.BillNo)
+                .ThenByDescending(x => x.BillDate)
+                .ThenByDescending(x => x.BillNo)
                 .ToList();
 
             _suppressLayoutSave = true;
@@ -629,6 +630,9 @@ namespace PosBranch_Win.Reports.FinancialReports
             try
             {
                 UltraGridLayout layout = e.Layout;
+                layout.Override.ExpansionIndicator = ShowExpansionIndicator.CheckOnDisplay;
+                layout.ViewStyleBand = ViewStyleBand.Vertical;
+
                 UltraGridBand band = layout.Bands[0];
 
                 band.Override.HeaderAppearance.BackColor = GridHeaderBlue;
@@ -639,6 +643,7 @@ namespace PosBranch_Win.Reports.FinancialReports
 
                 foreach (UltraGridColumn col in band.Columns)
                 {
+                    col.Hidden = true;
                     col.ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
                 }
 
@@ -646,6 +651,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                 if (band.Columns.Exists("CategoryId")) { band.Columns["CategoryId"].Hidden = true; band.Columns["CategoryId"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.True; }
                 if (band.Columns.Exists("CategoryName")) { band.Columns["CategoryName"].Hidden = true; band.Columns["CategoryName"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.True; }
                 if (band.Columns.Exists("DocNo")) { band.Columns["DocNo"].Hidden = true; band.Columns["DocNo"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.True; }
+                if (band.Columns.Exists("HasLoadedReceipts")) { band.Columns["HasLoadedReceipts"].Hidden = true; band.Columns["HasLoadedReceipts"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.True; }
 
                 ConfigureColumn(band, "LedgerID", "Cust. ID", 70, HAlign.Center, visiblePosition: 0);
                 ConfigureColumn(band, "LedgerName", "Customer Name", 200, HAlign.Left, visiblePosition: 1);
@@ -660,6 +666,50 @@ namespace PosBranch_Win.Reports.FinancialReports
                 SetDefaultAggregation("InvoiceAmount", "Sum");
                 SetDefaultAggregation("ReceivedAmount", "Sum");
                 SetDefaultAggregation("Balance", "Sum");
+
+                // Configure Child Band 1 for Receipt History drilldown
+                if (layout.Bands.Count > 1)
+                {
+                    UltraGridBand childBand = layout.Bands[1];
+                    childBand.HeaderVisible = true;
+                    childBand.Header.Caption = "Receipt History & Adjustments";
+                    childBand.Header.Appearance.BackColor = Color.FromArgb(41, 128, 185);
+                    childBand.Header.Appearance.ForeColor = Color.White;
+                    childBand.Header.Appearance.FontData.Bold = DefaultableBoolean.True;
+                    childBand.Override.AllowAddNew = AllowAddNew.No;
+                    childBand.Override.AllowDelete = DefaultableBoolean.False;
+                    childBand.Override.AllowUpdate = DefaultableBoolean.False;
+                    childBand.Override.RowSelectors = DefaultableBoolean.False;
+                    childBand.Override.HeaderAppearance.BackColor = Color.FromArgb(70, 130, 180);
+                    childBand.Override.HeaderAppearance.ForeColor = Color.White;
+                    childBand.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.True;
+                    childBand.Override.RowAlternateAppearance.BackColor = Color.FromArgb(246, 250, 255);
+
+                    foreach (UltraGridColumn col in childBand.Columns)
+                    {
+                        col.Hidden = true;
+                        col.ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
+                    }
+
+                    ConfigureColumn(childBand, "ReceiptDate", "Receipt Date", 105, HAlign.Left, "{date}", "dd/MM/yyyy", visiblePosition: 0);
+                    ConfigureColumn(childBand, "VoucherNo", "Voucher No", 115, HAlign.Left, visiblePosition: 1);
+                    ConfigureColumn(childBand, "PaymentMode", "Payment Mode", 125, HAlign.Left, visiblePosition: 2);
+                    ConfigureColumn(childBand, "BillAmount", "Invoice Amount", 110, HAlign.Right, "{currency}", "#,##0.00", visiblePosition: 3);
+                    ConfigureColumn(childBand, "ReceiptAmount", "Received / Adjusted", 120, HAlign.Right, "{currency}", "#,##0.00", visiblePosition: 4);
+                    ConfigureColumn(childBand, "BalanceAmount", "Balance After", 110, HAlign.Right, "{currency}", "#,##0.00", visiblePosition: 5);
+                    ConfigureColumn(childBand, "Remarks", "Remarks / Narration", 220, HAlign.Left, visiblePosition: 6);
+
+                    if (childBand.Columns.Exists("ReceiptAmount"))
+                    {
+                        childBand.Columns["ReceiptAmount"].CellAppearance.ForeColor = Color.FromArgb(27, 94, 32);
+                        childBand.Columns["ReceiptAmount"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
+                    }
+
+                    if (childBand.Columns.Exists("BalanceAmount"))
+                    {
+                        childBand.Columns["BalanceAmount"].CellAppearance.ForeColor = Color.FromArgb(191, 54, 12);
+                    }
+                }
 
                 ApplySavedLayoutIfAvailable();
             }
@@ -696,11 +746,77 @@ namespace PosBranch_Win.Reports.FinancialReports
         {
             if (e.Row == null || !e.Row.IsDataRow) return;
 
-            var row = e.Row.ListObject as CustomerOutstandingReportRow;
-            if (row != null && row.Balance > 0)
+            if (e.Row.Band.Index == 0)
             {
-                e.Row.Cells["Balance"].Appearance.ForeColor = Color.FromArgb(185, 28, 28);
-                e.Row.Cells["Balance"].Appearance.FontData.Bold = DefaultableBoolean.True;
+                var row = e.Row.ListObject as CustomerOutstandingReportRow;
+                if (row != null)
+                {
+                    e.Row.ExpansionIndicator = row.ReceivedAmount > 0
+                        ? ShowExpansionIndicator.Always
+                        : ShowExpansionIndicator.Never;
+
+                    if (row.Balance > 0 && e.Row.Cells.Exists("Balance"))
+                    {
+                        e.Row.Cells["Balance"].Appearance.ForeColor = Color.FromArgb(185, 28, 28);
+                        e.Row.Cells["Balance"].Appearance.FontData.Bold = DefaultableBoolean.True;
+                    }
+                }
+            }
+        }
+
+        private void gridReport_BeforeRowExpanded(object sender, CancelableRowEventArgs e)
+        {
+            if (e.Row.Band.Index == 0)
+            {
+                var row = e.Row.ListObject as CustomerOutstandingReportRow;
+                if (row != null && !row.HasLoadedReceipts)
+                {
+                    row.HasLoadedReceipts = true;
+                    if (row.ReceivedAmount > 0)
+                    {
+                        Cursor currentCursor = Cursor;
+                        Cursor = Cursors.WaitCursor;
+                        try
+                        {
+                            int branchId = SessionContext.BranchId;
+                            var receipts = _repository.GetBillReceiptHistory(row.LedgerID, row.BillNo, branchId, row.InvoiceAmount, row.Balance);
+                            if (receipts != null && receipts.Count > 0)
+                            {
+                                row.ReceiptDetails.Clear();
+                                row.ReceiptDetails.AddRange(receipts);
+                            }
+                            else
+                            {
+                                // Synthesize summary receipt row if no detailed vouchers found
+                                row.ReceiptDetails.Clear();
+                                row.ReceiptDetails.Add(new CustomerBillReceiptDetail
+                                {
+                                    BillNo = row.BillNo,
+                                    ReceiptDate = row.BillDate ?? DateTime.Today,
+                                    VoucherNo = "RECEIPT",
+                                    PaymentMode = "Settlement / Adjustment",
+                                    BillAmount = row.InvoiceAmount,
+                                    ReceiptAmount = row.ReceivedAmount,
+                                    BalanceAmount = row.Balance,
+                                    Remarks = "Direct Settlement / Voucher Adjustment"
+                                });
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Error expanding customer receipt details: {ex.Message}");
+                        }
+                        finally
+                        {
+                            Cursor = currentCursor;
+                        }
+
+                        if (e.Row.ChildBands.Count > 0 && e.Row.ChildBands[0].Rows != null)
+                        {
+                            e.Row.ChildBands[0].Rows.Refresh(RefreshRow.ReloadData);
+                        }
+                    }
+                }
             }
         }
 
@@ -713,7 +829,7 @@ namespace PosBranch_Win.Reports.FinancialReports
         {
             try
             {
-                if (e.Row == null || !e.Row.IsDataRow) return;
+                if (e.Row == null || !e.Row.IsDataRow || e.Row.Band.Index != 0) return;
                 var row = e.Row.ListObject as CustomerOutstandingReportRow;
                 if (row == null) return;
 

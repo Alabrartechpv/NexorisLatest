@@ -88,8 +88,6 @@ namespace Repository.ReportRepository
                         }
                     }
                 }
-
-                EnrichSalesPerson(rows);
             }
             finally
             {
@@ -100,169 +98,217 @@ namespace Repository.ReportRepository
             return rows;
         }
 
-        private void EnrichSalesPerson(List<CustomerOutstandingReportRow> rows)
+        public List<CustomerBillReceiptDetail> GetBillReceiptHistory(int customerLedgerId, long billNo, int branchId, decimal invoiceAmt, decimal balance)
         {
-            if (rows == null || rows.Count == 0) return;
+            List<CustomerBillReceiptDetail> list = new List<CustomerBillReceiptDetail>();
+            int effectiveBranchId = branchId > 0 ? branchId : GetContextValue(SessionContext.BranchId, DataBase.BranchId);
 
-            var missingRows = rows.Where(r => r.BillNo > 0 && string.IsNullOrWhiteSpace(r.SalesPerson)).ToList();
-            if (missingRows.Count == 0) return;
-
+            // 1. Fetch Receipt History using Stored Procedure STOREDPROCEDURE._CustomerReceiptMaster (Operation: VIEWRECEIPT)
             try
             {
-                string masterTable = TableExists("SMaster") ? "SMaster" : (TableExists("SalesMaster") ? "SalesMaster" : "");
-                if (string.IsNullOrEmpty(masterTable)) return;
+                if (DataConnection.State != ConnectionState.Open)
+                    DataConnection.Open();
 
-                bool hasUserId = ColumnExists(masterTable, "UserId");
-                bool hasEmpId = ColumnExists(masterTable, "EmpID") || ColumnExists(masterTable, "EmpId");
-                bool hasSalesmanId = ColumnExists(masterTable, "SalesmanId") || ColumnExists(masterTable, "SalesManId");
-                bool hasSalesman = ColumnExists(masterTable, "Salesman") || ColumnExists(masterTable, "SalesPerson") || ColumnExists(masterTable, "SalesmanName");
-
-                string empCol = ColumnExists(masterTable, "EmpID") ? "EmpID" : (ColumnExists(masterTable, "EmpId") ? "EmpId" : null);
-                string salesmanIdCol = ColumnExists(masterTable, "SalesmanId") ? "SalesmanId" : (ColumnExists(masterTable, "SalesManId") ? "SalesManId" : null);
-                string salesmanTextCol = ColumnExists(masterTable, "Salesman") ? "Salesman" : (ColumnExists(masterTable, "SalesPerson") ? "SalesPerson" : (ColumnExists(masterTable, "SalesmanName") ? "SalesmanName" : null));
-
-                bool hasUsers = TableExists("Users");
-                bool hasLedger = TableExists("LedgerMaster");
-
-                List<string> nameExpressions = new List<string>();
-                if (salesmanTextCol != null)
+                DataTable dt = new DataTable();
+                try
                 {
-                    nameExpressions.Add($"NULLIF(sm.[{salesmanTextCol}], '')");
-                }
-                if (hasUsers && hasUserId)
-                {
-                    nameExpressions.Add("NULLIF(u.UserName, '')");
-                }
-                if (hasUsers && empCol != null)
-                {
-                    nameExpressions.Add("NULLIF(uEmp.UserName, '')");
-                }
-                if (hasUsers && salesmanIdCol != null)
-                {
-                    nameExpressions.Add("NULLIF(uSm.UserName, '')");
-                }
-                if (hasLedger && empCol != null)
-                {
-                    nameExpressions.Add("NULLIF(lEmp.LedgerName, '')");
-                }
-                if (hasLedger && salesmanIdCol != null)
-                {
-                    nameExpressions.Add("NULLIF(lSm.LedgerName, '')");
-                }
-                if (hasUserId)
-                {
-                    nameExpressions.Add("CASE WHEN ISNULL(sm.UserId, 0) > 0 THEN 'User ' + CAST(sm.UserId AS varchar(20)) ELSE NULL END");
-                }
-                nameExpressions.Add("''");
-
-                string coalesceName = $"COALESCE({string.Join(", ", nameExpressions)})";
-
-                List<string> idExpressions = new List<string>();
-                if (salesmanIdCol != null) idExpressions.Add($"NULLIF(sm.[{salesmanIdCol}], 0)");
-                if (empCol != null) idExpressions.Add($"NULLIF(sm.[{empCol}], 0)");
-                if (hasUserId) idExpressions.Add($"NULLIF(sm.UserId, 0)");
-                idExpressions.Add("0");
-                string coalesceId = $"COALESCE({string.Join(", ", idExpressions)})";
-
-                List<string> joins = new List<string>();
-                if (hasUsers && hasUserId)
-                    joins.Add("LEFT JOIN Users u ON u.UserID = sm.UserId");
-                if (hasUsers && empCol != null)
-                    joins.Add($"LEFT JOIN Users uEmp ON uEmp.UserID = sm.[{empCol}]");
-                if (hasUsers && salesmanIdCol != null)
-                    joins.Add($"LEFT JOIN Users uSm ON uSm.UserID = sm.[{salesmanIdCol}]");
-                if (hasLedger && empCol != null)
-                    joins.Add($"LEFT JOIN LedgerMaster lEmp ON lEmp.LedgerID = sm.[{empCol}]");
-                if (hasLedger && salesmanIdCol != null)
-                    joins.Add($"LEFT JOIN LedgerMaster lSm ON lSm.LedgerID = sm.[{salesmanIdCol}]");
-
-                var billNos = missingRows.Select(r => r.BillNo).Distinct().ToList();
-
-                for (int i = 0; i < billNos.Count; i += 500)
-                {
-                    var chunk = billNos.Skip(i).Take(500).ToList();
-                    string inClause = string.Join(",", chunk);
-
-                    string query = $@"
-                        SELECT sm.BillNo,
-                               CAST({coalesceName} AS nvarchar(150)) AS SalesPerson,
-                               CAST({coalesceId} AS int) AS SalesmanId
-                        FROM {masterTable} sm
-                        {string.Join(Environment.NewLine, joins)}
-                        WHERE sm.BillNo IN ({inClause})
-                    ";
-
-                    using (SqlCommand cmd = new SqlCommand(query, (SqlConnection)DataConnection))
+                    using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._CustomerReceiptMaster, (SqlConnection)DataConnection))
                     {
-                        using (SqlDataReader reader = cmd.ExecuteReader())
-                        {
-                            var map = new Dictionary<long, Tuple<string, int?>>();
-                            while (reader.Read())
-                            {
-                                long bNo = reader.GetInt64(0);
-                                string sp = !reader.IsDBNull(1) ? reader.GetString(1)?.Trim() : "";
-                                int? smId = !reader.IsDBNull(2) ? reader.GetInt32(2) : (int?)null;
-                                if (!map.ContainsKey(bNo))
-                                {
-                                    map[bNo] = Tuple.Create(sp, smId);
-                                }
-                            }
-                            reader.Close();
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.AddWithValue("@CustomerLedgerId", customerLedgerId);
+                        cmd.Parameters.AddWithValue("@BillNoUntil", billNo);
+                        cmd.Parameters.AddWithValue("@BranchId", effectiveBranchId);
+                        cmd.Parameters.AddWithValue("@_Operation", "VIEWRECEIPT");
 
-                            foreach (var row in missingRows)
+                        using (SqlDataAdapter da = new SqlDataAdapter(cmd))
+                        {
+                            da.Fill(dt);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Error calling SP _CustomerReceiptMaster VIEWRECEIPT: {ex.Message}");
+                }
+
+                // 2. Fallback to Stored Procedure STOREDPROCEDURE._CustomerReceiptDetails (Operation: GETBYBILLNO)
+                if (dt == null || dt.Rows.Count == 0)
+                {
+                    try
+                    {
+                        using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._CustomerReceiptDetails, (SqlConnection)DataConnection))
+                        {
+                            cmd.CommandType = CommandType.StoredProcedure;
+                            cmd.Parameters.AddWithValue("@CustomerLedgerId", customerLedgerId);
+                            cmd.Parameters.AddWithValue("@BillNo", billNo);
+                            cmd.Parameters.AddWithValue("@BranchId", effectiveBranchId);
+                            cmd.Parameters.AddWithValue("@_Operation", "GETBYBILLNO");
+
+                            using (SqlDataAdapter da = new SqlDataAdapter(cmd))
                             {
-                                if (map.TryGetValue(row.BillNo, out var info))
-                                {
-                                    if (!string.IsNullOrWhiteSpace(info.Item1) && string.IsNullOrWhiteSpace(row.SalesPerson))
-                                        row.SalesPerson = info.Item1;
-                                    if (info.Item2.HasValue && info.Item2.Value > 0 && !row.SalesmanId.HasValue)
-                                        row.SalesmanId = info.Item2;
-                                }
+                                da.Fill(dt);
                             }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Error calling SP _CustomerReceiptDetails GETBYBILLNO: {ex.Message}");
+                    }
+                }
+
+                if (dt != null && dt.Rows.Count > 0)
+                {
+                    decimal runningBillAmt = invoiceAmt > 0 ? invoiceAmt : 0m;
+                    decimal runningBal = invoiceAmt;
+
+                    for (int i = 0; i < dt.Rows.Count; i++)
+                    {
+                        DataRow r = dt.Rows[i];
+                        decimal rcptAmt = r.Table.Columns.Contains("ReceiptAmount") && r["ReceiptAmount"] != DBNull.Value
+                            ? Convert.ToDecimal(r["ReceiptAmount"])
+                            : (r.Table.Columns.Contains("ReceivedAmount") && r["ReceivedAmount"] != DBNull.Value
+                                ? Convert.ToDecimal(r["ReceivedAmount"])
+                                : (r.Table.Columns.Contains("Amount") && r["Amount"] != DBNull.Value
+                                    ? Convert.ToDecimal(r["Amount"])
+                                    : 0m));
+
+                        if (rcptAmt <= 0) continue;
+
+                        decimal billAmt = r.Table.Columns.Contains("BillAmount") && r["BillAmount"] != DBNull.Value
+                            ? Convert.ToDecimal(r["BillAmount"])
+                            : (r.Table.Columns.Contains("InvoiceAmount") && r["InvoiceAmount"] != DBNull.Value
+                                ? Convert.ToDecimal(r["InvoiceAmount"])
+                                : runningBillAmt);
+
+                        if (i == 0 && runningBillAmt == 0) runningBillAmt = billAmt;
+                        runningBal = Math.Max(0m, runningBal - rcptAmt);
+
+                        decimal balAmt = r.Table.Columns.Contains("BalanceAmount") && r["BalanceAmount"] != DBNull.Value
+                            ? Convert.ToDecimal(r["BalanceAmount"])
+                            : (r.Table.Columns.Contains("Balance") && r["Balance"] != DBNull.Value
+                                ? Convert.ToDecimal(r["Balance"])
+                                : runningBal);
+
+                        DateTime rcptDate = r.Table.Columns.Contains("ReceiptDate") && r["ReceiptDate"] != DBNull.Value
+                            ? Convert.ToDateTime(r["ReceiptDate"])
+                            : (r.Table.Columns.Contains("VoucherDate") && r["VoucherDate"] != DBNull.Value
+                                ? Convert.ToDateTime(r["VoucherDate"])
+                                : (r.Table.Columns.Contains("BillDate") && r["BillDate"] != DBNull.Value
+                                    ? Convert.ToDateTime(r["BillDate"])
+                                    : DateTime.Today));
+
+                        string voucherNo = r.Table.Columns.Contains("VoucherNo") && r["VoucherNo"] != DBNull.Value
+                            ? Convert.ToString(r["VoucherNo"])
+                            : (r.Table.Columns.Contains("VoucherId") && r["VoucherId"] != DBNull.Value
+                                ? "VCH-" + Convert.ToString(r["VoucherId"])
+                                : (r.Table.Columns.Contains("ReceiptMasterId") && r["ReceiptMasterId"] != DBNull.Value
+                                    ? "CR-" + Convert.ToString(r["ReceiptMasterId"])
+                                    : "RECEIPT"));
+
+                        string payMode = r.Table.Columns.Contains("PaymentMode") && r["PaymentMode"] != DBNull.Value
+                            ? Convert.ToString(r["PaymentMode"])
+                            : (r.Table.Columns.Contains("PayModeName") && r["PayModeName"] != DBNull.Value
+                                ? Convert.ToString(r["PayModeName"])
+                                : (r.Table.Columns.Contains("Type") && r["Type"] != DBNull.Value
+                                    ? Convert.ToString(r["Type"])
+                                    : "Cash / Bank"));
+
+                        string remarks = r.Table.Columns.Contains("Remarks") && r["Remarks"] != DBNull.Value
+                            ? Convert.ToString(r["Remarks"])
+                            : (r.Table.Columns.Contains("Narration") && r["Narration"] != DBNull.Value
+                                ? Convert.ToString(r["Narration"])
+                                : "");
+
+                        list.Add(new CustomerBillReceiptDetail
+                        {
+                            BillNo = billNo,
+                            ReceiptDate = rcptDate,
+                            VoucherNo = voucherNo,
+                            PaymentMode = payMode,
+                            BillAmount = billAmt,
+                            ReceiptAmount = rcptAmt,
+                            BalanceAmount = balAmt,
+                            Remarks = remarks
+                        });
+
+                        runningBillAmt = balAmt;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error querying SP customer receipt: {ex.Message}");
+            }
+            finally
+            {
+                if (DataConnection.State == ConnectionState.Open)
+                    DataConnection.Close();
+            }
+
+            // 3. Check for Credit Notes applied to this invoice via Stored Procedure STOREDPROCEDURE._CreditNoteMaster (Operation: GETBYBILLNO)
+            try
+            {
+                if (DataConnection.State != ConnectionState.Open)
+                    DataConnection.Open();
+
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._CreditNoteMaster, (SqlConnection)DataConnection))
+                {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@BillNo", billNo.ToString());
+                    if (customerLedgerId > 0)
+                        cmd.Parameters.AddWithValue("@CustomerLedgerId", customerLedgerId);
+                    cmd.Parameters.AddWithValue("@BranchId", effectiveBranchId);
+                    cmd.Parameters.AddWithValue("@_Operation", "GETBYBILLNO");
+
+                    using (SqlDataAdapter da = new SqlDataAdapter(cmd))
+                    {
+                        DataTable dtCn = new DataTable();
+                        da.Fill(dtCn);
+
+                        foreach (DataRow r in dtCn.Rows)
+                        {
+                            decimal credAmt = r.Table.Columns.Contains("CreditAmount") && r["CreditAmount"] != DBNull.Value
+                                ? Convert.ToDecimal(r["CreditAmount"])
+                                : (r.Table.Columns.Contains("ReturnedAmount") && r["ReturnedAmount"] != DBNull.Value
+                                    ? Convert.ToDecimal(r["ReturnedAmount"])
+                                    : 0m);
+
+                            if (credAmt <= 0) continue;
+
+                            DateTime payDate = r.Table.Columns.Contains("BillDate") && r["BillDate"] != DBNull.Value
+                                ? Convert.ToDateTime(r["BillDate"])
+                                : DateTime.Today;
+
+                            list.Add(new CustomerBillReceiptDetail
+                            {
+                                BillNo = billNo,
+                                ReceiptDate = payDate,
+                                VoucherNo = "CREDIT-NOTE",
+                                PaymentMode = "Credit Note / SR",
+                                BillAmount = r.Table.Columns.Contains("InvoiceAmount") && r["InvoiceAmount"] != DBNull.Value
+                                    ? Convert.ToDecimal(r["InvoiceAmount"])
+                                    : invoiceAmt,
+                                ReceiptAmount = credAmt,
+                                BalanceAmount = r.Table.Columns.Contains("Balance") && r["Balance"] != DBNull.Value
+                                    ? Convert.ToDecimal(r["Balance"])
+                                    : balance,
+                                Remarks = "Credit Note Adjustment"
+                            });
                         }
                     }
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine("Error enriching SalesPerson: " + ex.Message);
+                System.Diagnostics.Debug.WriteLine($"Error querying SP _CreditNoteMaster: {ex.Message}");
             }
-        }
+            finally
+            {
+                if (DataConnection.State == ConnectionState.Open)
+                    DataConnection.Close();
+            }
 
-        private bool TableExists(string tableName)
-        {
-            try
-            {
-                using (SqlCommand cmd = new SqlCommand("SELECT 1 FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = @TableName", (SqlConnection)DataConnection))
-                {
-                    cmd.Parameters.AddWithValue("@TableName", tableName);
-                    object res = cmd.ExecuteScalar();
-                    return res != null && res != DBNull.Value;
-                }
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        private bool ColumnExists(string tableName, string columnName)
-        {
-            try
-            {
-                string cleanTable = tableName.StartsWith("dbo.") ? tableName.Substring(4) : tableName;
-                using (SqlCommand cmd = new SqlCommand("SELECT CASE WHEN COL_LENGTH(@TableName, @ColumnName) IS NULL THEN 0 ELSE 1 END;", (SqlConnection)DataConnection))
-                {
-                    cmd.Parameters.AddWithValue("@TableName", "dbo." + cleanTable);
-                    cmd.Parameters.AddWithValue("@ColumnName", columnName);
-                    object res = cmd.ExecuteScalar();
-                    return res != null && res != DBNull.Value && Convert.ToInt32(res) == 1;
-                }
-            }
-            catch
-            {
-                return false;
-            }
+            return list.OrderBy(p => p.ReceiptDate).ToList();
         }
 
         public List<CustomerGridList> GetCustomers()
