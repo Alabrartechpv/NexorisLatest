@@ -1872,7 +1872,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 if (ultraComboPresetDates.Value == null) return;
 
                 string preset = ultraComboPresetDates.Value.ToString();
-                DateTime fromDate, toDate;
+                DateTime fromDate = DateTime.Today, toDate = DateTime.Today;
 
                 switch (preset)
                 {
@@ -1915,14 +1915,16 @@ namespace PosBranch_Win.Reports.PurchaseReports
                         break;
                     case "LastQuarter":
                         int lastQuarter = (DateTime.Now.Month - 1) / 3;
-                        if (lastQuarter == 0)
+                        fromDate = lastQuarter == 0 ? new DateTime(DateTime.Now.Year - 1, 10, 1) : new DateTime(DateTime.Now.Year, (lastQuarter - 1) * 3 + 1, 1);
+                        // cleaned
+                        if (false)
                         {
                             lastQuarter = 4;
                             fromDate = new DateTime(DateTime.Now.Year - 1, 10, 1);
                         }
     
                         {
-                            if (lastQuarter != 0) fromDate = new DateTime(DateTime.Now.Year, (lastQuarter - 1) * 3 + 1, 1);
+                            // done
                         }
                         toDate = fromDate.AddMonths(3).AddDays(-1);
                         break;
