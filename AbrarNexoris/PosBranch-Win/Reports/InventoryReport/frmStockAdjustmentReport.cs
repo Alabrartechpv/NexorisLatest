@@ -48,6 +48,9 @@ namespace PosBranch_Win.Reports.InventoryReport
         private BackgroundWorker _searchWorker;
         private List<StockAdjustmentReportRow> _allRows = new List<StockAdjustmentReportRow>();
         private bool _accentPanelsCreated;
+        private bool _isInitializing = true;
+        private bool _isUpdatingDates;
+        private bool _pendingFetch;
         private Infragistics.Win.Misc.UltraLabel lblPeriod;
         private Infragistics.Win.UltraWinEditors.UltraComboEditor comboPeriod;
 
@@ -110,10 +113,14 @@ namespace PosBranch_Win.Reports.InventoryReport
             comboPeriod.Items.Add("Today", "Today");
             comboPeriod.Items.Add("Yesterday", "Yesterday");
             comboPeriod.Items.Add("This Week", "This Week");
+            comboPeriod.Items.Add("Last Week", "Last Week");
             comboPeriod.Items.Add("This Month", "This Month");
             comboPeriod.Items.Add("Last Month", "Last Month");
             comboPeriod.Items.Add("This Quarter", "This Quarter");
+            comboPeriod.Items.Add("Last Quarter", "Last Quarter");
             comboPeriod.Items.Add("This Year", "This Year");
+            comboPeriod.Items.Add("Last Year", "Last Year");
+            comboPeriod.Items.Add("This Financial Year", "This Financial Year");
             comboPeriod.Items.Add("Custom Range", "Custom Range");
 
             lblFromDate.Text = "From:";
@@ -164,6 +171,8 @@ namespace PosBranch_Win.Reports.InventoryReport
             panelFilters.ClientArea.Controls.Add(comboPeriod);
 
             comboPeriod.ValueChanged += ComboPeriod_ValueChanged;
+            dtpFromDate.ValueChanged += (s, e) => { if (!_isInitializing && !_isUpdatingDates && comboPeriod.Value?.ToString() == "Custom Range") FetchFromDatabase(); };
+            dtpToDate.ValueChanged += (s, e) => { if (!_isInitializing && !_isUpdatingDates && comboPeriod.Value?.ToString() == "Custom Range") FetchFromDatabase(); };
             comboPeriod.Value = "ALL";
 
             comboType.Items.Clear();
@@ -172,6 +181,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             comboType.Items.Add("Stock OUT", "Stock OUT");
             comboType.Value = "";
             comboType.DropDownStyle = Infragistics.Win.DropDownStyle.DropDownList;
+            comboType.ValueChanged += (s, e) => { if (!_isInitializing) FetchFromDatabase(); };
 
             InitializeRuntimeAppearance();
             StyleGrid();
@@ -222,6 +232,7 @@ namespace PosBranch_Win.Reports.InventoryReport
 
             KeyPreview = true;
             KeyDown += FrmStockAdjustmentReport_KeyDown;
+            _isInitializing = false;
             FormClosing += (s, e) =>
             {
                 if (_searchWorker != null && _searchWorker.IsBusy)
@@ -236,6 +247,117 @@ namespace PosBranch_Win.Reports.InventoryReport
         }
 
         private void ComboPeriod_ValueChanged(object sender, EventArgs e)
+        {
+            ApplyPeriodSelection();
+        }
+
+        private void ApplyPeriodSelection()
+        {
+            if (comboPeriod.Value == null) return;
+            string val = comboPeriod.Value.ToString();
+            DateTime today = DateTime.Today;
+            _isUpdatingDates = true;
+            try
+            {
+                switch (val)
+                {
+                    case "ALL":
+                        dtpFromDate.Value = new DateTime(1753, 1, 1);
+                        dtpToDate.Value = today;
+                        dtpFromDate.Enabled = false;
+                        dtpToDate.Enabled = false;
+                        break;
+                    case "Today":
+                        dtpFromDate.Value = today;
+                        dtpToDate.Value = today;
+                        dtpFromDate.Enabled = false;
+                        dtpToDate.Enabled = false;
+                        break;
+                    case "Yesterday":
+                        dtpFromDate.Value = today.AddDays(-1);
+                        dtpToDate.Value = today.AddDays(-1);
+                        dtpFromDate.Enabled = false;
+                        dtpToDate.Enabled = false;
+                        break;
+                    case "This Week":
+                        int daysFromMonday = (7 + (int)today.DayOfWeek - (int)DayOfWeek.Monday) % 7;
+                        dtpFromDate.Value = today.AddDays(-daysFromMonday);
+                        dtpToDate.Value = today;
+                        dtpFromDate.Enabled = false;
+                        dtpToDate.Enabled = false;
+                        break;
+                    case "Last Week":
+                        int daysSinceMon = (7 + (int)today.DayOfWeek - (int)DayOfWeek.Monday) % 7;
+                        dtpFromDate.Value = today.AddDays(-daysSinceMon - 7);
+                        dtpToDate.Value = today.AddDays(-daysSinceMon - 1);
+                        dtpFromDate.Enabled = false;
+                        dtpToDate.Enabled = false;
+                        break;
+                    case "This Month":
+                        dtpFromDate.Value = new DateTime(today.Year, today.Month, 1);
+                        dtpToDate.Value = today;
+                        dtpFromDate.Enabled = false;
+                        dtpToDate.Enabled = false;
+                        break;
+                    case "Last Month":
+                        DateTime firstOfCurrentMonth = new DateTime(today.Year, today.Month, 1);
+                        dtpFromDate.Value = firstOfCurrentMonth.AddMonths(-1);
+                        dtpToDate.Value = firstOfCurrentMonth.AddDays(-1);
+                        dtpFromDate.Enabled = false;
+                        dtpToDate.Enabled = false;
+                        break;
+                    case "This Quarter":
+                        int currentQuarterIdx = (today.Month - 1) / 3;
+                        dtpFromDate.Value = new DateTime(today.Year, currentQuarterIdx * 3 + 1, 1);
+                        dtpToDate.Value = today;
+                        dtpFromDate.Enabled = false;
+                        dtpToDate.Enabled = false;
+                        break;
+                    case "Last Quarter":
+                        int qIdx = (today.Month - 1) / 3;
+                        DateTime firstOfCurrQtr = new DateTime(today.Year, qIdx * 3 + 1, 1);
+                        dtpFromDate.Value = firstOfCurrQtr.AddMonths(-3);
+                        dtpToDate.Value = firstOfCurrQtr.AddDays(-1);
+                        dtpFromDate.Enabled = false;
+                        dtpToDate.Enabled = false;
+                        break;
+                    case "This Year":
+                        dtpFromDate.Value = new DateTime(today.Year, 1, 1);
+                        dtpToDate.Value = today;
+                        dtpFromDate.Enabled = false;
+                        dtpToDate.Enabled = false;
+                        break;
+                    case "Last Year":
+                        dtpFromDate.Value = new DateTime(today.Year - 1, 1, 1);
+                        dtpToDate.Value = new DateTime(today.Year - 1, 12, 31);
+                        dtpFromDate.Enabled = false;
+                        dtpToDate.Enabled = false;
+                        break;
+                    case "This Financial Year":
+                        int fyYr = today.Month >= 4 ? today.Year : today.Year - 1;
+                        dtpFromDate.Value = new DateTime(fyYr, 4, 1);
+                        dtpToDate.Value = today;
+                        dtpFromDate.Enabled = false;
+                        dtpToDate.Enabled = false;
+                        break;
+                    case "Custom Range":
+                        dtpFromDate.Enabled = true;
+                        dtpToDate.Enabled = true;
+                        break;
+                }
+            }
+            finally
+            {
+                _isUpdatingDates = false;
+            }
+
+            if (!_isInitializing && val != "Custom Range")
+            {
+                FetchFromDatabase();
+            }
+        }
+
+        private void ObsoleteOldComboPeriodMethod()
         {
             if (comboPeriod.Value == null) return;
             string val = comboPeriod.Value.ToString();
@@ -327,6 +449,12 @@ namespace PosBranch_Win.Reports.InventoryReport
                 ultraPanelGridFooter.Appearance.BorderColor = GridFooterBorder;
                 ultraPanelGridFooter.BorderStyle = UIElementBorderStyle.Solid;
                 ultraPanelGridFooter.Dock = DockStyle.Bottom;
+                ultraPanelGridFooter.SendToBack();
+                if (gridReport != null)
+                {
+                    gridReport.Dock = DockStyle.Fill;
+                    gridReport.BringToFront();
+                }
                 ultraPanelGridFooter.Height = 26;
             }
 
@@ -463,6 +591,19 @@ namespace PosBranch_Win.Reports.InventoryReport
             gridReport.DisplayLayout.AutoFitStyle = AutoFitStyle.None;
             gridReport.DisplayLayout.ScrollBounds = ScrollBounds.ScrollToFill;
             gridReport.DisplayLayout.Scrollbars = Scrollbars.Both;
+            gridReport.DisplayLayout.MaxColScrollRegions = 1;
+            gridReport.DisplayLayout.MaxRowScrollRegions = 1;
+            gridReport.DisplayLayout.ScrollBarLook.Appearance.BackColor = FilterPanelBackColor;
+            gridReport.DisplayLayout.ScrollBarLook.Appearance.BorderColor = BorderBlue;
+            gridReport.DisplayLayout.ScrollBarLook.TrackAppearance.BackColor = Color.FromArgb(225, 236, 246);
+            gridReport.DisplayLayout.ScrollBarLook.ButtonAppearance.BackColor = GridHeaderBlue;
+            gridReport.DisplayLayout.ScrollBarLook.ButtonAppearance.BackColor2 = GridHeaderBlueDark;
+            gridReport.DisplayLayout.ScrollBarLook.ButtonAppearance.BackGradientStyle = GradientStyle.Vertical;
+            gridReport.DisplayLayout.ScrollBarLook.ButtonAppearance.BorderColor = BorderBlue;
+            gridReport.DisplayLayout.ScrollBarLook.ThumbAppearance.BackColor = Color.FromArgb(170, 195, 220);
+            gridReport.DisplayLayout.ScrollBarLook.ThumbAppearance.BackColor2 = Color.FromArgb(130, 165, 200);
+            gridReport.DisplayLayout.ScrollBarLook.ThumbAppearance.BackGradientStyle = GradientStyle.Vertical;
+            gridReport.DisplayLayout.ScrollBarLook.ThumbAppearance.BorderColor = BorderBlue;
             gridReport.DisplayLayout.BorderStyle = UIElementBorderStyle.Solid;
             gridReport.DisplayLayout.CaptionVisible = DefaultableBoolean.False;
             gridReport.DisplayLayout.GroupByBox.Hidden = true;
@@ -534,6 +675,11 @@ namespace PosBranch_Win.Reports.InventoryReport
         private void GridReport_InitializeLayout(object sender, InitializeLayoutEventArgs e)
         {
             if (e.Layout.Bands.Count == 0) return;
+            e.Layout.AutoFitStyle = AutoFitStyle.None;
+            e.Layout.Scrollbars = Scrollbars.Both;
+            e.Layout.ScrollBounds = ScrollBounds.ScrollToFill;
+            e.Layout.MaxColScrollRegions = 1;
+            e.Layout.MaxRowScrollRegions = 1;
             UltraGridBand band = e.Layout.Bands[0];
 
             foreach (UltraGridColumn column in band.Columns)
@@ -1398,6 +1544,10 @@ namespace PosBranch_Win.Reports.InventoryReport
             dtpToDate.Value = DateTime.Today;
             comboType.Value = "";
             txtSearch.Text = string.Empty;
+            dtpFromDate.Enabled = false;
+            dtpToDate.Enabled = false;
+            FetchFromDatabase();
+            return;
             _allRows.Clear();
             gridReport.DataSource = null;
             _filterManager?.ClearFilters();
@@ -1440,7 +1590,11 @@ namespace PosBranch_Win.Reports.InventoryReport
 
         private void FetchFromDatabase()
         {
-            if (_searchWorker.IsBusy) return;
+            if (_searchWorker.IsBusy)
+            {
+                _pendingFetch = true;
+                return;
+            }
 
             Cursor.Current = Cursors.WaitCursor;
             btnSearch.Enabled = false;
@@ -1450,7 +1604,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             {
                 CompanyId = SessionContext.CompanyId,
                 BranchId = SessionContext.BranchId,
-                FinYearId = SessionContext.FinYearId,
+                FinYearId = 0,
                 FromDate = dtpFromDate.Value != null ? Convert.ToDateTime(dtpFromDate.Value).Date : DateTime.MinValue,
                 ToDate = dtpToDate.Value != null ? Convert.ToDateTime(dtpToDate.Value).Date : DateTime.MaxValue,
                 AdjustmentType = Convert.ToString(comboType.Value),
@@ -1490,6 +1644,11 @@ namespace PosBranch_Win.Reports.InventoryReport
                 if (!IsDisposed && !Disposing)
                 {
                     btnSearch.Enabled = true;
+                    if (_pendingFetch)
+                    {
+                        _pendingFetch = false;
+                        FetchFromDatabase();
+                    }
                     Cursor.Current = Cursors.Default;
                 }
             }
@@ -1538,14 +1697,14 @@ namespace PosBranch_Win.Reports.InventoryReport
             }
 
             int distinctDocs = items.Select(x => x.StockAdjustmentNo).Distinct().Count();
-            decimal totalIn = items.Where(x => x.AdjustmentType == "Stock IN").Sum(x => x.QtyDifference);
-            decimal totalOut = items.Where(x => x.AdjustmentType == "Stock OUT").Sum(x => x.QtyDifference);
+            decimal totalIn = items.Sum(x => x.StockInQty);
+            decimal totalOut = items.Sum(x => x.StockOutQty);
             decimal netVal = items.Sum(x => x.AdjustmentValue);
 
             lblDocCountValue.Text = distinctDocs.ToString("N0");
             lblStockInValue.Text = totalIn.ToString("N2");
             lblStockOutValue.Text = totalOut.ToString("N2");
-            lblNetValueValue.Text = "₹" + netVal.ToString("N2");
+            lblNetValueValue.Text = (netVal >= 0 ? "₹" : "-₹") + Math.Abs(netVal).ToString("N2");
         }
 
         private void BtnExport_Click(object sender, EventArgs e)

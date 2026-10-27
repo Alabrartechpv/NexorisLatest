@@ -1916,7 +1916,9 @@ namespace PosBranch_Win.Reports.PurchaseReports
                         break;
                     case "LastQuarter":
                         int lastQuarter = (DateTime.Now.Month - 1) / 3;
-                        if (lastQuarter == 0)
+                        fromDate = lastQuarter == 0 ? new DateTime(DateTime.Now.Year - 1, 10, 1) : new DateTime(DateTime.Now.Year, (lastQuarter - 1) * 3 + 1, 1);
+                        // cleaned
+                        if (false)
                         {
                             fromDate = new DateTime(DateTime.Now.Year - 1, 10, 1);
                         }
