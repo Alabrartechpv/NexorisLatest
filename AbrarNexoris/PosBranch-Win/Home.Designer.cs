@@ -61,10 +61,6 @@ namespace PosBranch_Win
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolPurchaseHome = new Infragistics.Win.UltraWinToolbars.ButtonTool("Purchase");
             Infragistics.Win.UltraWinToolbars.RibbonGroup ribbonGroupStockAdjHome = new Infragistics.Win.UltraWinToolbars.RibbonGroup("ribbonGroupStockAdjHome");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolStockAdjHome = new Infragistics.Win.UltraWinToolbars.ButtonTool("stockadjustment");
-            Infragistics.Win.UltraWinToolbars.RibbonGroup ribbonGroupPurchaseReturnHome = new Infragistics.Win.UltraWinToolbars.RibbonGroup("ribbonGroupPurchaseReturnHome");
-            Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolPurchaseReturnHome = new Infragistics.Win.UltraWinToolbars.ButtonTool("Purchase R/n");
-            Infragistics.Win.UltraWinToolbars.RibbonGroup ribbonGroupSalesReturnHome = new Infragistics.Win.UltraWinToolbars.RibbonGroup("ribbonGroupSalesReturnHome");
-            Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolSalesReturnHome = new Infragistics.Win.UltraWinToolbars.ButtonTool("Sales Return");
             Infragistics.Win.UltraWinToolbars.RibbonGroup ribbonGroupPaymentHome = new Infragistics.Win.UltraWinToolbars.RibbonGroup("ribbonGroupPaymentHome");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolPaymentHome = new Infragistics.Win.UltraWinToolbars.ButtonTool("Payment");
             Infragistics.Win.UltraWinToolbars.RibbonGroup ribbonGroupReceiptHome = new Infragistics.Win.UltraWinToolbars.RibbonGroup("ribbonGroupReceiptHome");
@@ -594,14 +590,6 @@ namespace PosBranch_Win
             buttonToolStockAdjHome.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
             ribbonGroupStockAdjHome.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
             buttonToolStockAdjHome});
-            ribbonGroupPurchaseReturnHome.Caption = "Ctrl+F6";
-            buttonToolPurchaseReturnHome.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
-            ribbonGroupPurchaseReturnHome.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
-            buttonToolPurchaseReturnHome});
-            ribbonGroupSalesReturnHome.Caption = "Ctrl+F7";
-            buttonToolSalesReturnHome.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
-            ribbonGroupSalesReturnHome.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
-            buttonToolSalesReturnHome});
             ribbonGroupPaymentHome.Caption = "Ctrl+F9";
             buttonToolPaymentHome.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
             ribbonGroupPaymentHome.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
@@ -651,8 +639,6 @@ namespace PosBranch_Win
             ribbonGroup6,
             ribbonGroupPurchaseHome,
             ribbonGroupStockAdjHome,
-            ribbonGroupPurchaseReturnHome,
-            ribbonGroupSalesReturnHome,
             ribbonGroupPaymentHome,
             ribbonGroupReceiptHome,
             ribbonGroup7,

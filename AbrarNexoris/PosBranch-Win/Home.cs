@@ -2090,12 +2090,19 @@ namespace PosBranch_Win
                     }
                 }
 
+                if (homeTab.Groups.Exists("ribbonGroupPurchaseReturnHome"))
+                {
+                    homeTab.Groups.Remove(homeTab.Groups["ribbonGroupPurchaseReturnHome"]);
+                }
+                if (homeTab.Groups.Exists("ribbonGroupSalesReturnHome"))
+                {
+                    homeTab.Groups.Remove(homeTab.Groups["ribbonGroupSalesReturnHome"]);
+                }
+
                 var items = new (string GroupKey, string Caption, string ToolKey)[]
                 {
                     ("ribbonGroupPurchaseHome", "Ctrl+F3", "Purchase"),
                     ("ribbonGroupStockAdjHome", "Ctrl+F5", "stockadjustment"),
-                    ("ribbonGroupPurchaseReturnHome", "Ctrl+F6", "Purchase R/n"),
-                    ("ribbonGroupSalesReturnHome", "Ctrl+F7", "Sales Return"),
                     ("ribbonGroupPaymentHome", "Ctrl+F9", "Payment"),
                     ("ribbonGroupReceiptHome", "Ctrl+F11", "Receipt")
                 };
