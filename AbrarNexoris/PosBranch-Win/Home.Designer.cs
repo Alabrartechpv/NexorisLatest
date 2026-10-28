@@ -586,27 +586,27 @@ namespace PosBranch_Win
             buttonTool120.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
             ribbonGroup6.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
             buttonTool120});
-            ribbonGroupPurchaseHome.Caption = "F3";
+            ribbonGroupPurchaseHome.Caption = "Ctrl+F3";
             buttonToolPurchaseHome.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
             ribbonGroupPurchaseHome.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
             buttonToolPurchaseHome});
-            ribbonGroupStockAdjHome.Caption = "F5";
+            ribbonGroupStockAdjHome.Caption = "Ctrl+F5";
             buttonToolStockAdjHome.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
             ribbonGroupStockAdjHome.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
             buttonToolStockAdjHome});
-            ribbonGroupPurchaseReturnHome.Caption = "F6";
+            ribbonGroupPurchaseReturnHome.Caption = "Ctrl+F6";
             buttonToolPurchaseReturnHome.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
             ribbonGroupPurchaseReturnHome.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
             buttonToolPurchaseReturnHome});
-            ribbonGroupSalesReturnHome.Caption = "F7";
+            ribbonGroupSalesReturnHome.Caption = "Ctrl+F7";
             buttonToolSalesReturnHome.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
             ribbonGroupSalesReturnHome.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
             buttonToolSalesReturnHome});
-            ribbonGroupPaymentHome.Caption = "F9";
+            ribbonGroupPaymentHome.Caption = "Ctrl+F9";
             buttonToolPaymentHome.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
             ribbonGroupPaymentHome.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
             buttonToolPaymentHome});
-            ribbonGroupReceiptHome.Caption = "F10";
+            ribbonGroupReceiptHome.Caption = "Ctrl+F11";
             buttonToolReceiptHome.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
             ribbonGroupReceiptHome.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
             buttonToolReceiptHome});

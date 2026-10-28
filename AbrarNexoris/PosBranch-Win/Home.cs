@@ -2092,12 +2092,12 @@ namespace PosBranch_Win
 
                 var items = new (string GroupKey, string Caption, string ToolKey)[]
                 {
-                    ("ribbonGroupPurchaseHome", "F3", "Purchase"),
-                    ("ribbonGroupStockAdjHome", "F5", "stockadjustment"),
-                    ("ribbonGroupPurchaseReturnHome", "F6", "Purchase R/n"),
-                    ("ribbonGroupSalesReturnHome", "F7", "Sales Return"),
-                    ("ribbonGroupPaymentHome", "F9", "Payment"),
-                    ("ribbonGroupReceiptHome", "F10", "Receipt")
+                    ("ribbonGroupPurchaseHome", "Ctrl+F3", "Purchase"),
+                    ("ribbonGroupStockAdjHome", "Ctrl+F5", "stockadjustment"),
+                    ("ribbonGroupPurchaseReturnHome", "Ctrl+F6", "Purchase R/n"),
+                    ("ribbonGroupSalesReturnHome", "Ctrl+F7", "Sales Return"),
+                    ("ribbonGroupPaymentHome", "Ctrl+F9", "Payment"),
+                    ("ribbonGroupReceiptHome", "Ctrl+F11", "Receipt")
                 };
 
                 // Find index of Exit group ("ribbonGroup3", caption "F4" or contains tool "Remove" / "Exit")
@@ -3926,6 +3926,46 @@ namespace PosBranch_Win
                 return true;
             }
 
+            if (ctrl && !alt)
+            {
+                if (keyCode == Keys.F3 || keyCode == Keys.P)
+                {
+                    Transaction.FrmPurchase purchase = new Transaction.FrmPurchase();
+                    OpenFormInTabSafe(purchase, "Purchase");
+                    return true;
+                }
+                if (keyCode == Keys.F5)
+                {
+                    Transaction.FrmStockAdjustment stockAdj = new Transaction.FrmStockAdjustment();
+                    OpenFormInTabSafe(stockAdj, "Stock Adjustment");
+                    return true;
+                }
+                if (keyCode == Keys.F6)
+                {
+                    Transaction.frmPurchaseReturn pReturn = new Transaction.frmPurchaseReturn();
+                    OpenFormInTabSafe(pReturn, "Purchase Return");
+                    return true;
+                }
+                if (keyCode == Keys.F7)
+                {
+                    Transaction.frmSalesReturn sReturn = new Transaction.frmSalesReturn();
+                    OpenFormInTabSafe(sReturn, "Sales Return");
+                    return true;
+                }
+                if (keyCode == Keys.F9)
+                {
+                    Accounts.FrmPayment payment = new Accounts.FrmPayment();
+                    OpenFormInTabSafe(payment, "Payment");
+                    return true;
+                }
+                if (keyCode == Keys.F11)
+                {
+                    Accounts.FrmReceipt receipt = new Accounts.FrmReceipt();
+                    OpenFormInTabSafe(receipt, "Receipt");
+                    return true;
+                }
+            }
+
             if (keyCode == Keys.Escape && !ctrl && !alt)
             {
                 // Check if an UltraGrid cell is actively in edit mode
@@ -3964,31 +4004,25 @@ namespace PosBranch_Win
                             OpenFormInTab(new Master.frmItemMasterNew(), "Item Master");
                             return true;
                         case Keys.P:
-                        case Keys.F3:
+
                             OpenFormInTab(new Transaction.FrmPurchase(), "Purchase");
                             return true;
                         case Keys.S:
                             OpenFormInTab(new Transaction.frmSalesInvoice(), "Sales Invoice");
                             return true;
                         case Keys.A:
-                        case Keys.F5:
+
                             OpenFormInTab(new Transaction.FrmStockAdjustment(), "Stock Adjustment");
                             return true;
                         case Keys.R:
-                        case Keys.F7:
+
                             OpenFormInTab(new Transaction.frmSalesReturn(), "Sales Return");
                             return true;
                         case Keys.E:
-                        case Keys.F6:
+
                             OpenFormInTab(new Transaction.frmPurchaseReturn(), "Purchase Return");
                             return true;
-                        case Keys.F9:
-                            OpenFormInTab(new Accounts.FrmPayment(), "Payment");
-                            return true;
-                        case Keys.F10:
-                        case Keys.F11:
-                            OpenFormInTab(new Accounts.FrmReceipt(), "Receipt");
-                            return true;
+
                     }
                 }
             }
@@ -4177,37 +4211,37 @@ namespace PosBranch_Win
                     e.Handled = true;
                 }
             }
-            else if (e.KeyCode == Keys.F3)
+            else if (e.Control && (e.KeyCode == Keys.F3 || e.KeyCode == Keys.P))
             {
                 Transaction.FrmPurchase purchase = new Transaction.FrmPurchase();
                 OpenFormInTabSafe(purchase, "Purchase");
                 e.Handled = true;
             }
-            else if (e.KeyCode == Keys.F5)
+            else if (e.Control && e.KeyCode == Keys.F5)
             {
                 Transaction.FrmStockAdjustment stockAdj = new Transaction.FrmStockAdjustment();
                 OpenFormInTabSafe(stockAdj, "Stock Adjustment");
                 e.Handled = true;
             }
-            else if (e.KeyCode == Keys.F6)
+            else if (e.Control && e.KeyCode == Keys.F6)
             {
                 Transaction.frmPurchaseReturn pReturn = new Transaction.frmPurchaseReturn();
                 OpenFormInTabSafe(pReturn, "Purchase Return");
                 e.Handled = true;
             }
-            else if (e.KeyCode == Keys.F7)
+            else if (e.Control && e.KeyCode == Keys.F7)
             {
                 Transaction.frmSalesReturn sReturn = new Transaction.frmSalesReturn();
                 OpenFormInTabSafe(sReturn, "Sales Return");
                 e.Handled = true;
             }
-            else if (e.KeyCode == Keys.F9)
+            else if (e.Control && e.KeyCode == Keys.F9)
             {
                 Accounts.FrmPayment payment = new Accounts.FrmPayment();
                 OpenFormInTabSafe(payment, "Payment");
                 e.Handled = true;
             }
-            else if (e.KeyCode == Keys.F10 || e.KeyCode == Keys.F11)
+            else if (e.Control && e.KeyCode == Keys.F11)
             {
                 Accounts.FrmReceipt receipt = new Accounts.FrmReceipt();
                 OpenFormInTabSafe(receipt, "Receipt");
