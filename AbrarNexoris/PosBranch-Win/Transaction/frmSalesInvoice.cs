@@ -1031,6 +1031,17 @@ namespace PosBranch_Win.Transaction
         {
             try
             {
+                if (SessionContext.CounterSessionId <= 0)
+                {
+                    try
+                    {
+                        using (var sessionRepo = new Repository.ShiftSessionRepo())
+                        {
+                            sessionRepo.StartOrResumeSession();
+                        }
+                    }
+                    catch { }
+                }
                 // Lock down salesperson field (Administrators are exempt from lock)
                 bool isAdmin = string.Equals(SessionContext.UserLevel, "Administrator", StringComparison.OrdinalIgnoreCase);
                 if (txtSalesPerson != null)

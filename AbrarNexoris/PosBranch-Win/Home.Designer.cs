@@ -57,6 +57,14 @@ namespace PosBranch_Win
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonTool124 = new Infragistics.Win.UltraWinToolbars.ButtonTool("Delet");
             Infragistics.Win.UltraWinToolbars.RibbonGroup ribbonGroup6 = new Infragistics.Win.UltraWinToolbars.RibbonGroup("ribbonGroup3");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonTool120 = new Infragistics.Win.UltraWinToolbars.ButtonTool("Remove");
+            Infragistics.Win.UltraWinToolbars.RibbonGroup ribbonGroupPurchaseHome = new Infragistics.Win.UltraWinToolbars.RibbonGroup("ribbonGroupPurchaseHome");
+            Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolPurchaseHome = new Infragistics.Win.UltraWinToolbars.ButtonTool("Purchase");
+            Infragistics.Win.UltraWinToolbars.RibbonGroup ribbonGroupStockAdjHome = new Infragistics.Win.UltraWinToolbars.RibbonGroup("ribbonGroupStockAdjHome");
+            Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolStockAdjHome = new Infragistics.Win.UltraWinToolbars.ButtonTool("stockadjustment");
+            Infragistics.Win.UltraWinToolbars.RibbonGroup ribbonGroupPaymentHome = new Infragistics.Win.UltraWinToolbars.RibbonGroup("ribbonGroupPaymentHome");
+            Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolPaymentHome = new Infragistics.Win.UltraWinToolbars.ButtonTool("Payment");
+            Infragistics.Win.UltraWinToolbars.RibbonGroup ribbonGroupReceiptHome = new Infragistics.Win.UltraWinToolbars.RibbonGroup("ribbonGroupReceiptHome");
+            Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolReceiptHome = new Infragistics.Win.UltraWinToolbars.ButtonTool("Receipt");
             Infragistics.Win.UltraWinToolbars.RibbonGroup ribbonGroup7 = new Infragistics.Win.UltraWinToolbars.RibbonGroup("Ctrl+R");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonTool126 = new Infragistics.Win.UltraWinToolbars.ButtonTool("ReOrder");
             Infragistics.Win.UltraWinToolbars.RibbonGroup ribbonGroup8 = new Infragistics.Win.UltraWinToolbars.RibbonGroup("ribbonGroupReport");
@@ -574,6 +582,22 @@ namespace PosBranch_Win
             buttonTool120.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
             ribbonGroup6.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
             buttonTool120});
+            ribbonGroupPurchaseHome.Caption = "Ctrl+F3";
+            buttonToolPurchaseHome.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
+            ribbonGroupPurchaseHome.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
+            buttonToolPurchaseHome});
+            ribbonGroupStockAdjHome.Caption = "Ctrl+F5";
+            buttonToolStockAdjHome.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
+            ribbonGroupStockAdjHome.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
+            buttonToolStockAdjHome});
+            ribbonGroupPaymentHome.Caption = "Ctrl+F9";
+            buttonToolPaymentHome.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
+            ribbonGroupPaymentHome.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
+            buttonToolPaymentHome});
+            ribbonGroupReceiptHome.Caption = "Ctrl+F11";
+            buttonToolReceiptHome.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
+            ribbonGroupReceiptHome.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
+            buttonToolReceiptHome});
             ribbonGroup7.Caption = "Ctrl+R";
             buttonTool126.InstanceProps.MinimumSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
             ribbonGroup7.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
@@ -613,6 +637,10 @@ namespace PosBranch_Win
             ribbonGroup4,
             ribbonGroup5,
             ribbonGroup6,
+            ribbonGroupPurchaseHome,
+            ribbonGroupStockAdjHome,
+            ribbonGroupPaymentHome,
+            ribbonGroupReceiptHome,
             ribbonGroup7,
             ribbonGroup8,
             ribbonGroup9,
@@ -955,6 +983,7 @@ namespace PosBranch_Win
             buttonTool5.SharedPropsInternal.Caption = "Pos";
             appearance20.Image = ((object)(resources.GetObject("appearance20.Image")));
             buttonTool8.SharedPropsInternal.AppearancesSmall.Appearance = appearance20;
+            buttonTool8.SharedPropsInternal.AppearancesLarge.Appearance = appearance20;
             buttonTool8.SharedPropsInternal.Caption = "Purchase";
             buttonTool9.SharedPropsInternal.AppearancesLarge.Appearance = appearance14;
             buttonTool9.SharedPropsInternal.AppearancesSmall.Appearance = appearance14;
@@ -1050,10 +1079,12 @@ namespace PosBranch_Win
             buttonTool62.SharedPropsInternal.Caption = "Daily Sales";
             appearance42.Image = ((object)(resources.GetObject("appearance42.Image")));
             buttonTool64.SharedPropsInternal.AppearancesLarge.Appearance = appearance42;
-            buttonTool64.SharedPropsInternal.Caption = "Customer Receipt";
+            buttonTool64.SharedPropsInternal.AppearancesSmall.Appearance = appearance42;
+            buttonTool64.SharedPropsInternal.Caption = "Receipt";
             appearance43.Image = ((object)(resources.GetObject("appearance43.Image")));
             buttonTool66.SharedPropsInternal.AppearancesLarge.Appearance = appearance43;
-            buttonTool66.SharedPropsInternal.Caption = "Vendor Payment";
+            buttonTool66.SharedPropsInternal.AppearancesSmall.Appearance = appearance43;
+            buttonTool66.SharedPropsInternal.Caption = "Payment";
             appearance44.Image = ((object)(resources.GetObject("appearance44.Image")));
             buttonTool68.SharedPropsInternal.AppearancesLarge.Appearance = appearance44;
             buttonTool68.SharedPropsInternal.Caption = "Contra";

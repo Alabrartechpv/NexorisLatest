@@ -57,12 +57,51 @@ END";
             }
         }
 
+        private static int TryReadCounterIdFromConfig()
+        {
+            try
+            {
+                const string configPath = @"C:\Connection\Config.txt";
+                if (!System.IO.File.Exists(configPath)) return 0;
+                string config = System.IO.File.ReadAllText(configPath);
+                string[] parts = config.Split(new[] { ';' }, StringSplitOptions.RemoveEmptyEntries);
+                foreach (string part in parts)
+                {
+                    string[] keyValue = part.Split(new[] { '=' }, 2);
+                    if (keyValue.Length == 2 && keyValue[0].Trim().Equals("CounterId", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (int.TryParse(keyValue[1].Trim(), out int cid) && cid > 0)
+                            return cid;
+                    }
+                }
+            }
+            catch { }
+            return 0;
+        }
+
         public bool StartOrResumeSession()
         {
             EnsureSchema();
 
             if (SessionContext.CounterId <= 0)
-                return false;
+            {
+                int cfgCounterId = TryReadCounterIdFromConfig();
+                if (cfgCounterId > 0)
+                {
+                    SessionContext.CounterId = cfgCounterId;
+                    SessionContext.CounterName = $"COUNTER{cfgCounterId}";
+                }
+                else
+                {
+                    SessionContext.CounterId = 1;
+                    SessionContext.CounterName = "COUNTER1";
+                }
+            }
+
+            int companyId = SessionContext.CompanyId > 0 ? SessionContext.CompanyId : 1;
+            int branchId = SessionContext.BranchId > 0 ? SessionContext.BranchId : 1;
+            int finYearId = SessionContext.FinYearId > 0 ? SessionContext.FinYearId : 1;
+            int userId = SessionContext.UserId > 0 ? SessionContext.UserId : 1;
 
             try
             {
@@ -72,12 +111,12 @@ END";
                 using (SqlCommand cmd = new SqlCommand("dbo.POS_CounterSession", (SqlConnection)DataConnection))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@CompanyId", SessionContext.CompanyId);
-                    cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
-                    cmd.Parameters.AddWithValue("@FinYearId", SessionContext.FinYearId);
+                    cmd.Parameters.AddWithValue("@CompanyId", companyId);
+                    cmd.Parameters.AddWithValue("@BranchId", branchId);
+                    cmd.Parameters.AddWithValue("@FinYearId", finYearId);
                     cmd.Parameters.AddWithValue("@CounterId", SessionContext.CounterId);
                     cmd.Parameters.AddWithValue("@CounterName", (object)SessionContext.CounterName ?? DBNull.Value);
-                    cmd.Parameters.AddWithValue("@UserId", SessionContext.UserId);
+                    cmd.Parameters.AddWithValue("@UserId", userId);
                     cmd.Parameters.AddWithValue("@SystemName", Environment.MachineName);
 
                     using (SqlDataReader reader = cmd.ExecuteReader())
