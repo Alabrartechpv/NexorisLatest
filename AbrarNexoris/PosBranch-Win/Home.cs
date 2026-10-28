@@ -127,6 +127,9 @@ namespace PosBranch_Win
             // Ensure "Vendor Payment Report" button exists in Vendor ribbon
             EnsureVendorPaymentReportRibbonButton();
 
+            // Ensure Purchase, Stock Adjustment, Purchase Return, Sales Return, Payment, Receipt buttons exist in Home ribbon
+            EnsureHomeTransactionRibbonButtons();
+
             // Ribbon tools are now serialized in the designer (Home.Designer.cs)
 
             // UltraTabControl doesn't need DrawItem handler as it has built-in styling
@@ -1585,6 +1588,9 @@ namespace PosBranch_Win
             // Ensure "Vendor Payment Report" button exists in the Vendor ribbon
             EnsureVendorPaymentReportRibbonButton();
 
+            // Ensure Purchase, Stock Adjustment, Purchase Return, Sales Return, Payment, Receipt buttons exist in Home ribbon
+            EnsureHomeTransactionRibbonButtons();
+
             // Apply active persistent language to Home and all controls
             ApplyLanguageToAllForms();
         }
@@ -2009,6 +2015,161 @@ namespace PosBranch_Win
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"EnsureVendorPaymentReportRibbonButton error: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Programmatically ensures the Purchase, Stock Adjustment, Purchase Return, Sales Return, Payment, Receipt
+        /// buttons exist in the Home ribbon tab immediately following the Exit (F4) button.
+        /// Safe to call multiple times without creating duplicates.
+        /// </summary>
+        private void EnsureHomeTransactionRibbonButtons()
+        {
+            try
+            {
+                // 1. Locate Home ribbon tab
+                Infragistics.Win.UltraWinToolbars.RibbonTab homeTab = null;
+                if (ultraToolbarsManager1.Ribbon != null && ultraToolbarsManager1.Ribbon.Tabs != null)
+                {
+                    if (ultraToolbarsManager1.Ribbon.Tabs.Exists("Home"))
+                    {
+                        homeTab = ultraToolbarsManager1.Ribbon.Tabs["Home"];
+                    }
+                    else
+                    {
+                        foreach (Infragistics.Win.UltraWinToolbars.RibbonTab tab in ultraToolbarsManager1.Ribbon.Tabs)
+                        {
+                            if (tab.Caption != null && tab.Caption.Equals("Home", StringComparison.OrdinalIgnoreCase))
+                            {
+                                homeTab = tab;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (homeTab == null) return;
+
+                // 2. Ensure shared tools have large appearance and proper captions
+                if (ultraToolbarsManager1.Tools.Exists("Purchase"))
+                {
+                    var pTool = ultraToolbarsManager1.Tools["Purchase"] as Infragistics.Win.UltraWinToolbars.ButtonTool;
+                    if (pTool?.SharedProps != null)
+                    {
+                        pTool.SharedProps.Caption = "Purchase";
+                        if (pTool.SharedProps.AppearancesLarge.Appearance.Image == null && pTool.SharedProps.AppearancesSmall.Appearance.Image != null)
+                        {
+                            pTool.SharedProps.AppearancesLarge.Appearance.Image = pTool.SharedProps.AppearancesSmall.Appearance.Image;
+                        }
+                    }
+                }
+
+                if (ultraToolbarsManager1.Tools.Exists("Payment"))
+                {
+                    var payTool = ultraToolbarsManager1.Tools["Payment"] as Infragistics.Win.UltraWinToolbars.ButtonTool;
+                    if (payTool?.SharedProps != null)
+                    {
+                        payTool.SharedProps.Caption = "Payment";
+                        if (payTool.SharedProps.AppearancesSmall.Appearance.Image == null && payTool.SharedProps.AppearancesLarge.Appearance.Image != null)
+                        {
+                            payTool.SharedProps.AppearancesSmall.Appearance.Image = payTool.SharedProps.AppearancesLarge.Appearance.Image;
+                        }
+                    }
+                }
+
+                if (ultraToolbarsManager1.Tools.Exists("Receipt"))
+                {
+                    var recTool = ultraToolbarsManager1.Tools["Receipt"] as Infragistics.Win.UltraWinToolbars.ButtonTool;
+                    if (recTool?.SharedProps != null)
+                    {
+                        recTool.SharedProps.Caption = "Receipt";
+                        if (recTool.SharedProps.AppearancesSmall.Appearance.Image == null && recTool.SharedProps.AppearancesLarge.Appearance.Image != null)
+                        {
+                            recTool.SharedProps.AppearancesSmall.Appearance.Image = recTool.SharedProps.AppearancesLarge.Appearance.Image;
+                        }
+                    }
+                }
+
+                var items = new (string GroupKey, string Caption, string ToolKey)[]
+                {
+                    ("ribbonGroupPurchaseHome", "F3", "Purchase"),
+                    ("ribbonGroupStockAdjHome", "F5", "stockadjustment"),
+                    ("ribbonGroupPurchaseReturnHome", "F6", "Purchase R/n"),
+                    ("ribbonGroupSalesReturnHome", "F7", "Sales Return"),
+                    ("ribbonGroupPaymentHome", "F9", "Payment"),
+                    ("ribbonGroupReceiptHome", "F10", "Receipt")
+                };
+
+                // Find index of Exit group ("ribbonGroup3", caption "F4" or contains tool "Remove" / "Exit")
+                int exitIndex = -1;
+                for (int i = 0; i < homeTab.Groups.Count; i++)
+                {
+                    var grp = homeTab.Groups[i];
+                    if (grp.Key == "ribbonGroup3" ||
+                        (grp.Caption != null && (grp.Caption.Equals("F4", StringComparison.OrdinalIgnoreCase) || grp.Caption.Equals("Exit", StringComparison.OrdinalIgnoreCase))) ||
+                        grp.Tools.Exists("Remove") || grp.Tools.Exists("Exit"))
+                    {
+                        exitIndex = i;
+                        break;
+                    }
+                }
+
+                int insertIndex = (exitIndex >= 0) ? exitIndex + 1 : homeTab.Groups.Count;
+
+                foreach (var item in items)
+                {
+                    Infragistics.Win.UltraWinToolbars.RibbonGroup grp = null;
+                    if (homeTab.Groups.Exists(item.GroupKey))
+                    {
+                        grp = homeTab.Groups[item.GroupKey];
+                    }
+                    else
+                    {
+                        grp = new Infragistics.Win.UltraWinToolbars.RibbonGroup(item.GroupKey, item.Caption);
+                        if (insertIndex >= 0 && insertIndex <= homeTab.Groups.Count)
+                        {
+                            homeTab.Groups.Insert(insertIndex, grp);
+                        }
+                        else
+                        {
+                            homeTab.Groups.Add(grp);
+                        }
+                    }
+
+                    grp.Caption = item.Caption;
+                    grp.Visible = true;
+
+                    if (!grp.Tools.Exists(item.ToolKey))
+                    {
+                        var tool = grp.Tools.AddTool(item.ToolKey);
+                        if (tool != null)
+                        {
+                            tool.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
+                            tool.InstanceProps.MinimumSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
+                        }
+                    }
+                    else
+                    {
+                        var tool = grp.Tools[item.ToolKey];
+                        if (tool != null)
+                        {
+                            tool.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
+                            tool.InstanceProps.MinimumSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
+                        }
+                    }
+
+                    if (ultraToolbarsManager1.Tools.Exists(item.ToolKey))
+                    {
+                        ultraToolbarsManager1.Tools[item.ToolKey].SharedProps.Visible = true;
+                        ultraToolbarsManager1.Tools[item.ToolKey].SharedProps.Enabled = true;
+                    }
+
+                    insertIndex = homeTab.Groups.IndexOf(grp) + 1;
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"EnsureHomeTransactionRibbonButtons error: {ex.Message}");
             }
         }
 
@@ -3006,7 +3167,7 @@ namespace PosBranch_Win
                 frmSalesInvoice frmsales = new frmSalesInvoice();
                 OpenFormInTabSafe(frmsales, "Sales Invoice");
             }
-            if (e.Tool.Key == "Sales Return")
+            if (e.Tool.Key == "Sales Return" || e.Tool.Key == "salesreturn" || e.Tool.Key == "SalesReturnTransaction")
             {
                 frmSalesReturn frmsalesreturn = new frmSalesReturn();
                 OpenFormInTabSafe(frmsalesreturn, "Sales Return");
@@ -3086,7 +3247,7 @@ namespace PosBranch_Win
                 Accounts.FrmAccountGroup AccountGroup = new FrmAccountGroup();
                 OpenFormInTabSafe(AccountGroup, "AccountGroup");
             }
-            if (e.Tool.Key == "Receipt")
+            if (e.Tool.Key == "Receipt" || e.Tool.Key == "receipt")
             {
                 Accounts.FrmReceipt receipt = new FrmReceipt();
                 OpenFormInTabSafe(receipt, "Receipt");
@@ -3136,7 +3297,7 @@ namespace PosBranch_Win
                 PosBranch_Win.Reports.FinancialReports.FrmCashInOutReport cioReport = new PosBranch_Win.Reports.FinancialReports.FrmCashInOutReport();
                 OpenFormInTabSafe(cioReport, "Cash In / Cash Out");
             }
-            if (e.Tool.Key == "Payment")
+            if (e.Tool.Key == "Payment" || e.Tool.Key == "payment")
             {
                 Accounts.FrmPayment payment = new FrmPayment();
                 OpenFormInTabSafe(payment, "Payment");
@@ -3212,7 +3373,7 @@ namespace PosBranch_Win
                 FrmUsers users = new FrmUsers();
                 OpenFormInTabSafe(users, "Users");
             }
-            if (e.Tool.Key == "Purchase")
+            if (e.Tool.Key == "Purchase" || e.Tool.Key == "purchase")
             {
                 FrmPurchase purchase = new FrmPurchase();
                 OpenFormInTabSafe(purchase, "Purchase");
@@ -3222,7 +3383,7 @@ namespace PosBranch_Win
                 frmPurchaseOrder purchaseOrder = new frmPurchaseOrder();
                 OpenFormInTabSafe(purchaseOrder, "Purchase Order");
             }
-            if (e.Tool.Key == "Purchase R/n")
+            if (e.Tool.Key == "Purchase R/n" || e.Tool.Key == "Purchase Return" || e.Tool.Key == "purchasereturn")
             {
                 frmPurchaseReturn preturn = new frmPurchaseReturn();
                 OpenFormInTabSafe(preturn, "Purchase Return");
@@ -3246,7 +3407,7 @@ namespace PosBranch_Win
                 FrmCurrency currencyForm = new FrmCurrency();
                 OpenFormInTabSafe(currencyForm, "Currency");
             }
-            if (e.Tool.Key == "stockadjustment")
+            if (e.Tool.Key == "stockadjustment" || e.Tool.Key == "Stock Adjustment" || e.Tool.Key == "StockAdjustment")
             {
                 FrmStockAdjustment stokadj = new FrmStockAdjustment();
                 OpenFormInTabSafe(stokadj, "Stock Adjustment");
@@ -3803,19 +3964,30 @@ namespace PosBranch_Win
                             OpenFormInTab(new Master.frmItemMasterNew(), "Item Master");
                             return true;
                         case Keys.P:
+                        case Keys.F3:
                             OpenFormInTab(new Transaction.FrmPurchase(), "Purchase");
                             return true;
                         case Keys.S:
                             OpenFormInTab(new Transaction.frmSalesInvoice(), "Sales Invoice");
                             return true;
                         case Keys.A:
+                        case Keys.F5:
                             OpenFormInTab(new Transaction.FrmStockAdjustment(), "Stock Adjustment");
                             return true;
                         case Keys.R:
+                        case Keys.F7:
                             OpenFormInTab(new Transaction.frmSalesReturn(), "Sales Return");
                             return true;
                         case Keys.E:
+                        case Keys.F6:
                             OpenFormInTab(new Transaction.frmPurchaseReturn(), "Purchase Return");
+                            return true;
+                        case Keys.F9:
+                            OpenFormInTab(new Accounts.FrmPayment(), "Payment");
+                            return true;
+                        case Keys.F10:
+                        case Keys.F11:
+                            OpenFormInTab(new Accounts.FrmReceipt(), "Receipt");
                             return true;
                     }
                 }
@@ -4004,6 +4176,42 @@ namespace PosBranch_Win
                     ultraToolbarsManager1_ToolClick_1(this, new Infragistics.Win.UltraWinToolbars.ToolClickEventArgs(ultraToolbarsManager1.Tools["Delete"], null));
                     e.Handled = true;
                 }
+            }
+            else if (e.KeyCode == Keys.F3)
+            {
+                Transaction.FrmPurchase purchase = new Transaction.FrmPurchase();
+                OpenFormInTabSafe(purchase, "Purchase");
+                e.Handled = true;
+            }
+            else if (e.KeyCode == Keys.F5)
+            {
+                Transaction.FrmStockAdjustment stockAdj = new Transaction.FrmStockAdjustment();
+                OpenFormInTabSafe(stockAdj, "Stock Adjustment");
+                e.Handled = true;
+            }
+            else if (e.KeyCode == Keys.F6)
+            {
+                Transaction.frmPurchaseReturn pReturn = new Transaction.frmPurchaseReturn();
+                OpenFormInTabSafe(pReturn, "Purchase Return");
+                e.Handled = true;
+            }
+            else if (e.KeyCode == Keys.F7)
+            {
+                Transaction.frmSalesReturn sReturn = new Transaction.frmSalesReturn();
+                OpenFormInTabSafe(sReturn, "Sales Return");
+                e.Handled = true;
+            }
+            else if (e.KeyCode == Keys.F9)
+            {
+                Accounts.FrmPayment payment = new Accounts.FrmPayment();
+                OpenFormInTabSafe(payment, "Payment");
+                e.Handled = true;
+            }
+            else if (e.KeyCode == Keys.F10 || e.KeyCode == Keys.F11)
+            {
+                Accounts.FrmReceipt receipt = new Accounts.FrmReceipt();
+                OpenFormInTabSafe(receipt, "Receipt");
+                e.Handled = true;
             }
             else if (e.KeyCode == Keys.F4 && !e.Alt)
             {
@@ -5590,6 +5798,10 @@ namespace PosBranch_Win
                 "Purchase Order",
                 "Purchase R/n",
                 "stockadjustment",
+                "Stock Adjustment",
+                "purchasereturn",
+                "Purchase Return",
+                "salesreturn",
                 "Goods Received"
             };
 
