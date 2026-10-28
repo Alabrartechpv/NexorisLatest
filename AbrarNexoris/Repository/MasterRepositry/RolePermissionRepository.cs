@@ -18,12 +18,124 @@ namespace Repository.MasterRepositry
         /// </summary>
         /// <param name="roleId">Role ID to get permissions for</param>
         /// <returns>List of RolePermission objects</returns>
+        /// <summary>
+        /// Resolves all matching Role IDs across dbo.Roles and dbo.UserLevel for a given Role ID or Role Name
+        /// </summary>
+        public List<int> GetTargetRoleIds(int roleId, string roleName = null)
+        {
+            var ids = new HashSet<int>();
+            if (roleId > 0) ids.Add(roleId);
+
+            try
+            {
+                var allRoles = GetAllRoles();
+                var matched = allRoles.Where(r =>
+                    (roleId > 0 && (r.RoleID == roleId || (r.UserLevelID.HasValue && r.UserLevelID.Value == roleId))) ||
+                    (!string.IsNullOrWhiteSpace(roleName) && string.Equals(r.RoleName?.Trim(), roleName.Trim(), StringComparison.OrdinalIgnoreCase))
+                ).ToList();
+
+                string resolvedName = roleName;
+                if (string.IsNullOrWhiteSpace(resolvedName) && matched.Count > 0)
+                {
+                    resolvedName = matched.FirstOrDefault(m => !string.IsNullOrWhiteSpace(m.RoleName))?.RoleName;
+                }
+
+                if (!string.IsNullOrWhiteSpace(resolvedName))
+                {
+                    var byName = allRoles.Where(r => string.Equals(r.RoleName?.Trim(), resolvedName.Trim(), StringComparison.OrdinalIgnoreCase));
+                    foreach (var r in byName)
+                    {
+                        if (r.RoleID > 0) ids.Add(r.RoleID);
+                        if (r.UserLevelID.HasValue && r.UserLevelID.Value > 0) ids.Add(r.UserLevelID.Value);
+                    }
+                }
+                else
+                {
+                    foreach (var r in matched)
+                    {
+                        if (r.RoleID > 0) ids.Add(r.RoleID);
+                        if (r.UserLevelID.HasValue && r.UserLevelID.Value > 0) ids.Add(r.UserLevelID.Value);
+                    }
+                }
+            }
+            catch { }
+
+            try
+            {
+                if (DataConnection.State != ConnectionState.Open) DataConnection.Open();
+                using (SqlCommand cmd = new SqlCommand(@"
+DECLARE @Names TABLE (RoleName NVARCHAR(100));
+
+IF OBJECT_ID('dbo.Roles', 'U') IS NOT NULL
+    INSERT INTO @Names SELECT RoleName FROM dbo.Roles WHERE RoleID = @RId OR UserLevelID = @RId;
+
+IF OBJECT_ID('dbo.Roles', 'U') IS NOT NULL AND OBJECT_ID('dbo.UserLevel', 'U') IS NOT NULL
+BEGIN
+    SELECT 
+        u.UserLevelID AS RoleID,
+        u.UserLevel AS RoleName,
+        ISNULL(r.RoleID, u.UserLevelID) AS UserLevelID
+    FROM dbo.UserLevel u
+    LEFT JOIN dbo.Roles r ON UPPER(RTRIM(LTRIM(u.UserLevel))) = UPPER(RTRIM(LTRIM(r.RoleName)))
+    WHERE ISNULL(u.UserLevel, '') <> ''
+    ORDER BY u.UserLevelID;
+END
+ELSE IF OBJECT_ID('dbo.UserLevel', 'U') IS NOT NULL
+    INSERT INTO @Names SELECT UserLevel FROM dbo.UserLevel WHERE UserLevelID = @RId;
+
+IF ISNULL(@RName, '') <> ''
+    INSERT INTO @Names VALUES (@RName);
+
+IF OBJECT_ID('dbo.Roles', 'U') IS NOT NULL
+BEGIN
+    SELECT DISTINCT RoleID FROM dbo.Roles r INNER JOIN @Names n ON UPPER(RTRIM(LTRIM(r.RoleName))) = UPPER(RTRIM(LTRIM(n.RoleName)));
+    SELECT DISTINCT UserLevelID FROM dbo.Roles r INNER JOIN @Names n ON UPPER(RTRIM(LTRIM(r.RoleName))) = UPPER(RTRIM(LTRIM(n.RoleName))) WHERE UserLevelID IS NOT NULL;
+END
+
+IF OBJECT_ID('dbo.Roles', 'U') IS NOT NULL AND OBJECT_ID('dbo.UserLevel', 'U') IS NOT NULL
+BEGIN
+    SELECT 
+        u.UserLevelID AS RoleID,
+        u.UserLevel AS RoleName,
+        ISNULL(r.RoleID, u.UserLevelID) AS UserLevelID
+    FROM dbo.UserLevel u
+    LEFT JOIN dbo.Roles r ON UPPER(RTRIM(LTRIM(u.UserLevel))) = UPPER(RTRIM(LTRIM(r.RoleName)))
+    WHERE ISNULL(u.UserLevel, '') <> ''
+    ORDER BY u.UserLevelID;
+END
+ELSE IF OBJECT_ID('dbo.UserLevel', 'U') IS NOT NULL
+    SELECT DISTINCT UserLevelID FROM dbo.UserLevel u INNER JOIN @Names n ON UPPER(RTRIM(LTRIM(u.UserLevel))) = UPPER(RTRIM(LTRIM(n.RoleName)));
+", (SqlConnection)DataConnection))
+                {
+                    cmd.Parameters.AddWithValue("@RId", roleId);
+                    cmd.Parameters.AddWithValue("@RName", roleName ?? "");
+                    using (SqlDataReader reader = cmd.ExecuteReader())
+                    {
+                        do
+                        {
+                            while (reader.Read())
+                            {
+                                if (!reader.IsDBNull(0))
+                                {
+                                    int val = Convert.ToInt32(reader[0]);
+                                    if (val > 0) ids.Add(val);
+                                }
+                            }
+                        } while (reader.NextResult());
+                    }
+                }
+            }
+            catch { }
+
+            return ids.Count > 0 ? ids.ToList() : new List<int> { roleId };
+        }
+
         public List<RolePermission> GetPermissionsByRoleId(int roleId)
         {
             List<RolePermission> savedPermissions = new List<RolePermission>();
 
             // Resolve all matching role IDs (e.g., both RoleID=4 and UserLevelID=3 for Cashier)
-            List<int> targetRoleIds = new List<int> { roleId };
+            List<int> targetRoleIds = GetTargetRoleIds(roleId);
             try
             {
                 var allRoles = GetAllRoles();
@@ -138,7 +250,25 @@ END", (SqlConnection)DataConnection))
 
             foreach (var sf in staticForms)
             {
-                var saved = savedPermissions?.FirstOrDefault(p => 
+                var matchingList = savedPermissions?.Where(p => 
+                    (p.FormID > 0 && p.FormID == sf.FormID) ||
+                    (!string.IsNullOrEmpty(p.FormKey) && string.Equals(p.FormKey, sf.FormKey, StringComparison.OrdinalIgnoreCase)) ||
+                    (!string.IsNullOrEmpty(p.FormName) && string.Equals(p.FormName, sf.FormName, StringComparison.OrdinalIgnoreCase))).ToList();
+                var saved = (matchingList != null && matchingList.Count > 0)
+                    ? new RolePermission
+                    {
+                        RoleID = roleId,
+                        FormID = sf.FormID,
+                        FormKey = sf.FormKey,
+                        FormName = sf.FormName,
+                        Category = sf.Category,
+                        CanView = matchingList.Any(m => m.CanView),
+                        CanAdd = matchingList.Any(m => m.CanAdd),
+                        CanEdit = matchingList.Any(m => m.CanEdit),
+                        CanDelete = matchingList.Any(m => m.CanDelete)
+                    }
+                    : null;
+                var ignoredSaved = savedPermissions?.FirstOrDefault(p => 
                     (p.FormID > 0 && p.FormID == sf.FormID) ||
                     (!string.IsNullOrEmpty(p.FormKey) && string.Equals(p.FormKey, sf.FormKey, StringComparison.OrdinalIgnoreCase)) ||
                     (!string.IsNullOrEmpty(p.FormName) && string.Equals(p.FormName, sf.FormName, StringComparison.OrdinalIgnoreCase)));
@@ -354,7 +484,18 @@ END", (SqlConnection)DataConnection))
                 if (DataConnection.State != ConnectionState.Open) DataConnection.Open();
 
                 using (SqlCommand cmd = new SqlCommand(@"
-IF OBJECT_ID('dbo.UserLevel', 'U') IS NOT NULL
+IF OBJECT_ID('dbo.Roles', 'U') IS NOT NULL AND OBJECT_ID('dbo.UserLevel', 'U') IS NOT NULL
+BEGIN
+    SELECT 
+        u.UserLevelID AS RoleID,
+        u.UserLevel AS RoleName,
+        ISNULL(r.RoleID, u.UserLevelID) AS UserLevelID
+    FROM dbo.UserLevel u
+    LEFT JOIN dbo.Roles r ON UPPER(RTRIM(LTRIM(u.UserLevel))) = UPPER(RTRIM(LTRIM(r.RoleName)))
+    WHERE ISNULL(u.UserLevel, '') <> ''
+    ORDER BY u.UserLevelID;
+END
+ELSE IF OBJECT_ID('dbo.UserLevel', 'U') IS NOT NULL
 BEGIN
     SELECT UserLevelID AS RoleID, UserLevel AS RoleName, UserLevelID 
     FROM dbo.UserLevel 
@@ -670,7 +811,18 @@ BEGIN
     (N'Inventory Manager'),
     (N'Standard User');
 
-    IF OBJECT_ID('dbo.UserLevel', 'U') IS NOT NULL
+    IF OBJECT_ID('dbo.Roles', 'U') IS NOT NULL AND OBJECT_ID('dbo.UserLevel', 'U') IS NOT NULL
+BEGIN
+    SELECT 
+        u.UserLevelID AS RoleID,
+        u.UserLevel AS RoleName,
+        ISNULL(r.RoleID, u.UserLevelID) AS UserLevelID
+    FROM dbo.UserLevel u
+    LEFT JOIN dbo.Roles r ON UPPER(RTRIM(LTRIM(u.UserLevel))) = UPPER(RTRIM(LTRIM(r.RoleName)))
+    WHERE ISNULL(u.UserLevel, '') <> ''
+    ORDER BY u.UserLevelID;
+END
+ELSE IF OBJECT_ID('dbo.UserLevel', 'U') IS NOT NULL
     BEGIN
         INSERT INTO #DefaultRoles (RoleName)
         SELECT DISTINCT UserLevel FROM dbo.UserLevel WHERE ISNULL(UserLevel, '') <> '';
@@ -1030,7 +1182,7 @@ END", (SqlConnection)DataConnection))
 
             if (permissions == null || permissions.Count == 0) return "Success";
 
-            List<int> targetRoleIds = new List<int> { roleId };
+            List<int> targetRoleIds = GetTargetRoleIds(roleId);
             try
             {
                 var allRoles = GetAllRoles();

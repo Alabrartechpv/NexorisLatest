@@ -911,7 +911,7 @@ namespace PosBranch_Win
                         tabName = "Purchase Return Report";
                     }
 
-                    bool allowed = SessionContext.CanView(checkTabKey) || SessionContext.CanView(formTypeName);
+                    bool allowed = SessionContext.CanView(checkTabKey) || SessionContext.CanView(ResolveCanonicalPermissionKey(checkTabKey)) || SessionContext.CanView(formTypeName) || SessionContext.CanView(ResolveCanonicalPermissionKey(formTypeName));
                     if (!allowed)
                     {
                         MessageBox.Show($"Access Denied: You do not have permission to access '{tabName}'. Please contact your administrator.",
@@ -1204,7 +1204,7 @@ namespace PosBranch_Win
                         tabName = "Purchase Return Report";
                     }
 
-                    bool allowed = SessionContext.CanView(checkTabKey) || SessionContext.CanView(formTypeName);
+                    bool allowed = SessionContext.CanView(checkTabKey) || SessionContext.CanView(ResolveCanonicalPermissionKey(checkTabKey)) || SessionContext.CanView(formTypeName) || SessionContext.CanView(ResolveCanonicalPermissionKey(formTypeName));
                     if (!allowed)
                     {
                         MessageBox.Show($"Access Denied: You do not have permission to access '{tabName}'. Please contact your administrator.",
@@ -2400,7 +2400,7 @@ namespace PosBranch_Win
                     try
                     {
                         string toolKey = tool.Key?.Trim();
-                        string permCheckKey = toolKey;
+                        string permCheckKey = ResolveCanonicalPermissionKey(toolKey);
                         if (toolKey == "SalesReturn") permCheckKey = "salesreturnreport";
                         else if (toolKey == "PurchaseReturn") permCheckKey = "purchasereturnreport";
                         bool isGlobalAction = toolKey == "Save" ||
@@ -2457,7 +2457,7 @@ namespace PosBranch_Win
                                         try
                                         {
                                             string toolKey = tool.Key?.Trim();
-                        string permCheckKey = toolKey;
+                        string permCheckKey = ResolveCanonicalPermissionKey(toolKey);
                         if (toolKey == "SalesReturn") permCheckKey = "salesreturnreport";
                         else if (toolKey == "PurchaseReturn") permCheckKey = "purchasereturnreport";
                                             bool isGlobalAction = toolKey == "Save" || toolKey == "Delet" || toolKey == "Clear" ||
@@ -2471,22 +2471,23 @@ namespace PosBranch_Win
                         bool hasReportAccess = isAdmin || (ReportNavigatorDefinitions != null && ReportNavigatorDefinitions.Any(def => SessionContext.CanView(def.Key) || SessionContext.CanView(def.ActionKey) || SessionContext.CanView(def.Text)));
                         bool hasPermission = isAdmin || isGlobalAction || (isReportLauncher ? hasReportAccess : SessionContext.CanView(permCheckKey));
                                             
-                                            tool.SharedProps.Visible = true;
+                                            tool.SharedProps.Visible = isAdmin || isGlobalAction || hasPermission;
                                             tool.SharedProps.Enabled = hasPermission;
                                             if (tool.InstanceProps != null)
                                             {
-                                                tool.InstanceProps.Visible = Infragistics.Win.DefaultableBoolean.True;
+                                                tool.InstanceProps.Visible = (isAdmin || isGlobalAction || hasPermission) ? Infragistics.Win.DefaultableBoolean.True : Infragistics.Win.DefaultableBoolean.False;
+                                                if (hasPermission) { groupHasVisibleTools = true; tabHasVisibleTools = true; }
                                             }
                                         }
                                         catch { }
                                     }
 
-                                    group.Visible = true;
+                                    group.Visible = isAdmin || groupHasVisibleTools;
                                 }
                                 catch { }
                             }
 
-                            tab.Visible = true;
+                            tab.Visible = isAdmin || tabHasVisibleTools;
                         }
                         catch { }
                     }
@@ -2545,10 +2546,42 @@ namespace PosBranch_Win
         /// </summary>
         /// <param name="formKey">Form key to check</param>
         /// <returns>True if permitted, false if denied</returns>
+        private string ResolveCanonicalPermissionKey(string toolKey)
+        {
+            if (string.IsNullOrWhiteSpace(toolKey)) return "";
+            string tk = toolKey.Trim();
+            if (tk == "Roles") return "RolePermissions";
+            if (tk == "SalesReturn") return "salesreturnreport";
+            if (tk == "PurchaseReturn") return "purchasereturnreport";
+            if (tk == "Ledger" || tk == "Account Ledgers" || tk == "FrmLedgers" || tk == "AccountLedgers") return "ledgers";
+            if (tk == "frmvendor") return "vendor";
+            if (tk == "General PM setup" || tk == "GeneralPMsetup") return "paymode";
+            if (tk == "Print Barcode") return "barcode";
+            if (tk == "PLU Weighing") return "plu";
+            if (tk == "OpeningStock") return "openingstock";
+            if (tk == "BtnClosing" || tk == "Closing" || tk == "frmClosing" || tk == "counterclosing") return "closing";
+            if (tk == "Change Item No") return "changeitemno";
+            if (tk == "Database") return "databasemaintenance";
+            if (tk == "ActivityLog " || tk == "ActivityLog") return "activitylog";
+            if (tk == "POSSettings") return "possettings";
+            if (tk == "FinancialYearClosing") return "yearclosing";
+            if (tk == "AppLanguage") return "applanguage";
+            if (tk == "GeneralPayment" || tk == "General Payment") return "generalpayment";
+            if (tk == "GeneralReceipt" || tk == "General Receipt") return "generalreceipt";
+            if (tk == "Journal") return "journal";
+            if (tk == "Contra") return "contra";
+            if (tk == "ManualPartyBalance" || tk == "Manual Party Balance") return "manualpartybalance";
+            if (tk == "ExecutiveDashboard" || tk == "BossDashboard" || tk == "ExecutiveKPI" || tk == "Executive Dashboard") return "dashboard";
+            if (tk == "Overview" || tk == "Dashboard Overview") return "overview";
+            if (tk == "BusinessSummary" || tk == "Business Summary") return "businesssummary";
+            return tk;
+        }
+
         private bool CheckViewPermission(string formKey, params string[] alternateFormKeys)
         {
             if (SessionContext.IsAdmin) return true;
-            var formKeys = new[] { formKey }.Concat(alternateFormKeys ?? Enumerable.Empty<string>());
+            string canonical = ResolveCanonicalPermissionKey(formKey);
+            var formKeys = new[] { formKey, canonical }.Concat(alternateFormKeys ?? Enumerable.Empty<string>()).Distinct();
             if (!formKeys.Any(key => SessionContext.CanView(key)))
             {
                 MessageBox.Show($"You do not have permission to access this module.\n\nRequired permission: View access to '{formKey}'",
@@ -2691,7 +2724,7 @@ namespace PosBranch_Win
             }
 
             // Map aliases to permission keys
-            string permissionKey = toolKey;
+            string permissionKey = ResolveCanonicalPermissionKey(toolKey);
             if (toolKey == "Roles") permissionKey = "RolePermissions";
             if (toolKey == "SalesReturn") permissionKey = "salesreturnreport";
             if (toolKey == "PurchaseReturn") permissionKey = "purchasereturnreport";
@@ -2742,8 +2775,8 @@ namespace PosBranch_Win
                     {
                         string formTypeName = activeForm.GetType().Name;
                         string formTitle = activeForm.Text ?? formTypeName;
-                        bool canAdd = SessionContext.CanAdd(formTypeName) || SessionContext.CanAdd(formTitle);
-                        bool canEdit = SessionContext.CanEdit(formTypeName) || SessionContext.CanEdit(formTitle);
+                        bool canAdd = SessionContext.CanAdd(formTypeName) || SessionContext.CanAdd(ResolveCanonicalPermissionKey(formTypeName)) || SessionContext.CanAdd(formTitle) || SessionContext.CanAdd(ResolveCanonicalPermissionKey(formTitle));
+                        bool canEdit = SessionContext.CanEdit(formTypeName) || SessionContext.CanEdit(ResolveCanonicalPermissionKey(formTypeName)) || SessionContext.CanEdit(formTitle) || SessionContext.CanEdit(ResolveCanonicalPermissionKey(formTitle));
 
                         if (!canAdd && !canEdit)
                         {
@@ -2997,7 +3030,7 @@ namespace PosBranch_Win
                     {
                         string formTypeName = activeForm.GetType().Name;
                         string formTitle = activeForm.Text ?? formTypeName;
-                        if (!SessionContext.CanDelete(formTypeName) && !SessionContext.CanDelete(formTitle))
+                        if (!SessionContext.CanDelete(formTypeName) && !SessionContext.CanDelete(ResolveCanonicalPermissionKey(formTypeName)) && !SessionContext.CanDelete(formTitle) && !SessionContext.CanDelete(ResolveCanonicalPermissionKey(formTitle)))
                         {
                             MessageBox.Show("Access Denied: You do not have permission to Delete in this form.",
                                 "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning);
@@ -3179,7 +3212,7 @@ namespace PosBranch_Win
                 Accounts.FrmVendor vendor = new FrmVendor();
                 OpenFormInTabSafe(vendor, "Vendor");
             }
-            if (e.Tool.Key == "Ledger")
+            if (e.Tool.Key == "Ledger" || e.Tool.Key == "ledgers" || e.Tool.Key == "AccountLedgers" || e.Tool.Key == "FrmLedgers")
             {
                 Accounts.FrmLedgers ledgers = new FrmLedgers();
                 OpenFormInTabSafe(ledgers, "Ledger");
@@ -3387,10 +3420,10 @@ namespace PosBranch_Win
                 Utilities.frmOpeningStock frmOpnstk = new Utilities.frmOpeningStock();
                 OpenFormInTabSafe(frmOpnstk, "Opening Stock");
             }
-            if (e.Tool.Key == "BtnClosing")
+            if (e.Tool.Key == "BtnClosing" || e.Tool.Key == "Closing" || e.Tool.Key == "counterclosing" || e.Tool.Key == "frmClosing")
             {
                 Utilities.frmClosing frmClosing = new Utilities.frmClosing();
-                OpenFormInTab(frmClosing, "Closing");
+                OpenFormInTabSafe(frmClosing, "Closing");
             }
 
             if (e.Tool.Key == "Change Item No")
@@ -6373,7 +6406,7 @@ namespace PosBranch_Win
 
                 if (!SessionContext.IsAdmin &&
                     !SessionContext.CanView(tabName) &&
-                    !SessionContext.CanView(formType.Name))
+                    !SessionContext.CanView(ResolveCanonicalPermissionKey(tabName)) && !SessionContext.CanView(formType.Name) && !SessionContext.CanView(ResolveCanonicalPermissionKey(formType.Name)))
                 {
                     MessageBox.Show($"Access Denied: You do not have permission to access '{tabName}'. Please contact your administrator.",
                         "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning);
