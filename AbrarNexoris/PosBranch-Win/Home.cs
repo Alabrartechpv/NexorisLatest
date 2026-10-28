@@ -77,7 +77,7 @@ namespace PosBranch_Win
             new ReportNavigatorDefinition("Sales", "Item-wise Sales Summary", "ItemwiseSalesSummaryReport"),
             new ReportNavigatorDefinition("Sales", "Customer-wise Sales Summary", "CustomerwiseSalesSummaryReport"),
             new ReportNavigatorDefinition("Sales", "Salesman-wise Sales Summary", "SalesmanwiseSalesSummaryReport"),
-            new ReportNavigatorDefinition("Sales", "Sales Return Report", "SalesReturn"),
+            new ReportNavigatorDefinition("Sales", "Sales Return Report", "SalesReturnReport", "SalesReturn"),
             new ReportNavigatorDefinition("Sales", "Sales Return Audit Report", "SalesReturnAuditReport"),
             new ReportNavigatorDefinition("Sales", "Sales Profit", "SalesProfit"),
             new ReportNavigatorDefinition("Sales", "Salesman Incentive Report", "SalesmanIncentiveReport"),
@@ -86,7 +86,7 @@ namespace PosBranch_Win
             new ReportNavigatorDefinition("Sales", "Counter Report", "CounterReport"),
             new ReportNavigatorDefinition("Purchase", "Purchase Details", "Purchase Details"),
             new ReportNavigatorDefinition("Purchase", "Purchase Audit Report", "PurchaseAuditReport"),
-            new ReportNavigatorDefinition("Purchase", "Purchase Return Report", "PurchaseReturn"),
+            new ReportNavigatorDefinition("Purchase", "Purchase Return Report", "PurchaseReturnReport", "PurchaseReturn"),
             new ReportNavigatorDefinition("Purchase", "Purchase Return Audit Report", "PurchaseReturnAuditReport"),
             new ReportNavigatorDefinition("Purchase", "Vendor Purchase Report", "VendorPurchaseReport"),
             new ReportNavigatorDefinition("Customer", "Customer Outstanding Listing", "CustomerOutstandingReport"),
@@ -114,7 +114,9 @@ namespace PosBranch_Win
         private static readonly Dictionary<string, string> ReportNavigatorActionAliases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             { "StockReportAdv", "StockReport" },
-            { "VendorDNPaymentReport", "VendorPaymentReport" }
+            { "VendorDNPaymentReport", "VendorPaymentReport" },
+            { "SalesReturnReport", "SalesReturn" },
+            { "PurchaseReturnReport", "PurchaseReturn" }
         };
 
         public Home()
@@ -897,7 +899,19 @@ namespace PosBranch_Win
                 if (!SessionContext.IsAdmin && formToOpen != null)
                 {
                     string formTypeName = formToOpen.GetType().Name;
-                    bool allowed = SessionContext.CanView(tabName) || SessionContext.CanView(formTypeName);
+                    string checkTabKey = tabName;
+                    if (formToOpen is Reports.SalesReports.SalesReturnReport || string.Equals(tabName, "SalesReturn", StringComparison.OrdinalIgnoreCase))
+                    {
+                        checkTabKey = "salesreturnreport";
+                        tabName = "Sales Return Report";
+                    }
+                    else if (formToOpen is Reports.PurchaseReports.PurchaseReturnReport || string.Equals(tabName, "PurchaseReturn", StringComparison.OrdinalIgnoreCase))
+                    {
+                        checkTabKey = "purchasereturnreport";
+                        tabName = "Purchase Return Report";
+                    }
+
+                    bool allowed = SessionContext.CanView(checkTabKey) || SessionContext.CanView(formTypeName);
                     if (!allowed)
                     {
                         MessageBox.Show($"Access Denied: You do not have permission to access '{tabName}'. Please contact your administrator.",
@@ -1178,7 +1192,19 @@ namespace PosBranch_Win
                 if (!SessionContext.IsAdmin && formToOpen != null)
                 {
                     string formTypeName = formToOpen.GetType().Name;
-                    bool allowed = SessionContext.CanView(tabName) || SessionContext.CanView(formTypeName);
+                    string checkTabKey = tabName;
+                    if (formToOpen is Reports.SalesReports.SalesReturnReport || string.Equals(tabName, "SalesReturn", StringComparison.OrdinalIgnoreCase))
+                    {
+                        checkTabKey = "salesreturnreport";
+                        tabName = "Sales Return Report";
+                    }
+                    else if (formToOpen is Reports.PurchaseReports.PurchaseReturnReport || string.Equals(tabName, "PurchaseReturn", StringComparison.OrdinalIgnoreCase))
+                    {
+                        checkTabKey = "purchasereturnreport";
+                        tabName = "Purchase Return Report";
+                    }
+
+                    bool allowed = SessionContext.CanView(checkTabKey) || SessionContext.CanView(formTypeName);
                     if (!allowed)
                     {
                         MessageBox.Show($"Access Denied: You do not have permission to access '{tabName}'. Please contact your administrator.",
@@ -2350,6 +2376,23 @@ namespace PosBranch_Win
             try
             {
                 bool isAdmin = SessionContext.IsAdmin;
+                ApplyReportNavigatorPermissions();
+
+                if (ultraExplorerBarSideMenu != null && ultraExplorerBarSideMenu.Groups.Exists("MyFavouriteMenu"))
+                {
+                    try
+                    {
+                        var favGrp = ultraExplorerBarSideMenu.Groups["MyFavouriteMenu"];
+                        foreach (Infragistics.Win.UltraWinExplorerBar.UltraExplorerBarItem fItem in favGrp.Items)
+                        {
+                            if (fItem.Key == "AddToFavourite") continue;
+                            bool fAllowed = isAdmin || SessionContext.CanView(fItem.Key) || SessionContext.CanView(fItem.Text);
+                            fItem.Visible = fAllowed;
+                            fItem.Settings.Enabled = fAllowed ? Infragistics.Win.DefaultableBoolean.True : Infragistics.Win.DefaultableBoolean.False;
+                        }
+                    }
+                    catch { }
+                }
 
                 // 1. Iterate Shared Tools
                 foreach (Infragistics.Win.UltraWinToolbars.ToolBase tool in ultraToolbarsManager1.Tools)
@@ -2357,16 +2400,19 @@ namespace PosBranch_Win
                     try
                     {
                         string toolKey = tool.Key?.Trim();
+                        string permCheckKey = toolKey;
+                        if (toolKey == "SalesReturn") permCheckKey = "salesreturnreport";
+                        else if (toolKey == "PurchaseReturn") permCheckKey = "purchasereturnreport";
                         bool isGlobalAction = toolKey == "Save" ||
                                              toolKey == "Delet" ||
                                              toolKey == "Clear" ||
                                              toolKey == "Remove" ||
                                              toolKey == "Exit" ||
-                                             toolKey == "Report" ||
+
                                              toolKey == "LogOff" ||
                                              toolKey == "LogIn" ||
-                                             toolKey == "ReOrder" ||
-                                             toolKey == "Overview" ||
+
+
                                              toolKey == "Hold" ||
                                              toolKey == "LastBill" ||
                                              toolKey == "Database" ||
@@ -2375,7 +2421,9 @@ namespace PosBranch_Win
                                              toolKey == "StockLookup" ||
                                              toolKey == "FrmFormSearch";
 
-                        bool hasPermission = isAdmin || isGlobalAction || SessionContext.CanView(toolKey) || SessionContext.CanView(tool.Key);
+                        bool isReportLauncher = toolKey == "Report";
+                        bool hasReportAccess = isAdmin || (ReportNavigatorDefinitions != null && ReportNavigatorDefinitions.Any(def => SessionContext.CanView(def.Key) || SessionContext.CanView(def.ActionKey) || SessionContext.CanView(def.Text)));
+                        bool hasPermission = isAdmin || isGlobalAction || (isReportLauncher ? hasReportAccess : SessionContext.CanView(permCheckKey));
                         
                         if (tool.SharedProps != null)
                         {
@@ -2409,14 +2457,19 @@ namespace PosBranch_Win
                                         try
                                         {
                                             string toolKey = tool.Key?.Trim();
+                        string permCheckKey = toolKey;
+                        if (toolKey == "SalesReturn") permCheckKey = "salesreturnreport";
+                        else if (toolKey == "PurchaseReturn") permCheckKey = "purchasereturnreport";
                                             bool isGlobalAction = toolKey == "Save" || toolKey == "Delet" || toolKey == "Clear" ||
-                                                                 toolKey == "Remove" || toolKey == "Exit" || toolKey == "Report" ||
-                                                                 toolKey == "LogOff" || toolKey == "LogIn" || toolKey == "ReOrder" ||
-                                                                 toolKey == "Overview" || toolKey == "Hold" || toolKey == "LastBill" ||
+                                                                 toolKey == "Remove" || toolKey == "Exit" ||
+                                                                 toolKey == "LogOff" || toolKey == "LogIn" ||
+                     toolKey == "Hold" || toolKey == "LastBill" ||
                                                                  toolKey == "Database" || toolKey == "Search" || toolKey == "SEARCH" ||
                                                                  toolKey == "StockLookup" || toolKey == "FrmFormSearch";
 
-                                            bool hasPermission = isAdmin || isGlobalAction || SessionContext.CanView(toolKey) || SessionContext.CanView(tool.Key);
+                                            bool isReportLauncher = toolKey == "Report";
+                        bool hasReportAccess = isAdmin || (ReportNavigatorDefinitions != null && ReportNavigatorDefinitions.Any(def => SessionContext.CanView(def.Key) || SessionContext.CanView(def.ActionKey) || SessionContext.CanView(def.Text)));
+                        bool hasPermission = isAdmin || isGlobalAction || (isReportLauncher ? hasReportAccess : SessionContext.CanView(permCheckKey));
                                             
                                             tool.SharedProps.Visible = true;
                                             tool.SharedProps.Enabled = hasPermission;
@@ -2446,6 +2499,47 @@ namespace PosBranch_Win
         }
 
         /// <summary>
+        /// Filters items and groups in the Report Navigator so only permitted reports are visible and clickable.
+        /// </summary>
+        public void ApplyReportNavigatorPermissions()
+        {
+            try
+            {
+                if (ultraExplorerBarReportNavigator == null || ultraExplorerBarReportNavigator.Groups == null)
+                    return;
+
+                bool isAdmin = SessionContext.IsAdmin;
+
+                foreach (Infragistics.Win.UltraWinExplorerBar.UltraExplorerBarGroup group in ultraExplorerBarReportNavigator.Groups)
+                {
+                    int visibleCount = 0;
+                    foreach (Infragistics.Win.UltraWinExplorerBar.UltraExplorerBarItem item in group.Items)
+                    {
+                        string actionKey = ResolveReportNavigatorActionKey(item.Key);
+                        string permActionKey = actionKey;
+                        if (actionKey == "SalesReturn") permActionKey = "salesreturnreport";
+                        else if (actionKey == "PurchaseReturn") permActionKey = "purchasereturnreport";
+                        string cleanText = item.Text?.Replace("•", "").Trim();
+                        bool canView = isAdmin ||
+                                       SessionContext.CanView(item.Key) ||
+                                       SessionContext.CanView(permActionKey) ||
+                                       SessionContext.CanView(cleanText);
+
+                        item.Visible = canView;
+                        item.Settings.Enabled = canView ? Infragistics.Win.DefaultableBoolean.True : Infragistics.Win.DefaultableBoolean.False;
+                        if (canView) visibleCount++;
+                    }
+
+                    group.Visible = isAdmin || (visibleCount > 0);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error applying Report Navigator permissions: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// Checks if user has CanView permission for the specified form key.
         /// Shows access denied message if not permitted.
         /// </summary>
@@ -2453,6 +2547,7 @@ namespace PosBranch_Win
         /// <returns>True if permitted, false if denied</returns>
         private bool CheckViewPermission(string formKey, params string[] alternateFormKeys)
         {
+            if (SessionContext.IsAdmin) return true;
             var formKeys = new[] { formKey }.Concat(alternateFormKeys ?? Enumerable.Empty<string>());
             if (!formKeys.Any(key => SessionContext.CanView(key)))
             {
@@ -2553,6 +2648,8 @@ namespace PosBranch_Win
 
             if (toolKey == "Overview")
             {
+                if (!CheckViewPermission("Overview", "overview", "FrmDashboardOverview", "Dashboard Overview"))
+                    return;
                 Dashboard.FrmDashboardOverview overview = new Dashboard.FrmDashboardOverview(OpenFormInTabSafe);
                 OpenFormInTabSafe(overview, "Overview");
                 return;
@@ -2560,6 +2657,8 @@ namespace PosBranch_Win
 
             if (toolKey == "ExecutiveDashboard" || toolKey == "BossDashboard" || toolKey == "ExecutiveKPI")
             {
+                if (!CheckViewPermission("ExecutiveDashboard", "dashboard", "FrmExecutiveKpiDashboard", "Executive Dashboard", "Executive Dashboard & KPIs"))
+                    return;
                 Dashboard.FrmExecutiveKpiDashboard execDashboard = new Dashboard.FrmExecutiveKpiDashboard(OpenFormInTabSafe);
                 OpenFormInTabSafe(execDashboard, "Executive Dashboard");
                 return;
@@ -2567,6 +2666,8 @@ namespace PosBranch_Win
 
             if (toolKey == "BusinessSummary")
             {
+                if (!CheckViewPermission("BusinessSummary", "businesssummary", "FinalAnalysis", "Business Summary"))
+                    return;
                 Settings.FinalAnalysis finalAnalysis = new Settings.FinalAnalysis();
                 OpenFormInTabSafe(finalAnalysis, "Business Summary");
                 return;
@@ -2592,6 +2693,8 @@ namespace PosBranch_Win
             // Map aliases to permission keys
             string permissionKey = toolKey;
             if (toolKey == "Roles") permissionKey = "RolePermissions";
+            if (toolKey == "SalesReturn") permissionKey = "salesreturnreport";
+            if (toolKey == "PurchaseReturn") permissionKey = "purchasereturnreport";
 
             // Check permission before opening any form (skip for global action tools)
             bool isGlobalAction = toolKey == "Save" ||
@@ -2602,9 +2705,9 @@ namespace PosBranch_Win
                                  toolKey == "Report" ||
                                  toolKey == "LogOff" ||
                                  toolKey == "LogIn" ||
-                                 toolKey == "ReOrder" ||
-                                 toolKey == "Overview" ||
-                                 toolKey == "ExecutiveDashboard" ||
+
+
+
                                  toolKey == "Hold" ||
                                  toolKey == "LastBill" ||
                                  toolKey == "Search" ||
@@ -2614,7 +2717,7 @@ namespace PosBranch_Win
 
             if (!isGlobalAction)
             {
-                if (!CheckViewPermission(permissionKey, e.Tool.Key))
+                if (!CheckViewPermission(permissionKey))
                     return;
             }
 
@@ -3333,7 +3436,7 @@ namespace PosBranch_Win
             if (e.Tool.Key == "SalesReturn")
             {
                 Reports.SalesReports.SalesReturnReport frmSalesRetun = new Reports.SalesReports.SalesReturnReport();
-                OpenFormInTab(frmSalesRetun, "SalesReturn");
+                OpenFormInTab(frmSalesRetun, "Sales Return Report");
             }
             if (e.Tool.Key == "SalesProfit")
             {
@@ -3360,7 +3463,7 @@ namespace PosBranch_Win
             {
 
                 Reports.PurchaseReports.PurchaseReturnReport frmPurchaseReturnReport = new Reports.PurchaseReports.PurchaseReturnReport();
-                OpenFormInTab(frmPurchaseReturnReport, "PurchaseReturn");
+                OpenFormInTab(frmPurchaseReturnReport, "Purchase Return Report");
             }
             if (e.Tool.Key == "VendorPurchaseReport")
             {
@@ -3450,6 +3553,8 @@ namespace PosBranch_Win
             }
             if (e.Tool.Key == "ReOrder")
             {
+                if (!CheckViewPermission("ReOrder", "smartreorder", "FrmSmartReorderDashboard", "Smart Reorder Dashboard"))
+                    return;
                 Reports.InventoryReport.FrmSmartReorderDashboard reorderDashboard = new Reports.InventoryReport.FrmSmartReorderDashboard();
                 OpenFormInTab(reorderDashboard, "Smart Reorder Dashboard");
             }
@@ -4876,6 +4981,16 @@ namespace PosBranch_Win
                             keyToExecute = "Change Item No";
                     }
 
+                    if (!SessionContext.IsAdmin &&
+                        !SessionContext.CanView(keyToExecute == "SalesReturn" ? "salesreturnreport" : (keyToExecute == "PurchaseReturn" ? "purchasereturnreport" : keyToExecute)) &&
+                        !SessionContext.CanView(e.Item.Key) &&
+                        !SessionContext.CanView(e.Item.Text))
+                    {
+                        MessageBox.Show($"Access Denied: You do not have permission to access '{e.Item.Text}'.",
+                            "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+
                     if (ultraToolbarsManager1.Tools.Exists(keyToExecute))
                     {
                         _openingFromFavourite = true;
@@ -5760,6 +5875,7 @@ namespace PosBranch_Win
                 panelReportNavigatorWrapper.Visible = true;
 
             _isReportNavigatorVisible = true;
+            ApplyReportNavigatorPermissions();
 
             if (ultraExplorerBarReportNavigator != null && ultraExplorerBarReportNavigator.Groups.Count > 0)
             {
@@ -5884,6 +6000,16 @@ namespace PosBranch_Win
                     keyToExecute == "GovtGSTReturnReport")
                 {
                     Infragistics.Win.UltraWinToolbars.ToolBase toolToExecute;
+
+                    if (!SessionContext.IsAdmin &&
+                        !SessionContext.CanView(keyToExecute == "SalesReturn" ? "salesreturnreport" : (keyToExecute == "PurchaseReturn" ? "purchasereturnreport" : keyToExecute)) &&
+                        !SessionContext.CanView(e.Item.Key) &&
+                        !SessionContext.CanView(e.Item.Text))
+                    {
+                        MessageBox.Show($"Access Denied: You do not have permission to access '{e.Item.Text}'.",
+                            "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
 
                     if (ultraToolbarsManager1.Tools.Exists(keyToExecute))
                     {
@@ -6244,6 +6370,15 @@ namespace PosBranch_Win
                 string tabName = string.IsNullOrEmpty(formTitle) 
                     ? PosBranch_Win.DialogBox.FrmFormSearch.GetFriendlyFormName(formType) 
                     : formTitle;
+
+                if (!SessionContext.IsAdmin &&
+                    !SessionContext.CanView(tabName) &&
+                    !SessionContext.CanView(formType.Name))
+                {
+                    MessageBox.Show($"Access Denied: You do not have permission to access '{tabName}'. Please contact your administrator.",
+                        "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
 
                 // Ensure single form instance across open tabs
                 foreach (Infragistics.Win.UltraWinTabControl.UltraTab tab in tabControlMain.Tabs)

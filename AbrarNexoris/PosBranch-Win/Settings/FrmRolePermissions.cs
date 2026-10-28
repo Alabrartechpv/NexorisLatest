@@ -387,6 +387,23 @@ namespace PosBranch_Win.Settings
                     MessageBox.Show("Permissions saved successfully!", "Success",
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
                     lblStatus.Text = $"Permissions saved for role: {cmbRoles.Text}";
+
+                    try
+                    {
+                        if (_selectedRoleId == SessionContext.RoleId)
+                        {
+                            var updatedPerms = _permRepo.GetPermissionsByRoleId(_selectedRoleId);
+                            SessionContext.LoadPermissions(updatedPerms);
+                            foreach (Form f in Application.OpenForms)
+                            {
+                                if (f is Home homeForm)
+                                {
+                                    homeForm.ApplyRolePermissions();
+                                }
+                            }
+                        }
+                    }
+                    catch { }
                 }
                 else
                 {

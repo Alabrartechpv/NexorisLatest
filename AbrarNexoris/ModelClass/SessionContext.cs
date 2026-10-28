@@ -315,12 +315,6 @@ namespace ModelClass
         /// <summary>
         /// Initializes the session context with all required values.
         /// </summary>
-        /// <param name="companyId">Company ID</param>
-        /// <param name="branchId">Branch ID</param>
-        /// <param name="finYearId">Financial Year ID</param>
-        /// <param name="userId">User ID</param>
-        /// <param name="counterId">Counter ID (optional)</param>
-        /// <param name="systemMacId">System MAC ID (optional)</param>
         public static void Initialize(
             int companyId,
             int branchId,
@@ -354,17 +348,6 @@ namespace ModelClass
         /// <summary>
         /// Initializes the session context from login response data.
         /// </summary>
-        /// <param name="companyId">Company ID</param>
-        /// <param name="branchId">Branch ID</param>
-        /// <param name="finYearId">Financial Year ID</param>
-        /// <param name="userId">User ID</param>
-        /// <param name="userName">User Name</param>
-        /// <param name="userLevel">User Level/Role</param>
-        /// <param name="emailId">Email ID</param>
-        /// <param name="branchName">Branch Name</param>
-        /// <param name="companyName">Company Name (optional)</param>
-        /// <param name="counterId">Counter ID (optional)</param>
-        /// <param name="systemMacId">System MAC ID (optional)</param>
         public static void InitializeFromLogin(
             int companyId,
             int branchId,
@@ -415,6 +398,7 @@ namespace ModelClass
             FinYearTo = null;
             FinYearStatus = null;
 
+            ClearPermissions();
             OnSessionCleared?.Invoke();
         }
 
@@ -425,7 +409,6 @@ namespace ModelClass
         /// <summary>
         /// Validates that the session is initialized and all required values are set.
         /// </summary>
-        /// <exception cref="InvalidOperationException">Thrown when session is not properly initialized</exception>
         public static void ValidateSession()
         {
             if (!IsInitialized)
@@ -489,8 +472,6 @@ namespace ModelClass
         /// <summary>
         /// Checks if the session is valid without throwing exceptions.
         /// </summary>
-        /// <param name="errorMessage">Output parameter containing error message if validation fails</param>
-        /// <returns>True if session is valid, false otherwise</returns>
         public static bool TryValidateSession(out string errorMessage)
         {
             errorMessage = null;
@@ -534,9 +515,7 @@ namespace ModelClass
 
         /// <summary>
         /// Loads POS settings from a list of POSSetting objects.
-        /// This method is called from Login.cs after retrieving settings from repository.
         /// </summary>
-        /// <param name="settings">List of settings to apply</param>
         public static void LoadSettings(List<POSSetting> settings)
         {
             try
@@ -558,7 +537,6 @@ namespace ModelClass
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error applying POS settings: {ex.Message}");
-                // Keep default values if settings fail to apply
             }
         }
 
@@ -573,12 +551,6 @@ namespace ModelClass
             return defaultValue;
         }
 
-        /// <summary>
-        /// Applies a single setting value to the corresponding SessionContext property.
-        /// </summary>
-        /// <param name="key">Setting key</param>
-        /// <param name="value">Setting value as string</param>
-        /// <param name="type">Setting type (Boolean, String, Integer)</param>
         private static void ApplySetting(string key, string value, string type)
         {
             if (string.IsNullOrEmpty(key)) return;
@@ -588,75 +560,53 @@ namespace ModelClass
 
             switch (cleanKey)
             {
-                // Sales Settings
                 case "DuplicateItemBehavior":
                     DuplicateItemBehavior = cleanValue ?? "MergeQuantity";
                     break;
-
                 case "AllowNegativeStock":
                     AllowNegativeStock = ParseBoolean(cleanValue, false);
                     break;
-
                 case "AutoPrintAfterSave":
-                    AutoPrintAfterSave = ParseBoolean(cleanValue, true); // Default true
+                    AutoPrintAfterSave = ParseBoolean(cleanValue, true);
                     break;
-
                 case "DefaultSaleType":
                     DefaultSaleType = cleanValue ?? "Cash";
                     break;
-
                 case "DefaultPriceLevel":
                     DefaultPriceLevel = cleanValue ?? "RetailPrice";
                     break;
-
                 case "DefaultCreditDays":
                     DefaultCreditDays = int.TryParse(cleanValue, out var defaultCreditDays) ? defaultCreditDays : 30;
                     break;
-
                 case "RoundingMethod":
                     RoundingMethod = cleanValue ?? "None";
                     break;
-
                 case "MaxDiscountPercent":
                     MaxDiscountPercent = int.TryParse(cleanValue, out var maxDisc) ? maxDisc : 100;
                     break;
-
                 case "AllowSaleBelowCost":
                     AllowSaleBelowCost = ParseBoolean(cleanValue, false);
                     break;
-
-                // Display Settings
                 case "ShowCostToUser":
                     ShowCostToUser = ParseBoolean(cleanValue, false);
                     break;
-
                 case "ShowMarginColumn":
                     ShowMarginColumn = ParseBoolean(cleanValue, false);
                     break;
-
-                // Printing Settings
                 case "PrintCopies":
                     PrintCopies = int.TryParse(cleanValue, out var copies) ? copies : 1;
                     break;
-
                 default:
-                    // Unknown setting, log for debugging
                     System.Diagnostics.Debug.WriteLine($"Unknown setting key: {key}");
                     break;
             }
         }
 
-        /// <summary>
-        /// Marks settings as needing refresh. Call LoadSettings after retrieving from repository.
-        /// </summary>
         public static void MarkSettingsForRefresh()
         {
             SettingsLoaded = false;
         }
 
-        /// <summary>
-        /// Resets all settings to their default values.
-        /// </summary>
         public static void ResetSettingsToDefaults()
         {
             DuplicateItemBehavior = "MergeQuantity";
@@ -678,10 +628,6 @@ namespace ModelClass
 
         #region Helper Methods
 
-        /// <summary>
-        /// Gets a summary of the current session context.
-        /// </summary>
-        /// <returns>String containing session information</returns>
         public static string GetSessionSummary()
         {
             return $"Session Context:\n" +
@@ -720,7 +666,44 @@ namespace ModelClass
         public static bool PermissionsLoaded => _permissions.Count > 0;
 
         /// <summary>
-        /// Loads permissions for the current user's role
+        /// Normalizes any form key, ribbon key, or display name by stripping prefixes ("frm"),
+        /// punctuation, spaces, and converting to lower-case.
+        /// </summary>
+        public static string NormalizeKey(string val)
+        {
+            if (string.IsNullOrWhiteSpace(val)) return string.Empty;
+            string s = val.Trim().ToLowerInvariant()
+                .Replace(" ", "")
+                .Replace("-", "")
+                .Replace("_", "")
+                .Replace("/", "")
+                .Replace("&", "")
+                .Replace("(", "")
+                .Replace(")", "")
+                .Replace(".", "")
+                .Replace("•", "");
+
+            if (s.StartsWith("frm") && s.Length > 3)
+            {
+                s = s.Substring(3);
+            }
+            return s;
+        }
+
+        private static void RegisterAlias(string alias, Master.RolePermission p)
+        {
+            if (string.IsNullOrWhiteSpace(alias) || p == null) return;
+            string trimmed = alias.Trim();
+            _permissions[trimmed] = p;
+            string norm = NormalizeKey(trimmed);
+            if (!string.IsNullOrEmpty(norm))
+            {
+                _permissions[norm] = p;
+            }
+        }
+
+        /// <summary>
+        /// Loads permissions for the current user's role and populates canonical aliases
         /// </summary>
         /// <param name="permissions">Collection of role permissions to load</param>
         public static void LoadPermissions(IEnumerable<Master.RolePermission> permissions)
@@ -732,89 +715,640 @@ namespace ModelClass
                 {
                     if (p == null) continue;
 
-                    if (!string.IsNullOrWhiteSpace(p.FormKey))
-                    {
-                        string key = p.FormKey.Trim();
-                        _permissions[key] = p;
-                        _permissions[key.Replace(" ", "").ToLowerInvariant()] = p;
+                    string formKey = p.FormKey?.Trim() ?? "";
+                    string formName = p.FormName?.Trim() ?? "";
 
-                        // Add class name and tool key aliases for known keys
-                        string cleanKey = key.ToLowerInvariant();
-                        if (cleanKey == "itemmaster")
-                        {
-                            _permissions["frmitemmasternew"] = p;
-                            _permissions["frmitemmaster"] = p;
-                            _permissions["itemmaster"] = p;
-                            _permissions["item master"] = p;
-                        }
-                        else if (cleanKey == "sales")
-                        {
-                            _permissions["frmsalesinvoice"] = p;
-                            _permissions["sales invoice"] = p;
-                            _permissions["sales"] = p;
-                        }
-                        else if (cleanKey == "salesreturn")
-                        {
-                            _permissions["frmsalesreturn"] = p;
-                            _permissions["sales return"] = p;
-                            _permissions["salesreturn"] = p;
-                        }
-                        else if (cleanKey == "purchase")
-                        {
-                            _permissions["frmpurchase"] = p;
-                            _permissions["purchase invoice"] = p;
-                            _permissions["purchase"] = p;
-                        }
-                        else if (cleanKey == "purchasereturn")
-                        {
-                            _permissions["frmpurchasereturn"] = p;
-                            _permissions["purchase return"] = p;
-                            _permissions["purchase r/n"] = p;
-                            _permissions["purchasereturn"] = p;
-                        }
-                        else if (cleanKey == "purchaseorder")
-                        {
-                            _permissions["frmpurchaseorder"] = p;
-                            _permissions["purchase order"] = p;
-                            _permissions["purchaseorder"] = p;
-                        }
-                        else if (cleanKey == "pos")
-                        {
-                            _permissions["frmpos"] = p;
-                            _permissions["pos terminal"] = p;
-                            _permissions["pos"] = p;
-                        }
-                        else if (cleanKey == "grn")
-                        {
-                            _permissions["goods received"] = p;
-                            _permissions["goods received notes"] = p;
-                            _permissions["good received notes (grn)"] = p;
-                            _permissions["grn"] = p;
-                        }
-                        else if (cleanKey == "stockadjustment")
-                        {
-                            _permissions["frmstockadjustment"] = p;
-                            _permissions["stock adjustment"] = p;
-                            _permissions["stockadjustment"] = p;
-                        }
-                        else if (cleanKey == "stocktransfer")
-                        {
-                            _permissions["frmstocktransfer"] = p;
-                            _permissions["stock transfer"] = p;
-                            _permissions["stocktransfer"] = p;
-                        }
-                        else if (cleanKey == "users")
-                        {
-                            _permissions["frmusers"] = p;
-                            _permissions["users & accounts"] = p;
-                            _permissions["users"] = p;
-                        }
-                    }
-                    if (!string.IsNullOrWhiteSpace(p.FormName))
+                    if (!string.IsNullOrEmpty(formKey))
                     {
-                        string name = p.FormName.Trim();
-                        _permissions[name] = p;
-                        _permissions[name.Replace(" ", "").ToLowerInvariant()] = p;
+                        RegisterAlias(formKey, p);
+                    }
+                    if (!string.IsNullOrEmpty(formName))
+                    {
+                        RegisterAlias(formName, p);
+                    }
+
+                    string normKey = NormalizeKey(formKey);
+                    string normName = NormalizeKey(formName);
+                    string combined = normKey + " " + normName;
+
+                    // 1. Executive Dashboard & KPIs
+                    if (combined.Contains("executivedashboard") || combined.Contains("dashboard") || combined.Contains("kpi") || combined.Contains("executive"))
+                    {
+                        RegisterAlias("dashboard", p);
+                        RegisterAlias("executivedashboard", p);
+                        RegisterAlias("frmexecutivekpidashboard", p);
+                        RegisterAlias("bossdashboard", p);
+                        RegisterAlias("executivekpi", p);
+                        RegisterAlias("executivedashboard(30kpis)", p);
+                        RegisterAlias("executivedashboard&kpis", p);
+                        RegisterAlias("executive dashboard", p);
+                        RegisterAlias("executive dashboard & kpis", p);
+                        RegisterAlias("kpi dashboard", p);
+                        RegisterAlias("executive dashboard (30 kpis)", p);
+                    }
+
+                    // 2. Dashboard Overview
+                    if (combined.Contains("overview"))
+                    {
+                        RegisterAlias("overview", p);
+                        RegisterAlias("dashboardoverview", p);
+                        RegisterAlias("frmdashboardoverview", p);
+                        RegisterAlias("dashboard overview", p);
+                    }
+
+                    // 3. Business Summary / Final Analysis
+                    if (combined.Contains("businesssummary") || combined.Contains("finalanalysis"))
+                    {
+                        RegisterAlias("businesssummary", p);
+                        RegisterAlias("finalanalysis", p);
+                        RegisterAlias("business summary", p);
+                        RegisterAlias("frmfinalanalysis", p);
+                    }
+
+                    // 4. Smart Reorder Dashboard
+                    if (combined.Contains("reorder") || combined.Contains("smartreorder"))
+                    {
+                        RegisterAlias("smartreorder", p);
+                        RegisterAlias("reorder", p);
+                        RegisterAlias("frmsmartreorderdashboard", p);
+                        RegisterAlias("smart reorder dashboard", p);
+                        RegisterAlias("smart reorder", p);
+                    }
+
+                    // 5. Item Master
+                    if (normKey == "itemmaster" || normName.Contains("itemmaster") || normName == "item")
+                    {
+                        RegisterAlias("itemmaster", p);
+                        RegisterAlias("frmitemmasternew", p);
+                        RegisterAlias("frmitemmaster", p);
+                        RegisterAlias("item master", p);
+                        RegisterAlias("item", p);
+                    }
+
+                    // 6. Unit Master
+                    if (normKey == "unit" || normKey == "unitmaster" || normName.Contains("unitmaster") || normName.Contains("unit"))
+                    {
+                        RegisterAlias("unit", p);
+                        RegisterAlias("unitmaster", p);
+                        RegisterAlias("frmunitmaster", p);
+                        RegisterAlias("unit master", p);
+                    }
+
+                    // 7. Item Type Master
+                    if (normKey == "itemtype" || normName.Contains("itemtype") || normName.Contains("item type"))
+                    {
+                        RegisterAlias("itemtype", p);
+                        RegisterAlias("item type", p);
+                        RegisterAlias("frmitemtype", p);
+                        RegisterAlias("item type master", p);
+                    }
+
+                    // 8. General Paymode Setup
+                    if (normKey.Contains("paymode") || normName.Contains("paymode"))
+                    {
+                        RegisterAlias("paymode", p);
+                        RegisterAlias("paymodesetup", p);
+                        RegisterAlias("general pm setup", p);
+                        RegisterAlias("generalpmsetup", p);
+                        RegisterAlias("paymodemaster", p);
+                        RegisterAlias("frmgeneralpaymodesetup", p);
+                    }
+
+                    // 9. Tax Management
+                    if (normKey.Contains("tax") || normName.Contains("tax"))
+                    {
+                        RegisterAlias("taxmanagement", p);
+                        RegisterAlias("frmtaxmanagement", p);
+                        RegisterAlias("tax management", p);
+                        RegisterAlias("tax management & rates", p);
+                    }
+
+                    // 10. Sales Invoice / Sales
+                    if (normKey == "sales" || normName == "sales invoice" || normName == "sales")
+                    {
+                        RegisterAlias("sales", p);
+                        RegisterAlias("frmsalesinvoice", p);
+                        RegisterAlias("sales invoice", p);
+                        RegisterAlias("salesinvoice", p);
+                    }
+
+                    // 11. Sales Return
+                    if ((normKey == "salesreturn" || normName == "salesreturn" || string.Equals(formName, "Sales Return", StringComparison.OrdinalIgnoreCase)) && !normKey.Contains("report") && !normName.Contains("report"))
+                    {
+                        RegisterAlias("salesreturn", p);
+                        RegisterAlias("frmsalesreturn", p);
+                        RegisterAlias("sales return", p);
+
+                    }
+
+                    // 12. Purchase
+                    if (normKey == "purchase" || normName == "purchase invoice" || normName == "purchase entry" || normName == "purchase")
+                    {
+                        RegisterAlias("purchase", p);
+                        RegisterAlias("frmpurchase", p);
+                        RegisterAlias("purchase invoice", p);
+                        RegisterAlias("purchase entry", p);
+                        RegisterAlias("goods received", p);
+                    }
+
+                    // 13. Purchase Order
+                    if (normKey == "purchaseorder" || normName.Contains("purchase order"))
+                    {
+                        RegisterAlias("purchaseorder", p);
+                        RegisterAlias("frmpurchaseorder", p);
+                        RegisterAlias("purchase order", p);
+                    }
+
+                    // 14. Purchase Return
+                    if ((normKey == "purchasereturn" || normName == "purchasereturn" || string.Equals(formName, "Purchase Return", StringComparison.OrdinalIgnoreCase)) && !normKey.Contains("report") && !normName.Contains("report"))
+                    {
+                        RegisterAlias("purchasereturn", p);
+                        RegisterAlias("frmpurchasereturn", p);
+                        RegisterAlias("purchase return", p);
+                        RegisterAlias("purchase r/n", p);
+                        RegisterAlias("purchasereturnwithoutgr", p);
+                    }
+
+                    // 15. POS Terminal
+                    if (normKey == "pos" || normName.Contains("pos"))
+                    {
+                        RegisterAlias("pos", p);
+                        RegisterAlias("frmpos", p);
+                        RegisterAlias("pos terminal", p);
+                    }
+
+                    // 16. GRN (Goods Received Notes)
+                    if (normKey == "grn" || normName.Contains("grn") || normName.Contains("goods received"))
+                    {
+                        RegisterAlias("grn", p);
+                        RegisterAlias("goods received", p);
+                        RegisterAlias("goods received notes", p);
+                        RegisterAlias("goods received notes (grn)", p);
+                        RegisterAlias("grnreport", p);
+                    }
+
+                    // 17. Stock Adjustment
+                    if (normKey == "stockadjustment" || normName.Contains("stock adjustment"))
+                    {
+                        RegisterAlias("stockadjustment", p);
+                        RegisterAlias("frmstockadjustment", p);
+                        RegisterAlias("stock adjustment", p);
+                    }
+
+                    // 18. Stock Transfer
+                    if (normKey == "stocktransfer" || normName.Contains("stock transfer"))
+                    {
+                        RegisterAlias("stocktransfer", p);
+                        RegisterAlias("frmstocktransfer", p);
+                        RegisterAlias("stock transfer", p);
+                    }
+
+                    // 19. Users & Security Setup
+                    if (normKey == "users" || normName.Contains("user"))
+                    {
+                        RegisterAlias("users", p);
+                        RegisterAlias("frmusers", p);
+                        RegisterAlias("users & accounts", p);
+                        RegisterAlias("users & security setup", p);
+                    }
+
+                    // 20. Role Permissions
+                    if (normKey.Contains("role") || normName.Contains("role"))
+                    {
+                        RegisterAlias("rolepermissions", p);
+                        RegisterAlias("roles", p);
+                        RegisterAlias("frmrolepermissions", p);
+                        RegisterAlias("role permissions", p);
+                        RegisterAlias("role permissions management", p);
+                    }
+
+                    // 21. Sales Reports & Summaries
+                    if (normKey.Contains("salesreport") || normName.Contains("sales summary") || normName.Contains("daily sales"))
+                    {
+                        RegisterAlias("salesreport", p);
+                        RegisterAlias("salessummary", p);
+                        RegisterAlias("salessummaryreport", p);
+                        RegisterAlias("dsales", p);
+                        RegisterAlias("frmsales_rpt", p);
+                        RegisterAlias("daily sales", p);
+                        RegisterAlias("daily sales report", p);
+                        RegisterAlias("sales summary report", p);
+                    }
+                    if (normKey.Contains("salesdetails") || normName.Contains("sales details"))
+                    {
+                        RegisterAlias("salesdetails", p);
+                        RegisterAlias("sales details", p);
+                        RegisterAlias("salesdetailsreport", p);
+                        RegisterAlias("sales details report", p);
+                        RegisterAlias("frmsalesreportmasterdetail", p);
+                    }
+                    if (normKey.Contains("salesprofit") || normName.Contains("sales profit"))
+                    {
+                        RegisterAlias("salesprofit", p);
+                        RegisterAlias("sales profit", p);
+                        RegisterAlias("salesprofitreport", p);
+                        RegisterAlias("sales profit report", p);
+                        RegisterAlias("frmsalesprofit", p);
+                    }
+                    if (normKey.Contains("salesaudit") || normName.Contains("sales audit"))
+                    {
+                        RegisterAlias("salesauditreport", p);
+                        RegisterAlias("sales audit report", p);
+                        RegisterAlias("salesaudit", p);
+                        RegisterAlias("frmsalesauditreport", p);
+                    }
+                    if (normKey.Contains("salesreturnreport") || normName.Contains("salesreturnreport") ||
+                        (normKey.Contains("salesreturn") && normKey.Contains("report")) ||
+                        (normName.Contains("salesreturn") && normName.Contains("report")) ||
+                        formName.IndexOf("Sales Return Report", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        RegisterAlias("salesreturnreport", p);
+                        RegisterAlias("sales return report", p);
+                        RegisterAlias("frmsalesreturnreport", p);
+                    }
+                    if (normKey.Contains("salesreturnaudit") || normName.Contains("sales return audit"))
+                    {
+                        RegisterAlias("salesreturnauditreport", p);
+                        RegisterAlias("sales return audit report", p);
+                        RegisterAlias("salesreturnaudit", p);
+                        RegisterAlias("frmsalesreturnauditreport", p);
+                    }
+                    if (normKey.Contains("salesmanincentive") || normName.Contains("salesman incentive"))
+                    {
+                        RegisterAlias("salesmanincentive", p);
+                        RegisterAlias("salesman incentive", p);
+                        RegisterAlias("salesmanincentivereport", p);
+                        RegisterAlias("salesman incentive report", p);
+                        RegisterAlias("frmsalesmanincentivereport", p);
+                    }
+                    if (normKey.Contains("customerwisesales") || normName.Contains("customer-wise sales") || normName.Contains("customerwise sales"))
+                    {
+                        RegisterAlias("customerwisesalessummary", p);
+                        RegisterAlias("customerwisesalessummaryreport", p);
+                        RegisterAlias("customer-wise sales summary", p);
+                        RegisterAlias("frmcustomerwisesalessummaryreport", p);
+                    }
+                    if (normKey.Contains("salesmanwisesales") || normName.Contains("salesman-wise sales") || normName.Contains("salesmanwise sales"))
+                    {
+                        RegisterAlias("salesmanwisesalessummary", p);
+                        RegisterAlias("salesmanwisesalessummaryreport", p);
+                        RegisterAlias("salesman-wise sales summary", p);
+                        RegisterAlias("frmsalesmanwisesalessummaryreport", p);
+                    }
+                    if (normKey.Contains("itemwisesales") || normName.Contains("item-wise sales") || normName.Contains("itemwise sales"))
+                    {
+                        RegisterAlias("itemwisesalessummary", p);
+                        RegisterAlias("itemwisesalessummaryreport", p);
+                        RegisterAlias("item-wise sales summary", p);
+                        RegisterAlias("frmitemwisesalessummaryreport", p);
+                    }
+                    if (normKey.Contains("saleshold") || normName.Contains("sales hold"))
+                    {
+                        RegisterAlias("salesholdreport", p);
+                        RegisterAlias("sales hold report", p);
+                        RegisterAlias("tool_salesholdreport", p);
+                        RegisterAlias("frmsalesholdreport", p);
+                    }
+                    if (normKey.Contains("counterreport") || normName.Contains("counter sales") || normName.Contains("counter report"))
+                    {
+                        RegisterAlias("counterreport", p);
+                        RegisterAlias("counter report", p);
+                        RegisterAlias("counter sales report", p);
+                        RegisterAlias("frmcounterreport", p);
+                    }
+
+                    // 22. Purchase Reports
+                    if (normKey.Contains("purchasereport") || normName.Contains("purchase summary"))
+                    {
+                        RegisterAlias("purchasereport", p);
+                        RegisterAlias("purchase report", p);
+                        RegisterAlias("purchasesummary", p);
+                        RegisterAlias("purchase summary report", p);
+                        RegisterAlias("frmpurchasereport", p);
+                    }
+                    if (normKey.Contains("purchasedetails") || normName.Contains("purchase details"))
+                    {
+                        RegisterAlias("purchasedetails", p);
+                        RegisterAlias("purchase details", p);
+                        RegisterAlias("purchasedetailsreport", p);
+                        RegisterAlias("purchase details report", p);
+                        RegisterAlias("frmpurchasereportdetails", p);
+                    }
+                    if (normKey.Contains("purchasereturnreport") || normName.Contains("purchasereturnreport") ||
+                        (normKey.Contains("purchasereturn") && normKey.Contains("report")) ||
+                        (normName.Contains("purchasereturn") && normName.Contains("report")) ||
+                        formName.IndexOf("Purchase Return Report", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        RegisterAlias("purchasereturnreport", p);
+                        RegisterAlias("purchase return report", p);
+                        RegisterAlias("frmpurchasereturnreport", p);
+                    }
+                    if (normKey.Contains("vendorpurchasereport") || normName.Contains("vendor purchase"))
+                    {
+                        RegisterAlias("vendorpurchasereport", p);
+                        RegisterAlias("vendor purchase report", p);
+                        RegisterAlias("frmvendorpurchasereport", p);
+                    }
+                    if (normKey.Contains("purchaseaudit") || normName.Contains("purchase audit"))
+                    {
+                        RegisterAlias("purchaseauditreport", p);
+                        RegisterAlias("purchase audit report", p);
+                        RegisterAlias("frmpurchaseauditreport", p);
+                    }
+                    if (normKey.Contains("purchasereturnaudit") || normName.Contains("purchase return audit"))
+                    {
+                        RegisterAlias("purchasereturnauditreport", p);
+                        RegisterAlias("purchase return audit report", p);
+                    }
+
+                    // 23. Stock / Inventory Reports
+                    if (normKey.Contains("stockreport") || normName.Contains("stock report") || normName.Contains("stock listing"))
+                    {
+                        RegisterAlias("stockreport", p);
+                        RegisterAlias("stock report", p);
+                        RegisterAlias("stocklisting", p);
+                        RegisterAlias("stocklistingreport", p);
+                        RegisterAlias("stock listing", p);
+                        RegisterAlias("stock listing report", p);
+                        RegisterAlias("frmstockreport", p);
+                    }
+                    if (normKey.Contains("stockreportadv") || normName.Contains("advanced stock report"))
+                    {
+                        RegisterAlias("stockreportadv", p);
+                        RegisterAlias("stockreportadvanced", p);
+                        RegisterAlias("advanced stock report", p);
+                        RegisterAlias("stock report advanced", p);
+                        RegisterAlias("frmstockreportadvanced", p);
+                    }
+                    if (normKey.Contains("stockvaluation") || normName.Contains("stock valuation"))
+                    {
+                        RegisterAlias("stockvaluation", p);
+                        RegisterAlias("stock valuation", p);
+                        RegisterAlias("stockvaluationreport", p);
+                        RegisterAlias("stock valuation report", p);
+                        RegisterAlias("frmstockvaluationreport", p);
+                    }
+                    if (normKey.Contains("stockadjustmentreport") || normName.Contains("stock adjustment report"))
+                    {
+                        RegisterAlias("stockadjustmentreport", p);
+                        RegisterAlias("stock adjustment report", p);
+                        RegisterAlias("frmstockadjustmentreport", p);
+                    }
+                    if (normKey.Contains("stockadjustmentaudit") || normName.Contains("stock adjustment audit"))
+                    {
+                        RegisterAlias("stockadjustmentauditreport", p);
+                        RegisterAlias("stock adjustment audit report", p);
+                        RegisterAlias("stockadjustmentaudit", p);
+                    }
+                    if (normKey.Contains("lowstock") || normName.Contains("low stock"))
+                    {
+                        RegisterAlias("lowstockalert", p);
+                        RegisterAlias("low stock alert", p);
+                        RegisterAlias("lowstockalertreport", p);
+                        RegisterAlias("low stock alert report", p);
+                        RegisterAlias("frmlowstockalertreport", p);
+                    }
+                    if (normKey.Contains("inactiveitem") || normName.Contains("inactive item"))
+                    {
+                        RegisterAlias("inactiveitemsreport", p);
+                        RegisterAlias("inactive items report", p);
+                        RegisterAlias("frminactiveitemsreport", p);
+                    }
+                    if (normKey == "itemreport" || normName.Contains("item report"))
+                    {
+                        RegisterAlias("itemreport", p);
+                        RegisterAlias("item report", p);
+                        RegisterAlias("item report & details", p);
+                        RegisterAlias("frmitemreport", p);
+                    }
+                    if (normKey.Contains("audittrail") || normKey.Contains("stockaudit") || normName.Contains("inventory audit trail") || normName.Contains("stock audit"))
+                    {
+                        RegisterAlias("audittrail", p);
+                        RegisterAlias("audit trail", p);
+                        RegisterAlias("stockaudit", p);
+                        RegisterAlias("stock audit report", p);
+                        RegisterAlias("inventory audit trail", p);
+                        RegisterAlias("frmauditreport", p);
+                    }
+
+                    // 24. Accounts & Financial Reports
+                    if (normKey.Contains("tradingpl") || normName.Contains("trading") || normName.Contains("trading account"))
+                    {
+                        RegisterAlias("tradingpl", p);
+                        RegisterAlias("tradingplaccount", p);
+                        RegisterAlias("tradingaccount", p);
+                        RegisterAlias("trading account", p);
+                        RegisterAlias("trading & profit / loss account", p);
+                        RegisterAlias("frmtradingplaccount", p);
+                    }
+                    if (normKey.Contains("profitloss") || normName.Contains("profit and loss") || normName.Contains("profit & loss"))
+                    {
+                        RegisterAlias("profitloss", p);
+                        RegisterAlias("profitlossaccount", p);
+                        RegisterAlias("profit & loss account", p);
+                        RegisterAlias("profit and loss account", p);
+                        RegisterAlias("frmprofitlossaccount", p);
+                    }
+                    if (normKey.Contains("balancesheet") || normName.Contains("balance sheet"))
+                    {
+                        RegisterAlias("balancesheet", p);
+                        RegisterAlias("balance sheet", p);
+                        RegisterAlias("balancesheetreport", p);
+                        RegisterAlias("frmbalancesheet", p);
+                    }
+                    if (normKey.Contains("trialbalance") || normName.Contains("trial balance"))
+                    {
+                        RegisterAlias("trialbalance", p);
+                        RegisterAlias("trial balance", p);
+                        RegisterAlias("trialbalancereport", p);
+                        RegisterAlias("frmtrialbalance", p);
+                    }
+                    if (normKey.Contains("cashbankbook") || normName.Contains("cash & bank book") || normName.Contains("cash and bank"))
+                    {
+                        RegisterAlias("cashbankbook", p);
+                        RegisterAlias("cash & bank book", p);
+                        RegisterAlias("cash and bank book", p);
+                        RegisterAlias("frmcashbankbook", p);
+                    }
+                    if (normKey.Contains("daybook") || normName.Contains("day book"))
+                    {
+                        RegisterAlias("daybook", p);
+                        RegisterAlias("day book", p);
+                        RegisterAlias("daybookreport", p);
+                        RegisterAlias("frmdaybook", p);
+                    }
+                    if (normKey.Contains("cashinout") || normName.Contains("cash in / out") || normName.Contains("cash in / cash out"))
+                    {
+                        RegisterAlias("cashinout", p);
+                        RegisterAlias("cash in / out report", p);
+                        RegisterAlias("cash in / cash out", p);
+                        RegisterAlias("cashinoutreport", p);
+                        RegisterAlias("frmcashinoutreport", p);
+                    }
+                    if (normKey.Contains("bankstatement") || normName.Contains("bank statement"))
+                    {
+                        RegisterAlias("bankstatement", p);
+                        RegisterAlias("bank statement", p);
+                        RegisterAlias("bankstatementreport", p);
+                        RegisterAlias("bank statement report", p);
+                        RegisterAlias("frmbankstatementreport", p);
+                    }
+                    if (normKey.Contains("shiftreconciliation") || normName.Contains("shift reconciliation") || normName.Contains("shift report") || normName.Contains("counter closing report"))
+                    {
+                        RegisterAlias("shiftreconciliation", p);
+                        RegisterAlias("shift reconciliation", p);
+                        RegisterAlias("shiftreconciliationreport", p);
+                        RegisterAlias("shift report", p);
+                        RegisterAlias("counter closing report", p);
+                        RegisterAlias("frmshiftreconciliationreport", p);
+                    }
+                    if (normKey.Contains("customeroutstanding") || normName.Contains("customer outstanding"))
+                    {
+                        RegisterAlias("customeroutstanding", p);
+                        RegisterAlias("customer outstanding", p);
+                        RegisterAlias("customeroutstandingreport", p);
+                        RegisterAlias("customer outstanding listing", p);
+                        RegisterAlias("frmcustomeroutstandingreport", p);
+                    }
+                    if (normKey.Contains("customerreceiptreport") || normName.Contains("customer receipt report"))
+                    {
+                        RegisterAlias("customerreceiptreport", p);
+                        RegisterAlias("customer receipt report", p);
+                        RegisterAlias("frmcustomerreceiptreport", p);
+                    }
+                    if (normKey.Contains("customerledger") || normName.Contains("customer ledger"))
+                    {
+                        RegisterAlias("customerledger", p);
+                        RegisterAlias("customer ledger", p);
+                        RegisterAlias("customerledgerreport", p);
+                        RegisterAlias("customer ledger statement", p);
+                        RegisterAlias("frmcustomerledgerreport", p);
+                    }
+                    if (normKey.Contains("vendoroutstanding") || normName.Contains("vendor outstanding"))
+                    {
+                        RegisterAlias("vendoroutstanding", p);
+                        RegisterAlias("vendor outstanding", p);
+                        RegisterAlias("vendoroutstandingreport", p);
+                        RegisterAlias("vendor outstanding listing", p);
+                        RegisterAlias("unallocatedpurchasereturns", p);
+                        RegisterAlias("unallocated purchase returns", p);
+                        RegisterAlias("frmvendoroutstandingreport", p);
+                    }
+                    if (normKey.Contains("vendorpaymentreport") || normName.Contains("vendor payment report") || normKey.Contains("vendordn"))
+                    {
+                        RegisterAlias("vendorpaymentreport", p);
+                        RegisterAlias("vendor payment report", p);
+                        RegisterAlias("vendordnpaymentreport", p);
+                        RegisterAlias("frmvendorpaymentreport", p);
+                    }
+                    if (normKey.Contains("manualpartybalance") || normName.Contains("manual party balance"))
+                    {
+                        RegisterAlias("manualpartybalance", p);
+                        RegisterAlias("manualpartybalancereport", p);
+                        RegisterAlias("manual party balance", p);
+                        RegisterAlias("manual party balance report", p);
+                        RegisterAlias("frmmanualpartybalance", p);
+                        RegisterAlias("frmmanualpartybalancereport", p);
+                    }
+                    if (normKey.Contains("combinedpartybalance") || normName.Contains("combined party balance"))
+                    {
+                        RegisterAlias("combinedpartybalance", p);
+                        RegisterAlias("combinedpartybalancereport", p);
+                        RegisterAlias("combined party balance", p);
+                        RegisterAlias("combined party balance report", p);
+                        RegisterAlias("frmcombinedpartybalancereport", p);
+                    }
+                    if (normKey.Contains("inputgst") || normName.Contains("input gst"))
+                    {
+                        RegisterAlias("inputgst", p);
+                        RegisterAlias("inputgstreport", p);
+                        RegisterAlias("input gst report", p);
+                        RegisterAlias("input gst & itc report", p);
+                        RegisterAlias("frminputgstreport", p);
+                    }
+                    if (normKey.Contains("outputgst") || normName.Contains("output gst"))
+                    {
+                        RegisterAlias("outputgst", p);
+                        RegisterAlias("outputgstreport", p);
+                        RegisterAlias("output gst report", p);
+                        RegisterAlias("frmoutputgstreport", p);
+                    }
+                    if (normKey.Contains("govtgst") || normName.Contains("government gst"))
+                    {
+                        RegisterAlias("govtgst", p);
+                        RegisterAlias("govtgstreturnreport", p);
+                        RegisterAlias("government gst return report", p);
+                        RegisterAlias("frmgovtgstreturnreport", p);
+                    }
+
+                    // 25. Utilities & Settings
+                    if (normKey.Contains("activitylog") || normName.Contains("activity log"))
+                    {
+                        RegisterAlias("activitylog", p);
+                        RegisterAlias("activity log", p);
+                        RegisterAlias("activitylogselector", p);
+                        RegisterAlias("activitylog ", p);
+                    }
+                    if (normKey.Contains("barcode") || normName.Contains("barcode"))
+                    {
+                        RegisterAlias("barcode", p);
+                        RegisterAlias("print barcode", p);
+                        RegisterAlias("printbarcode", p);
+                        RegisterAlias("frmbarcode", p);
+                    }
+                    if (normKey.Contains("plu") || normName.Contains("plu"))
+                    {
+                        RegisterAlias("plu", p);
+                        RegisterAlias("plu weighing", p);
+                        RegisterAlias("pluweighing", p);
+                        RegisterAlias("frmplu", p);
+                    }
+                    if (normKey.Contains("openingstock") || normName.Contains("opening stock"))
+                    {
+                        RegisterAlias("openingstock", p);
+                        RegisterAlias("opening stock", p);
+                        RegisterAlias("frmopeningstock", p);
+                    }
+                    if (normKey.Contains("counterclosing") || normKey.Contains("btnclosing") || normName.Contains("closing"))
+                    {
+                        RegisterAlias("counterclosing", p);
+                        RegisterAlias("btnclosing", p);
+                        RegisterAlias("closing", p);
+                        RegisterAlias("frmclosing", p);
+                    }
+                    if (normKey.Contains("changeitemno") || normName.Contains("change item no"))
+                    {
+                        RegisterAlias("changeitemno", p);
+                        RegisterAlias("change item no", p);
+                        RegisterAlias("frmchangeitemno", p);
+                    }
+                    if (normKey.Contains("excelimport") || normName.Contains("excel import"))
+                    {
+                        RegisterAlias("excelimport", p);
+                        RegisterAlias("excel import", p);
+                        RegisterAlias("excel import/export", p);
+                        RegisterAlias("frmexcelimport", p);
+                    }
+                    if (normKey.Contains("yearclosing") || normName.Contains("year closing") || normName.Contains("financial year closing"))
+                    {
+                        RegisterAlias("yearclosing", p);
+                        RegisterAlias("financialyearclosing", p);
+                        RegisterAlias("financial year closing", p);
+                        RegisterAlias("frmfinancialyearclosing", p);
+                    }
+                    if (normKey.Contains("language") || normName.Contains("language"))
+                    {
+                        RegisterAlias("applanguage", p);
+                        RegisterAlias("languagesettings", p);
+                        RegisterAlias("language", p);
+                        RegisterAlias("app language", p);
+                        RegisterAlias("frmlanguagesettings", p);
+                    }
+                    if (normKey.Contains("nexorisai") || normName.Contains("nexoris ai"))
+                    {
+                        RegisterAlias("nexorisai", p);
+                        RegisterAlias("nexoris ai", p);
+                        RegisterAlias("frmnexorisaisettings", p);
                     }
                 }
             }
@@ -838,11 +1372,9 @@ namespace ModelClass
         /// <summary>
         /// Checks if the current user has View permission for the specified form
         /// </summary>
-        /// <param name="formKey">Form key matching the tool key in ultraToolbarsManager</param>
-        /// <returns>True if user can view the form, false otherwise</returns>
         public static bool CanView(string formKey)
         {
-            if (string.IsNullOrEmpty(formKey)) return false;
+            if (string.IsNullOrWhiteSpace(formKey)) return false;
             if (IsAdmin) return true;
             if (_permissions == null || _permissions.Count == 0) return false;
 
@@ -850,16 +1382,17 @@ namespace ModelClass
             if (_permissions.TryGetValue(key, out var p) && p != null)
                 return p.CanView;
 
-            string normKey = key.Replace(" ", "").ToLowerInvariant();
-            if (_permissions.TryGetValue(normKey, out var pNorm) && pNorm != null)
+            string normKey = NormalizeKey(key);
+            if (!string.IsNullOrEmpty(normKey) && _permissions.TryGetValue(normKey, out var pNorm) && pNorm != null)
                 return pNorm.CanView;
 
             foreach (var kvp in _permissions)
             {
                 if (kvp.Value == null) continue;
                 if (string.Equals(kvp.Key, key, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(kvp.Value.FormKey, key, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(kvp.Value.FormName, key, StringComparison.OrdinalIgnoreCase))
+                    string.Equals(NormalizeKey(kvp.Key), normKey, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(NormalizeKey(kvp.Value.FormKey), normKey, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(NormalizeKey(kvp.Value.FormName), normKey, StringComparison.OrdinalIgnoreCase))
                 {
                     return kvp.Value.CanView;
                 }
@@ -870,19 +1403,25 @@ namespace ModelClass
 
         public static bool CanAdd(string formKey)
         {
-            if (string.IsNullOrEmpty(formKey)) return false;
+            if (string.IsNullOrWhiteSpace(formKey)) return false;
             if (IsAdmin) return true;
             if (_permissions == null || _permissions.Count == 0) return false;
 
-            if (_permissions.TryGetValue(formKey, out var p) && p != null)
+            string key = formKey.Trim();
+            if (_permissions.TryGetValue(key, out var p) && p != null)
                 return p.CanAdd;
 
-            string cleanKey = formKey.Trim();
+            string normKey = NormalizeKey(key);
+            if (!string.IsNullOrEmpty(normKey) && _permissions.TryGetValue(normKey, out var pNorm) && pNorm != null)
+                return pNorm.CanAdd;
+
             foreach (var kvp in _permissions)
             {
                 if (kvp.Value == null) continue;
-                if (string.Equals(kvp.Key, cleanKey, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(kvp.Value.FormName, cleanKey, StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(kvp.Key, key, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(NormalizeKey(kvp.Key), normKey, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(NormalizeKey(kvp.Value.FormKey), normKey, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(NormalizeKey(kvp.Value.FormName), normKey, StringComparison.OrdinalIgnoreCase))
                 {
                     return kvp.Value.CanAdd;
                 }
@@ -893,19 +1432,25 @@ namespace ModelClass
 
         public static bool CanEdit(string formKey)
         {
-            if (string.IsNullOrEmpty(formKey)) return false;
+            if (string.IsNullOrWhiteSpace(formKey)) return false;
             if (IsAdmin) return true;
             if (_permissions == null || _permissions.Count == 0) return false;
 
-            if (_permissions.TryGetValue(formKey, out var p) && p != null)
+            string key = formKey.Trim();
+            if (_permissions.TryGetValue(key, out var p) && p != null)
                 return p.CanEdit;
 
-            string cleanKey = formKey.Trim();
+            string normKey = NormalizeKey(key);
+            if (!string.IsNullOrEmpty(normKey) && _permissions.TryGetValue(normKey, out var pNorm) && pNorm != null)
+                return pNorm.CanEdit;
+
             foreach (var kvp in _permissions)
             {
                 if (kvp.Value == null) continue;
-                if (string.Equals(kvp.Key, cleanKey, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(kvp.Value.FormName, cleanKey, StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(kvp.Key, key, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(NormalizeKey(kvp.Key), normKey, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(NormalizeKey(kvp.Value.FormKey), normKey, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(NormalizeKey(kvp.Value.FormName), normKey, StringComparison.OrdinalIgnoreCase))
                 {
                     return kvp.Value.CanEdit;
                 }
@@ -916,19 +1461,25 @@ namespace ModelClass
 
         public static bool CanDelete(string formKey)
         {
-            if (string.IsNullOrEmpty(formKey)) return false;
+            if (string.IsNullOrWhiteSpace(formKey)) return false;
             if (IsAdmin) return true;
             if (_permissions == null || _permissions.Count == 0) return false;
 
-            if (_permissions.TryGetValue(formKey, out var p) && p != null)
+            string key = formKey.Trim();
+            if (_permissions.TryGetValue(key, out var p) && p != null)
                 return p.CanDelete;
 
-            string cleanKey = formKey.Trim();
+            string normKey = NormalizeKey(key);
+            if (!string.IsNullOrEmpty(normKey) && _permissions.TryGetValue(normKey, out var pNorm) && pNorm != null)
+                return pNorm.CanDelete;
+
             foreach (var kvp in _permissions)
             {
                 if (kvp.Value == null) continue;
-                if (string.Equals(kvp.Key, cleanKey, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(kvp.Value.FormName, cleanKey, StringComparison.OrdinalIgnoreCase))
+                if (string.Equals(kvp.Key, key, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(NormalizeKey(kvp.Key), normKey, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(NormalizeKey(kvp.Value.FormKey), normKey, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(NormalizeKey(kvp.Value.FormName), normKey, StringComparison.OrdinalIgnoreCase))
                 {
                     return kvp.Value.CanDelete;
                 }
@@ -942,8 +1493,12 @@ namespace ModelClass
         /// </summary>
         public static Master.RolePermission GetPermission(string formKey)
         {
-            if (string.IsNullOrEmpty(formKey)) return null;
-            return _permissions.TryGetValue(formKey, out var p) ? p : null;
+            if (string.IsNullOrWhiteSpace(formKey)) return null;
+            string key = formKey.Trim();
+            if (_permissions.TryGetValue(key, out var p)) return p;
+            string norm = NormalizeKey(key);
+            if (!string.IsNullOrEmpty(norm) && _permissions.TryGetValue(norm, out var pNorm)) return pNorm;
+            return null;
         }
 
         /// <summary>

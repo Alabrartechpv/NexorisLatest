@@ -199,6 +199,16 @@ namespace PosBranch_Win.DialogBox
                         .ToList();
                 }
 
+                // Enforce role permissions: non-admin users only see forms they are permitted to view
+                if (!ModelClass.SessionContext.IsAdmin)
+                {
+                    _filteredForms = _filteredForms
+                        .Where(item => ModelClass.SessionContext.CanView(item.DisplayName) ||
+                                       ModelClass.SessionContext.CanView(item.ClassName) ||
+                                       ModelClass.SessionContext.CanView(item.FormType.Name))
+                        .ToList();
+                }
+
                 foreach (var item in _filteredForms)
                 {
                     int rowIndex = gridResults.Rows.Add(item.DisplayName, item.Category, item.ClassName);
@@ -292,6 +302,17 @@ namespace PosBranch_Win.DialogBox
             FormSearchItem selectedItem = gridResults.CurrentRow.Tag as FormSearchItem;
             if (selectedItem == null || selectedItem.FormType == null)
                 return;
+
+            // Enforce role permissions check before opening form
+            if (!ModelClass.SessionContext.IsAdmin &&
+                !ModelClass.SessionContext.CanView(selectedItem.DisplayName) &&
+                !ModelClass.SessionContext.CanView(selectedItem.ClassName) &&
+                !ModelClass.SessionContext.CanView(selectedItem.FormType.Name))
+            {
+                MessageBox.Show($"Access Denied: You do not have permission to access '{selectedItem.DisplayName}'. Please contact your administrator.",
+                    "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
 
             this.Close();
 
