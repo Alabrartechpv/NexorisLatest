@@ -2359,7 +2359,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
             }
 
-            return exportTable;
+            return exportTable; 
         }
 
         /// <summary>
