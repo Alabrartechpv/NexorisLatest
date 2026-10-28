@@ -271,14 +271,13 @@ BEGIN
         SELECT @ClosingStock = ISNULL(SUM(ISNULL(Stock, 0) * ISNULL(Cost, 0)), 0)
         FROM PriceSettings
         WHERE (@BranchId = 0 OR BranchId = @BranchId) 
-          AND ISNULL(Stock, 0) > 0
           AND ISNULL(IsBaseUnit, 'N') = 'Y';
     END
     ELSE IF OBJECT_ID('StockMaster', 'U') IS NOT NULL
     BEGIN
         SELECT @ClosingStock = ISNULL(SUM(CurrentStock * Cost), 0)
         FROM StockMaster
-        WHERE (@BranchId = 0 OR BranchId = @BranchId) AND CurrentStock > 0;
+        WHERE (@BranchId = 0 OR BranchId = @BranchId);
     END
 
     IF @ClosingStock = 0
@@ -1303,6 +1302,154 @@ END
 
 GO
 PRINT '  [_POS_ExecutiveDashboardKPIs] updated successfully.';
+GO
+
+-- ============================================================================
+-- POS_CounterSession: Robust Counter Shift Session Handling
+-- Automatically closes stale, admin, and 0-sale abandoned sessions so new cashiers
+-- are never blocked from opening Sales or prompted for false shift closings.
+-- ============================================================================
+IF OBJECT_ID('dbo.POS_CounterSession', 'P') IS NULL
+    EXEC('CREATE PROCEDURE dbo.POS_CounterSession AS RETURN 0;');
+GO
+
+ALTER PROCEDURE [dbo].[POS_CounterSession]
+(
+    @CompanyId INT,
+    @BranchId INT,
+    @FinYearId INT,
+    @CounterId INT,
+    @CounterName VARCHAR(50) = NULL,
+    @UserId INT,
+    @SystemName VARCHAR(100) = NULL
+)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @SessionId BIGINT;
+
+    -- 1. Auto-close any stale open sessions from previous days on this counter
+    UPDATE dbo.CounterSessions
+    SET Status = 'Closed',
+        CloseTime = GETDATE(),
+        ModifiedDate = GETDATE()
+    WHERE BranchId = @BranchId
+      AND CounterId = @CounterId
+      AND Status = 'Open'
+      AND CAST(LoginTime AS DATE) < CAST(GETDATE() AS DATE);
+
+    -- 2. Auto-close any open sessions on this counter left by an Administrator or admin user
+    UPDATE cs
+    SET cs.Status = 'Closed',
+        cs.CloseTime = GETDATE(),
+        cs.ModifiedDate = GETDATE()
+    FROM dbo.CounterSessions cs
+    INNER JOIN dbo.Users u ON cs.UserId = u.UserID
+    LEFT JOIN dbo.UserLevel ul ON u.UserLevelID = ul.UserLevelID
+    WHERE cs.BranchId = @BranchId
+      AND cs.CounterId = @CounterId
+      AND cs.Status = 'Open'
+      AND (ul.UserLevel = 'Administrator' OR LOWER(RTRIM(LTRIM(u.UserName))) = 'admin');
+
+    -- 3. Auto-close any open session on this counter by a DIFFERENT user that has ZERO sales transactions
+    UPDATE cs
+    SET cs.Status = 'Closed',
+        cs.CloseTime = GETDATE(),
+        cs.ModifiedDate = GETDATE()
+    FROM dbo.CounterSessions cs
+    WHERE cs.BranchId = @BranchId
+      AND cs.CounterId = @CounterId
+      AND cs.Status = 'Open'
+      AND cs.UserId <> @UserId
+      AND NOT EXISTS (
+          SELECT 1 
+          FROM dbo.SMaster s 
+          WHERE s.CounterSessionId = cs.SessionId 
+            AND ISNULL(s.CancelFlag, 0) = 0
+      );
+
+    -- 4. Check if THIS specific user already has an open session on this counter today: resume it
+    SELECT TOP 1 @SessionId = SessionId
+    FROM dbo.CounterSessions WITH (UPDLOCK, HOLDLOCK)
+    WHERE BranchId = @BranchId
+      AND CounterId = @CounterId
+      AND UserId = @UserId
+      AND Status = 'Open'
+    ORDER BY LoginTime DESC;
+
+    IF @SessionId IS NOT NULL
+    BEGIN
+        UPDATE dbo.CounterSessions
+        SET CompanyId = @CompanyId,
+            FinYearId = @FinYearId,
+            CounterName = ISNULL(@CounterName, CounterName),
+            SystemName = ISNULL(@SystemName, SystemName),
+            ModifiedDate = GETDATE()
+        WHERE SessionId = @SessionId;
+
+        SELECT *
+        FROM dbo.CounterSessions
+        WHERE SessionId = @SessionId;
+
+        RETURN;
+    END
+
+    -- 5. If another user STILL has an open session on this counter (with actual sales): resume it so app can flag shift closing required
+    SELECT TOP 1 @SessionId = SessionId
+    FROM dbo.CounterSessions WITH (UPDLOCK, HOLDLOCK)
+    WHERE BranchId = @BranchId
+      AND CounterId = @CounterId
+      AND Status = 'Open'
+    ORDER BY LoginTime DESC;
+
+    IF @SessionId IS NOT NULL
+    BEGIN
+        UPDATE dbo.CounterSessions
+        SET CompanyId = @CompanyId,
+            FinYearId = @FinYearId,
+            CounterName = ISNULL(@CounterName, CounterName),
+            SystemName = ISNULL(@SystemName, SystemName),
+            ModifiedDate = GETDATE()
+        WHERE SessionId = @SessionId;
+
+        SELECT *
+        FROM dbo.CounterSessions
+        WHERE SessionId = @SessionId;
+
+        RETURN;
+    END
+
+    -- 6. Check if this user already has an open session on ANOTHER counter and close it
+    UPDATE dbo.CounterSessions
+    SET Status = 'Closed',
+        CloseTime = GETDATE(),
+        ModifiedDate = GETDATE()
+    WHERE BranchId = @BranchId
+      AND UserId = @UserId
+      AND Status = 'Open'
+      AND CounterId <> @CounterId;
+
+    -- 7. No open session on this counter: create a new session
+    INSERT INTO dbo.CounterSessions
+    (
+        CompanyId, BranchId, FinYearId, CounterId, CounterName,
+        UserId, LoginTime, Status, SystemName, CreatedDate
+    )
+    VALUES
+    (
+        @CompanyId, @BranchId, @FinYearId, @CounterId, @CounterName,
+        @UserId, GETDATE(), 'Open', @SystemName, GETDATE()
+    );
+
+    SET @SessionId = SCOPE_IDENTITY();
+
+    SELECT *
+    FROM dbo.CounterSessions
+    WHERE SessionId = @SessionId;
+END
+GO
+PRINT '  [POS_CounterSession] updated successfully.';
 GO
 
 PRINT '>>> Nexoris Client-Side Update Patch completed successfully!';

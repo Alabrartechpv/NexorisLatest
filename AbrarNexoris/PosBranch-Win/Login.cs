@@ -282,8 +282,7 @@ namespace PosBranch_Win
                                 bool isBillingUser = userLevel?.Equals("Cashier", StringComparison.OrdinalIgnoreCase) == true ||
                                                      userLevel?.Equals("Sales Man", StringComparison.OrdinalIgnoreCase) == true;
 
-                                bool needsCounterSession = isBillingUser ||
-                                                           (SessionContext.IsAdmin && counterId > 0);
+                                bool needsCounterSession = isBillingUser;
 
                                 if (needsCounterSession)
                                 {
