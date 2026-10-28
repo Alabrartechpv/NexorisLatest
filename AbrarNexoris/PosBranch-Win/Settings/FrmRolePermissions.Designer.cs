@@ -24,6 +24,7 @@ namespace PosBranch_Win.Settings
             this.cmbCategoryFilter = new System.Windows.Forms.ComboBox();
             this.lblSearchForm = new System.Windows.Forms.Label();
             this.txtSearchForm = new System.Windows.Forms.TextBox();
+            this.chkShowCheckedOnly = new System.Windows.Forms.CheckBox();
             this.pnlGrid = new System.Windows.Forms.Panel();
             this.dgvPermissions = new System.Windows.Forms.DataGridView();
             this.pnlButtons = new System.Windows.Forms.Panel();
@@ -69,6 +70,7 @@ namespace PosBranch_Win.Settings
             // pnlRoleSelection
             // 
             this.pnlRoleSelection.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(240)))), ((int)(((byte)(248)))), ((int)(((byte)(255)))));
+            this.pnlRoleSelection.Controls.Add(this.chkShowCheckedOnly);
             this.pnlRoleSelection.Controls.Add(this.txtSearchForm);
             this.pnlRoleSelection.Controls.Add(this.lblSearchForm);
             this.pnlRoleSelection.Controls.Add(this.cmbCategoryFilter);
@@ -140,6 +142,18 @@ namespace PosBranch_Win.Settings
             this.txtSearchForm.Name = "txtSearchForm";
             this.txtSearchForm.Size = new System.Drawing.Size(200, 24);
             this.txtSearchForm.TabIndex = 5;
+            // 
+            // chkShowCheckedOnly
+            // 
+            this.chkShowCheckedOnly.AutoSize = true;
+            this.chkShowCheckedOnly.Font = new System.Drawing.Font("Segoe UI", 9.5F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.chkShowCheckedOnly.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(0)))), ((int)(((byte)(100)))), ((int)(((byte)(0)))));
+            this.chkShowCheckedOnly.Location = new System.Drawing.Point(795, 13);
+            this.chkShowCheckedOnly.Name = "chkShowCheckedOnly";
+            this.chkShowCheckedOnly.Size = new System.Drawing.Size(155, 21);
+            this.chkShowCheckedOnly.TabIndex = 6;
+            this.chkShowCheckedOnly.Text = "Show Checked Only";
+            this.chkShowCheckedOnly.UseVisualStyleBackColor = true;
             // 
             // pnlGrid
             // 
@@ -340,6 +354,7 @@ namespace PosBranch_Win.Settings
         private System.Windows.Forms.ComboBox cmbCategoryFilter;
         private System.Windows.Forms.Label lblSearchForm;
         private System.Windows.Forms.TextBox txtSearchForm;
+        private System.Windows.Forms.CheckBox chkShowCheckedOnly;
         private System.Windows.Forms.Panel pnlGrid;
         private System.Windows.Forms.DataGridView dgvPermissions;
         private System.Windows.Forms.Panel pnlButtons;

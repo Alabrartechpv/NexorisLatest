@@ -575,6 +575,18 @@ namespace PosBranch_Win
                         var permissions = permRepo.GetPermissionsByRoleId(roleId);
                         SessionContext.LoadPermissions(permissions);
                     }
+                    else if (!string.IsNullOrWhiteSpace(matchedRoleName))
+                    {
+                        SessionContext.UserLevel = matchedRoleName;
+                        var targetIds = permRepo.GetTargetRoleIds(0, matchedRoleName);
+                        if (targetIds != null && targetIds.Count > 0)
+                        {
+                            roleId = targetIds[0];
+                            SessionContext.RoleId = roleId;
+                            var permissions = permRepo.GetPermissionsByRoleId(roleId);
+                            SessionContext.LoadPermissions(permissions);
+                        }
+                    }
                 }
             }
             catch (Exception ex)

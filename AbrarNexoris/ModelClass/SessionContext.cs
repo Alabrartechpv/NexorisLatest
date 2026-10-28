@@ -690,15 +690,51 @@ namespace ModelClass
             return s;
         }
 
+        private static void SetOrMergePermission(string key, Master.RolePermission p)
+        {
+            if (string.IsNullOrWhiteSpace(key) || p == null) return;
+            string trimmed = key.Trim();
+            if (_permissions.TryGetValue(trimmed, out var existing) && existing != null)
+            {
+                _permissions[trimmed] = new Master.RolePermission
+                {
+                    RoleID = p.RoleID > 0 ? p.RoleID : existing.RoleID,
+                    FormID = p.CanView ? p.FormID : existing.FormID,
+                    FormKey = p.CanView ? p.FormKey : existing.FormKey,
+                    FormName = p.CanView ? p.FormName : existing.FormName,
+                    Category = p.CanView ? p.Category : existing.Category,
+                    CanView = existing.CanView || p.CanView,
+                    CanAdd = existing.CanAdd || p.CanAdd,
+                    CanEdit = existing.CanEdit || p.CanEdit,
+                    CanDelete = existing.CanDelete || p.CanDelete
+                };
+            }
+            else
+            {
+                _permissions[trimmed] = new Master.RolePermission
+                {
+                    RoleID = p.RoleID,
+                    FormID = p.FormID,
+                    FormKey = p.FormKey,
+                    FormName = p.FormName,
+                    Category = p.Category,
+                    CanView = p.CanView,
+                    CanAdd = p.CanAdd,
+                    CanEdit = p.CanEdit,
+                    CanDelete = p.CanDelete
+                };
+            }
+        }
+
         private static void RegisterAlias(string alias, Master.RolePermission p)
         {
             if (string.IsNullOrWhiteSpace(alias) || p == null) return;
             string trimmed = alias.Trim();
-            _permissions[trimmed] = p;
+            SetOrMergePermission(trimmed, p);
             string norm = NormalizeKey(trimmed);
             if (!string.IsNullOrEmpty(norm))
             {
-                _permissions[norm] = p;
+                SetOrMergePermission(norm, p);
             }
         }
 
@@ -1241,14 +1277,23 @@ namespace ModelClass
                         RegisterAlias("vendordnpaymentreport", p);
                         RegisterAlias("frmvendorpaymentreport", p);
                     }
-                    if (normKey.Contains("manualpartybalance") || normName.Contains("manual party balance"))
+                    if ((normKey == "manualpartybalance" || normKey == "manualpartybalanceentry" || normName == "manual party balance entry" || normName == "manual party balance" || string.Equals(formKey, "manualpartybalance", StringComparison.OrdinalIgnoreCase)) && !normKey.Contains("report") && !normName.Contains("report"))
                     {
                         RegisterAlias("manualpartybalance", p);
-                        RegisterAlias("manualpartybalancereport", p);
                         RegisterAlias("manual party balance", p);
-                        RegisterAlias("manual party balance report", p);
+                        RegisterAlias("manual party balance entry", p);
+                        RegisterAlias("manualpartybalanceentry", p);
                         RegisterAlias("frmmanualpartybalance", p);
+                    }
+                    if (normKey.Contains("manualpartybalancereport") || (normKey.Contains("manualpartybalance") && normKey.Contains("report")) || (normName.Contains("manual party balance") && normName.Contains("report")))
+                    {
+                        RegisterAlias("manualpartybalancereport", p);
+                        RegisterAlias("manual party balance report", p);
                         RegisterAlias("frmmanualpartybalancereport", p);
+                    }
+                    if (false)
+                    {
+
                     }
                     if (normKey.Contains("combinedpartybalance") || normName.Contains("combined party balance"))
                     {
@@ -1281,6 +1326,115 @@ namespace ModelClass
                         RegisterAlias("frmgovtgstreturnreport", p);
                     }
 
+                    // 24b. Accounts Entry Forms & Vouchers
+                    if ((normKey == "generalpayment" || normName.Contains("general payment")) && !normKey.Contains("report") && !normName.Contains("report"))
+                    {
+                        RegisterAlias("generalpayment", p);
+                        RegisterAlias("general payment", p);
+                        RegisterAlias("frmgeneralpayment", p);
+                        RegisterAlias("generalpaymentvoucher", p);
+                        RegisterAlias("general payment voucher", p);
+                    }
+                    if ((normKey == "generalreceipt" || normName.Contains("general receipt")) && !normKey.Contains("report") && !normName.Contains("report"))
+                    {
+                        RegisterAlias("generalreceipt", p);
+                        RegisterAlias("general receipt", p);
+                        RegisterAlias("frmgeneralreceipt", p);
+                        RegisterAlias("generalreceiptvoucher", p);
+                        RegisterAlias("general receipt voucher", p);
+                    }
+                    if ((normKey == "journal" || normName.Contains("journal voucher")) && !normKey.Contains("report") && !normName.Contains("report"))
+                    {
+                        RegisterAlias("journal", p);
+                        RegisterAlias("journalvoucher", p);
+                        RegisterAlias("journal voucher", p);
+                        RegisterAlias("frmjournal", p);
+                    }
+                    if ((normKey == "contra" || normName.Contains("contra voucher")) && !normKey.Contains("report") && !normName.Contains("report"))
+                    {
+                        RegisterAlias("contra", p);
+                        RegisterAlias("contravoucher", p);
+                        RegisterAlias("contra voucher", p);
+                        RegisterAlias("frmcontra", p);
+                    }
+                    if ((normKey == "customer" || normName.Contains("customer management")) && !normKey.Contains("report") && !normName.Contains("report"))
+                    {
+                        RegisterAlias("customer", p);
+                        RegisterAlias("customermanagement", p);
+                        RegisterAlias("customer management", p);
+                        RegisterAlias("frmcustomer", p);
+                    }
+                    if ((normKey == "vendor" || normName.Contains("vendor management")) && !normKey.Contains("report") && !normName.Contains("report"))
+                    {
+                        RegisterAlias("vendor", p);
+                        RegisterAlias("frmvendor", p);
+                        RegisterAlias("vendormanagement", p);
+                        RegisterAlias("vendor management", p);
+                    }
+                    if ((normKey == "ledgers" || normKey == "ledger" || normKey == "accountledgers" || normName == "account ledgers" || normName == "ledger" || normName == "ledgers") && !normKey.Contains("customer") && !normKey.Contains("vendor") && !normName.Contains("customer") && !normName.Contains("vendor") && !normKey.Contains("report") && !normName.Contains("report") && !normName.Contains("statement") && !normName.Contains("summary"))
+                    {
+                        RegisterAlias("ledgers", p);
+                        RegisterAlias("ledger", p);
+                        RegisterAlias("account ledgers", p);
+                        RegisterAlias("frmledgers", p);
+                        RegisterAlias("frmledger", p);
+                    }
+                    if (normKey == "accountgroup" || normName.Contains("account group"))
+                    {
+                        RegisterAlias("accountgroup", p);
+                        RegisterAlias("account group", p);
+                        RegisterAlias("account group setup", p);
+                        RegisterAlias("frmaccountgroup", p);
+                    }
+                    if (normKey == "chartofaccount" || normName.Contains("chart of account"))
+                    {
+                        RegisterAlias("chartofaccount", p);
+                        RegisterAlias("chart of account", p);
+                        RegisterAlias("chart of accounts", p);
+                        RegisterAlias("frmchartofacc", p);
+                        RegisterAlias("frmchartofaccount", p);
+                    }
+                    if ((normKey == "receipt" || normName == "customer receipt") && !normKey.Contains("report") && !normName.Contains("report"))
+                    {
+                        RegisterAlias("receipt", p);
+                        RegisterAlias("customer receipt", p);
+                        RegisterAlias("customerreceipt", p);
+                        RegisterAlias("frmreceipt", p);
+                    }
+                    if ((normKey == "payment" || normName == "vendor payment") && !normKey.Contains("report") && !normName.Contains("report"))
+                    {
+                        RegisterAlias("payment", p);
+                        RegisterAlias("vendor payment", p);
+                        RegisterAlias("vendorpayment", p);
+                        RegisterAlias("frmpayment", p);
+                    }
+                    if ((normKey == "debitnote" || normName.Contains("debit note")) && !normKey.Contains("report") && !normName.Contains("report"))
+                    {
+                        RegisterAlias("debitnote", p);
+                        RegisterAlias("debit note", p);
+                        RegisterAlias("debit note voucher", p);
+                        RegisterAlias("frmdebitnote", p);
+                    }
+                    if ((normKey == "creditnote" || normName.Contains("credit note")) && !normKey.Contains("report") && !normName.Contains("report"))
+                    {
+                        RegisterAlias("creditnote", p);
+                        RegisterAlias("credit note", p);
+                        RegisterAlias("credit note voucher", p);
+                        RegisterAlias("frmcreditnote", p);
+                    }
+                    if ((normKey == "bankreconciliation" || normName.Contains("bank reconciliation")) && !normKey.Contains("report") && !normName.Contains("report"))
+                    {
+                        RegisterAlias("bankreconciliation", p);
+                        RegisterAlias("bank reconciliation", p);
+                        RegisterAlias("frmbankreconciliation", p);
+                    }
+                    if ((normKey == "expenseentry" || normName.Contains("expense voucher")) && !normKey.Contains("report") && !normName.Contains("report"))
+                    {
+                        RegisterAlias("expenseentry", p);
+                        RegisterAlias("expense voucher entry", p);
+                        RegisterAlias("frmexpenseentry", p);
+                    }
+
                     // 25. Utilities & Settings
                     if (normKey.Contains("activitylog") || normName.Contains("activity log"))
                     {
@@ -1309,7 +1463,7 @@ namespace ModelClass
                         RegisterAlias("opening stock", p);
                         RegisterAlias("frmopeningstock", p);
                     }
-                    if (normKey.Contains("counterclosing") || normKey.Contains("btnclosing") || normName.Contains("closing"))
+                    if ((normKey == "counterclosing" || normKey == "btnclosing" || normKey == "closing" || normName == "closing" || normName.Contains("counter shift closing") || normName.Contains("daily closing")) && !normKey.Contains("year") && !normName.Contains("year"))
                     {
                         RegisterAlias("counterclosing", p);
                         RegisterAlias("btnclosing", p);
@@ -1369,10 +1523,47 @@ namespace ModelClass
             }
         }
 
+        private static IEnumerable<string> GetEquivalentKeys(string key, string normKey)
+        {
+            yield return key;
+            if (!string.IsNullOrEmpty(normKey) && !string.Equals(key, normKey, StringComparison.OrdinalIgnoreCase))
+                yield return normKey;
+
+            if (normKey == "ledgers" || normKey == "ledger" || normKey == "accountledgers")
+            {
+                yield return "ledgers";
+                yield return "ledger";
+                yield return "account ledgers";
+                yield return "accountledgers";
+                yield return "frmledgers";
+                yield return "frmledger";
+            }
+            else if (normKey == "closing" || normKey == "btnclosing" || normKey == "counterclosing")
+            {
+                yield return "closing";
+                yield return "btnclosing";
+                yield return "counterclosing";
+                yield return "frmclosing";
+            }
+        }
+
         /// <summary>
-        /// Checks if the current user has View permission for the specified form
         /// </summary>
         public static bool CanView(string formKey)
+        {
+            if (string.IsNullOrWhiteSpace(formKey)) return false;
+            if (IsAdmin) return true;
+            if (_permissions == null || _permissions.Count == 0) return false;
+            string k = formKey.Trim();
+            string nk = NormalizeKey(k);
+            foreach (var eq in GetEquivalentKeys(k, nk))
+            {
+                if (_permissions.TryGetValue(eq, out var pe) && pe != null && pe.CanView) return true;
+            }
+            return CanViewInternal(formKey);
+        }
+
+        private static bool CanViewInternal(string formKey)
         {
             if (string.IsNullOrWhiteSpace(formKey)) return false;
             if (IsAdmin) return true;
@@ -1380,11 +1571,11 @@ namespace ModelClass
 
             string key = formKey.Trim();
             if (_permissions.TryGetValue(key, out var p) && p != null)
-                return p.CanView;
+                if (p.CanView) return true;
 
             string normKey = NormalizeKey(key);
             if (!string.IsNullOrEmpty(normKey) && _permissions.TryGetValue(normKey, out var pNorm) && pNorm != null)
-                return pNorm.CanView;
+                if (pNorm.CanView) return true;
 
             foreach (var kvp in _permissions)
             {
@@ -1394,7 +1585,7 @@ namespace ModelClass
                     string.Equals(NormalizeKey(kvp.Value.FormKey), normKey, StringComparison.OrdinalIgnoreCase) ||
                     string.Equals(NormalizeKey(kvp.Value.FormName), normKey, StringComparison.OrdinalIgnoreCase))
                 {
-                    return kvp.Value.CanView;
+                    if (kvp.Value.CanView) return true;
                 }
             }
 
@@ -1406,14 +1597,28 @@ namespace ModelClass
             if (string.IsNullOrWhiteSpace(formKey)) return false;
             if (IsAdmin) return true;
             if (_permissions == null || _permissions.Count == 0) return false;
+            string k = formKey.Trim();
+            string nk = NormalizeKey(k);
+            foreach (var eq in GetEquivalentKeys(k, nk))
+            {
+                if (_permissions.TryGetValue(eq, out var pe) && pe != null && pe.CanAdd) return true;
+            }
+            return CanAddInternal(formKey);
+        }
+
+        private static bool CanAddInternal(string formKey)
+        {
+            if (string.IsNullOrWhiteSpace(formKey)) return false;
+            if (IsAdmin) return true;
+            if (_permissions == null || _permissions.Count == 0) return false;
 
             string key = formKey.Trim();
             if (_permissions.TryGetValue(key, out var p) && p != null)
-                return p.CanAdd;
+                if (p.CanAdd) return true;
 
             string normKey = NormalizeKey(key);
             if (!string.IsNullOrEmpty(normKey) && _permissions.TryGetValue(normKey, out var pNorm) && pNorm != null)
-                return pNorm.CanAdd;
+                if (pNorm.CanAdd) return true;
 
             foreach (var kvp in _permissions)
             {
@@ -1423,7 +1628,7 @@ namespace ModelClass
                     string.Equals(NormalizeKey(kvp.Value.FormKey), normKey, StringComparison.OrdinalIgnoreCase) ||
                     string.Equals(NormalizeKey(kvp.Value.FormName), normKey, StringComparison.OrdinalIgnoreCase))
                 {
-                    return kvp.Value.CanAdd;
+                    if (kvp.Value.CanAdd) return true;
                 }
             }
 
@@ -1435,14 +1640,28 @@ namespace ModelClass
             if (string.IsNullOrWhiteSpace(formKey)) return false;
             if (IsAdmin) return true;
             if (_permissions == null || _permissions.Count == 0) return false;
+            string k = formKey.Trim();
+            string nk = NormalizeKey(k);
+            foreach (var eq in GetEquivalentKeys(k, nk))
+            {
+                if (_permissions.TryGetValue(eq, out var pe) && pe != null && pe.CanEdit) return true;
+            }
+            return CanEditInternal(formKey);
+        }
+
+        private static bool CanEditInternal(string formKey)
+        {
+            if (string.IsNullOrWhiteSpace(formKey)) return false;
+            if (IsAdmin) return true;
+            if (_permissions == null || _permissions.Count == 0) return false;
 
             string key = formKey.Trim();
             if (_permissions.TryGetValue(key, out var p) && p != null)
-                return p.CanEdit;
+                if (p.CanEdit) return true;
 
             string normKey = NormalizeKey(key);
             if (!string.IsNullOrEmpty(normKey) && _permissions.TryGetValue(normKey, out var pNorm) && pNorm != null)
-                return pNorm.CanEdit;
+                if (pNorm.CanEdit) return true;
 
             foreach (var kvp in _permissions)
             {
@@ -1452,7 +1671,7 @@ namespace ModelClass
                     string.Equals(NormalizeKey(kvp.Value.FormKey), normKey, StringComparison.OrdinalIgnoreCase) ||
                     string.Equals(NormalizeKey(kvp.Value.FormName), normKey, StringComparison.OrdinalIgnoreCase))
                 {
-                    return kvp.Value.CanEdit;
+                    if (kvp.Value.CanEdit) return true;
                 }
             }
 
@@ -1464,14 +1683,28 @@ namespace ModelClass
             if (string.IsNullOrWhiteSpace(formKey)) return false;
             if (IsAdmin) return true;
             if (_permissions == null || _permissions.Count == 0) return false;
+            string k = formKey.Trim();
+            string nk = NormalizeKey(k);
+            foreach (var eq in GetEquivalentKeys(k, nk))
+            {
+                if (_permissions.TryGetValue(eq, out var pe) && pe != null && pe.CanDelete) return true;
+            }
+            return CanDeleteInternal(formKey);
+        }
+
+        private static bool CanDeleteInternal(string formKey)
+        {
+            if (string.IsNullOrWhiteSpace(formKey)) return false;
+            if (IsAdmin) return true;
+            if (_permissions == null || _permissions.Count == 0) return false;
 
             string key = formKey.Trim();
             if (_permissions.TryGetValue(key, out var p) && p != null)
-                return p.CanDelete;
+                if (p.CanDelete) return true;
 
             string normKey = NormalizeKey(key);
             if (!string.IsNullOrEmpty(normKey) && _permissions.TryGetValue(normKey, out var pNorm) && pNorm != null)
-                return pNorm.CanDelete;
+                if (pNorm.CanDelete) return true;
 
             foreach (var kvp in _permissions)
             {
@@ -1481,7 +1714,7 @@ namespace ModelClass
                     string.Equals(NormalizeKey(kvp.Value.FormKey), normKey, StringComparison.OrdinalIgnoreCase) ||
                     string.Equals(NormalizeKey(kvp.Value.FormName), normKey, StringComparison.OrdinalIgnoreCase))
                 {
-                    return kvp.Value.CanDelete;
+                    if (kvp.Value.CanDelete) return true;
                 }
             }
 
@@ -1492,6 +1725,18 @@ namespace ModelClass
         /// Gets the full permission object for a form
         /// </summary>
         public static Master.RolePermission GetPermission(string formKey)
+        {
+            if (string.IsNullOrWhiteSpace(formKey)) return null;
+            string k = formKey.Trim();
+            string nk = NormalizeKey(k);
+            foreach (var eq in GetEquivalentKeys(k, nk))
+            {
+                if (_permissions.TryGetValue(eq, out var pe) && pe != null) return pe;
+            }
+            return GetPermissionInternal(formKey);
+        }
+
+        private static Master.RolePermission GetPermissionInternal(string formKey)
         {
             if (string.IsNullOrWhiteSpace(formKey)) return null;
             string key = formKey.Trim();

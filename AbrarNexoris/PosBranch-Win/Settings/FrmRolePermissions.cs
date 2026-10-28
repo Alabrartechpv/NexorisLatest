@@ -47,6 +47,7 @@ namespace PosBranch_Win.Settings
             // Event handlers for filtering
             cmbCategoryFilter.SelectedIndexChanged += (s, ev) => ApplyFilter();
             txtSearchForm.TextChanged += (s, ev) => ApplyFilter();
+            if (chkShowCheckedOnly != null) chkShowCheckedOnly.CheckedChanged += (s, ev) => ApplyFilter();
             btnGrantViewAll.Click += BtnGrantViewAll_Click;
 
             LanguageManager.ApplyLanguageToForm(this);
@@ -118,6 +119,7 @@ namespace PosBranch_Win.Settings
             string currentSelected = cmbCategoryFilter.SelectedItem?.ToString();
             cmbCategoryFilter.Items.Clear();
             cmbCategoryFilter.Items.Add("All Categories");
+            cmbCategoryFilter.Items.Add("Granted / Checked Only");
 
             var categories = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -259,6 +261,9 @@ namespace PosBranch_Win.Settings
 
             // Alternating row colors
             dgvPermissions.AlternatingRowsDefaultCellStyle.BackColor = Color.FromArgb(240, 248, 255);
+            dgvPermissions.CellFormatting += DgvPermissions_CellFormatting;
+            dgvPermissions.CurrentCellDirtyStateChanged += DgvPermissions_CurrentCellDirtyStateChanged;
+            dgvPermissions.CellValueChanged += DgvPermissions_CellValueChanged;
         }
 
         /// <summary>
@@ -317,10 +322,14 @@ namespace PosBranch_Win.Settings
 
             string selectedCategory = cmbCategoryFilter.SelectedItem?.ToString() ?? "All Categories";
             string searchText = txtSearchForm.Text?.Trim().ToLower() ?? "";
+            bool showCheckedOnly = (chkShowCheckedOnly != null && chkShowCheckedOnly.Checked) ||
+                                   string.Equals(selectedCategory, "Granted / Checked Only", StringComparison.OrdinalIgnoreCase);
 
             var filtered = _currentPermissions.Where(p =>
             {
-                bool matchCat = selectedCategory == "All Categories" ||
+                bool isChecked = p.CanView || p.CanAdd || p.CanEdit || p.CanDelete;
+                if (showCheckedOnly && !isChecked) return false;
+                bool matchCat = selectedCategory == "All Categories" || selectedCategory == "Granted / Checked Only" ||
                                 string.Equals(p.Category?.Trim(), selectedCategory.Trim(), StringComparison.OrdinalIgnoreCase);
                 bool matchSearch = string.IsNullOrEmpty(searchText) ||
                                    (p.FormName != null && p.FormName.ToLower().Contains(searchText)) ||
@@ -337,12 +346,69 @@ namespace PosBranch_Win.Settings
                 roleText = r.RoleName;
             }
 
-            lblStatus.Text = $"Showing {filtered.Count} of {_currentPermissions.Count} forms for role: {roleText}";
+            UpdateStatusCounts(filtered.Count);
         }
 
         /// <summary>
         /// Saves permissions for the selected role
         /// </summary>
+        private void UpdateStatusCounts(int filteredCount = -1)
+        {
+            if (_currentPermissions == null) return;
+
+            int total = _currentPermissions.Count;
+            int checkedCount = _currentPermissions.Count(p => p.CanView || p.CanAdd || p.CanEdit || p.CanDelete);
+            int vCount = _currentPermissions.Count(p => p.CanView);
+            int aCount = _currentPermissions.Count(p => p.CanAdd);
+            int eCount = _currentPermissions.Count(p => p.CanEdit);
+            int dCount = _currentPermissions.Count(p => p.CanDelete);
+
+            string roleText = cmbRoles.Text;
+            if (string.IsNullOrWhiteSpace(roleText) && cmbRoles.SelectedItem is Role r)
+            {
+                roleText = r.RoleName;
+            }
+
+            int showing = filteredCount >= 0 ? filteredCount : dgvPermissions.Rows.Count;
+            lblStatus.Text = $"Role: {roleText} | Checked / Granted: {checkedCount}/{total} (View: {vCount}, Add: {aCount}, Edit: {eCount}, Delete: {dCount}) | Showing: {showing} forms";
+        }
+
+        private void DgvPermissions_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.RowIndex >= dgvPermissions.Rows.Count) return;
+            var row = dgvPermissions.Rows[e.RowIndex];
+            if (row.DataBoundItem is FormPermissionGrid item)
+            {
+                bool isGranted = item.CanView || item.CanAdd || item.CanEdit || item.CanDelete;
+                if (isGranted)
+                {
+                    row.DefaultCellStyle.BackColor = Color.FromArgb(238, 252, 238);
+                    if (e.ColumnIndex >= 0 && e.ColumnIndex < dgvPermissions.Columns.Count && dgvPermissions.Columns[e.ColumnIndex].Name == "FormName")
+                    {
+                        e.CellStyle.Font = new Font(dgvPermissions.Font, FontStyle.Bold);
+                        e.CellStyle.ForeColor = Color.FromArgb(0, 100, 0);
+                    }
+                }
+            }
+        }
+
+        private void DgvPermissions_CurrentCellDirtyStateChanged(object sender, EventArgs e)
+        {
+            if (dgvPermissions.IsCurrentCellDirty && dgvPermissions.CurrentCell is DataGridViewCheckBoxCell)
+            {
+                dgvPermissions.CommitEdit(DataGridViewDataErrorContexts.Commit);
+            }
+        }
+
+        private void DgvPermissions_CellValueChanged(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex >= 0 && _currentPermissions != null)
+            {
+                dgvPermissions.InvalidateRow(e.RowIndex);
+                UpdateStatusCounts();
+            }
+        }
+
         private void btnSave_Click(object sender, EventArgs e)
         {
             if (_selectedRoleId <= 0)
@@ -390,9 +456,10 @@ namespace PosBranch_Win.Settings
 
                     try
                     {
-                        if (_selectedRoleId == SessionContext.RoleId)
+                        var targetIds = _permRepo.GetTargetRoleIds(_selectedRoleId, cmbRoles.Text?.Trim());
+                        if (targetIds.Contains(SessionContext.RoleId) || string.Equals(cmbRoles.Text?.Trim(), SessionContext.UserLevel?.Trim(), StringComparison.OrdinalIgnoreCase))
                         {
-                            var updatedPerms = _permRepo.GetPermissionsByRoleId(_selectedRoleId);
+                            var updatedPerms = _permRepo.GetPermissionsByRoleId(SessionContext.RoleId);
                             SessionContext.LoadPermissions(updatedPerms);
                             foreach (Form f in Application.OpenForms)
                             {
@@ -427,7 +494,8 @@ namespace PosBranch_Win.Settings
                 if (row.DataBoundItem is FormPermissionGrid item)
                     item.CanView = true;
             }
-            lblStatus.Text = "View permission granted for displayed forms. Click Save to apply.";
+            dgvPermissions.Invalidate();
+            UpdateStatusCounts();
         }
 
         /// <summary>
@@ -450,7 +518,8 @@ namespace PosBranch_Win.Settings
                     item.CanDelete = true;
                 }
             }
-            lblStatus.Text = "All permissions granted for displayed forms. Click Save to apply.";
+            dgvPermissions.Invalidate();
+            UpdateStatusCounts();
         }
 
         /// <summary>
@@ -473,7 +542,8 @@ namespace PosBranch_Win.Settings
                     item.CanDelete = false;
                 }
             }
-            lblStatus.Text = "All permissions revoked for displayed forms. Click Save to apply.";
+            dgvPermissions.Invalidate();
+            UpdateStatusCounts();
         }
 
         /// <summary>
