@@ -28,6 +28,7 @@ namespace PosBranch_Win.Settings
             this.dgvPermissions = new System.Windows.Forms.DataGridView();
             this.pnlButtons = new System.Windows.Forms.Panel();
             this.btnClose = new System.Windows.Forms.Button();
+            this.btnSyncForms = new System.Windows.Forms.Button();
             this.btnRefresh = new System.Windows.Forms.Button();
             this.btnRevokeAll = new System.Windows.Forms.Button();
             this.btnGrantAll = new System.Windows.Forms.Button();
@@ -162,6 +163,7 @@ namespace PosBranch_Win.Settings
             // 
             this.pnlButtons.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(240)))), ((int)(((byte)(248)))), ((int)(((byte)(255)))));
             this.pnlButtons.Controls.Add(this.btnClose);
+            this.pnlButtons.Controls.Add(this.btnSyncForms);
             this.pnlButtons.Controls.Add(this.btnRefresh);
             this.pnlButtons.Controls.Add(this.btnRevokeAll);
             this.pnlButtons.Controls.Add(this.btnGrantAll);
@@ -203,6 +205,21 @@ namespace PosBranch_Win.Settings
             this.btnRefresh.Text = "Refresh";
             this.btnRefresh.UseVisualStyleBackColor = false;
             this.btnRefresh.Click += new System.EventHandler(this.btnRefresh_Click);
+            // 
+            // btnSyncForms
+            // 
+            this.btnSyncForms.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(111)))), ((int)(((byte)(66)))), ((int)(((byte)(193)))));
+            this.btnSyncForms.FlatAppearance.BorderSize = 0;
+            this.btnSyncForms.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnSyncForms.Font = new System.Drawing.Font("Segoe UI", 9F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.btnSyncForms.ForeColor = System.Drawing.Color.White;
+            this.btnSyncForms.Location = new System.Drawing.Point(620, 15);
+            this.btnSyncForms.Name = "btnSyncForms";
+            this.btnSyncForms.Size = new System.Drawing.Size(145, 32);
+            this.btnSyncForms.TabIndex = 6;
+            this.btnSyncForms.Text = "+ Add / Sync Forms";
+            this.btnSyncForms.UseVisualStyleBackColor = false;
+            this.btnSyncForms.Click += new System.EventHandler(this.btnSyncForms_Click);
             // 
             // btnRevokeAll
             // 
@@ -291,13 +308,13 @@ namespace PosBranch_Win.Settings
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.BackColor = System.Drawing.Color.White;
-            this.ClientSize = new System.Drawing.Size(800, 540);
+            this.ClientSize = new System.Drawing.Size(960, 560);
             this.Controls.Add(this.pnlGrid);
             this.Controls.Add(this.pnlButtons);
             this.Controls.Add(this.pnlStatus);
             this.Controls.Add(this.pnlRoleSelection);
             this.Controls.Add(this.pnlHeader);
-            this.MinimumSize = new System.Drawing.Size(700, 500);
+            this.MinimumSize = new System.Drawing.Size(960, 520);
             this.Name = "FrmRolePermissions";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
             this.Text = "Role Permission Management";
@@ -332,6 +349,7 @@ namespace PosBranch_Win.Settings
         private System.Windows.Forms.Button btnRevokeAll;
         private System.Windows.Forms.Button btnRefresh;
         private System.Windows.Forms.Button btnClose;
+        private System.Windows.Forms.Button btnSyncForms;
         private System.Windows.Forms.Panel pnlStatus;
         private System.Windows.Forms.Label lblStatus;
     }

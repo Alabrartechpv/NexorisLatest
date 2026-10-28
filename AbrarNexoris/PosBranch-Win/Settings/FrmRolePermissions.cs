@@ -97,6 +97,15 @@ namespace PosBranch_Win.Settings
             btnRefresh.ForeColor = Color.White;
             btnRefresh.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
 
+            if (btnSyncForms != null)
+            {
+                btnSyncForms.FlatStyle = FlatStyle.Flat;
+                btnSyncForms.FlatAppearance.BorderSize = 0;
+                btnSyncForms.BackColor = Color.FromArgb(111, 66, 193);
+                btnSyncForms.ForeColor = Color.White;
+                btnSyncForms.Font = new Font("Segoe UI", 9.5f, FontStyle.Bold);
+            }
+
             btnClose.FlatStyle = FlatStyle.Flat;
             btnClose.FlatAppearance.BorderSize = 0;
             btnClose.BackColor = Color.FromArgb(52, 58, 64);
@@ -106,15 +115,33 @@ namespace PosBranch_Win.Settings
 
         private void LoadCategoryFilter()
         {
+            string currentSelected = cmbCategoryFilter.SelectedItem?.ToString();
             cmbCategoryFilter.Items.Clear();
             cmbCategoryFilter.Items.Add("All Categories");
-            cmbCategoryFilter.Items.Add("Master");
-            cmbCategoryFilter.Items.Add("Transaction");
-            cmbCategoryFilter.Items.Add("Accounts");
-            cmbCategoryFilter.Items.Add("Reports");
-            cmbCategoryFilter.Items.Add("Settings");
-            cmbCategoryFilter.Items.Add("Utilities");
-            cmbCategoryFilter.SelectedIndex = 0;
+
+            var categories = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "Master", "Transaction", "Accounts", "Reports", "Settings", "Utilities"
+            };
+
+            if (_currentPermissions != null)
+            {
+                foreach (var p in _currentPermissions)
+                {
+                    if (!string.IsNullOrWhiteSpace(p.Category))
+                        categories.Add(p.Category.Trim());
+                }
+            }
+
+            foreach (var cat in categories.OrderBy(c => c))
+            {
+                cmbCategoryFilter.Items.Add(cat);
+            }
+
+            if (!string.IsNullOrEmpty(currentSelected) && cmbCategoryFilter.Items.Contains(currentSelected))
+                cmbCategoryFilter.SelectedItem = currentSelected;
+            else
+                cmbCategoryFilter.SelectedIndex = 0;
         }
 
         /// <summary>
@@ -171,7 +198,7 @@ namespace PosBranch_Win.Settings
                 DataPropertyName = "Category",
                 Name = "Category",
                 HeaderText = "Category",
-                Width = 100,
+                Width = 110,
                 ReadOnly = true
             });
 
@@ -180,7 +207,7 @@ namespace PosBranch_Win.Settings
                 DataPropertyName = "FormName",
                 Name = "FormName",
                 HeaderText = "Form / Module",
-                Width = 180,
+                Width = 240,
                 ReadOnly = true
             });
 
@@ -274,6 +301,7 @@ namespace PosBranch_Win.Settings
             try
             {
                 _currentPermissions = _permRepo.GetFormsWithPermissions(roleId);
+                LoadCategoryFilter();
                 ApplyFilter();
             }
             catch (Exception ex)
@@ -326,11 +354,29 @@ namespace PosBranch_Win.Settings
 
             try
             {
+                dgvPermissions.EndEdit();
+
                 if (_currentPermissions == null || _currentPermissions.Count == 0)
                 {
                     MessageBox.Show("No permissions available to save.", "Validation",
                         MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
+                }
+
+                // Sync visible grid rows to _currentPermissions
+                foreach (DataGridViewRow row in dgvPermissions.Rows)
+                {
+                    if (row.DataBoundItem is FormPermissionGrid gridItem)
+                    {
+                        if (row.Cells["CanView"].Value != null)
+                            gridItem.CanView = Convert.ToBoolean(row.Cells["CanView"].Value);
+                        if (row.Cells["CanAdd"].Value != null)
+                            gridItem.CanAdd = Convert.ToBoolean(row.Cells["CanAdd"].Value);
+                        if (row.Cells["CanEdit"].Value != null)
+                            gridItem.CanEdit = Convert.ToBoolean(row.Cells["CanEdit"].Value);
+                        if (row.Cells["CanDelete"].Value != null)
+                            gridItem.CanDelete = Convert.ToBoolean(row.Cells["CanDelete"].Value);
+                    }
                 }
 
                 // Save master permissions list to database
@@ -357,9 +403,12 @@ namespace PosBranch_Win.Settings
 
         private void BtnGrantViewAll_Click(object sender, EventArgs e)
         {
+            dgvPermissions.EndEdit();
             foreach (DataGridViewRow row in dgvPermissions.Rows)
             {
                 row.Cells["CanView"].Value = true;
+                if (row.DataBoundItem is FormPermissionGrid item)
+                    item.CanView = true;
             }
             lblStatus.Text = "View permission granted for displayed forms. Click Save to apply.";
         }
@@ -369,12 +418,20 @@ namespace PosBranch_Win.Settings
         /// </summary>
         private void btnGrantAll_Click(object sender, EventArgs e)
         {
+            dgvPermissions.EndEdit();
             foreach (DataGridViewRow row in dgvPermissions.Rows)
             {
                 row.Cells["CanView"].Value = true;
                 row.Cells["CanAdd"].Value = true;
                 row.Cells["CanEdit"].Value = true;
                 row.Cells["CanDelete"].Value = true;
+                if (row.DataBoundItem is FormPermissionGrid item)
+                {
+                    item.CanView = true;
+                    item.CanAdd = true;
+                    item.CanEdit = true;
+                    item.CanDelete = true;
+                }
             }
             lblStatus.Text = "All permissions granted for displayed forms. Click Save to apply.";
         }
@@ -384,12 +441,20 @@ namespace PosBranch_Win.Settings
         /// </summary>
         private void btnRevokeAll_Click(object sender, EventArgs e)
         {
+            dgvPermissions.EndEdit();
             foreach (DataGridViewRow row in dgvPermissions.Rows)
             {
                 row.Cells["CanView"].Value = false;
                 row.Cells["CanAdd"].Value = false;
                 row.Cells["CanEdit"].Value = false;
                 row.Cells["CanDelete"].Value = false;
+                if (row.DataBoundItem is FormPermissionGrid item)
+                {
+                    item.CanView = false;
+                    item.CanAdd = false;
+                    item.CanEdit = false;
+                    item.CanDelete = false;
+                }
             }
             lblStatus.Text = "All permissions revoked for displayed forms. Click Save to apply.";
         }
@@ -402,6 +467,211 @@ namespace PosBranch_Win.Settings
             if (_selectedRoleId > 0)
             {
                 LoadPermissionsForRole(_selectedRoleId);
+            }
+        }
+
+        /// <summary>
+        /// Handles adding newly added forms (auto-scan or manual add)
+        /// </summary>
+        private void btnSyncForms_Click(object sender, EventArgs e)
+        {
+            ContextMenuStrip menu = new ContextMenuStrip();
+            menu.Font = new Font("Segoe UI", 9.5f);
+
+            var itemScan = new ToolStripMenuItem("🔍 Auto-Scan & Add All Project Forms", null, (s, ev) => AutoScanAndSyncProjectForms());
+            var itemManual = new ToolStripMenuItem("➕ Manually Register New Form / Module...", null, (s, ev) => ShowManualAddFormDialog());
+
+            menu.Items.Add(itemScan);
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add(itemManual);
+
+            menu.Show(btnSyncForms, new Point(0, btnSyncForms.Height));
+        }
+
+        private void AutoScanAndSyncProjectForms()
+        {
+            try
+            {
+                Cursor.Current = Cursors.WaitCursor;
+                var assembly = typeof(FrmRolePermissions).Assembly;
+                var formTypes = assembly.GetTypes()
+                    .Where(t => typeof(Form).IsAssignableFrom(t) && !t.IsAbstract && !t.IsGenericTypeDefinition)
+                    .ToList();
+
+                var discoveredForms = new List<FormPermissionGrid>();
+
+                foreach (var t in formTypes)
+                {
+                    string typeName = t.Name;
+                    string ns = t.Namespace ?? "";
+
+                    // Exclude internal helper types
+                    if (typeName.StartsWith("<") || typeName.Contains("Anon") || typeName == "FloatingTabHostForm")
+                        continue;
+
+                    // Determine Category from namespace or type name
+                    string category = "Utilities";
+                    if (ns.IndexOf("Reports", StringComparison.OrdinalIgnoreCase) >= 0 || typeName.IndexOf("Report", StringComparison.OrdinalIgnoreCase) >= 0)
+                        category = "Reports";
+                    else if (ns.IndexOf("Master", StringComparison.OrdinalIgnoreCase) >= 0)
+                        category = "Master";
+                    else if (ns.IndexOf("Transaction", StringComparison.OrdinalIgnoreCase) >= 0)
+                        category = "Transaction";
+                    else if (ns.IndexOf("Accounts", StringComparison.OrdinalIgnoreCase) >= 0 || ns.IndexOf("Account", StringComparison.OrdinalIgnoreCase) >= 0)
+                        category = "Accounts";
+                    else if (ns.IndexOf("Settings", StringComparison.OrdinalIgnoreCase) >= 0)
+                        category = "Settings";
+
+                    // Generate clean form key
+                    string key = typeName.ToLowerInvariant();
+                    if (key.StartsWith("frm")) key = key.Substring(3);
+
+                    // Generate friendly title
+                    string friendlyName = GenerateFriendlyFormName(typeName);
+
+                    discoveredForms.Add(new FormPermissionGrid
+                    {
+                        FormKey = key,
+                        FormName = friendlyName,
+                        Category = category
+                    });
+                }
+
+                int synced = _permRepo.SyncAllDiscoveredForms(discoveredForms);
+
+                if (_selectedRoleId > 0)
+                {
+                    LoadPermissionsForRole(_selectedRoleId);
+                }
+
+                LoadCategoryFilter();
+
+                MessageBox.Show($"Scanned {discoveredForms.Count} project forms.\n{synced} forms synchronized with database successfully!",
+                    "Forms Synchronization", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error syncing project forms: {ex.Message}", "Sync Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                Cursor.Current = Cursors.Default;
+            }
+        }
+
+        private static string GenerateFriendlyFormName(string typeName)
+        {
+            if (string.IsNullOrWhiteSpace(typeName)) return "";
+            string name = typeName;
+            if (name.StartsWith("Frm", StringComparison.OrdinalIgnoreCase))
+                name = name.Substring(3);
+
+            // Insert spaces between CamelCase words
+            var sb = new System.Text.StringBuilder();
+            for (int i = 0; i < name.Length; i++)
+            {
+                if (i > 0 && char.IsUpper(name[i]) && (!char.IsUpper(name[i - 1]) || (i + 1 < name.Length && char.IsLower(name[i + 1]))))
+                {
+                    sb.Append(' ');
+                }
+                sb.Append(name[i]);
+            }
+            return sb.ToString();
+        }
+
+        private void ShowManualAddFormDialog()
+        {
+            using (Form dlg = new Form())
+            {
+                dlg.Text = "Register New Form / Module";
+                dlg.Size = new Size(420, 260);
+                dlg.StartPosition = FormStartPosition.CenterParent;
+                dlg.FormBorderStyle = FormBorderStyle.FixedDialog;
+                dlg.MaximizeBox = false;
+                dlg.MinimizeBox = false;
+                dlg.BackColor = Color.White;
+
+                Label lblName = new Label { Text = "Form / Module Name:", Location = new Point(20, 20), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
+                TextBox txtName = new TextBox { Location = new Point(20, 42), Size = new Size(360, 24), Font = new Font("Segoe UI", 9.5f) };
+
+                Label lblKey = new Label { Text = "Form Key / Tool Key:", Location = new Point(20, 75), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
+                TextBox txtKey = new TextBox { Location = new Point(20, 97), Size = new Size(360, 24), Font = new Font("Segoe UI", 9.5f) };
+
+                Label lblCat = new Label { Text = "Category:", Location = new Point(20, 130), AutoSize = true, Font = new Font("Segoe UI", 9f, FontStyle.Bold) };
+                ComboBox cmbCat = new ComboBox { Location = new Point(20, 152), Size = new Size(360, 24), DropDownStyle = ComboBoxStyle.DropDownList, Font = new Font("Segoe UI", 9.5f) };
+                cmbCat.Items.AddRange(new object[] { "Reports", "Master", "Transaction", "Accounts", "Settings", "Utilities" });
+                cmbCat.SelectedIndex = 0;
+
+                txtName.TextChanged += (s, e) =>
+                {
+                    if (string.IsNullOrWhiteSpace(txtKey.Text) || txtKey.Tag == null)
+                    {
+                        txtKey.Text = txtName.Text.Replace(" ", "").ToLowerInvariant();
+                        txtKey.Tag = null;
+                    }
+                };
+                txtKey.KeyDown += (s, e) => txtKey.Tag = "manual";
+
+                Button btnAdd = new Button
+                {
+                    Text = "Register Form",
+                    DialogResult = DialogResult.OK,
+                    Location = new Point(160, 190),
+                    Size = new Size(110, 30),
+                    BackColor = Color.FromArgb(0, 120, 215),
+                    ForeColor = Color.White,
+                    FlatStyle = FlatStyle.Flat,
+                    Font = new Font("Segoe UI", 9f, FontStyle.Bold)
+                };
+                btnAdd.FlatAppearance.BorderSize = 0;
+
+                Button btnCancel = new Button
+                {
+                    Text = "Cancel",
+                    DialogResult = DialogResult.Cancel,
+                    Location = new Point(280, 190),
+                    Size = new Size(100, 30),
+                    BackColor = Color.Gray,
+                    ForeColor = Color.White,
+                    FlatStyle = FlatStyle.Flat,
+                    Font = new Font("Segoe UI", 9f, FontStyle.Bold)
+                };
+                btnCancel.FlatAppearance.BorderSize = 0;
+
+                dlg.Controls.AddRange(new Control[] { lblName, txtName, lblKey, txtKey, lblCat, cmbCat, btnAdd, btnCancel });
+                dlg.AcceptButton = btnAdd;
+                dlg.CancelButton = btnCancel;
+
+                if (dlg.ShowDialog(this) == DialogResult.OK)
+                {
+                    string formName = txtName.Text.Trim();
+                    string formKey = txtKey.Text.Trim();
+                    string category = cmbCat.SelectedItem?.ToString() ?? "Reports";
+
+                    if (string.IsNullOrEmpty(formName))
+                    {
+                        MessageBox.Show("Please enter a form name.", "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                        return;
+                    }
+
+                    if (string.IsNullOrEmpty(formKey))
+                        formKey = formName.Replace(" ", "").ToLowerInvariant();
+
+                    bool registered = _permRepo.RegisterNewForm(formKey, formName, category);
+                    if (registered)
+                    {
+                        if (_selectedRoleId > 0)
+                        {
+                            LoadPermissionsForRole(_selectedRoleId);
+                        }
+                        LoadCategoryFilter();
+                        MessageBox.Show($"Form '{formName}' registered successfully and added to permissions list!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    }
+                    else
+                    {
+                        MessageBox.Show("Failed to register new form in database.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
+                }
             }
         }
 

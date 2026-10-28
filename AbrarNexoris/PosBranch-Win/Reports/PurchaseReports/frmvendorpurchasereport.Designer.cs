@@ -496,12 +496,14 @@ namespace PosBranch_Win.Reports.PurchaseReports
             // 
             // dtpFrom
             // 
+            this.dtpFrom.DateTime = new System.DateTime(2026, 10, 27, 0, 0, 0, 0);
             this.dtpFrom.Dock = System.Windows.Forms.DockStyle.Fill;
             this.dtpFrom.Font = new System.Drawing.Font("Segoe UI", 9F);
             this.dtpFrom.Location = new System.Drawing.Point(0, 18);
             this.dtpFrom.Name = "dtpFrom";
             this.dtpFrom.Size = new System.Drawing.Size(154, 25);
             this.dtpFrom.TabIndex = 1;
+            this.dtpFrom.Value = new System.DateTime(2026, 10, 27, 0, 0, 0, 0);
             this.dtpFrom.ValueChanged += new System.EventHandler(this.DatePicker_ValueChanged);
             // 
             // lblFrom
@@ -529,12 +531,14 @@ namespace PosBranch_Win.Reports.PurchaseReports
             // 
             // dtpTo
             // 
+            this.dtpTo.DateTime = new System.DateTime(2026, 10, 27, 0, 0, 0, 0);
             this.dtpTo.Dock = System.Windows.Forms.DockStyle.Fill;
             this.dtpTo.Font = new System.Drawing.Font("Segoe UI", 9F);
             this.dtpTo.Location = new System.Drawing.Point(0, 18);
             this.dtpTo.Name = "dtpTo";
             this.dtpTo.Size = new System.Drawing.Size(154, 25);
             this.dtpTo.TabIndex = 1;
+            this.dtpTo.Value = new System.DateTime(2026, 10, 27, 0, 0, 0, 0);
             this.dtpTo.ValueChanged += new System.EventHandler(this.DatePicker_ValueChanged);
             // 
             // lblTo

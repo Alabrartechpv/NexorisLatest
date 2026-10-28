@@ -236,7 +236,6 @@ namespace PosBranch_Win.Reports.InventoryReport
             this.panelGrid.Dock = System.Windows.Forms.DockStyle.Fill;
             this.panelGrid.Location = new System.Drawing.Point(0, 64);
             this.panelGrid.Name = "panelGrid";
-            this.panelGrid.Padding = new System.Windows.Forms.Padding(0);
             this.panelGrid.Size = new System.Drawing.Size(1250, 565);
             this.panelGrid.TabIndex = 0;
             // 
@@ -253,7 +252,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             this.gridReport.Dock = System.Windows.Forms.DockStyle.Fill;
             this.gridReport.Location = new System.Drawing.Point(0, 0);
             this.gridReport.Name = "gridReport";
-            this.gridReport.Size = new System.Drawing.Size(1250, 539);
+            this.gridReport.Size = new System.Drawing.Size(1250, 565);
             this.gridReport.TabIndex = 0;
             // 
             // panelSummary
@@ -408,7 +407,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             this.Font = new System.Drawing.Font("Segoe UI", 9F);
             this.Name = "frmStockAdjustmentReport";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
-            this.Text = "Stock Adjustment Report";
+            this.Text = "                                                    ";
             this.Load += new System.EventHandler(this.FrmStockAdjustmentReport_Load);
             this.panelFilters.ClientArea.ResumeLayout(false);
             this.panelFilters.ClientArea.PerformLayout();
