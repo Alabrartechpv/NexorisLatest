@@ -489,7 +489,12 @@ namespace PosBranch_Win.Dashboard
                 CreateKpiCard("39. Cash In / Out", "Total cash movement: Money In vs Money Out", FormatCurr(_model.NetCashFlow), $"In: {FormatCurr(_model.TotalCashIn)} | Out: {FormatCurr(_model.TotalCashOut)}", _model.NetCashFlow >= 0 ? Color.FromArgb(46, 125, 50) : Color.FromArgb(198, 40, 40), () => DrillDown("CashInOutReport")),
 
                 // 40. Daily Tender Split (Cash vs Bank/UPI Sales & Reconciliation)
-                CreateKpiCard("40. Cash vs Bank Sales", "Daily sales tender breakup: Cash vs Bank/UPI/Card with day-end reconciliation", FormatCurr((_model.DailyCashSales + _model.DailyBankSales) > 0 ? (_model.DailyCashSales + _model.DailyBankSales) : _model.TotalSalesRevenue), $"Cash: {FormatCurr(_model.DailyCashSales)} | Bank: {FormatCurr(_model.DailyBankSales)}", Color.FromArgb(13, 148, 136), () => DrillDown("CounterReport")),
+                CreateKpiCard("40. Cash vs Bank Sales", "Daily sales tender breakup: Cash vs Bank/UPI/Card with day-end reconciliation", 
+                    FormatCurr((_model.DailyCashSales + _model.DailyBankSales + _model.DailyCreditSales) > 0 ? (_model.DailyCashSales + _model.DailyBankSales + _model.DailyCreditSales) : _model.TotalSalesRevenue), 
+                    _model.DailyCreditSales > 0 
+                        ? $"Cash: {FormatCurr(_model.DailyCashSales)} | Bank: {FormatCurr(_model.DailyBankSales)} | Cr: {FormatCurr(_model.DailyCreditSales)}" 
+                        : $"Cash: {FormatCurr(_model.DailyCashSales)} | Bank: {FormatCurr(_model.DailyBankSales)}", 
+                    Color.FromArgb(13, 148, 136), () => DrillDown("CounterReport")),
 
                 // 41. Counter Cash Shortage / Excess Tracker (Discrepancy Audit)
                 CreateKpiCard("41. Shortage / Excess", "Counter cash discrepancy: Counted vs System Expected cash (Shift/Day Close)",
