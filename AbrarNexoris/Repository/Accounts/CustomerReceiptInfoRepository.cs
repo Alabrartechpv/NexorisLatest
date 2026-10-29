@@ -241,31 +241,23 @@ namespace Repository.Accounts
                                 return false; // Missing payment method
                             }
 
-                             // Resolve the actual Ledger ID for the selected payment mode via POS_PayMode SP
+                             // Resolve the actual Ledger ID for the selected payment mode from PayMode table
                              int cashLedgerId = 0;
                              try
                              {
-                                 using (SqlCommand paymodeCmd = new SqlCommand(STOREDPROCEDURE.POS_PayMode, conn, transaction))
+                                 using (SqlCommand paymodeCmd = new SqlCommand("SELECT LedgerID FROM PayMode WHERE PayModeID = @PayModeID", conn, transaction))
                                  {
-                                     paymodeCmd.CommandType = CommandType.StoredProcedure;
-                                     paymodeCmd.Parameters.AddWithValue("@PaymodeId", paymentMethodId);
-                                     paymodeCmd.Parameters.AddWithValue("@_Operation", "GETBYID");
-                                     using (SqlDataAdapter da = new SqlDataAdapter(paymodeCmd))
+                                     paymodeCmd.Parameters.AddWithValue("@PayModeID", paymentMethodId);
+                                     object result = paymodeCmd.ExecuteScalar();
+                                     if (result != null && result != DBNull.Value)
                                      {
-                                         DataTable dtPaymode = new DataTable();
-                                         da.Fill(dtPaymode);
-                                         if (dtPaymode != null && dtPaymode.Rows.Count > 0 &&
-                                             dtPaymode.Columns.Contains("LedgerID") &&
-                                             dtPaymode.Rows[0]["LedgerID"] != DBNull.Value)
-                                         {
-                                             cashLedgerId = Convert.ToInt32(dtPaymode.Rows[0]["LedgerID"]);
-                                         }
+                                         cashLedgerId = Convert.ToInt32(result);
                                      }
                                  }
                              }
                              catch (Exception ex)
                              {
-                                 System.Diagnostics.Debug.WriteLine($"Error fetching LedgerID from POS_PayMode SP: {ex.Message}");
+                                 System.Diagnostics.Debug.WriteLine($"Error fetching LedgerID from PayMode table: {ex.Message}");
                              }
 
                              // Fallback to cash ledger if not resolved from PayMode SP
