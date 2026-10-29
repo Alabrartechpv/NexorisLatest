@@ -166,6 +166,17 @@ namespace Repository
             return int.TryParse(record.GetValue(ordinal).ToString(), out value) ? value : 0;
         }
 
+        private string GetString(IDataRecord record, string columnName)
+        {
+            int ordinal = GetOrdinal(record, columnName);
+            if (ordinal < 0 || record.IsDBNull(ordinal))
+            {
+                return string.Empty;
+            }
+
+            return record.GetValue(ordinal)?.ToString() ?? string.Empty;
+        }
+
         private int GetOrdinal(IDataRecord record, string columnName)
         {
             for (int i = 0; i < record.FieldCount; i++)
@@ -641,7 +652,9 @@ WHERE SessionId = @SessionId
                                 PhysicalCashCounted = reader["PhysicalCashCounted"] != DBNull.Value ? Convert.ToDecimal(reader["PhysicalCashCounted"]) : 0,
                                 CashDifference = reader["CashDifference"] != DBNull.Value ? Convert.ToDecimal(reader["CashDifference"]) : 0,
                                 Status = reader["Status"]?.ToString() ?? "",
-                                Counter = reader["Counter"]?.ToString() ?? ""
+                                Counter = reader["Counter"]?.ToString() ?? "",
+                                UserId = GetInt(reader, "UserId"),
+                                UserName = GetString(reader, "UserName")
                             };
 
                             historyList.Add(model);
@@ -660,12 +673,68 @@ WHERE SessionId = @SessionId
                     DataConnection.Close();
             }
 
+            if (historyList.Any(x => string.IsNullOrWhiteSpace(x.UserName)))
+            {
+                ResolveMissingUserNames(historyList);
+            }
+
             return historyList;
         }
 
         /// <summary>
         /// Get shift closing denominations by shift closing ID
         /// </summary>
+        private void ResolveMissingUserNames(List<ClosingModel> historyList)
+        {
+            if (historyList == null || historyList.Count == 0) return;
+
+            bool wasOpen = DataConnection.State == ConnectionState.Open;
+            try
+            {
+                if (!wasOpen)
+                    DataConnection.Open();
+
+                using (SqlCommand userCmd = new SqlCommand(@"
+                    SELECT SC.ShiftClosingId, ISNULL(U.UserName, ISNULL(U2.UserName, '')) AS UserName
+                    FROM ShiftClosing SC
+                    LEFT JOIN Users U ON U.UserID = SC.UserId
+                    LEFT JOIN Users U2 ON U2.UserID = SC.CreatedBy
+                    WHERE SC.IsDelete = 0", (SqlConnection)DataConnection))
+                {
+                    using (SqlDataReader userReader = userCmd.ExecuteReader())
+                    {
+                        var userMap = new Dictionary<int, string>();
+                        while (userReader.Read())
+                        {
+                            int id = Convert.ToInt32(userReader["ShiftClosingId"]);
+                            string name = userReader["UserName"]?.ToString() ?? "";
+                            if (!string.IsNullOrWhiteSpace(name))
+                            {
+                                userMap[id] = name;
+                            }
+                        }
+
+                        foreach (var item in historyList)
+                        {
+                            if (string.IsNullOrWhiteSpace(item.UserName) && userMap.TryGetValue(item.ShiftClosingId, out string resolvedName))
+                            {
+                                item.UserName = resolvedName;
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Could not resolve missing user names: {ex.Message}");
+            }
+            finally
+            {
+                if (!wasOpen && DataConnection.State == ConnectionState.Open)
+                    DataConnection.Close();
+            }
+        }
+
         public List<CashDetail> GetClosingDenominations(int shiftClosingId)
         {
             List<CashDetail> details = new List<CashDetail>();
