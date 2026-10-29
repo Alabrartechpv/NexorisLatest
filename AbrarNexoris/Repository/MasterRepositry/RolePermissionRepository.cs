@@ -21,6 +21,9 @@ namespace Repository.MasterRepositry
         /// <summary>
         /// Resolves all matching Role IDs across dbo.Roles and dbo.UserLevel for a given Role ID or Role Name
         /// </summary>
+        private static bool _rolesSeeded = false;
+        private static bool _formsSeeded = false;
+
         public List<int> GetTargetRoleIds(int roleId, string roleName = null)
         {
             var ids = new HashSet<int>();
@@ -793,6 +796,13 @@ END", (SqlConnection)DataConnection))
 
         private void EnsureRolesSeededInDatabase()
         {
+            if (_rolesSeeded) return;
+            _rolesSeeded = true;
+            EnsureRolesSeededInDatabase_Impl();
+        }
+
+        private void EnsureRolesSeededInDatabase_Impl()
+        {
             try
             {
                 if (DataConnection.State != ConnectionState.Open) DataConnection.Open();
@@ -882,6 +892,13 @@ END", (SqlConnection)DataConnection))
         private void EnsureActivityLogPermissionForm() => EnsureAllFormsSeededInDatabase();
 
         private void EnsureAllFormsSeededInDatabase()
+        {
+            if (_formsSeeded) return;
+            _formsSeeded = true;
+            EnsureAllFormsSeededInDatabase_Impl();
+        }
+
+        private void EnsureAllFormsSeededInDatabase_Impl()
         {
             try
             {

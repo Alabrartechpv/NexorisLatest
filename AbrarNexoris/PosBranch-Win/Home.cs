@@ -2422,7 +2422,7 @@ namespace PosBranch_Win
                                              toolKey == "FrmFormSearch";
 
                         bool isReportLauncher = toolKey == "Report";
-                        bool hasReportAccess = isAdmin || (ReportNavigatorDefinitions != null && ReportNavigatorDefinitions.Any(def => SessionContext.CanView(def.Key) || SessionContext.CanView(def.ActionKey) || SessionContext.CanView(def.Text)));
+                        bool hasReportAccess = isReportLauncher && (isAdmin || (ReportNavigatorDefinitions != null && ReportNavigatorDefinitions.Any(def => SessionContext.CanView(def.Key) || SessionContext.CanView(def.ActionKey) || SessionContext.CanView(def.Text))));
                         bool hasPermission = isAdmin || isGlobalAction || (isReportLauncher ? hasReportAccess : SessionContext.CanView(permCheckKey));
                         
                         if (tool.SharedProps != null)
@@ -2469,7 +2469,7 @@ namespace PosBranch_Win
                                                                  toolKey == "StockLookup" || toolKey == "FrmFormSearch";
 
                                             bool isReportLauncher = toolKey == "Report";
-                        bool hasReportAccess = isAdmin || (ReportNavigatorDefinitions != null && ReportNavigatorDefinitions.Any(def => SessionContext.CanView(def.Key) || SessionContext.CanView(def.ActionKey) || SessionContext.CanView(def.Text)));
+                        bool hasReportAccess = isReportLauncher && (isAdmin || (ReportNavigatorDefinitions != null && ReportNavigatorDefinitions.Any(def => SessionContext.CanView(def.Key) || SessionContext.CanView(def.ActionKey) || SessionContext.CanView(def.Text))));
                         bool hasPermission = isAdmin || isGlobalAction || (isReportLauncher ? hasReportAccess : SessionContext.CanView(permCheckKey));
                                             
                                             tool.SharedProps.Visible = true;
