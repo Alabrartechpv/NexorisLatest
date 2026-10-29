@@ -2555,7 +2555,7 @@ namespace PosBranch_Win
                         {
                             if (fItem.Key == "AddToFavourite") continue;
                             bool fAllowed = isAdmin || SessionContext.CanView(fItem.Key) || SessionContext.CanView(fItem.Text);
-                            fItem.Visible = fAllowed;
+                            fItem.Visible = true;
                             fItem.Settings.Enabled = fAllowed ? Infragistics.Win.DefaultableBoolean.True : Infragistics.Win.DefaultableBoolean.False;
                         }
                     }
@@ -2596,9 +2596,10 @@ namespace PosBranch_Win
                         if (tool.SharedProps != null)
                         {
                             tool.SharedProps.Enabled = hasPermission;
-                            if (!isAdmin && !isGlobalAction)
+                            tool.SharedProps.Visible = true;
+                            // show all forms always; permission controls enablement
                             {
-                                tool.SharedProps.Visible = hasPermission;
+                                // show all forms always; permission controls enablement
                             }
                         }
                     }
@@ -2639,23 +2640,23 @@ namespace PosBranch_Win
                         bool hasReportAccess = isAdmin || (ReportNavigatorDefinitions != null && ReportNavigatorDefinitions.Any(def => SessionContext.CanView(def.Key) || SessionContext.CanView(def.ActionKey) || SessionContext.CanView(def.Text)));
                         bool hasPermission = isAdmin || isGlobalAction || (isReportLauncher ? hasReportAccess : SessionContext.CanView(permCheckKey));
                                             
-                                            tool.SharedProps.Visible = isAdmin || isGlobalAction || hasPermission;
+                                            tool.SharedProps.Visible = true;
                                             tool.SharedProps.Enabled = hasPermission;
                                             if (tool.InstanceProps != null)
                                             {
-                                                tool.InstanceProps.Visible = (isAdmin || isGlobalAction || hasPermission) ? Infragistics.Win.DefaultableBoolean.True : Infragistics.Win.DefaultableBoolean.False;
+                                                tool.InstanceProps.Visible = Infragistics.Win.DefaultableBoolean.True;
                                                 if (hasPermission) { groupHasVisibleTools = true; tabHasVisibleTools = true; }
                                             }
                                         }
                                         catch { }
                                     }
 
-                                    group.Visible = isAdmin || groupHasVisibleTools;
+                                    group.Visible = true;
                                 }
                                 catch { }
                             }
 
-                            tab.Visible = isAdmin || tabHasVisibleTools;
+                            tab.Visible = true;
                         }
                         catch { }
                     }
@@ -2694,12 +2695,12 @@ namespace PosBranch_Win
                                        SessionContext.CanView(permActionKey) ||
                                        SessionContext.CanView(cleanText);
 
-                        item.Visible = canView;
+                        item.Visible = true;
                         item.Settings.Enabled = canView ? Infragistics.Win.DefaultableBoolean.True : Infragistics.Win.DefaultableBoolean.False;
                         if (canView) visibleCount++;
                     }
 
-                    group.Visible = isAdmin || (visibleCount > 0);
+                    group.Visible = true;
                 }
             }
             catch (Exception ex)
