@@ -411,6 +411,7 @@ namespace PosBranch_Win.Settings
 
         private void btnSave_Click(object sender, EventArgs e)
         {
+            if (cmbRoles.SelectedValue != null && int.TryParse(cmbRoles.SelectedValue.ToString(), out int cboVal) && cboVal > 0) _selectedRoleId = cboVal; else if (cmbRoles.SelectedItem is Role selRole && selRole.RoleID > 0) _selectedRoleId = selRole.RoleID;
             if (_selectedRoleId <= 0)
             {
                 MessageBox.Show("Please select a role first.", "Validation",
@@ -446,7 +447,7 @@ namespace PosBranch_Win.Settings
                 }
 
                 // Save master permissions list to database
-                string result = _permRepo.SavePermissions(_selectedRoleId, _currentPermissions);
+                string result = _permRepo.SavePermissions(_selectedRoleId, _currentPermissions, cmbRoles.Text?.Trim());
 
                 if (result == "Success")
                 {
@@ -487,6 +488,12 @@ namespace PosBranch_Win.Settings
 
         private void BtnGrantViewAll_Click(object sender, EventArgs e)
         {
+            if (_currentPermissions != null) { foreach (var p in _currentPermissions) { p.CanView = true; } }
+            BtnGrantViewAll_Impl(sender, e);
+        }
+
+        private void BtnGrantViewAll_Impl(object sender, EventArgs e)
+        {
             dgvPermissions.EndEdit();
             foreach (DataGridViewRow row in dgvPermissions.Rows)
             {
@@ -502,6 +509,12 @@ namespace PosBranch_Win.Settings
         /// Grants all permissions to the selected role
         /// </summary>
         private void btnGrantAll_Click(object sender, EventArgs e)
+        {
+            if (_currentPermissions != null) { foreach (var p in _currentPermissions) { p.CanView = true; p.CanAdd = true; p.CanEdit = true; p.CanDelete = true; } }
+            btnGrantAll_Impl(sender, e);
+        }
+
+        private void btnGrantAll_Impl(object sender, EventArgs e)
         {
             dgvPermissions.EndEdit();
             foreach (DataGridViewRow row in dgvPermissions.Rows)
@@ -526,6 +539,12 @@ namespace PosBranch_Win.Settings
         /// Revokes all permissions from the selected role
         /// </summary>
         private void btnRevokeAll_Click(object sender, EventArgs e)
+        {
+            if (_currentPermissions != null) { foreach (var p in _currentPermissions) { p.CanView = false; p.CanAdd = false; p.CanEdit = false; p.CanDelete = false; } }
+            btnRevokeAll_Impl(sender, e);
+        }
+
+        private void btnRevokeAll_Impl(object sender, EventArgs e)
         {
             dgvPermissions.EndEdit();
             foreach (DataGridViewRow row in dgvPermissions.Rows)
