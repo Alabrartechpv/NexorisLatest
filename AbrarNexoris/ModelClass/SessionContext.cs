@@ -1560,7 +1560,7 @@ namespace ModelClass
             {
                 if (_permissions.TryGetValue(eq, out var pe) && pe != null && pe.CanView) return true;
             }
-            return CanViewInternal(formKey);
+            return false;
         }
 
         private static bool CanViewInternal(string formKey)
@@ -1603,7 +1603,7 @@ namespace ModelClass
             {
                 if (_permissions.TryGetValue(eq, out var pe) && pe != null && pe.CanAdd) return true;
             }
-            return CanAddInternal(formKey);
+            return false;
         }
 
         private static bool CanAddInternal(string formKey)
@@ -1646,7 +1646,7 @@ namespace ModelClass
             {
                 if (_permissions.TryGetValue(eq, out var pe) && pe != null && pe.CanEdit) return true;
             }
-            return CanEditInternal(formKey);
+            return false;
         }
 
         private static bool CanEditInternal(string formKey)
@@ -1689,7 +1689,7 @@ namespace ModelClass
             {
                 if (_permissions.TryGetValue(eq, out var pe) && pe != null && pe.CanDelete) return true;
             }
-            return CanDeleteInternal(formKey);
+            return false;
         }
 
         private static bool CanDeleteInternal(string formKey)
@@ -1733,7 +1733,7 @@ namespace ModelClass
             {
                 if (_permissions.TryGetValue(eq, out var pe) && pe != null) return pe;
             }
-            return GetPermissionInternal(formKey);
+            return null;
         }
 
         private static Master.RolePermission GetPermissionInternal(string formKey)
