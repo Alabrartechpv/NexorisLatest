@@ -176,12 +176,12 @@ ELSE IF OBJECT_ID('dbo.UserLevel', 'U') IS NOT NULL
             return ids.Count > 0 ? ids.ToList() : new List<int> { roleId };
         }
 
-        public List<RolePermission> GetPermissionsByRoleId(int roleId, string roleName = null)
+        public List<RolePermission> GetPermissionsByRoleId(int roleId)
         {
             List<RolePermission> savedPermissions = new List<RolePermission>();
 
             // Resolve all matching role IDs (e.g., both RoleID=4 and UserLevelID=3 for Cashier)
-            List<int> targetRoleIds = GetTargetRoleIds(roleId, roleName);
+            List<int> targetRoleIds = GetTargetRoleIds(roleId);
             try
             {
                 var allRoles = GetAllRoles();
@@ -1242,7 +1242,7 @@ END", (SqlConnection)DataConnection))
 
             if (permissions == null || permissions.Count == 0) return "Success";
 
-            List<int> targetRoleIds = GetTargetRoleIds(roleId, roleName);
+            List<int> targetRoleIds = GetTargetRoleIds(roleId);
             try
             {
                 var allRoles = GetAllRoles();
