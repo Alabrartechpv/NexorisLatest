@@ -305,7 +305,9 @@ namespace PosBranch_Win.Settings
         {
             try
             {
-                _currentPermissions = _permRepo.GetFormsWithPermissions(roleId);
+                string roleText = cmbRoles.Text?.Trim();
+                if (string.IsNullOrWhiteSpace(roleText) && cmbRoles.SelectedItem is Role r) roleText = r.RoleName?.Trim();
+                _currentPermissions = _permRepo.GetFormsWithPermissions(roleId, roleText);
                 LoadCategoryFilter();
                 ApplyFilter();
             }
@@ -460,7 +462,7 @@ namespace PosBranch_Win.Settings
                         var targetIds = _permRepo.GetTargetRoleIds(_selectedRoleId, cmbRoles.Text?.Trim());
                         if (targetIds.Contains(SessionContext.RoleId) || string.Equals(cmbRoles.Text?.Trim(), SessionContext.UserLevel?.Trim(), StringComparison.OrdinalIgnoreCase))
                         {
-                            var updatedPerms = _permRepo.GetPermissionsByRoleId(SessionContext.RoleId);
+                            var updatedPerms = _permRepo.GetPermissionsByRoleId(SessionContext.RoleId, SessionContext.UserLevel?.Trim());
                             SessionContext.LoadPermissions(updatedPerms);
                             foreach (Form f in Application.OpenForms)
                             {

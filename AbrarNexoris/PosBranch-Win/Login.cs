@@ -572,7 +572,7 @@ namespace PosBranch_Win
                         SessionContext.RoleId = roleId;
                         SessionContext.UserLevel = matchedRoleName; // Crucial: Ensures SessionContext.IsAdmin evaluates correctly!
 
-                        var permissions = permRepo.GetPermissionsByRoleId(roleId);
+                        var permissions = permRepo.GetPermissionsByRoleId(roleId, matchedRoleName);
                         SessionContext.LoadPermissions(permissions);
                     }
                     else if (!string.IsNullOrWhiteSpace(matchedRoleName))
@@ -583,7 +583,7 @@ namespace PosBranch_Win
                         {
                             roleId = targetIds[0];
                             SessionContext.RoleId = roleId;
-                            var permissions = permRepo.GetPermissionsByRoleId(roleId);
+                            var permissions = permRepo.GetPermissionsByRoleId(roleId, matchedRoleName);
                             SessionContext.LoadPermissions(permissions);
                         }
                     }
