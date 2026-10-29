@@ -407,7 +407,7 @@ namespace PosBranch_Win.Reports.InventoryReport
             this.Font = new System.Drawing.Font("Segoe UI", 9F);
             this.Name = "frmStockAdjustmentReport";
             this.StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen;
-            this.Text = "                                                    ";
+            this.Text = "sdasd";
             this.Load += new System.EventHandler(this.FrmStockAdjustmentReport_Load);
             this.panelFilters.ClientArea.ResumeLayout(false);
             this.panelFilters.ClientArea.PerformLayout();
