@@ -408,6 +408,24 @@ namespace PosBranch_Win.DialogBox
                     col.CellAppearance.TextHAlign = HAlign.Left;
                     col.Width = 100;
                 }
+                if (band.Columns.Exists("Counter"))
+                {
+                    var col = band.Columns["Counter"];
+                    col.Hidden = false;
+                    col.Header.VisiblePosition = position++;
+                    col.Header.Caption = "Counter";
+                    col.CellAppearance.TextHAlign = HAlign.Left;
+                    col.Width = 100;
+                }
+                if (band.Columns.Exists("UserName"))
+                {
+                    var col = band.Columns["UserName"];
+                    col.Hidden = false;
+                    col.Header.VisiblePosition = position++;
+                    col.Header.Caption = "Closed By";
+                    col.CellAppearance.TextHAlign = HAlign.Left;
+                    col.Width = 100;
+                }
                 if (band.Columns.Exists("TransactionDate"))
                 {
                     var col = band.Columns["TransactionDate"];
@@ -507,9 +525,9 @@ namespace PosBranch_Win.DialogBox
 
                 // Hide other columns that are not explicitly shown
                 string[] visibleColumns = showSensitiveCashDetails
-                    ? new[] { "DocNo", "TransactionDate", "NetSales", "TotalCollection",
+                    ? new[] { "DocNo", "Counter", "UserName", "TransactionDate", "NetSales", "TotalCollection",
                         "CashSale", "CardSale", "UpiSale", "PhysicalCashCounted", "CashDifference", "Status" }
-                    : new[] { "DocNo", "TransactionDate", "Status" };
+                    : new[] { "DocNo", "Counter", "UserName", "TransactionDate", "Status" };
                 foreach (UltraGridColumn col in band.Columns)
                 {
                     if (!visibleColumns.Contains(col.Key))
@@ -555,6 +573,7 @@ namespace PosBranch_Win.DialogBox
                         default: // All
                             filtered = closingHistoryListData.Where(p =>
                                 (p.DocNo ?? "").ToLower().Contains(searchText) ||
+                                (p.UserName ?? "").ToLower().Contains(searchText) ||
                                 (p.Counter ?? "").ToLower().Contains(searchText));
                             break;
                     }
