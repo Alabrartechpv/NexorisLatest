@@ -1386,13 +1386,17 @@ namespace ModelClass
                         RegisterAlias("account group setup", p);
                         RegisterAlias("frmaccountgroup", p);
                     }
-                    if (normKey == "chartofaccount" || normName.Contains("chart of account"))
+                    if (normKey.Contains("chart") || normName.Contains("chart"))
                     {
                         RegisterAlias("chartofaccount", p);
                         RegisterAlias("chart of account", p);
                         RegisterAlias("chart of accounts", p);
                         RegisterAlias("frmchartofacc", p);
+                        RegisterAlias("chartofacc", p);
+                        RegisterAlias("chart of acc", p);
+                        RegisterAlias("chart of acc.", p);
                         RegisterAlias("frmchartofaccount", p);
+                        RegisterAlias("frmchartofaccounts", p);
                     }
                     if ((normKey == "receipt" || normName == "customer receipt") && !normKey.Contains("report") && !normName.Contains("report"))
                     {
@@ -1504,6 +1508,13 @@ namespace ModelClass
                         RegisterAlias("nexoris ai", p);
                         RegisterAlias("frmnexorisaisettings", p);
                     }
+                    if (normKey.Contains("database") || normName.Contains("database"))
+                    {
+                        RegisterAlias("database", p);
+                        RegisterAlias("databasemaintenance", p);
+                        RegisterAlias("frmdatabase", p);
+                        RegisterAlias("database backup", p);
+                    }
                 }
             }
             System.Diagnostics.Debug.WriteLine($"Loaded {_permissions.Count} permission entries for role ID {RoleId}");
@@ -1538,12 +1549,31 @@ namespace ModelClass
                 yield return "frmledgers";
                 yield return "frmledger";
             }
+            else if (normKey == "database" || normKey == "databasemaintenance" || normKey == "frmdatabase")
+            {
+                yield return "database";
+                yield return "databasemaintenance";
+                yield return "frmdatabase";
+                yield return "database backup";
+            }
             else if (normKey == "closing" || normKey == "btnclosing" || normKey == "counterclosing")
             {
                 yield return "closing";
                 yield return "btnclosing";
                 yield return "counterclosing";
                 yield return "frmclosing";
+            }
+            else if (normKey.Contains("chart"))
+            {
+                yield return "chartofaccount";
+                yield return "chart of account";
+                yield return "chart of accounts";
+                yield return "chartofacc";
+                yield return "chart of acc";
+                yield return "chart of acc.";
+                yield return "frmchartofacc";
+                yield return "frmchartofaccount";
+                yield return "frmchartofaccounts";
             }
         }
 

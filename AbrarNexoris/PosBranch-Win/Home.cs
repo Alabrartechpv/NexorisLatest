@@ -1621,7 +1621,7 @@ namespace PosBranch_Win
             ApplyLanguageToAllForms();
         }
 
-        /// <summary>
+
         /// Programmatically ensures the "Item Type" button exists in the Utilities ribbon group.
         /// Scans ALL tabs and groups to find the one that contains UnitMaster/Users/Paymode.
         /// Safe to call multiple times — never creates duplicates.
@@ -1718,7 +1718,7 @@ namespace PosBranch_Win
             }
         }
 
-        /// <summary>
+
         /// Programmatically ensures the "SEARCH" button (Ctrl+S) exists in the Home ribbon tab.
         /// When clicked or triggered by Ctrl+S, opens the Form Search dialog (FrmFormSearch).
         /// </summary>
@@ -1929,7 +1929,7 @@ namespace PosBranch_Win
             return bmp;
         }
 
-        /// <summary>
+
         /// Programmatically ensures the "Vendor Payment Report" button exists in the Vendor ribbon tab.
         /// Places it directly in the Report group so users can easily launch it from the ribbon.
         /// Safe to call multiple times.
@@ -2044,7 +2044,7 @@ namespace PosBranch_Win
             }
         }
 
-        /// <summary>
+
         /// Programmatically ensures the Purchase, Stock Adjustment, Purchase Return, Sales Return, Payment, Receipt
         /// buttons exist in the Home ribbon tab immediately following the Exit (F4) button.
         /// Safe to call multiple times without creating duplicates.
@@ -2254,7 +2254,7 @@ namespace PosBranch_Win
             }
         }
 
-        /// <summary>
+
         /// Adjusts the tab control appearance
         /// </summary>
         private void AdjustTabControlAppearance()
@@ -2283,7 +2283,7 @@ namespace PosBranch_Win
             }
         }
 
-        /// <summary>
+
         /// Configures tab appearance and handles selection changes
         /// </summary>
         private void ConfigureTabAppearance()
@@ -2328,7 +2328,7 @@ namespace PosBranch_Win
             catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Tab config error: {ex.Message}"); }
         }
 
-        /// <summary>
+
         /// Helper method to set tab appearance properties
         /// </summary>
         private void SetTabAppearanceProperty(string propertyName, string subProperty, object value)
@@ -2343,7 +2343,7 @@ namespace PosBranch_Win
             catch { /* Ignore reflection errors */ }
         }
 
-        /// <summary>
+
         /// Applies styling to a tab (active or inactive)
         /// </summary>
         private void ApplyTabStyling(Infragistics.Win.UltraWinTabControl.UltraTab tab, bool isActive)
@@ -2362,7 +2362,7 @@ namespace PosBranch_Win
             catch { /* Ignore reflection errors */ }
         }
 
-        /// <summary>
+
         /// Tries to enable close buttons using reflection for UltraTabControl v22.2
         /// </summary>
         private void EnableCloseButtons()
@@ -2410,7 +2410,7 @@ namespace PosBranch_Win
         }
 
 
-        /// <summary>
+
         /// Handles tab closing event
         /// </summary>
         private void TabControlMain_TabClosed(object sender, Infragistics.Win.UltraWinTabControl.TabClosedEventArgs e)
@@ -2444,7 +2444,7 @@ namespace PosBranch_Win
             }
         }
 
-        /// <summary>
+
         /// Handles tab closing event (before closing)
         /// </summary>
         private void TabControlMain_TabClosing(object sender, Infragistics.Win.UltraWinTabControl.TabClosingEventArgs e)
@@ -2535,8 +2535,60 @@ namespace PosBranch_Win
 
         // (removed obsolete ToolClick handler, using ultraToolbarsManager1_ToolClick_1)
 
+        private static readonly Dictionary<Image, Image> _disabledImageCache = new Dictionary<Image, Image>();
+        private static readonly Dictionary<string, Image> _originalSmallImages = new Dictionary<string, Image>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, Image> _originalLargeImages = new Dictionary<string, Image>(StringComparer.OrdinalIgnoreCase);
+
+        private static Image GetGrayscaleImage(Image original)
+        {
+            if (original == null) return null;
+            lock (_disabledImageCache)
+            {
+                if (_disabledImageCache.TryGetValue(original, out Image cached))
+                    return cached;
+
+                try
+                {
+                    Bitmap bmp = new Bitmap(original.Width, original.Height);
+                    using (Graphics g = Graphics.FromImage(bmp))
+                    {
+                        var cm = new System.Drawing.Imaging.ColorMatrix(new float[][]
+                        {
+                            new float[] { 0.299f, 0.299f, 0.299f, 0, 0 },
+                            new float[] { 0.587f, 0.587f, 0.587f, 0, 0 },
+                            new float[] { 0.114f, 0.114f, 0.114f, 0, 0 },
+                            new float[] { 0,      0,      0,      0.55f, 0 },
+                            new float[] { 0.15f,  0.15f,  0.15f,  0, 1 }
+                        });
+                        using (var ia = new System.Drawing.Imaging.ImageAttributes())
+                        {
+                            ia.SetColorMatrix(cm);
+                            g.DrawImage(original, new Rectangle(0, 0, original.Width, original.Height),
+                                0, 0, original.Width, original.Height, GraphicsUnit.Pixel, ia);
+                        }
+                    }
+                    _disabledImageCache[original] = bmp;
+                    return bmp;
+                }
+                catch
+                {
+                    return original;
+                }
+            }
+        }
+
+
+
+        private static bool IsGlobalActionTool(string toolKey)
+        {
+            if (string.IsNullOrWhiteSpace(toolKey)) return false;
+            string tk = toolKey.Trim();
+            return tk == "Save" || tk == "Delet" || tk == "Clear" || tk == "Remove" || tk == "Exit" ||
+                   tk == "LogOff" || tk == "LogIn" || tk == "Hold" || tk == "LastBill" ||
+                   tk == "Search" || tk == "SEARCH" || tk == "StockLookup" || tk == "FrmFormSearch";
+        }
+
         /// <summary>
-        /// Applies role-based permissions to toolbar buttons.
         /// Disables buttons that the user does not have CanView permission for.
         /// </summary>
         public void ApplyRolePermissions()
@@ -2545,6 +2597,9 @@ namespace PosBranch_Win
             {
                 bool isAdmin = SessionContext.IsAdmin;
                 ApplyReportNavigatorPermissions();
+
+                // (RadialMenu permissions check skipped)
+
 
                 if (ultraExplorerBarSideMenu != null && ultraExplorerBarSideMenu.Groups.Exists("MyFavouriteMenu"))
                 {
@@ -2557,10 +2612,45 @@ namespace PosBranch_Win
                             bool fAllowed = isAdmin || SessionContext.CanView(fItem.Key) || SessionContext.CanView(fItem.Text);
                             fItem.Visible = true;
                             fItem.Settings.Enabled = fAllowed ? Infragistics.Win.DefaultableBoolean.True : Infragistics.Win.DefaultableBoolean.False;
+
+
                         }
                     }
                     catch { }
                 }
+
+                // Ensure Dashboard tools have valid icons assigned if resource was missing or corrupted
+                try
+                {
+                    if (ultraToolbarsManager1.Tools.Exists("Overview"))
+                    {
+                        var t = ultraToolbarsManager1.Tools["Overview"];
+                        var img = global::PosBranch_Win.Properties.Resources.market_share;
+                        if (t.SharedProps.AppearancesLarge.Appearance == null) t.SharedProps.AppearancesLarge.Appearance = new Infragistics.Win.Appearance();
+                        if (t.SharedProps.AppearancesSmall.Appearance == null) t.SharedProps.AppearancesSmall.Appearance = new Infragistics.Win.Appearance();
+                        t.SharedProps.AppearancesLarge.Appearance.Image = img;
+                        t.SharedProps.AppearancesSmall.Appearance.Image = img;
+                    }
+                    if (ultraToolbarsManager1.Tools.Exists("BusinessSummary"))
+                    {
+                        var t = ultraToolbarsManager1.Tools["BusinessSummary"];
+                        var img = global::PosBranch_Win.Properties.Resources.revenue;
+                        if (t.SharedProps.AppearancesLarge.Appearance == null) t.SharedProps.AppearancesLarge.Appearance = new Infragistics.Win.Appearance();
+                        if (t.SharedProps.AppearancesSmall.Appearance == null) t.SharedProps.AppearancesSmall.Appearance = new Infragistics.Win.Appearance();
+                        t.SharedProps.AppearancesLarge.Appearance.Image = img;
+                        t.SharedProps.AppearancesSmall.Appearance.Image = img;
+                    }
+                    if (ultraToolbarsManager1.Tools.Exists("ExecutiveDashboard"))
+                    {
+                        var t = ultraToolbarsManager1.Tools["ExecutiveDashboard"];
+                        var img = global::PosBranch_Win.Properties.Resources.rate_of_return;
+                        if (t.SharedProps.AppearancesLarge.Appearance == null) t.SharedProps.AppearancesLarge.Appearance = new Infragistics.Win.Appearance();
+                        if (t.SharedProps.AppearancesSmall.Appearance == null) t.SharedProps.AppearancesSmall.Appearance = new Infragistics.Win.Appearance();
+                        t.SharedProps.AppearancesLarge.Appearance.Image = img;
+                        t.SharedProps.AppearancesSmall.Appearance.Image = img;
+                    }
+                }
+                catch { }
 
                 // 1. Iterate Shared Tools
                 foreach (Infragistics.Win.UltraWinToolbars.ToolBase tool in ultraToolbarsManager1.Tools)
@@ -2571,23 +2661,23 @@ namespace PosBranch_Win
                         string permCheckKey = ResolveCanonicalPermissionKey(toolKey);
                         if (toolKey == "SalesReturn") permCheckKey = "salesreturnreport";
                         else if (toolKey == "PurchaseReturn") permCheckKey = "purchasereturnreport";
-                        bool isGlobalAction = toolKey == "Save" ||
-                                             toolKey == "Delet" ||
-                                             toolKey == "Clear" ||
-                                             toolKey == "Remove" ||
-                                             toolKey == "Exit" ||
-
-                                             toolKey == "LogOff" ||
-                                             toolKey == "LogIn" ||
+                        bool isGlobalAction = IsGlobalActionTool(toolKey);
 
 
-                                             toolKey == "Hold" ||
-                                             toolKey == "LastBill" ||
-                                             toolKey == "Database" ||
-                                             toolKey == "Search" ||
-                                             toolKey == "SEARCH" ||
-                                             toolKey == "StockLookup" ||
-                                             toolKey == "FrmFormSearch";
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
                         bool isReportLauncher = toolKey == "Report";
                         bool hasReportAccess = isReportLauncher && (isAdmin || (ReportNavigatorDefinitions != null && ReportNavigatorDefinitions.Any(def => SessionContext.CanView(def.Key) || SessionContext.CanView(def.ActionKey) || SessionContext.CanView(def.Text))));
@@ -2596,10 +2686,42 @@ namespace PosBranch_Win
                         if (tool.SharedProps != null)
                         {
                             tool.SharedProps.Enabled = hasPermission;
-                            tool.SharedProps.Visible = true;
-                            // show all forms always; permission controls enablement
+
+                            if (!string.IsNullOrEmpty(toolKey))
                             {
-                                // show all forms always; permission controls enablement
+                                if (!_originalSmallImages.ContainsKey(toolKey))
+                                    _originalSmallImages[toolKey] = tool.SharedProps.AppearancesSmall?.Appearance?.Image as Image;
+                                if (!_originalLargeImages.ContainsKey(toolKey))
+                                    _originalLargeImages[toolKey] = tool.SharedProps.AppearancesLarge?.Appearance?.Image as Image;
+                                if (_originalSmallImages[toolKey] == null && _originalLargeImages[toolKey] != null) _originalSmallImages[toolKey] = _originalLargeImages[toolKey];
+                                if (_originalLargeImages[toolKey] == null && _originalSmallImages[toolKey] != null) _originalLargeImages[toolKey] = _originalSmallImages[toolKey];
+                                if (tool.SharedProps.AppearancesSmall.Appearance == null) tool.SharedProps.AppearancesSmall.Appearance = new Infragistics.Win.Appearance();
+                                if (tool.SharedProps.AppearancesLarge.Appearance == null) tool.SharedProps.AppearancesLarge.Appearance = new Infragistics.Win.Appearance();
+
+                                Image origSmall = _originalSmallImages[toolKey];
+                                Image origLarge = _originalLargeImages[toolKey];
+
+                                if (!hasPermission)
+                                {
+                                    if (origSmall != null && tool.SharedProps.AppearancesSmall?.Appearance != null)
+                                        tool.SharedProps.AppearancesSmall.Appearance.Image = GetGrayscaleImage(origSmall);
+                                    if (origLarge != null && tool.SharedProps.AppearancesLarge?.Appearance != null)
+                                        tool.SharedProps.AppearancesLarge.Appearance.Image = GetGrayscaleImage(origLarge);
+                                }
+                                else
+                                {
+                                    if (origSmall != null && tool.SharedProps.AppearancesSmall?.Appearance != null)
+                                        tool.SharedProps.AppearancesSmall.Appearance.Image = origSmall;
+                                    if (origLarge != null && tool.SharedProps.AppearancesLarge?.Appearance != null)
+                                        tool.SharedProps.AppearancesLarge.Appearance.Image = origLarge;
+                                }
+                            }
+
+
+
+
+                            {
+    
                             }
                         }
                     }
@@ -2629,23 +2751,83 @@ namespace PosBranch_Win
                         string permCheckKey = ResolveCanonicalPermissionKey(toolKey);
                         if (toolKey == "SalesReturn") permCheckKey = "salesreturnreport";
                         else if (toolKey == "PurchaseReturn") permCheckKey = "purchasereturnreport";
-                                            bool isGlobalAction = toolKey == "Save" || toolKey == "Delet" || toolKey == "Clear" ||
-                                                                 toolKey == "Remove" || toolKey == "Exit" ||
-                                                                 toolKey == "LogOff" || toolKey == "LogIn" ||
-                     toolKey == "Hold" || toolKey == "LastBill" ||
-                                                                 toolKey == "Database" || toolKey == "Search" || toolKey == "SEARCH" ||
-                                                                 toolKey == "StockLookup" || toolKey == "FrmFormSearch";
+                                            bool isGlobalAction = IsGlobalActionTool(toolKey); /*
+                     toolKey == "Exit" ||
+                     toolKey == "LogIn" ||
+                     
+                    
+                     toolKey == "FrmFormSearch"; */
 
                                             bool isReportLauncher = toolKey == "Report";
                         bool hasReportAccess = isReportLauncher && (isAdmin || (ReportNavigatorDefinitions != null && ReportNavigatorDefinitions.Any(def => SessionContext.CanView(def.Key) || SessionContext.CanView(def.ActionKey) || SessionContext.CanView(def.Text))));
                         bool hasPermission = isAdmin || isGlobalAction || (isReportLauncher ? hasReportAccess : SessionContext.CanView(permCheckKey));
                                             
-                                            tool.SharedProps.Visible = true;
+                
+
+
                                             tool.SharedProps.Enabled = hasPermission;
+                                            Image origSmall = null;
+                                            Image origLarge = null;
+
+                            if (!string.IsNullOrEmpty(toolKey))
+                            {
+                                if (!_originalSmallImages.ContainsKey(toolKey))
+                                {
+                                    Image sImg = tool.SharedProps.AppearancesSmall?.Appearance?.Image as Image;
+                                    if (sImg == null && tool.InstanceProps?.AppearancesSmall?.Appearance?.Image != null)
+                                        sImg = tool.InstanceProps.AppearancesSmall.Appearance.Image as Image;
+                                    _originalSmallImages[toolKey] = sImg;
+                                }
+                                if (!_originalLargeImages.ContainsKey(toolKey))
+                                {
+                                    Image lImg = tool.SharedProps.AppearancesLarge?.Appearance?.Image as Image;
+                                    if (lImg == null && tool.InstanceProps?.AppearancesLarge?.Appearance?.Image != null)
+                                        lImg = tool.InstanceProps.AppearancesLarge.Appearance.Image as Image;
+                                    _originalLargeImages[toolKey] = lImg;
+                                }
+                                if (_originalSmallImages[toolKey] == null && _originalLargeImages[toolKey] != null) _originalSmallImages[toolKey] = _originalLargeImages[toolKey];
+                                if (_originalLargeImages[toolKey] == null && _originalSmallImages[toolKey] != null) _originalLargeImages[toolKey] = _originalSmallImages[toolKey];
+                                if (tool.SharedProps.AppearancesSmall.Appearance == null) tool.SharedProps.AppearancesSmall.Appearance = new Infragistics.Win.Appearance();
+                                if (tool.SharedProps.AppearancesLarge.Appearance == null) tool.SharedProps.AppearancesLarge.Appearance = new Infragistics.Win.Appearance();
+
+                                origSmall = _originalSmallImages[toolKey];
+                                origLarge = _originalLargeImages[toolKey];
+
+                                if (!hasPermission)
+                                {
+                                    if (origSmall != null && tool.SharedProps.AppearancesSmall?.Appearance != null)
+                                        tool.SharedProps.AppearancesSmall.Appearance.Image = GetGrayscaleImage(origSmall);
+                                    if (origLarge != null && tool.SharedProps.AppearancesLarge?.Appearance != null)
+                                        tool.SharedProps.AppearancesLarge.Appearance.Image = GetGrayscaleImage(origLarge);
+                                }
+                                else
+                                {
+                                    if (origSmall != null && tool.SharedProps.AppearancesSmall?.Appearance != null)
+                                        tool.SharedProps.AppearancesSmall.Appearance.Image = origSmall;
+                                    if (origLarge != null && tool.SharedProps.AppearancesLarge?.Appearance != null)
+                                        tool.SharedProps.AppearancesLarge.Appearance.Image = origLarge;
+                                }
+                            }
                                             if (tool.InstanceProps != null)
                                             {
                                                 tool.InstanceProps.Visible = Infragistics.Win.DefaultableBoolean.True;
-                                                if (hasPermission) { groupHasVisibleTools = true; tabHasVisibleTools = true; }
+                                                if (origLarge != null && tool.InstanceProps.AppearancesLarge != null)
+                                                {
+                                                    if (tool.InstanceProps.AppearancesLarge.Appearance == null) tool.InstanceProps.AppearancesLarge.Appearance = new Infragistics.Win.Appearance();
+                                                    tool.InstanceProps.AppearancesLarge.Appearance.Image = hasPermission ? origLarge : GetGrayscaleImage(origLarge);
+                                                }
+                                                if (origSmall != null && tool.InstanceProps.AppearancesSmall != null)
+                                                {
+                                                    if (tool.InstanceProps.AppearancesSmall.Appearance == null) tool.InstanceProps.AppearancesSmall.Appearance = new Infragistics.Win.Appearance();
+                                                    tool.InstanceProps.AppearancesSmall.Appearance.Image = hasPermission ? origSmall : GetGrayscaleImage(origSmall);
+                                                }
+                                                if (hasPermission)
+                                                {
+                                                    groupHasVisibleTools = true;
+                                                    tabHasVisibleTools = true;
+                                                }
+
+
                                             }
                                         }
                                         catch { }
@@ -2668,7 +2850,7 @@ namespace PosBranch_Win
             }
         }
 
-        /// <summary>
+
         /// Filters items and groups in the Report Navigator so only permitted reports are visible and clickable.
         /// </summary>
         public void ApplyReportNavigatorPermissions()
@@ -2697,6 +2879,8 @@ namespace PosBranch_Win
 
                         item.Visible = true;
                         item.Settings.Enabled = canView ? Infragistics.Win.DefaultableBoolean.True : Infragistics.Win.DefaultableBoolean.False;
+
+
                         if (canView) visibleCount++;
                     }
 
@@ -2709,7 +2893,7 @@ namespace PosBranch_Win
             }
         }
 
-        /// <summary>
+
         /// Checks if user has CanView permission for the specified form key.
         /// Shows access denied message if not permitted.
         /// </summary>
@@ -2723,6 +2907,7 @@ namespace PosBranch_Win
             if (tk == "SalesReturn") return "salesreturnreport";
             if (tk == "PurchaseReturn") return "purchasereturnreport";
             if (tk == "Ledger" || tk == "Account Ledgers" || tk == "FrmLedgers" || tk == "AccountLedgers") return "ledgers";
+            if (tk == "ChartOfAccount" || tk == "Chart Of Account" || tk == "Chart Of Acc" || tk == "ChartofAccounts" || tk == "FrmChartOfAcc" || tk == "FrmChartOfAccount" || tk == "chartofacc") return "chartofaccount";
             if (tk == "frmvendor") return "vendor";
             if (tk == "General PM setup" || tk == "GeneralPMsetup") return "paymode";
             if (tk == "Print Barcode") return "barcode";
@@ -2743,6 +2928,56 @@ namespace PosBranch_Win
             if (tk == "ExecutiveDashboard" || tk == "BossDashboard" || tk == "ExecutiveKPI" || tk == "Executive Dashboard") return "dashboard";
             if (tk == "Overview" || tk == "Dashboard Overview") return "overview";
             if (tk == "BusinessSummary" || tk == "Business Summary") return "businesssummary";
+            if (tk == "ExcelImport" || tk == "Excel Import") return "excelimport";
+            if (tk == "UnitMaster" || tk == "Unit Master") return "unit";
+            if (tk == "Item Type" || tk == "ItemType") return "itemtype";
+            if (tk == "TaxManagement" || tk == "Tax Management") return "TaxManagement";
+            if (tk == "TradingPLAccount" || tk == "TradingAccount") return "tradingpl";
+            if (tk == "ProfitLossAccount") return "profitloss";
+            if (tk == "BalanceSheet") return "balancesheet";
+            if (tk == "TrialBalance") return "trialbalance";
+            if (tk == "CashBankBook") return "cashbankbook";
+            if (tk == "DayBook") return "daybook";
+            if (tk == "BankReconciliation") return "bankreconciliation";
+            if (tk == "BankStatementReport") return "bankstatement";
+            if (tk == "ShiftReconciliationReport") return "shiftreconciliation";
+            if (tk == "DebitNote") return "debitnote";
+            if (tk == "CreditNote") return "creditnote";
+            if (tk == "Stock Adjustment" || tk == "stockadjustment" || tk == "StockAdjustment") return "stockadjustment";
+            if (tk == "Stock Transfer" || tk == "stocktransfer" || tk == "StockTransfer") return "stocktransfer";
+            if (tk == "Reason") return "reason";
+            if (tk == "Customer") return "customer";
+            if (tk == "Vendor") return "vendor";
+            if (tk == "Users") return "users";
+            if (tk == "Company") return "company";
+            if (tk == "Branch") return "branch";
+            if (tk == "Category") return "category";
+            if (tk == "Group") return "group";
+            if (tk == "Rack") return "rack";
+            if (tk == "Line") return "line";
+            if (tk == "Row") return "row";
+            if (tk == "State") return "state";
+            if (tk == "Country") return "country";
+            if (tk == "Currency") return "currency";
+            if (tk == "Brand") return "brand";
+            if (tk == "Pos") return "pos";
+            if (tk == "Sales") return "sales";
+            if (tk == "Purchase") return "purchase";
+            if (tk == "Purchase Order" || tk == "PurchaseOrder") return "purchaseorder";
+            if (tk == "CustomerOutstandingReport") return "customeroutstanding";
+            if (tk == "CustomerReceiptReport") return "customerreceiptreport";
+            if (tk == "CustomerLedgerReport") return "customerledger";
+            if (tk == "VendorOutstandingReport") return "vendoroutstanding";
+            if (tk == "VendorPaymentReport") return "vendorpaymentreport";
+            if (tk == "Sales Details") return "salesdetails";
+            if (tk == "Purchase Details") return "purchasedetails";
+            if (tk == "ItemwiseSalesSummaryReport") return "itemwisesalessummary";
+            if (tk == "DSales") return "salesreport";
+            if (tk == "CounterReport") return "counterreport";
+            if (tk == "SalesProfit") return "salesprofit";
+            if (tk == "SalesmanIncentiveReport") return "salesmanincentive";
+            if (tk == "SalesHoldReport" || tk == "Tool_SalesHoldReport") return "salesreport";
+            if (tk == "ReOrder") return "smartreorder";
             return tk;
         }
 
@@ -2760,7 +2995,7 @@ namespace PosBranch_Win
             return true;
         }
 
-        /// <summary>
+
         /// Gets the Form embedded in the currently active/selected tab.
         /// </summary>
         private Form GetActiveTabForm()
@@ -2899,11 +3134,12 @@ namespace PosBranch_Win
             if (toolKey == "PurchaseReturn") permissionKey = "purchasereturnreport";
 
             // Check permission before opening any form (skip for global action tools)
-            bool isGlobalAction = toolKey == "Save" ||
+            bool isGlobalAction = IsGlobalActionTool(toolKey) || toolKey == "Report"; /*
                                  toolKey == "Delet" ||
                                  toolKey == "Clear" ||
                                  toolKey == "Remove" ||
-                                 toolKey == "Exit" ||
+                                  toolKey == "Exit" ||
+           
                                  toolKey == "Report" ||
                                  toolKey == "LogOff" ||
                                  toolKey == "LogIn" ||
@@ -2915,7 +3151,8 @@ namespace PosBranch_Win
                                  toolKey == "Search" ||
                                  toolKey == "SEARCH" ||
                                  toolKey == "StockLookup" ||
-                                 toolKey == "FrmFormSearch";
+                                  toolKey == "FrmFormSearch"; */
+           
 
             if (!isGlobalAction)
             {
@@ -3949,7 +4186,7 @@ namespace PosBranch_Win
 
         }
 
-        /// <summary>
+
         /// Updates the tax status display in the status bar or form
         /// </summary>
         private void UpdateTaxStatusDisplay()
@@ -4401,7 +4638,7 @@ namespace PosBranch_Win
             }
         }
 
-        /// <summary>
+
         /// Resets modifier key flags on key release
         /// </summary>
         private void Home_KeyUp(object sender, KeyEventArgs e)
@@ -4413,12 +4650,12 @@ namespace PosBranch_Win
 
 
 
-        /// <summary>
+
         /// Current application theme color
         /// </summary>
         private Color currentThemeColor = Color.FromArgb(240, 248, 255);
 
-        /// <summary>
+
         /// Applies the selected color to the entire application like IRS POS
         /// </summary>
 
@@ -4536,7 +4773,7 @@ namespace PosBranch_Win
             }
         }
 
-        /// <summary>
+
         /// Applies theme to UltraPanel controls and their child controls
         /// </summary>
         /// <param name="ultraPanel">UltraPanel to theme</param>
@@ -4560,7 +4797,7 @@ namespace PosBranch_Win
             }
         }
 
-        /// <summary>
+
         /// Applies theme to all open MDI child forms (Sales, Purchase, etc.)
         /// </summary>
         /// <param name="themeColor">Theme color to apply</param>
@@ -4586,7 +4823,7 @@ namespace PosBranch_Win
             }
         }
 
-        /// <summary>
+
         /// Applies theme to all open tabbed forms (Sales, Purchase, etc.)
         /// </summary>
         /// <param name="themeColor">Theme color to apply</param>
@@ -4634,7 +4871,7 @@ namespace PosBranch_Win
             }
         }
 
-        /// <summary>
+
         /// Applies comprehensive theming to any form, overriding hardcoded Designer colors
         /// </summary>
         /// <param name="form">Form to theme</param>
@@ -4672,7 +4909,7 @@ namespace PosBranch_Win
             }
         }
 
-        /// <summary>
+
         /// Applies special theming for specific form types that need extra attention
         /// </summary>
         /// <param name="form">Form to apply special theming to</param>
@@ -4699,7 +4936,7 @@ namespace PosBranch_Win
             }
         }
 
-        /// <summary>
+
         /// Recursively applies theming to Infragistics UltraPanel controls
         /// </summary>
         private void ApplyThemeToUltraPanels(Control.ControlCollection controls, Color themeColor)
@@ -4795,7 +5032,7 @@ namespace PosBranch_Win
             }
         }
 
-        /// <summary>
+
         /// Recursively applies theming to Infragistics UltraGrid controls
         /// </summary>
         private void ApplyThemeToUltraGrids(Control.ControlCollection controls, Color themeColor)
@@ -4896,7 +5133,7 @@ namespace PosBranch_Win
             }
         }
 
-        /// <summary>
+
         /// Recursively applies theming to Infragistics UltraButton controls (preserve functional colors)
         /// </summary>
         private void ApplyThemeToUltraButtons(Control.ControlCollection controls, Color themeColor)
@@ -4975,7 +5212,7 @@ namespace PosBranch_Win
             }
         }
 
-        /// <summary>
+
         /// Recursively applies theming to Infragistics UltraLabel controls
         /// </summary>
         private void ApplyThemeToUltraLabels(Control.ControlCollection controls, Color themeColor)
@@ -5048,7 +5285,7 @@ namespace PosBranch_Win
             }
         }
 
-        /// <summary>
+
         /// Applies the selected language
         /// </summary>
         private void ApplyLanguage(string language)
@@ -5109,7 +5346,7 @@ namespace PosBranch_Win
             }
         }
 
-        /// <summary>
+
         /// Rewrites the favourites file from the current items in the group (persists removals)
         /// </summary>
         private void SaveAllFavorites()
@@ -5340,7 +5577,7 @@ namespace PosBranch_Win
             }
         }
 
-        /// <summary>
+
         /// Populates the MyScreenColour group with a grid of clickable color square blocks
         /// </summary>
         private void PopulateColorPalette()
@@ -6644,7 +6881,7 @@ namespace PosBranch_Win
 
         }
 
-        /// <summary>
+
         /// Public helper method to open any Form type dynamically in Home tabs or dialogs.
         /// </summary>
         public void OpenFormByType(Type formType, string formTitle = null)
@@ -6706,7 +6943,7 @@ namespace PosBranch_Win
             }
         }
 
-        /// <summary>
+
         /// Universal method that translates Home, Ribbon, ExplorerBar, StatusStrip, all tabbed forms, MDI children, and standalone dialogs
         /// </summary>
         public void ApplyLanguageToAllForms()
