@@ -1756,13 +1756,13 @@ namespace Repository.Accounts
             {
                 if (wasClosed) DataConnection.Open();
                 string query = @"
-                    SELECT ISNULL(SUM(ISNULL(v.Debit, 0)) - SUM(ISNULL(v.Credit, 0)), 0)
-                    FROM Vouchers v
-                    LEFT JOIN LedgerMaster lm ON v.LedgerID = lm.LedgerId
-                    WHERE v.BranchID = @BranchId
-                      AND ISNULL(v.CancelFlag, 0) = 0
-                      AND (v.GroupID = 14 OR lm.AccountGroupID = 14
-                           OR v.LedgerName = 'CASH' OR lm.LedgerName = 'CASH');";
+                    SELECT ISNULL(SUM((ISNULL(lm.OpnDebit, 0) - ISNULL(lm.OpnCredit, 0)) + (ISNULL(v.Debit, 0) - ISNULL(v.Credit, 0))), 0)
+                    FROM LedgerMaster lm
+                    LEFT JOIN (SELECT LedgerID, SUM(ISNULL(Debit, 0)) AS Debit, SUM(ISNULL(Credit, 0)) AS Credit FROM Vouchers WHERE (@BranchId = 0 OR BranchID = @BranchId) AND ISNULL(CancelFlag, 0) = 0 GROUP BY LedgerID) v ON lm.LedgerID = v.LedgerID
+                    WHERE (@BranchId = 0 OR lm.BranchID = @BranchId)
+
+                      AND (lm.GroupID = 14
+                           OR UPPER(lm.LedgerName) LIKE '%CASH%');";
 
                 using (SqlCommand cmd = new SqlCommand(query, (SqlConnection)DataConnection))
                 {
@@ -1805,9 +1805,9 @@ namespace Repository.Accounts
                 string query = @"
                     SELECT COUNT(1)
                     FROM PayMode pm
-                    LEFT JOIN LedgerMaster lm ON pm.LedgerID = lm.LedgerId
+                    LEFT JOIN LedgerMaster lm ON pm.LedgerID = lm.LedgerID
                     WHERE pm.PayModeID = @PayModeId
-                      AND (pm.PayModeName LIKE '%CASH%' OR lm.AccountGroupID = 14 OR lm.LedgerName LIKE '%CASH%');";
+                      AND (pm.PayModeName LIKE '%CASH%' OR lm.GroupID = 14 OR UPPER(lm.LedgerName) LIKE '%CASH%');";
 
                 using (SqlCommand cmd = new SqlCommand(query, (SqlConnection)DataConnection))
                 {

@@ -1912,15 +1912,15 @@ namespace Repository.TransactionRepository
                     cashLedgerId = objLedgerRepository.GetLedgerId("CASH", (int)AccountGroup.CASH_IN_HAND, branchId);
 
                 string query = @"
-                    SELECT ISNULL(SUM(ISNULL(v.Debit,0)) - SUM(ISNULL(v.Credit,0)), 0)
-                    FROM Vouchers v
-                    LEFT JOIN LedgerMaster lm ON v.LedgerID = lm.LedgerId
-                    WHERE v.BranchID = @BranchId
-                      AND ISNULL(v.CancelFlag,0) = 0
-                      AND (v.GroupID = @GroupId OR v.LedgerID = @LedgerId
-                           OR lm.AccountGroupID = @GroupId
-                           OR v.LedgerName = @LedgerName OR v.LedgerName = 'CASH'
-                           OR lm.LedgerName = @LedgerName OR lm.LedgerName = 'CASH')";
+                    SELECT ISNULL(SUM((ISNULL(lm.OpnDebit, 0) - ISNULL(lm.OpnCredit, 0)) + (ISNULL(v.Debit, 0) - ISNULL(v.Credit, 0))), 0)
+                    FROM LedgerMaster lm
+                    LEFT JOIN (SELECT LedgerID, SUM(ISNULL(Debit, 0)) AS Debit, SUM(ISNULL(Credit, 0)) AS Credit FROM Vouchers WHERE (@BranchId = 0 OR BranchID = @BranchId) AND ISNULL(CancelFlag, 0) = 0 GROUP BY LedgerID) v ON lm.LedgerID = v.LedgerID
+                    WHERE (@BranchId = 0 OR lm.BranchID = @BranchId)
+
+                      AND (lm.GroupID = @GroupId OR lm.LedgerID = @LedgerId
+
+
+                           OR UPPER(lm.LedgerName) LIKE '%CASH%')";
 
                 var p = new { BranchId = branchId, GroupId = (int)AccountGroup.CASH_IN_HAND,
                               LedgerId = cashLedgerId, LedgerName = DefaultLedgers.CASH };

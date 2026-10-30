@@ -1,1970 +1,2004 @@
-using Infragistics.Win;
-using Infragistics.Win.UltraWinGrid;
-using ModelClass;
-using ModelClass.Report;
-using Repository;
-using Repository.ReportRepository;
-using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
-using System.Drawing;
-using System.Drawing.Drawing2D;
-using System.IO;
-using System.Linq;
-using System.Text;
-using System.Windows.Forms;
-using PosBranch_Win.Reports;
-
-namespace PosBranch_Win.Reports.InventoryReport
-{
-    /// <summary>
-    /// Stock Valuation Report — shows inventory asset value calculated at Cost and Retail price per item.
-    /// </summary>
-    public partial class frmStockValuationReport : Form
-    {
-        // ─── Theme Palette (matches FrmSmartReorderDashboard / frmVendorOutstandingReport) ────────
-        private static readonly Color FormBackColor        = Color.FromArgb(232, 246, 255);
-        private static readonly Color FilterPanelBackColor = Color.FromArgb(232, 246, 255);
-        private static readonly Color ActionPanelBackColor = Color.FromArgb(206, 223, 238);
-        private static readonly Color BorderBlue           = Color.FromArgb(118, 154, 198);
-        private static readonly Color ControlBackColor     = Color.White;
-        private static readonly Color ControlTextColor     = Color.FromArgb(18, 49, 102);
-        private static readonly Color GridHeaderBlue       = Color.FromArgb(93, 151, 214);
-        private static readonly Color GridHeaderBlueDark   = Color.FromArgb(67, 118, 184);
-        private static readonly Color GridSelectedBlue     = Color.FromArgb(173, 216, 255);
-        private static readonly Color GridRowLine          = Color.FromArgb(197, 217, 241);
-        private static readonly Color GridAltRow           = Color.FromArgb(246, 250, 255);
-        private static readonly Color GridFooterBorder     = Color.FromArgb(144, 181, 223);
-        private static readonly Color SkyBlueOutline       = Color.FromArgb(160, 210, 255);
-
-        private static readonly Color ButtonTopColor       = Color.FromArgb(234, 244, 255);
-        private static readonly Color ButtonBottomColor    = Color.FromArgb(152, 188, 235);
-        private static readonly Color ButtonBorderColor    = Color.FromArgb(73, 119, 184);
-        private static readonly Color ButtonTextBlue       = Color.FromArgb(14, 47, 108);
-
-        private static readonly Color PanelHoverTopColor   = Color.FromArgb(245, 250, 255);
-        private static readonly Color PanelHoverBottomColor= Color.FromArgb(170, 206, 244);
-
-        private static readonly Color PanelPressedTopColor = Color.FromArgb(205, 226, 248);
-        private static readonly Color PanelPressedBottomColor = Color.FromArgb(128, 170, 224);
-
-        // ════════════════════════════════════════════════════════════
-        //  Fields
-        // ════════════════════════════════════════════════════════════
-        private StockReportAdvanceRepo _reportRepo;
-        private Dropdowns _dropdownRepo;
-        private BackgroundWorker _searchWorker;
-        private bool _isChangingDates = false;
-
-        /// <summary>All rows fetched from the DB (before any in-memory filter)</summary>
-        private List<StockValuationRow> _allRows = new List<StockValuationRow>();
-
-        private Infragistics.Win.Misc.UltraPanel gridFooterPanel;
-        private readonly Dictionary<string, Label> _footerLabels = new Dictionary<string, Label>();
-        private readonly Dictionary<string, string> _columnAggregations = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-        // ─── Column Chooser & Drag-Down to Hide State ────────────────────────────────
-        private ListBox columnChooserListBox;
-        private Form columnChooserForm;
-        private bool isDraggingHeaderToHide;
-        private UltraGridColumn columnBeingDragged;
-        private Point headerDragStartPoint;
-        private readonly System.Windows.Forms.ToolTip headerToolTip = new System.Windows.Forms.ToolTip();
-        private readonly HashSet<string> userHiddenColumnKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        private static readonly Cursor blackXCursor = CreateBlackXCursor();
-        private GridSideScrollFilter _sideScrollFilter;
-        private Label _lblRowSelectorSpacer;
-        private ReportColumnFilterManager _filterManager;
-
-        // ════════════════════════════════════════════════════════════
-        //  Constructor
-        // ════════════════════════════════════════════════════════════
-        private string _initialStockFilter = "Positive Stock";
-
-        public frmStockValuationReport() : this("Positive Stock")
-        {
-        }
-
-        public frmStockValuationReport(string initialStockFilter, int? groupId = null, int? categoryId = null)
-        {
-            _initialStockFilter = string.IsNullOrWhiteSpace(initialStockFilter) ? "Positive Stock" : initialStockFilter;
-            InitializeComponent();
-            this.Font = new Font("Segoe UI", 9F);
-            InitializeBackgroundWorker();
-            InitializeForm();
-            if (groupId.HasValue && groupId.Value > 0)
-            {
-                try { comboGroup.Value = groupId.Value; } catch { }
-            }
-            if (categoryId.HasValue && categoryId.Value > 0)
-            {
-                try { comboCategory.Value = categoryId.Value; } catch { }
-            }
-            this.Load += (s, e) => RunSearch();
-        }
-
-        // ════════════════════════════════════════════════════════════
-        //  Initialisation helpers
-        // ════════════════════════════════════════════════════════════
-        private void InitializeBackgroundWorker()
-        {
-            _searchWorker = new BackgroundWorker
-            {
-                WorkerSupportsCancellation = true,
-                WorkerReportsProgress = false
-            };
-            _searchWorker.DoWork             += SearchWorker_DoWork;
-            _searchWorker.RunWorkerCompleted += SearchWorker_RunWorkerCompleted;
-        }
-
-        private void InitializeForm()
-        {
-            try
-            {
-                _reportRepo   = new StockReportAdvanceRepo();
-                _dropdownRepo = new Dropdowns();
-
-                // Apply unified theme appearance
-                InitializeRuntimeAppearance();
-
-                // Default dates - Current Financial Year
-                DateTime now = DateTime.Now;
-                dtFrom.Value = new DateTime(now.Year, 1, 1);
-                dtTo.Value   = now;
-
-                InitializePeriodCombo();
-                InitializeStockFilterCombo();
-                if (!string.IsNullOrEmpty(_initialStockFilter))
-                {
-                    comboStockFilter.Text = _initialStockFilter;
-                    if (string.Equals(_initialStockFilter, "Dead Stock", StringComparison.OrdinalIgnoreCase))
-                    {
-                        dtFrom.Value = now.AddDays(-90);
-                        comboPeriod.Text = "Custom";
-                    }
-                }
-                LoadGroups();
-                LoadCategories();
-                StyleGrid();
-                StyleButtons();
-
-                LayoutSummaryCards();
-
-                // Register footer cell sync and column drag-to-hide handlers matching frmPurchaseReturn / frmStockReport
-                gridReport.Resize += (s, e) => UpdateFooterCellPositions();
-                gridReport.AfterColPosChanged += (s, e) =>
-                {
-                    UpdateFooterCellPositions();
-                    ReportGridLayoutHelper.SaveLayout("StockValuationReport", gridReport, userHiddenColumnKeys);
-                };
-                gridReport.AfterColRegionScroll += (s, e) => UpdateFooterCellPositions();
-                gridReport.AfterRowRegionScroll += (s, e) => UpdateFooterCellPositions();
-                gridReport.Paint += (s, e) => UpdateFooterCellPositions();
-                gridReport.AfterRowFilterChanged += (s, e) =>
-                {
-                    UpdateFooterValues();
-            _filterManager?.UpdateHeaderFilterIcons();
-                    UpdateFooterCellPositions();
-                };
-                gridReport.AfterSortChange += (s, e) => UpdateFooterValues();
-
-                SetupHeaderDragToHideAndColumnChooser();
-                _filterManager = new ReportColumnFilterManager(gridReport, () => { UpdateFooterCellPositions(); UpdateFooterValues(); });
-                InitializeGridFooter();
-
-                // Keyboard shortcuts
-                this.KeyPreview = true;
-                this.KeyDown    += FrmStockValuationReport_KeyDown;
-
-                // Events
-                btnSearch.Click  += BtnSearch_Click;
-                btnReset.Click   += BtnReset_Click;
-                btnExport.Click  += BtnExport_Click;
-                btnPrint.Click   += BtnPrint_Click;
-                btnClose.Click   += BtnClose_Click;
-                comboPeriod.ValueChanged  += ComboPeriod_ValueChanged;
-                comboStockFilter.ValueChanged += (s, e) => { if (_allRows.Count > 0) ApplyFilters(); };
-                txtSearch.TextChanged     += TxtSearch_TextChanged;
-                dtFrom.ValueChanged += DtDate_ValueChanged;
-                dtTo.ValueChanged   += DtDate_ValueChanged;
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Error initialising form: " + ex.Message, "Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        private void InitializePeriodCombo()
-        {
-            comboPeriod.Items.Clear();
-            comboPeriod.Items.Add("ALL",          "ALL");
-            comboPeriod.Items.Add("Today",        "Today");
-            comboPeriod.Items.Add("This Week",    "This Week");
-            comboPeriod.Items.Add("This Month",   "This Month");
-            comboPeriod.Items.Add("Last Month",   "Last Month");
-            comboPeriod.Items.Add("This Quarter", "This Quarter");
-            comboPeriod.Items.Add("This Year",    "This Year");
-            comboPeriod.Items.Add("Custom",       "Custom");
-            comboPeriod.Text = "ALL";
-        }
-
-        private void InitializeStockFilterCombo()
-        {
-            comboStockFilter.Items.Clear();
-            comboStockFilter.Items.Add("All Items",        "All Items");
-            comboStockFilter.Items.Add("Positive Stock",   "Positive Stock");
-            comboStockFilter.Items.Add("Zero Stock",       "Zero Stock");
-            comboStockFilter.Items.Add("Negative Stock",   "Negative Stock");
-            comboStockFilter.Items.Add("Low Stock",        "Low Stock");
-            comboStockFilter.Items.Add("Excess Stock",     "Excess Stock");
-            comboStockFilter.Items.Add("Dead Stock",       "Dead Stock");
-            comboStockFilter.Text = "All Items";
-        }
-
-        private void InitializeRuntimeAppearance()
-        {
-            BackColor = FormBackColor;
-
-            if (panelFilters != null)
-            {
-                panelFilters.Appearance.BackColor = FilterPanelBackColor;
-                panelFilters.Appearance.BorderColor = BorderBlue;
-                panelFilters.BorderStyle = UIElementBorderStyle.Solid;
-            }
-
-            if (panelGrid != null)
-            {
-                panelGrid.Appearance.BackColor = FormBackColor;
-                panelGrid.Appearance.BorderColor = BorderBlue;
-                panelGrid.BorderStyle = UIElementBorderStyle.Solid;
-            }
-
-            // Style Labels
-            StyleLabel(lblPeriod);
-            StyleLabel(lblFromDate);
-            StyleLabel(lblToDate);
-            StyleLabel(lblGroup);
-            StyleLabel(lblCategory);
-            StyleLabel(lblStockFilter);
-            StyleLabel(lblSearch);
-
-            // Style Inputs
-            StyleFilterCombo(comboPeriod);
-            StyleFilterCombo(comboGroup);
-            StyleFilterCombo(comboCategory);
-            StyleFilterCombo(comboStockFilter);
-            StyleDateTimeEditor(dtFrom);
-            StyleDateTimeEditor(dtTo);
-            StyleTextEditor(txtSearch);
-        }
-
-        private static void StyleLabel(Infragistics.Win.Misc.UltraLabel lbl)
-        {
-            if (lbl == null) return;
-            lbl.Appearance.BackColor = Color.Transparent;
-            lbl.Appearance.ForeColor = Color.FromArgb(18, 47, 95);
-            lbl.Appearance.FontData.Bold = DefaultableBoolean.False;
-            lbl.Appearance.FontData.Name = "Microsoft Sans Serif";
-            lbl.Appearance.FontData.SizeInPoints = 9F;
-        }
-
-        private static void StyleFilterCombo(Infragistics.Win.UltraWinEditors.UltraComboEditor combo)
-        {
-            if (combo == null) return;
-            combo.UseAppStyling = false;
-            combo.UseOsThemes = DefaultableBoolean.False;
-            combo.DisplayStyle = EmbeddableElementDisplayStyle.Office2013;
-            combo.BorderStyle = UIElementBorderStyle.Solid;
-            combo.Appearance.BackColor = ControlBackColor;
-            combo.Appearance.BorderColor = SkyBlueOutline;
-            combo.Appearance.ForeColor = ControlTextColor;
-            combo.Appearance.FontData.Name = "Microsoft Sans Serif";
-            combo.Appearance.FontData.SizeInPoints = 9F;
-            combo.ButtonStyle = UIElementButtonStyle.Office2003ToolbarButton;
-        }
-
-        private static void StyleDateTimeEditor(Infragistics.Win.UltraWinEditors.UltraDateTimeEditor dtEditor)
-        {
-            if (dtEditor == null) return;
-            dtEditor.UseAppStyling = false;
-            dtEditor.UseOsThemes = DefaultableBoolean.False;
-            dtEditor.DisplayStyle = EmbeddableElementDisplayStyle.Office2013;
-            dtEditor.BorderStyle = UIElementBorderStyle.Solid;
-            dtEditor.Appearance.BackColor = ControlBackColor;
-            dtEditor.Appearance.BorderColor = SkyBlueOutline;
-            dtEditor.Appearance.ForeColor = ControlTextColor;
-            dtEditor.Appearance.FontData.Name = "Microsoft Sans Serif";
-            dtEditor.Appearance.FontData.SizeInPoints = 9F;
-            dtEditor.ButtonStyle = UIElementButtonStyle.Office2003ToolbarButton;
-        }
-
-        private static void StyleTextEditor(Infragistics.Win.UltraWinEditors.UltraTextEditor editor)
-        {
-            if (editor == null) return;
-            editor.UseAppStyling = false;
-            editor.UseOsThemes = DefaultableBoolean.False;
-            editor.DisplayStyle = EmbeddableElementDisplayStyle.Office2013;
-            editor.BorderStyle = UIElementBorderStyle.Solid;
-            editor.Appearance.BackColor = ControlBackColor;
-            editor.Appearance.BorderColor = SkyBlueOutline;
-            editor.Appearance.ForeColor = ControlTextColor;
-            editor.Appearance.FontData.Name = "Microsoft Sans Serif";
-            editor.Appearance.FontData.SizeInPoints = 9F;
-        }
-
-        private void LoadGroups()
-        {
-            try
-            {
-                var groups = _dropdownRepo.getGroupDDl();
-                if (groups?.List != null)
-                {
-                    comboGroup.DataSource    = groups.List.ToList();
-                    comboGroup.ValueMember   = "Id";
-                    comboGroup.DisplayMember = "GroupName";
-                }
-            }
-            catch { }
-        }
-
-        private void LoadCategories()
-        {
-            try
-            {
-                var cats = _dropdownRepo.getCategoryDDl("");
-                if (cats?.List != null)
-                {
-                    comboCategory.DataSource    = cats.List.ToList();
-                    comboCategory.ValueMember   = "Id";
-                    comboCategory.DisplayMember = "CategoryName";
-                }
-            }
-            catch { }
-        }
-
-        // ════════════════════════════════════════════════════════════
-        //  Grid styling
-        // ════════════════════════════════════════════════════════════
-        private void StyleGrid()
-        {
-            gridReport.UseAppStyling = false;
-            gridReport.UseOsThemes = DefaultableBoolean.False;
-            gridReport.DisplayLayout.Appearance.BackColor = FormBackColor;
-            gridReport.DisplayLayout.AutoFitStyle = AutoFitStyle.None;
-            gridReport.DisplayLayout.ScrollBounds = ScrollBounds.ScrollToFill;
-            gridReport.DisplayLayout.Scrollbars = Scrollbars.Both;
-            gridReport.DisplayLayout.MaxColScrollRegions = 1;
-            gridReport.DisplayLayout.MaxRowScrollRegions = 1;
-            gridReport.DisplayLayout.ScrollStyle = ScrollStyle.Immediate;
-
-            // Scroll bar appearance
-            gridReport.DisplayLayout.ScrollBarLook.Appearance.BackColor = ActionPanelBackColor;
-            gridReport.DisplayLayout.ScrollBarLook.Appearance.BorderColor = BorderBlue;
-            gridReport.DisplayLayout.ScrollBarLook.TrackAppearance.BackColor = Color.FromArgb(225, 236, 246);
-            gridReport.DisplayLayout.ScrollBarLook.ButtonAppearance.BackColor = GridHeaderBlue;
-            gridReport.DisplayLayout.ScrollBarLook.ButtonAppearance.BackColor2 = GridHeaderBlueDark;
-            gridReport.DisplayLayout.ScrollBarLook.ButtonAppearance.BackGradientStyle = GradientStyle.Vertical;
-            gridReport.DisplayLayout.ScrollBarLook.ButtonAppearance.BorderColor = BorderBlue;
-
-            gridReport.DisplayLayout.BorderStyle = UIElementBorderStyle.Solid;
-            gridReport.DisplayLayout.CaptionVisible = DefaultableBoolean.False;
-            gridReport.DisplayLayout.GroupByBox.Hidden = true;
-
-            gridReport.DisplayLayout.Override.HeaderStyle = HeaderStyle.Standard;
-            gridReport.DisplayLayout.Override.HeaderClickAction = HeaderClickAction.SortSingle;
-            gridReport.DisplayLayout.Override.AllowAddNew = AllowAddNew.No;
-            gridReport.DisplayLayout.Override.AllowDelete = DefaultableBoolean.False;
-            gridReport.DisplayLayout.Override.AllowUpdate = DefaultableBoolean.False;
-            gridReport.DisplayLayout.Override.AllowColMoving = AllowColMoving.WithinBand;
-            gridReport.DisplayLayout.Override.AllowColSizing = AllowColSizing.Free;
-            gridReport.DisplayLayout.Override.AllowRowFiltering = DefaultableBoolean.False;
-            gridReport.DisplayLayout.Override.CellClickAction = CellClickAction.RowSelect;
-
-            gridReport.DisplayLayout.Override.RowSelectors = DefaultableBoolean.True;
-            gridReport.DisplayLayout.Override.RowSelectorHeaderStyle = RowSelectorHeaderStyle.ColumnChooserButton;
-            gridReport.BeforeColumnChooserDisplayed += (s, e) =>
-            {
-                e.Cancel = true;
-                ShowColumnChooserForm();
-            };
-            gridReport.DisplayLayout.Override.RowSelectorWidth = 25;
-            gridReport.DisplayLayout.Override.RowSelectorNumberStyle = RowSelectorNumberStyle.RowIndex;
-            gridReport.DisplayLayout.Override.RowSelectorAppearance.BackColor = GridHeaderBlueDark;
-            gridReport.DisplayLayout.Override.RowSelectorAppearance.BackColor2 = GridHeaderBlue;
-            gridReport.DisplayLayout.Override.RowSelectorAppearance.BackGradientStyle = GradientStyle.Vertical;
-            gridReport.DisplayLayout.Override.RowSelectorAppearance.BorderColor = BorderBlue;
-            gridReport.DisplayLayout.Override.RowSelectorAppearance.ForeColor = Color.White;
-            gridReport.DisplayLayout.Override.RowSelectorAppearance.FontData.Bold = DefaultableBoolean.True;
-            gridReport.DisplayLayout.Override.RowSelectorAppearance.TextHAlign = HAlign.Center;
-
-            gridReport.DisplayLayout.Override.MinRowHeight = 24;
-            gridReport.DisplayLayout.Override.DefaultRowHeight = 24;
-            gridReport.DisplayLayout.Override.RowAppearance.BackColor = Color.White;
-            gridReport.DisplayLayout.Override.RowAppearance.ForeColor = ControlTextColor;
-            gridReport.DisplayLayout.Override.RowAppearance.BorderColor = GridRowLine;
-            gridReport.DisplayLayout.Override.RowAlternateAppearance.BackColor = GridAltRow;
-            gridReport.DisplayLayout.Override.RowAlternateAppearance.BorderColor = GridRowLine;
-            gridReport.DisplayLayout.Override.ActiveRowAppearance.BackColor = GridSelectedBlue;
-            gridReport.DisplayLayout.Override.ActiveRowAppearance.ForeColor = ControlTextColor;
-            gridReport.DisplayLayout.Override.SelectedRowAppearance.BackColor = GridSelectedBlue;
-            gridReport.DisplayLayout.Override.SelectedRowAppearance.ForeColor = ControlTextColor;
-
-            gridReport.DisplayLayout.Override.HeaderAppearance.BackColor = GridHeaderBlue;
-            gridReport.DisplayLayout.Override.HeaderAppearance.BackColor2 = GridHeaderBlueDark;
-            gridReport.DisplayLayout.Override.HeaderAppearance.BackGradientStyle = GradientStyle.Vertical;
-            gridReport.DisplayLayout.Override.HeaderAppearance.ForeColor = Color.White;
-            gridReport.DisplayLayout.Override.HeaderAppearance.BorderColor = BorderBlue;
-            gridReport.DisplayLayout.Override.HeaderAppearance.TextHAlign = HAlign.Center;
-            gridReport.DisplayLayout.Override.HeaderAppearance.TextVAlign = VAlign.Middle;
-            gridReport.DisplayLayout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.False;
-            gridReport.DisplayLayout.Override.HeaderAppearance.FontData.Name = "Microsoft Sans Serif";
-            gridReport.DisplayLayout.Override.HeaderAppearance.FontData.SizeInPoints = 8.25F;
-            gridReport.DisplayLayout.Override.HeaderAppearance.ThemedElementAlpha = Alpha.Transparent;
-
-            gridReport.DisplayLayout.Override.BorderStyleHeader = UIElementBorderStyle.Solid;
-            gridReport.DisplayLayout.Override.BorderStyleCell = UIElementBorderStyle.Solid;
-            gridReport.DisplayLayout.Override.BorderStyleRow = UIElementBorderStyle.Solid;
-            gridReport.DisplayLayout.Override.CellAppearance.BorderColor = GridRowLine;
-            gridReport.DisplayLayout.Override.CellAppearance.ForeColor = ControlTextColor;
-            gridReport.DisplayLayout.Override.CellAppearance.FontData.Name = "Microsoft Sans Serif";
-            gridReport.DisplayLayout.Override.CellAppearance.FontData.SizeInPoints = 8.25F;
-            gridReport.DisplayLayout.Override.RowSizing = RowSizing.AutoFree;
-
-            gridReport.InitializeLayout += GridReport_InitializeLayout;
-            gridReport.InitializeRow    += GridReport_InitializeRow;
-        }
-
-        private void GridReport_InitializeLayout(object sender, InitializeLayoutEventArgs e)
-        {
-            if (e.Layout.Bands.Count == 0) return;
-            var band = e.Layout.Bands[0];
-
-            // Define column order and captions
-            var columns = new[]
-            {
-                ("Barcode",          "Barcode",            100,  HAlign.Left),
-                ("ItemName",         "Product",           220,  HAlign.Left),
-                ("GroupName",        "Group",             120,  HAlign.Left),
-                ("CategoryName",     "Category",          120,  HAlign.Left),
-                ("BaseUnitName",     "Unit",               70,  HAlign.Center),
-                ("ClosingStock",     "Qty",                90,  HAlign.Right),
-                ("Cost",             "Unit Cost",          90,  HAlign.Right),
-                ("RetailPrice",      "Unit Retail",        90,  HAlign.Right),
-                ("ValueAtCost",      "Value @ Cost",      110,  HAlign.Right),
-                ("ValueAtRetail",    "Value @ Retail",    120,  HAlign.Right),
-                ("PotentialProfit",  "Potential Profit",  120,  HAlign.Right),
-                ("MarginPercent",    "Margin %",           95,  HAlign.Right),
-            };
-
-            foreach (UltraGridColumn col in band.Columns)
-            {
-                col.ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
-            }
-
-            int pos = 0;
-            foreach (var (key, caption, width, align) in columns)
-            {
-                if (!band.Columns.Exists(key)) continue;
-                var col = band.Columns[key];
-                col.ExcludeFromColumnChooser = ExcludeFromColumnChooser.False;
-                col.Hidden         = userHiddenColumnKeys.Contains(key);
-                col.Header.Caption = caption;
-                col.Width          = width;
-                col.CellAppearance.TextHAlign = align;
-                col.Header.VisiblePosition    = pos++;
-                // Number formatting
-                if (key == "ClosingStock" || key == "Cost" || key == "RetailPrice" || key == "MarginPercent")
-                    col.Format = "N2";
-                // Currency formatting for value columns
-                if (key == "ValueAtCost" || key == "ValueAtRetail" || key == "PotentialProfit")
-                {
-                    col.Format = "N2";
-                    if (key == "PotentialProfit")
-                        col.CellAppearance.ForeColor = Color.FromArgb(0, 150, 60);
-                }
-            }
-
-            // Hide internal-only or unneeded columns
-            var hiddenCols = new[] { "ItemId", "SubCategoryName", "WholeSalePrice", "CreditPrice",
-                                     "OpeningStock", "Purchase", "PurchaseReturn", "StockAdjustmentIn",
-                                     "StockAdjustmentOut", "StockTransferIn", "StockTransferOut",
-                                     "Sales", "SalesReturn", "OrderedStock", "HoldQty",
-                                     "AvailableStock", "TotalIn", "TotalOut", "StockValue",
-                                     "Profit", "SaleAmount" };
-            foreach (var h in hiddenCols)
-            {
-                if (band.Columns.Exists(h))
-                {
-                    band.Columns[h].Hidden = true;
-                    band.Columns[h].ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
-                }
-            }
-
-            CreateFooterCells();
-            UpdateFooterCellPositions();
-            UpdateFooterValues();
-            _filterManager?.UpdateHeaderFilterIcons();
-            if (columnChooserForm != null && columnChooserForm.Visible)
-            {
-                PopulateColumnChooserListBox();
-            }
-        }
-
-        private void GridReport_InitializeRow(object sender, InitializeRowEventArgs e)
-        {
-            try
-            {
-                if (e.Row.Cells.Exists("ClosingStock"))
-                {
-                    decimal stock = Convert.ToDecimal(e.Row.Cells["ClosingStock"].Value ?? 0);
-                    if (stock < 0)
-                    {
-                        // Soft Red background for Negative Stock
-                        e.Row.Appearance.BackColor = Color.FromArgb(254, 226, 226);
-                        e.Row.Appearance.ForeColor = Color.FromArgb(153, 27, 27);
-                    }
-                    else if (stock == 0)
-                    {
-                        // Soft Orange background for Zero Stock
-                        e.Row.Appearance.BackColor = Color.FromArgb(255, 247, 237);
-                        e.Row.Appearance.ForeColor = Color.FromArgb(194, 65, 12);
-                    }
-                    else
-                    {
-                        // Clear general styling
-                        e.Row.Appearance.Reset();
-
-                        // Highlight High-Value Assets in bold green
-                        if (e.Row.Cells.Exists("ValueAtCost"))
-                        {
-                            decimal valAtCost = Convert.ToDecimal(e.Row.Cells["ValueAtCost"].Value ?? 0);
-                            if (valAtCost >= 10000)
-                            {
-                                e.Row.Cells["ValueAtCost"].Appearance.FontData.Bold = DefaultableBoolean.True;
-                                e.Row.Cells["ValueAtCost"].Appearance.ForeColor = Color.FromArgb(21, 128, 61);
-                            }
-                        }
-                    }
-                }
-            }
-            catch { }
-        }
-
-        #region Column Chooser & Drag-Down to Hide
-
-        private static Cursor CreateBlackXCursor()
-        {
-            try
-            {
-                using (Bitmap bmp = new Bitmap(32, 32))
-                using (Graphics g = Graphics.FromImage(bmp))
-                {
-                    g.SmoothingMode = SmoothingMode.AntiAlias;
-                    g.Clear(Color.Transparent);
-
-                    using (SolidBrush shadowBrush = new SolidBrush(Color.FromArgb(60, 0, 0, 0)))
-                    {
-                        g.FillEllipse(shadowBrush, 5, 5, 24, 24);
-                    }
-
-                    using (SolidBrush bgBrush = new SolidBrush(Color.FromArgb(220, 20, 20, 20)))
-                    {
-                        g.FillEllipse(bgBrush, 4, 4, 24, 24);
-                    }
-
-                    using (Pen whitePen = new Pen(Color.White, 3.5f))
-                    {
-                        whitePen.StartCap = LineCap.Round;
-                        whitePen.EndCap = LineCap.Round;
-                        g.DrawLine(whitePen, 11, 11, 21, 21);
-                        g.DrawLine(whitePen, 21, 11, 11, 21);
-                    }
-
-                    IntPtr hIcon = bmp.GetHicon();
-                    return new Cursor(hIcon);
-                }
-            }
-            catch
-            {
-                return Cursors.No;
-            }
-        }
-
-        private void SetupHeaderDragToHideAndColumnChooser()
-        {
-            gridReport.AllowDrop = true;
-            gridReport.MouseDown += Grid_MouseDown;
-            gridReport.MouseMove += Grid_MouseMove;
-            gridReport.MouseUp += Grid_MouseUp;
-            gridReport.DragOver += Grid_DragOver;
-            gridReport.DragDrop += Grid_DragDrop;
-
-            ContextMenuStrip headerMenu = new ContextMenuStrip { Font = new Font("Segoe UI", 9F) };
-            ToolStripMenuItem chooserItem = new ToolStripMenuItem("📋 Field / Column Chooser...", null, (s, e) => ShowColumnChooserForm());
-            chooserItem.Font = new Font("Segoe UI Semibold", 9.5F, FontStyle.Bold);
-            headerMenu.Items.Add(chooserItem);
-
-            ToolStripMenuItem showAllItem = new ToolStripMenuItem("🔓 Show / Unhide All Columns", null, (s, e) => UnhideAllColumns());
-            headerMenu.Items.Add(showAllItem);
-
-            gridReport.ContextMenuStrip = headerMenu;
-        }
-
-        private void Grid_MouseDown(object sender, MouseEventArgs e)
-        {
-            if (gridReport.DisplayLayout == null || gridReport.DisplayLayout.Bands.Count == 0)
-                return;
-
-            if (e.Button == MouseButtons.Left && _filterManager != null && _filterManager.HandleMouseDown(e)) { isDraggingHeaderToHide = false; columnBeingDragged = null; return; }
-            UIElement element = gridReport.DisplayLayout.UIElement?.ElementFromPoint(new Point(e.X, e.Y));
-            HeaderUIElement headerUI = element as HeaderUIElement ?? element?.GetAncestor(typeof(HeaderUIElement)) as HeaderUIElement;
-
-            UltraGridColumn col = headerUI?.Header?.Column;
-            if (headerUI != null && col != null)
-            {
-                if (e.Button == MouseButtons.Right)
-                {
-                    ShowHeaderContextMenu(col, e.Location);
-                    return;
-                }
-
-                if (e.Button == MouseButtons.Left)
-                {
-                    isDraggingHeaderToHide = true;
-                    columnBeingDragged = col;
-                    headerDragStartPoint = new Point(e.X, e.Y);
-                }
-            }
-        }
-
-        private void Grid_MouseMove(object sender, MouseEventArgs e)
-        {
-            if (!isDraggingHeaderToHide && _filterManager != null && _filterManager.HandleMouseMove(e, headerToolTip)) return;
-            if (!isDraggingHeaderToHide || columnBeingDragged == null || e.Button != MouseButtons.Left)
-                return;
-
-            int deltaX = Math.Abs(e.X - headerDragStartPoint.X);
-            int deltaY = e.Y - headerDragStartPoint.Y;
-
-            if (deltaY > 20 && deltaY > deltaX)
-            {
-                gridReport.Cursor = blackXCursor;
-                string colName = !string.IsNullOrEmpty(columnBeingDragged.Header.Caption) ? columnBeingDragged.Header.Caption : columnBeingDragged.Key;
-                headerToolTip.SetToolTip(gridReport, $"✖ Drag down to hide '{colName}' column");
-            }
-            else
-            {
-                gridReport.Cursor = Cursors.Default;
-                headerToolTip.SetToolTip(gridReport, string.Empty);
-            }
-        }
-
-        private void Grid_MouseUp(object sender, MouseEventArgs e)
-        {
-            if (isDraggingHeaderToHide)
-            {
-                if (columnBeingDragged != null && (e.Y - headerDragStartPoint.Y) > 40)
-                {
-                    HideColumn(columnBeingDragged);
-                }
-                isDraggingHeaderToHide = false;
-                columnBeingDragged = null;
-                gridReport.Cursor = Cursors.Default;
-                headerToolTip.SetToolTip(gridReport, string.Empty);
-            }
-        }
-
-        private void Grid_DragOver(object sender, DragEventArgs e)
-        {
-            if (e.Data.GetDataPresent(typeof(ColumnChooserItem)))
-            {
-                e.Effect = DragDropEffects.Move;
-            }
-        }
-
-        private void Grid_DragDrop(object sender, DragEventArgs e)
-        {
-            if (e.Data.GetData(typeof(ColumnChooserItem)) is ColumnChooserItem item)
-            {
-                Point clientPt = gridReport.PointToClient(new Point(e.X, e.Y));
-                int dropPosition = GetTargetColumnPositionFromPoint(clientPt);
-                UnhideColumn(item.ColumnKey, dropPosition);
-            }
-        }
-
-        private int GetTargetColumnPositionFromPoint(Point pt)
-        {
-            if (gridReport.DisplayLayout == null || gridReport.DisplayLayout.Bands.Count == 0)
-                return 0;
-
-            UIElement element = gridReport.DisplayLayout.UIElement?.ElementFromPoint(pt);
-            HeaderUIElement headerUI = element as HeaderUIElement ?? element?.GetAncestor(typeof(HeaderUIElement)) as HeaderUIElement;
-
-            if (headerUI != null && headerUI.Header?.Column != null)
-            {
-                return headerUI.Header.Column.Header.VisiblePosition;
-            }
-
-            UltraGridBand band = gridReport.DisplayLayout.Bands[0];
-            foreach (UltraGridColumn col in band.Columns.Cast<UltraGridColumn>().OrderBy(c => c.Header.VisiblePosition))
-            {
-                if (!col.Hidden)
-                {
-                    UIElement hUI = col.Header.GetUIElement();
-                    if (hUI != null && pt.X >= hUI.Rect.Left && pt.X <= hUI.Rect.Right)
-                    {
-                        return col.Header.VisiblePosition;
-                    }
-                }
-            }
-
-            return band.Columns.Count;
-        }
-
-        private void HideColumn(UltraGridColumn col)
-        {
-            if (col == null) return;
-            userHiddenColumnKeys.Add(col.Key);
-            col.Hidden = true;
-            CreateFooterCells();
-            UpdateFooterCellPositions();
-            UpdateFooterValues();
-            _filterManager?.UpdateHeaderFilterIcons();
-            ReportGridLayoutHelper.SaveLayout("StockValuationReport", gridReport, userHiddenColumnKeys);
-            if (columnChooserForm != null && columnChooserForm.Visible)
-            {
-                PopulateColumnChooserListBox();
-            }
-        }
-
-        private void ShowHeaderContextMenu(UltraGridColumn col, Point location)
-        {
-            if (col == null) return;
-            ContextMenuStrip menu = new ContextMenuStrip { Font = new Font("Segoe UI", 9F) };
-            string colName = !string.IsNullOrEmpty(col.Header.Caption) ? col.Header.Caption : col.Key;
-
-            _filterManager?.AddFilterContextMenuItems(menu, col, location);
-            ToolStripMenuItem hideItem = new ToolStripMenuItem($"🙈 Hide Column '{colName}'", null, (s, e) => HideColumn(col));
-            hideItem.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
-            menu.Items.Add(hideItem);
-
-            menu.Items.Add(new ToolStripSeparator());
-
-            ToolStripMenuItem chooserItem = new ToolStripMenuItem("📋 Field / Column Chooser...", null, (s, e) => ShowColumnChooserForm());
-            menu.Items.Add(chooserItem);
-
-            ToolStripMenuItem showAllItem = new ToolStripMenuItem("🔓 Show / Unhide All Columns", null, (s, e) => UnhideAllColumns());
-            menu.Items.Add(showAllItem);
-
-            menu.Show(gridReport, location);
-        }
-
-        private void ShowColumnChooserForm()
-        {
-            if (columnChooserForm == null || columnChooserForm.IsDisposed)
-            {
-                CreateColumnChooserForm();
-            }
-
-            PopulateColumnChooserListBox();
-            columnChooserForm.Show(this);
-            PositionColumnChooser();
-        }
-
-        private void CreateColumnChooserForm()
-        {
-            columnChooserForm = new Form
-            {
-                Text = "Customization (Field Chooser)",
-                Size = new Size(240, 300),
-                FormBorderStyle = FormBorderStyle.FixedSingle,
-                StartPosition = FormStartPosition.Manual,
-                TopMost = true,
-                MaximizeBox = false,
-                MinimizeBox = false,
-                BackColor = Color.FromArgb(240, 244, 248),
-                ShowIcon = false,
-                ShowInTaskbar = false
-            };
-
-            columnChooserForm.FormClosing += (s, e) =>
-            {
-                e.Cancel = true;
-                columnChooserForm.Hide();
-            };
-
-            columnChooserListBox = new ListBox
-            {
-                Dock = DockStyle.Fill,
-                AllowDrop = true,
-                DrawMode = DrawMode.OwnerDrawFixed,
-                BorderStyle = BorderStyle.None,
-                BackColor = Color.FromArgb(240, 244, 248),
-                ItemHeight = 34,
-                IntegralHeight = false
-            };
-
-            columnChooserListBox.DrawItem += ColumnChooserListBox_DrawItem;
-            columnChooserListBox.DoubleClick += ColumnChooserListBox_DoubleClick;
-            columnChooserListBox.MouseDown += ColumnChooserListBox_MouseDown;
-
-            columnChooserForm.Controls.Add(columnChooserListBox);
-        }
-
-        private void ColumnChooserListBox_MouseDown(object sender, MouseEventArgs e)
-        {
-            if (e.Button == MouseButtons.Left && columnChooserListBox != null)
-            {
-                int index = columnChooserListBox.IndexFromPoint(e.Location);
-                if (index >= 0 && index < columnChooserListBox.Items.Count)
-                {
-                    if (columnChooserListBox.Items[index] is ColumnChooserItem item)
-                    {
-                        columnChooserListBox.DoDragDrop(item, DragDropEffects.Move);
-                    }
-                }
-            }
-        }
-
-        private void PopulateColumnChooserListBox()
-        {
-            if (columnChooserListBox == null || gridReport.DisplayLayout.Bands.Count == 0)
-                return;
-
-            columnChooserListBox.Items.Clear();
-            UltraGridBand band = gridReport.DisplayLayout.Bands[0];
-
-            foreach (UltraGridColumn col in band.Columns)
-            {
-                if (col.Hidden && !col.Key.EndsWith("Id", StringComparison.OrdinalIgnoreCase) && col.ExcludeFromColumnChooser != ExcludeFromColumnChooser.True)
-                {
-                    string caption = !string.IsNullOrEmpty(col.Header.Caption) ? col.Header.Caption : col.Key;
-                    columnChooserListBox.Items.Add(new ColumnChooserItem(col.Key, caption));
-                }
-            }
-        }
-
-        private void ColumnChooserListBox_DoubleClick(object sender, EventArgs e)
-        {
-            if (columnChooserListBox.SelectedItem is ColumnChooserItem item)
-            {
-                UnhideColumn(item.ColumnKey);
-            }
-        }
-
-        private void UnhideColumn(string columnKey, int? targetVisiblePosition = null)
-        {
-            userHiddenColumnKeys.Remove(columnKey);
-            if (gridReport.DisplayLayout.Bands.Count > 0 && gridReport.DisplayLayout.Bands[0].Columns.Exists(columnKey))
-            {
-                UltraGridColumn col = gridReport.DisplayLayout.Bands[0].Columns[columnKey];
-                col.Hidden = false;
-                if (targetVisiblePosition.HasValue)
-                {
-                    col.Header.VisiblePosition = targetVisiblePosition.Value;
-                }
-                CreateFooterCells();
-                UpdateFooterCellPositions();
-                UpdateFooterValues();
-            _filterManager?.UpdateHeaderFilterIcons();
-                ReportGridLayoutHelper.SaveLayout("StockValuationReport", gridReport, userHiddenColumnKeys);
-                PopulateColumnChooserListBox();
-            }
-        }
-
-        private void UnhideAllColumns()
-        {
-            userHiddenColumnKeys.Clear();
-            if (gridReport.DisplayLayout.Bands.Count == 0) return;
-            UltraGridBand band = gridReport.DisplayLayout.Bands[0];
-            foreach (UltraGridColumn col in band.Columns)
-            {
-                if (!col.Key.EndsWith("Id", StringComparison.OrdinalIgnoreCase) && col.ExcludeFromColumnChooser != ExcludeFromColumnChooser.True)
-                {
-                    col.Hidden = false;
-                }
-            }
-            CreateFooterCells();
-            UpdateFooterCellPositions();
-            UpdateFooterValues();
-            _filterManager?.UpdateHeaderFilterIcons();
-            ReportGridLayoutHelper.SaveLayout("StockValuationReport", gridReport, userHiddenColumnKeys);
-            PopulateColumnChooserListBox();
-        }
-
-        private void PositionColumnChooser()
-        {
-            if (columnChooserForm != null && !columnChooserForm.IsDisposed && columnChooserForm.Visible)
-            {
-                columnChooserForm.Location = new Point(
-                    Right - columnChooserForm.Width - 30,
-                    Bottom - columnChooserForm.Height - 30);
-                columnChooserForm.BringToFront();
-            }
-        }
-
-        private void ColumnChooserListBox_DrawItem(object sender, DrawItemEventArgs e)
-        {
-            if (e.Index < 0 || columnChooserListBox == null || e.Index >= columnChooserListBox.Items.Count)
-                return;
-
-            if (!(columnChooserListBox.Items[e.Index] is ColumnChooserItem item))
-                return;
-
-            Rectangle rect = e.Bounds;
-            rect.Inflate(-4, -3);
-
-            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
-
-            using (SolidBrush bgBrush = new SolidBrush(Color.FromArgb(0, 121, 211)))
-            using (GraphicsPath path = RoundedRect(rect, 4))
-            {
-                e.Graphics.FillPath(bgBrush, path);
-            }
-
-            using (SolidBrush textBrush = new SolidBrush(Color.White))
-            {
-                StringFormat sf = new StringFormat
-                {
-                    LineAlignment = StringAlignment.Center,
-                    Alignment = StringAlignment.Center
-                };
-                using (Font textFont = new Font("Segoe UI", 9F, FontStyle.Bold))
-                {
-                    e.Graphics.DrawString(item.DisplayText, textFont, textBrush, rect, sf);
-                }
-            }
-        }
-
-        private static GraphicsPath RoundedRect(Rectangle bounds, int radius)
-        {
-            int diameter = radius * 2;
-            Size size = new Size(diameter, diameter);
-            Rectangle arc = new Rectangle(bounds.Location, size);
-            GraphicsPath path = new GraphicsPath();
-
-            if (radius == 0)
-            {
-                path.AddRectangle(bounds);
-                return path;
-            }
-
-            path.AddArc(arc, 180, 90);
-
-            arc.X = bounds.Right - diameter;
-            path.AddArc(arc, 270, 90);
-
-            arc.Y = bounds.Bottom - diameter;
-            path.AddArc(arc, 0, 90);
-
-            arc.X = bounds.Left;
-            path.AddArc(arc, 90, 90);
-
-            path.CloseFigure();
-            return path;
-        }
-
-        private sealed class ColumnChooserItem
-        {
-            public string ColumnKey { get; }
-            public string DisplayText { get; }
-
-            public ColumnChooserItem(string key, string text)
-            {
-                ColumnKey = key;
-                DisplayText = text;
-            }
-
-            public override string ToString()
-            {
-                return DisplayText;
-            }
-        }
-
-        #endregion
-
-        #region GridFooterPanel Dynamic Alignment & Calculation
-
-        private void InitializeGridFooter()
-        {
-            if (gridFooterPanel == null && panelGrid != null)
-            {
-                gridFooterPanel = new Infragistics.Win.Misc.UltraPanel();
-                gridFooterPanel.Dock = DockStyle.Bottom;
-                gridFooterPanel.Height = 28;
-                gridFooterPanel.Appearance.BackColor = GridHeaderBlue;
-                gridFooterPanel.Appearance.BackColor2 = GridHeaderBlue;
-                gridFooterPanel.Appearance.BackGradientStyle = GradientStyle.None;
-                gridFooterPanel.Appearance.BorderColor = GridFooterBorder;
-                gridFooterPanel.BorderStyle = UIElementBorderStyle.Solid;
-                gridFooterPanel.MouseWheel += GridFooter_MouseWheel;
-                panelGrid.ClientArea.Controls.Add(gridFooterPanel);
-                gridReport.BringToFront();
-                panelGrid.ClientArea.PerformLayout();
-            }
-
-            CreateFooterCells();
-            UpdateFooterCellPositions();
-            UpdateFooterValues();
-            _filterManager?.UpdateHeaderFilterIcons();
-        }
-
-        private void CreateFooterCells()
-        {
-            if (gridFooterPanel == null) return;
-            gridFooterPanel.ClientArea.Controls.Clear();
-            _footerLabels.Clear();
-
-            int rowSelectorWidth = gridReport.DisplayLayout.Override.RowSelectors == DefaultableBoolean.True
-                ? gridReport.DisplayLayout.Override.RowSelectorWidth
-                : 0;
-
-            if (rowSelectorWidth > 0)
-            {
-                _lblRowSelectorSpacer = new Label
-                {
-                    Name = "footer_row_selector_spacer",
-                    Text = "Σ",
-                    TextAlign = ContentAlignment.MiddleCenter,
-                    BackColor = GridHeaderBlueDark,
-                    BorderStyle = BorderStyle.None,
-                    AutoSize = false,
-                    Width = rowSelectorWidth,
-                    Height = gridFooterPanel.Height,
-                    Left = 0,
-                    Top = 0,
-                    ForeColor = Color.White,
-                    Font = new Font("Segoe UI", 9F, FontStyle.Bold)
-                };
-                _lblRowSelectorSpacer.Paint += (s, e) =>
-                {
-                    using (Pen borderPen = new Pen(BorderBlue, 1))
-                    {
-                        e.Graphics.DrawLine(borderPen, _lblRowSelectorSpacer.Width - 1, 0, _lblRowSelectorSpacer.Width - 1, _lblRowSelectorSpacer.Height);
-                    }
-                };
-                _lblRowSelectorSpacer.MouseWheel += GridFooter_MouseWheel;
-                gridFooterPanel.ClientArea.Controls.Add(_lblRowSelectorSpacer);
-                _lblRowSelectorSpacer.BringToFront();
-            }
-
-            if (gridReport.DisplayLayout == null || gridReport.DisplayLayout.Bands.Count == 0)
-                return;
-
-            UltraGridBand band = gridReport.DisplayLayout.Bands[0];
-            int xOffset = rowSelectorWidth;
-
-            foreach (UltraGridColumn column in band.Columns.Cast<UltraGridColumn>().OrderBy(c => c.Header.VisiblePosition))
-            {
-                if (column.Hidden)
-                    continue;
-
-                Label footerLabel = new Label
-                {
-                    Name = "footer_" + column.Key,
-                    Text = string.Empty,
-                    TextAlign = ContentAlignment.MiddleCenter,
-                    BackColor = GridHeaderBlue,
-                    BorderStyle = BorderStyle.None,
-                    AutoSize = false,
-                    Width = column.Width,
-                    Height = Math.Max(gridFooterPanel.Height - 2, 20),
-                    Left = xOffset,
-                    Top = 1,
-                    Tag = Tuple.Create(column.Key, string.Empty),
-                    ForeColor = Color.White,
-                    Font = new Font("Microsoft Sans Serif", 8.25F, FontStyle.Regular, GraphicsUnit.Point, 0),
-                    ContextMenuStrip = CreateFooterContextMenu(column.Key)
-                };
-
-                footerLabel.Paint += FooterLabel_Paint;
-                footerLabel.MouseWheel += GridFooter_MouseWheel;
-                gridFooterPanel.ClientArea.Controls.Add(footerLabel);
-                _footerLabels[column.Key] = footerLabel;
-
-                if (!_columnAggregations.ContainsKey(column.Key))
-                {
-                    _columnAggregations[column.Key] = "None";
-                }
-
-                xOffset += column.Width;
-            }
-        }
-
-        private void FooterLabel_Paint(object sender, PaintEventArgs e)
-        {
-            Label lbl = sender as Label;
-            if (lbl == null) return;
-
-            using (Pen borderPen = new Pen(Color.FromArgb(118, 154, 198), 1))
-            {
-                e.Graphics.DrawLine(borderPen, lbl.Width - 1, 0, lbl.Width - 1, lbl.Height);
-            }
-        }
-
-        private ContextMenuStrip CreateFooterContextMenu(string columnKey)
-        {
-            ContextMenuStrip menu = new ContextMenuStrip();
-            menu.Tag = columnKey;
-
-            bool isNumeric = gridReport.DisplayLayout.Bands.Count > 0 &&
-                             gridReport.DisplayLayout.Bands[0].Columns.Exists(columnKey) &&
-                             IsSummableColumn(gridReport.DisplayLayout.Bands[0].Columns[columnKey]);
-
-            ToolStripMenuItem itemSum = new ToolStripMenuItem("Sum");
-            itemSum.Tag = "Sum";
-            itemSum.Enabled = isNumeric;
-            itemSum.Click += FooterContextMenu_Click;
-
-            ToolStripMenuItem itemMin = new ToolStripMenuItem("Min");
-            itemMin.Tag = "Min";
-            itemMin.Click += FooterContextMenu_Click;
-
-            ToolStripMenuItem itemMax = new ToolStripMenuItem("Max");
-            itemMax.Tag = "Max";
-            itemMax.Click += FooterContextMenu_Click;
-
-            ToolStripMenuItem itemCount = new ToolStripMenuItem("Count");
-            itemCount.Tag = "Count";
-            itemCount.Click += FooterContextMenu_Click;
-
-            ToolStripMenuItem itemAverage = new ToolStripMenuItem("Average");
-            itemAverage.Tag = "Avg";
-            itemAverage.Enabled = isNumeric;
-            itemAverage.Click += FooterContextMenu_Click;
-
-            ToolStripMenuItem itemNone = new ToolStripMenuItem("None");
-            itemNone.Tag = "None";
-            itemNone.Click += FooterContextMenu_Click;
-
-            menu.Items.Add(itemSum);
-            menu.Items.Add(itemMin);
-            menu.Items.Add(itemMax);
-            menu.Items.Add(itemCount);
-            menu.Items.Add(itemAverage);
-            menu.Items.Add(new ToolStripSeparator());
-            menu.Items.Add(itemNone);
-
-            menu.Opening += (sender, e) =>
-            {
-                string currentAggregation = _columnAggregations.ContainsKey(columnKey)
-                    ? _columnAggregations[columnKey]
-                    : "None";
-
-                foreach (ToolStripItem menuItem in menu.Items)
-                {
-                    ToolStripMenuItem toolStripMenuItem = menuItem as ToolStripMenuItem;
-                    if (toolStripMenuItem != null && toolStripMenuItem.Tag != null)
-                    {
-                        toolStripMenuItem.Checked = string.Equals(toolStripMenuItem.Tag.ToString(), currentAggregation, StringComparison.OrdinalIgnoreCase);
-                    }
-                }
-            };
-
-            return menu;
-        }
-
-        private bool IsSummableColumn(UltraGridColumn column)
-        {
-            if (column == null || column.DataType == null) return false;
-            Type t = System.Nullable.GetUnderlyingType(column.DataType) ?? column.DataType;
-            return t == typeof(decimal) || t == typeof(double) || t == typeof(float) ||
-                   t == typeof(int) || t == typeof(long) || t == typeof(short);
-        }
-
-        private void FooterContextMenu_Click(object sender, EventArgs e)
-        {
-            ToolStripMenuItem item = sender as ToolStripMenuItem;
-            if (item == null)
-                return;
-
-            ContextMenuStrip menu = item.Owner as ContextMenuStrip;
-            if (menu == null || menu.Tag == null || item.Tag == null)
-                return;
-
-            string columnKey = menu.Tag.ToString();
-            string aggregation = item.Tag.ToString();
-
-            _columnAggregations[columnKey] = aggregation;
-            UpdateFooterValues();
-            _filterManager?.UpdateHeaderFilterIcons();
-        }
-
-        private void UpdateFooterCellPositions()
-        {
-            if (gridReport.DisplayLayout == null || gridReport.DisplayLayout.Bands.Count == 0 || _footerLabels.Count == 0 || gridFooterPanel == null)
-                return;
-
-            UltraGridBand band = gridReport.DisplayLayout.Bands[0];
-            int rowSelectorWidth = gridReport.DisplayLayout.Override.RowSelectors == DefaultableBoolean.True
-                ? gridReport.DisplayLayout.Override.RowSelectorWidth
-                : 0;
-            int scrollOffset = 0;
-            if (gridReport.ActiveColScrollRegion != null)
-            {
-                scrollOffset = gridReport.ActiveColScrollRegion.Position;
-            }
-
-            int calculatedX = rowSelectorWidth - scrollOffset;
-
-            foreach (UltraGridColumn column in band.Columns.Cast<UltraGridColumn>().OrderBy(c => c.Header.VisiblePosition))
-            {
-                if (column.Hidden || !_footerLabels.ContainsKey(column.Key))
-                    continue;
-
-                Label footerLabel = _footerLabels[column.Key];
-                var headerUI = column.Header.GetUIElement();
-                int left, width;
-
-                if (headerUI != null)
-                {
-                    left = headerUI.Rect.Left;
-                    width = headerUI.Rect.Width;
-                }
-                else
-                {
-                    left = calculatedX;
-                    width = column.Width;
-                }
-
-                calculatedX += width;
-
-                footerLabel.Left = left;
-                footerLabel.Width = width;
-                footerLabel.Top = 0;
-                footerLabel.Height = gridFooterPanel.Height;
-                footerLabel.Visible = (left + width > rowSelectorWidth && left < gridFooterPanel.Width);
-                footerLabel.Invalidate();
-            }
-
-            if (_lblRowSelectorSpacer != null)
-            {
-                _lblRowSelectorSpacer.BringToFront();
-            }
-        }
-
-        private void UpdateFooterValues()
-        {
-            if (_footerLabels.Count == 0)
-                return;
-
-            List<UltraGridRow> visibleRows = GetVisibleDataRows().ToList();
-            foreach (KeyValuePair<string, Label> footerEntry in _footerLabels)
-            {
-                string columnKey = footerEntry.Key;
-                Label footerLabel = footerEntry.Value;
-
-                if (!_columnAggregations.ContainsKey(columnKey) ||
-                    string.Equals(_columnAggregations[columnKey], "None", StringComparison.OrdinalIgnoreCase))
-                {
-                    footerLabel.Text = string.Empty;
-                    footerLabel.Tag = Tuple.Create(columnKey, string.Empty);
-                    footerLabel.Invalidate();
-                    continue;
-                }
-
-                object result = CalculateAggregation(columnKey, _columnAggregations[columnKey], visibleRows);
-                string displayValue = FormatAggregationResult(columnKey, _columnAggregations[columnKey], result);
-
-                footerLabel.Text = displayValue;
-                footerLabel.Tag = Tuple.Create(columnKey, displayValue);
-                footerLabel.ForeColor = Color.White;
-                footerLabel.Invalidate();
-            }
-        }
-
-        private IEnumerable<UltraGridRow> GetVisibleDataRows()
-        {
-            if (gridReport.Rows != null) { foreach (UltraGridRow row in gridReport.Rows) { if (row != null && row.IsDataRow && !row.IsFilteredOut && !row.Hidden) yield return row; } } yield break;
-            foreach (UltraGridRow row in GetVisibleDataRows())
-            {
-                if (row != null && row.IsDataRow && !row.IsFilteredOut && !row.Hidden)
-                    yield return row;
-            }
-        }
-
-        private object CalculateAggregation(string columnKey, string aggregation, List<UltraGridRow> visibleRows)
-        {
-            if (visibleRows == null || visibleRows.Count == 0)
-                return null;
-
-            switch (aggregation)
-            {
-                case "Sum":
-                    return visibleRows
-                        .Where(row => row.Cells.Exists(columnKey))
-                        .Select(row => GetNumericValue(row.Cells[columnKey].Value))
-                        .Where(value => value.HasValue)
-                        .Sum(value => value.Value);
-                case "Min":
-                    return visibleRows
-                        .Where(row => row.Cells.Exists(columnKey))
-                        .Select(row => row.Cells[columnKey].Value)
-                        .Where(HasCellValue)
-                        .Cast<IComparable>()
-                        .OrderBy(value => value)
-                        .FirstOrDefault();
-                case "Max":
-                    return visibleRows
-                        .Where(row => row.Cells.Exists(columnKey))
-                        .Select(row => row.Cells[columnKey].Value)
-                        .Where(HasCellValue)
-                        .Cast<IComparable>()
-                        .OrderByDescending(value => value)
-                        .FirstOrDefault();
-                case "Count":
-                    return visibleRows.Count(row => row.Cells.Exists(columnKey) && HasCellValue(row.Cells[columnKey].Value));
-                case "Avg":
-                    List<decimal> values = visibleRows
-                        .Where(row => row.Cells.Exists(columnKey))
-                        .Select(row => GetNumericValue(row.Cells[columnKey].Value))
-                        .Where(value => value.HasValue)
-                        .Select(value => value.Value)
-                        .ToList();
-                    return values.Count == 0 ? 0m : values.Average();
-                default:
-                    return null;
-            }
-        }
-
-        private string FormatAggregationResult(string columnKey, string aggregation, object result)
-        {
-            if (string.Equals(aggregation, "None", StringComparison.OrdinalIgnoreCase))
-                return string.Empty;
-
-            if (result == null)
-            {
-                if (string.Equals(aggregation, "Count", StringComparison.OrdinalIgnoreCase))
-                    return "0";
-                if (string.Equals(aggregation, "Sum", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(aggregation, "Avg", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(aggregation, "Min", StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(aggregation, "Max", StringComparison.OrdinalIgnoreCase))
-                    return "0.00";
-                return string.Empty;
-            }
-
-            if (aggregation == "Count")
-                return Convert.ToString(result);
-
-            if (gridReport.DisplayLayout != null &&
-                gridReport.DisplayLayout.Bands.Count > 0 &&
-                gridReport.DisplayLayout.Bands[0].Columns.Exists(columnKey))
-            {
-                UltraGridColumn column = gridReport.DisplayLayout.Bands[0].Columns[columnKey];
-                decimal? numericValue = GetNumericValue(result);
-                if (numericValue.HasValue)
-                {
-                    if (!string.IsNullOrWhiteSpace(column.Format))
-                        return numericValue.Value.ToString(column.Format);
-
-                    return numericValue.Value.ToString("N2");
-                }
-            }
-
-            return Convert.ToString(result);
-        }
-
-        private static decimal? GetNumericValue(object rawValue)
-        {
-            if (rawValue == null || rawValue == DBNull.Value)
-                return null;
-
-            if (rawValue is decimal decVal) return decVal;
-            if (rawValue is double dblVal) return Convert.ToDecimal(dblVal);
-            if (rawValue is float fltVal) return Convert.ToDecimal(fltVal);
-            if (rawValue is int intVal) return intVal;
-            if (rawValue is long longVal) return longVal;
-            if (rawValue is short shortVal) return shortVal;
-
-            return decimal.TryParse(Convert.ToString(rawValue), out decimal parsed) ? parsed : (decimal?)null;
-        }
-
-        private static bool HasCellValue(object value)
-        {
-            return value != null && value != DBNull.Value && !string.IsNullOrWhiteSpace(Convert.ToString(value));
-        }
-
-        #endregion
-
-        // ════════════════════════════════════════════════════════════
-        //  Button styling
-        // ════════════════════════════════════════════════════════════
-        private void StyleButtons()
-        {
-            StyleButton(btnSearch);
-            StyleButton(btnReset);
-            StyleButton(btnExport);
-            StyleButton(btnPrint);
-            StyleButton(btnClose);
-        }
-
-        private static void StyleButton(Infragistics.Win.Misc.UltraButton btn)
-        {
-            if (btn == null) return;
-            btn.UseAppStyling  = false;
-            btn.UseOsThemes    = DefaultableBoolean.False;
-            btn.ButtonStyle = UIElementButtonStyle.Office2013Button;
-            btn.Appearance.BackColor = ButtonTopColor;
-            btn.Appearance.BackColor2 = ButtonBottomColor;
-            btn.Appearance.BackGradientStyle = GradientStyle.Vertical;
-            btn.Appearance.BorderColor = ButtonBorderColor;
-            btn.Appearance.ForeColor = ButtonTextBlue;
-            btn.Appearance.FontData.Name = "Microsoft Sans Serif";
-            btn.Appearance.FontData.SizeInPoints = 9F;
-            btn.Appearance.FontData.Bold = DefaultableBoolean.False;
-
-            btn.HotTrackAppearance.BackColor = PanelHoverTopColor;
-            btn.HotTrackAppearance.BackColor2 = PanelHoverBottomColor;
-            btn.HotTrackAppearance.BorderColor = ButtonBorderColor;
-            btn.HotTrackAppearance.ForeColor = ButtonTextBlue;
-
-            btn.PressedAppearance.BackColor = PanelPressedTopColor;
-            btn.PressedAppearance.BackColor2 = PanelPressedBottomColor;
-            btn.PressedAppearance.BorderColor = ButtonBorderColor;
-            btn.PressedAppearance.ForeColor = ButtonTextBlue;
-        }
-
-        // ════════════════════════════════════════════════════════════
-        //  Summary card layout
-        // ════════════════════════════════════════════════════════════
-        private void LayoutSummaryCards()
-        {
-            // First apply card settings at runtime to avoid Designer parse bugs
-            SetupCardControls(cardItems, lblItemsCaption, lblItemsValue, "TOTAL UNIQUE ITEMS", "pnlCardItems");
-            SetupCardControls(cardQty, lblQtyCaption, lblQtyValue, "TOTAL STOCK QUANTITY", "pnlCardQty");
-            SetupCardControls(cardCostVal, lblCostCaption, lblCostValue, "TOTAL VALUE @ COST", "pnlCardCostVal");
-            SetupCardControls(cardRetailVal, lblRetailCaption, lblRetailValue, "TOTAL VALUE @ RETAIL", "pnlCardRetailVal");
-            SetupCardControls(cardProfit, lblProfitCaption, lblProfitValue, "POTENTIAL MARGIN PROFIT", "pnlCardProfit");
-
-            var cards = new[]
-            {
-                (cardItems,     lblItemsValue,     Color.FromArgb(25, 118, 210)),
-                (cardQty,       lblQtyValue,       Color.FromArgb(0, 137, 123)),
-                (cardCostVal,   lblCostValue,      Color.FromArgb(56, 142, 60)),
-                (cardRetailVal, lblRetailValue,    Color.FromArgb(123, 31, 162)),
-                (cardProfit,    lblProfitValue,    Color.FromArgb(211, 47, 47)),
-            };
-
-            int x = 15, y = 6, w = 238, h = 62, gap = 10;
-            foreach (var (card, val, valColor) in cards)
-            {
-                card.Location = new Point(x, y);
-                card.Size = new Size(w, h);
-
-                // Add a top colored accent line to each card
-                var accentLine = new Panel
-                {
-                    Dock = DockStyle.Top,
-                    Height = 3,
-                    BackColor = valColor
-                };
-                card.ClientArea.Controls.Add(accentLine);
-                accentLine.BringToFront();
-
-                // Style the value label color
-                val.Appearance.ForeColor = valColor;
-
-                x += w + gap;
-            }
-        }
-
-        private void SetupCardControls(Infragistics.Win.Misc.UltraPanel card, Infragistics.Win.Misc.UltraLabel caption, Infragistics.Win.Misc.UltraLabel value, string captionText, string cardName)
-        {
-            card.Name = cardName;
-            card.Size = new System.Drawing.Size(238, 62);
-            card.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
-            card.UseAppStyling = false;
-            card.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
-            card.Appearance.BackColor = System.Drawing.Color.White;
-            card.Appearance.BorderColor = System.Drawing.Color.FromArgb(226, 232, 240);
-
-            // Caption
-            caption.Text = captionText;
-            caption.Location = new Point(12, 8);
-            caption.Size = new System.Drawing.Size(210, 15);
-            caption.Font = new Font("Segoe UI", 7.5F, FontStyle.Bold);
-            caption.Appearance.ForeColor = Color.FromArgb(100, 116, 139);
-            caption.UseAppStyling = false;
-            caption.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
-
-            // Value label
-            value.Location = new Point(12, 26);
-            value.Size = new System.Drawing.Size(210, 28);
-            value.Font = new Font("Segoe UI Semibold", 14F, FontStyle.Bold);
-            value.Text = "–";
-            value.UseAppStyling = false;
-            value.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
-        }
-
-        // ════════════════════════════════════════════════════════════
-        //  Search / Filter
-        // ════════════════════════════════════════════════════════════
-        private void BtnSearch_Click(object sender, EventArgs e) => RunSearch();
-
-        private void RunSearch()
-        {
-            if (_searchWorker.IsBusy) return;
-
-            bool isAll = string.Equals(Convert.ToString(comboPeriod.Value ?? comboPeriod.Text), "ALL", StringComparison.OrdinalIgnoreCase);
-
-            if (!isAll && (dtFrom.Value == null || dtTo.Value == null))
-            {
-                MessageBox.Show("Please select a valid date range.", "Validation",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            btnSearch.Text    = "⏳ Searching…";
-            btnSearch.Enabled = false;
-            this.Cursor       = Cursors.WaitCursor;
-            SetStatus("Loading data…");
-
-            var filter = new StockReportFilter
-            {
-                FromDate   = isAll ? new DateTime(1753, 1, 1) : ((DateTime)dtFrom.Value).Date,
-                ToDate     = isAll ? DateTime.Today.AddDays(1).AddTicks(-1) : ((DateTime)dtTo.Value).Date.AddDays(1).AddTicks(-1),
-                CompanyId  = !string.IsNullOrEmpty(DataBase.CompanyId)  ? int.Parse(DataBase.CompanyId)  : 1,
-                BranchId   = !string.IsNullOrEmpty(DataBase.BranchId)   ? (int.TryParse(DataBase.BranchId, out int bid) ? bid : 0) : 1,
-                FinYearId  = !string.IsNullOrEmpty(DataBase.FinyearId)  ? int.Parse(DataBase.FinyearId)  : 1,
-                GroupId    = GetComboIntValue(comboGroup),
-                CategoryId = GetComboIntValue(comboCategory),
-            };
-
-            _searchWorker.RunWorkerAsync(filter);
-        }
-
-        private void SearchWorker_DoWork(object sender, DoWorkEventArgs e)
-        {
-            var filter = (StockReportFilter)e.Argument;
-            e.Result = _reportRepo.GetStockReport(filter);
-        }
-
-        private void SearchWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
-        {
-            try
-            {
-                if (e.Error != null || e.Result is Exception)
-                {
-                    string msg = e.Error?.Message ?? ((Exception)e.Result).Message;
-                    MessageBox.Show("Error loading data: " + msg, "Error",
-                        MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    SetStatus("Error loading data.");
-                    return;
-                }
-
-                var raw = e.Result as List<StockReportItem>;
-                if (raw == null || raw.Count == 0)
-                {
-                    _allRows = new List<StockValuationRow>();
-                    gridReport.DataSource = null;
-            _filterManager?.ClearFilters();
-            _filterManager?.UpdateHeaderFilterIcons();
-                    UpdateSummaryCards();
-                    UpdateFooterValues();
-            _filterManager?.UpdateHeaderFilterIcons();
-                    SetStatus("No records found for the selected criteria.");
-                    MessageBox.Show("No records found.", "No Data",
-                        MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    return;
-                }
-
-                // Map to valuation rows
-                _allRows = raw.Select(r => new StockValuationRow
-                {
-                    ItemId          = r.ItemId,
-                    Barcode         = r.Barcode,
-                    ItemName        = r.ItemName,
-                    GroupName       = r.GroupName,
-                    CategoryName    = r.CategoryName,
-                    SubCategoryName = r.SubCategoryName,
-                    BaseUnitName    = r.BaseUnitName,
-                    ClosingStock    = r.ClosingStock,
-                    Sales           = r.Sales,
-                    Cost            = r.Cost,
-                    RetailPrice     = r.RetailPrice,
-                    ValueAtCost     = r.ClosingStock * r.Cost,
-                    ValueAtRetail   = r.ClosingStock * r.RetailPrice,
-                    PotentialProfit = (r.ClosingStock * r.RetailPrice) - (r.ClosingStock * r.Cost),
-                }).ToList();
-
-                ApplyFilters();
-            }
-            finally
-            {
-                btnSearch.Text    = "🔍  Search";
-                btnSearch.Enabled = true;
-                this.Cursor       = Cursors.Default;
-            }
-        }
-
-        private void ApplyFilters()
-        {
-            string search = txtSearch.Text.Trim();
-            string stockFilter = comboStockFilter.Text;
-
-            var filtered = _allRows.AsEnumerable();
-
-            // Text search
-            if (!string.IsNullOrEmpty(search))
-            {
-                filtered = filtered.Where(r =>
-                    (r.Barcode   ?? "").IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    (r.ItemName  ?? "").IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    (r.GroupName ?? "").IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0 ||
-                    (r.CategoryName ?? "").IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0
-                );
-            }
-
-            // Stock filter
-            switch (stockFilter)
-            {
-                case "Positive Stock":  filtered = filtered.Where(r => r.ClosingStock > 0);  break;
-                case "Zero Stock":      filtered = filtered.Where(r => r.ClosingStock == 0); break;
-                case "Negative Stock":  filtered = filtered.Where(r => r.ClosingStock < 0);  break;
-                case "Low Stock":       filtered = filtered.Where(r => r.ClosingStock > 0 && r.ClosingStock < 5); break;
-                case "Excess Stock":    filtered = filtered.Where(r => r.ClosingStock > 100); break;
-                case "Dead Stock":      filtered = filtered.Where(r => r.ClosingStock > 0 && r.Sales == 0); break;
-            }
-
-            var result = filtered.ToList();
-            gridReport.DataSource = result;
-            _filterManager?.ClearFilters();
-            UpdateSummaryCards(result);
-            UpdateFooterValues();
-            _filterManager?.UpdateHeaderFilterIcons();
-            SetStatus($"Showing {result.Count} of {_allRows.Count} item(s)  |  F5 = Search  |  Ctrl+E = Export  |  Ctrl+P = Print  |  Esc = Close");
-        }
-
-        private void UpdateSummaryCards(List<StockValuationRow> rows = null)
-        {
-            rows = rows ?? _allRows;
-            lblItemsValue.Text  = rows.Count.ToString("N0");
-            lblQtyValue.Text    = rows.Sum(r => r.ClosingStock).ToString("N2");
-            lblCostValue.Text   = rows.Sum(r => r.ValueAtCost).ToString("N2");
-            lblRetailValue.Text = rows.Sum(r => r.ValueAtRetail).ToString("N2");
-            lblProfitValue.Text = rows.Sum(r => r.PotentialProfit).ToString("N2");
-        }
-
-        // ════════════════════════════════════════════════════════════
-        //  Helpers
-        // ════════════════════════════════════════════════════════════
-        private int? GetComboIntValue(Infragistics.Win.UltraWinEditors.UltraComboEditor combo)
-        {
-            if (combo.Value == null) return null;
-            if (int.TryParse(combo.Value.ToString(), out int id) && id > 0) return id;
-            return null;
-        }
-
-        private void SetStatus(string message)
-        {
-            if (lblStatus.InvokeRequired)
-                lblStatus.Invoke(new Action(() => lblStatus.Text = message));
-            else
-                lblStatus.Text = message;
-        }
-
-        // ════════════════════════════════════════════════════════════
-        //  Event handlers
-        // ════════════════════════════════════════════════════════════
-        public void RibbonClear() => BtnReset_Click(this, EventArgs.Empty);
-        public void Clear() => BtnReset_Click(this, EventArgs.Empty);
-
-        private void BtnReset_Click(object sender, EventArgs e)
-        {
-            DateTime now = DateTime.Now;
-            dtFrom.Value = new DateTime(now.Year, 1, 1);
-            dtTo.Value   = now;
-            comboPeriod.Text      = "ALL";
-            comboGroup.Value      = null;
-            comboCategory.Value   = null;
-            comboStockFilter.Text = "All Items";
-            txtSearch.Text        = "";
-            _allRows              = new List<StockValuationRow>();
-            gridReport.DataSource = null;
-            _filterManager?.ClearFilters();
-            _filterManager?.UpdateHeaderFilterIcons();
-            UpdateSummaryCards();
-            UpdateFooterValues();
-            _filterManager?.UpdateHeaderFilterIcons();
-            SetStatus("Filters reset.  |  F5 = Search  |  Esc = Close");
-        }
-
-        private void BtnClose_Click(object sender, EventArgs e) => this.Close();
-
-        private void BtnPrint_Click(object sender, EventArgs e) => gridReport.PrintPreview();
-
-        private void BtnExport_Click(object sender, EventArgs e)
-        {
-            try
-            {
-                var dlg = new SaveFileDialog
-                {
-                    Filter = ReportPdfExporter.CsvAndPdfFilter,
-                    FileName = $"StockValuation_{DateTime.Now:yyyyMMdd_HHmm}.csv"
-                };
-                if (dlg.ShowDialog() != DialogResult.OK) return;
-                if (ReportPdfExporter.CheckAndExportPdf(dlg, gridReport, "Stock Valuation Report")) return;
-                if (gridReport.Rows.Count == 0)
-                {
-                    MessageBox.Show("No data to export.", "Info",
-                        MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    return;
-                }
-                ExportToCsv(dlg.FileName);
-                MessageBox.Show("Export completed successfully!", "Success",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show("Export failed: " + ex.Message, "Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-            }
-        }
-
-        private void ExportToCsv(string path)
-        {
-            var sb = new StringBuilder();
-            var band = gridReport.DisplayLayout.Bands[0];
-            
-            // Header
-            foreach (UltraGridColumn col in band.Columns)
-                if (!col.Hidden) sb.Append(col.Header.Caption + ",");
-            if (sb.Length > 0) sb.Length--;
-            sb.AppendLine();
-            
-            // Data
-
-            foreach (UltraGridRow row in GetVisibleDataRows())
-            {
-                foreach (UltraGridColumn col in band.Columns)
-                {
-                    if (!col.Hidden)
-                    {
-                        string v = row.Cells[col].Value?.ToString() ?? "";
-                        if (v.Contains(",")) v = "\"" + v + "\"";
-                        sb.Append(v + ",");
-                    }
-                }
-                if (sb.Length > 0) sb.Length--;
-                sb.AppendLine();
-            }
-
-            // Summary Row at the bottom
-            sb.AppendLine();
-            
-            int itemsCount = GetVisibleDataRows().Count();
-            decimal totalQty = 0;
-            decimal totalValueCost = 0;
-            decimal totalValueRetail = 0;
-            decimal totalProfit = 0;
-            
-            foreach (UltraGridRow row in GetVisibleDataRows())
-            {
-                totalQty         += Convert.ToDecimal(row.Cells["ClosingStock"].Value ?? 0);
-                totalValueCost   += Convert.ToDecimal(row.Cells["ValueAtCost"].Value ?? 0);
-                totalValueRetail += Convert.ToDecimal(row.Cells["ValueAtRetail"].Value ?? 0);
-                totalProfit      += Convert.ToDecimal(row.Cells["PotentialProfit"].Value ?? 0);
-            }
-
-            foreach (UltraGridColumn col in band.Columns)
-            {
-                if (!col.Hidden)
-                {
-                    if (col.Key == "Barcode")
-                        sb.Append("TOTALS,");
-                    else if (col.Key == "ItemName")
-                        sb.Append($"({itemsCount} Items),");
-                    else if (col.Key == "ClosingStock")
-                        sb.Append($"{totalQty:F2},");
-                    else if (col.Key == "ValueAtCost")
-                        sb.Append($"{totalValueCost:F2},");
-                    else if (col.Key == "ValueAtRetail")
-                        sb.Append($"{totalValueRetail:F2},");
-                    else if (col.Key == "PotentialProfit")
-                        sb.Append($"{totalProfit:F2},");
-                    else if (col.Key == "MarginPercent")
-                        sb.Append($"{(totalValueRetail > 0 ? (totalProfit / totalValueRetail * 100) : 0):F2}%,");
-                    else
-                        sb.Append(",");
-                }
-            }
-            if (sb.Length > 0) sb.Length--;
-            sb.AppendLine();
-
-            File.WriteAllText(path, sb.ToString(), Encoding.UTF8);
-        }
-
-        private void ComboPeriod_ValueChanged(object sender, EventArgs e)
-        {
-            if (_isChangingDates) return;
-            if (comboPeriod.Value == null) return;
-
-            _isChangingDates = true;
-            try
-            {
-                string val = comboPeriod.Value.ToString();
-                DateTime now = DateTime.Now;
-                switch (val)
-                {
-                    case "ALL":
-                    case "All":           dtFrom.Value = new DateTime(1753, 1, 1);              dtTo.Value = now.Date;                              break;
-                    case "Today":         dtFrom.Value = now.Date;                              dtTo.Value = now.Date;                              break;
-                    case "This Week":     dtFrom.Value = now.Date.AddDays(-(int)now.DayOfWeek); dtTo.Value = now.Date;                              break;
-                    case "This Month":    dtFrom.Value = new DateTime(now.Year, now.Month, 1);  dtTo.Value = now.Date;                              break;
-                    case "Last Month":    var lm = now.AddMonths(-1); dtFrom.Value = new DateTime(lm.Year, lm.Month, 1); dtTo.Value = new DateTime(now.Year, now.Month, 1).AddDays(-1); break;
-                    case "This Quarter":  int q = (now.Month - 1) / 3; dtFrom.Value = new DateTime(now.Year, q * 3 + 1, 1); dtTo.Value = now.Date; break;
-                    case "This Year":     dtFrom.Value = new DateTime(now.Year, 1, 1);           dtTo.Value = now.Date;                              break;
-                }
-            }
-            finally
-            {
-                _isChangingDates = false;
-            }
-        }
-
-        private void DtDate_ValueChanged(object sender, EventArgs e)
-        {
-            if (_isChangingDates) return;
-
-            _isChangingDates = true;
-            try
-            {
-                if (comboPeriod.Text != "Custom") comboPeriod.Text = "Custom";
-            }
-            finally
-            {
-                _isChangingDates = false;
-            }
-        }
-
-        private void TxtSearch_TextChanged(object sender, EventArgs e)
-        {
-            if (_allRows.Count > 0) ApplyFilters();
-        }
-
-        private void FrmStockValuationReport_KeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.KeyCode == Keys.F5)                         { e.Handled = true; RunSearch(); }
-            else if (e.Control && e.KeyCode == Keys.E)        { e.Handled = true; BtnExport_Click(sender, e); }
-            else if (e.Control && e.KeyCode == Keys.P)        { e.Handled = true; BtnPrint_Click(sender, e); }
-            else if (e.KeyCode == Keys.Escape)                { e.Handled = true; this.Close(); }
-            else if (e.Control && e.KeyCode == Keys.Right)    { e.Handled = true; ScrollGridHorizontally(1); }
-            else if (e.Control && e.KeyCode == Keys.Left)     { e.Handled = true; ScrollGridHorizontally(-1); }
-        }
-
-        #region Side / Horizontal Scrolling Helpers
-
-        private void GridReport_MouseWheel(object sender, MouseEventArgs e)
-        {
-            if ((Control.ModifierKeys & Keys.Shift) == Keys.Shift)
-            {
-                if (e is HandledMouseEventArgs handled)
-                {
-                    handled.Handled = true;
-                }
-
-                int steps = Math.Max(1, Math.Abs(e.Delta) / 120);
-                ScrollGridHorizontally(e.Delta > 0 ? -1 : 1, steps);
-            }
-        }
-
-        private void GridFooter_MouseWheel(object sender, MouseEventArgs e)
-        {
-            if (e is HandledMouseEventArgs handled)
-            {
-                handled.Handled = true;
-            }
-
-            int steps = Math.Max(1, Math.Abs(e.Delta) / 120);
-            ScrollGridHorizontally(e.Delta > 0 ? -1 : 1, steps);
-        }
-
-        public void ScrollGridHorizontally(int direction, int steps = 1)
-        {
-            try
-            {
-                if (gridReport.DisplayLayout == null || gridReport.DisplayLayout.ColScrollRegions.Count == 0)
-                    return;
-
-                ColScrollRegion region = gridReport.ActiveColScrollRegion ?? gridReport.DisplayLayout.ColScrollRegions[0];
-                if (region == null)
-                    return;
-
-                steps = Math.Max(1, Math.Min(steps, 5));
-                for (int i = 0; i < steps; i++)
-                {
-                    if (direction < 0)
-                    {
-                        region.Scroll(ColScrollAction.LineLeft);
-                    }
-                    else if (direction > 0)
-                    {
-                        region.Scroll(ColScrollAction.LineRight);
-                    }
-                }
-
-                UpdateFooterCellPositions();
-            }
-            catch { }
-        }
-
-        private sealed class GridSideScrollFilter : NativeWindow
-        {
-            private const int WM_MOUSEHWHEEL = 0x020E;
-            private readonly frmStockValuationReport _form;
-
-            public GridSideScrollFilter(frmStockValuationReport form, UltraGrid grid)
-            {
-                _form = form;
-                if (grid.IsHandleCreated)
-                    AssignHandle(grid.Handle);
-                grid.HandleCreated += (s, e) => AssignHandle(grid.Handle);
-                grid.HandleDestroyed += (s, e) => ReleaseHandle();
-            }
-
-            protected override void WndProc(ref Message m)
-            {
-                if (m.Msg == WM_MOUSEHWHEEL)
-                {
-                    short delta = (short)((m.WParam.ToInt64() >> 16) & 0xFFFF);
-                    if (delta != 0)
-                    {
-                        int steps = Math.Max(1, Math.Abs(delta) / 120);
-                        _form.ScrollGridHorizontally(delta > 0 ? 1 : -1, steps);
-                        m.Result = IntPtr.Zero;
-                        return;
-                    }
-                }
-                base.WndProc(ref m);
-            }
-        }
-
-        #endregion
-
-    }
-
-    // ════════════════════════════════════════════════════════════
-    //  Valuation Row Model (calculated in-memory from StockReportItem)
-    // ════════════════════════════════════════════════════════════
-    public class StockValuationRow
-    {
-        public int     ItemId          { get; set; }
-        public string  Barcode         { get; set; }
-        public string  ItemName        { get; set; }
-        public string  GroupName       { get; set; }
-        public string  CategoryName    { get; set; }
-        public string  SubCategoryName { get; set; }
-        public string  BaseUnitName    { get; set; }
-        public decimal ClosingStock    { get; set; }
-        public decimal Sales           { get; set; }
-        public decimal Cost            { get; set; }
-        public decimal RetailPrice     { get; set; }
-        public decimal ValueAtCost     { get; set; }
-        public decimal ValueAtRetail   { get; set; }
-        public decimal PotentialProfit { get; set; }
-        public decimal MarginPercent   => RetailPrice > 0 ? ((RetailPrice - Cost) / RetailPrice) * 100 : 0;
-    }
-}
+using Infragistics.Win;
+using Infragistics.Win.UltraWinGrid;
+using ModelClass;
+using ModelClass.Report;
+using Repository;
+using Repository.ReportRepository;
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Data;
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Windows.Forms;
+using PosBranch_Win.Reports;
+
+namespace PosBranch_Win.Reports.InventoryReport
+{
+    /// <summary>
+    /// Stock Valuation Report — shows inventory asset value calculated at Cost and Retail price per item.
+    /// </summary>
+    public partial class frmStockValuationReport : Form
+    {
+        // ─── Theme Palette (matches FrmSmartReorderDashboard / frmVendorOutstandingReport) ────────
+        private static readonly Color FormBackColor        = Color.FromArgb(232, 246, 255);
+        private static readonly Color FilterPanelBackColor = Color.FromArgb(232, 246, 255);
+        private static readonly Color ActionPanelBackColor = Color.FromArgb(206, 223, 238);
+        private static readonly Color BorderBlue           = Color.FromArgb(118, 154, 198);
+        private static readonly Color ControlBackColor     = Color.White;
+        private static readonly Color ControlTextColor     = Color.FromArgb(18, 49, 102);
+        private static readonly Color GridHeaderBlue       = Color.FromArgb(93, 151, 214);
+        private static readonly Color GridHeaderBlueDark   = Color.FromArgb(67, 118, 184);
+        private static readonly Color GridSelectedBlue     = Color.FromArgb(173, 216, 255);
+        private static readonly Color GridRowLine          = Color.FromArgb(197, 217, 241);
+        private static readonly Color GridAltRow           = Color.FromArgb(246, 250, 255);
+        private static readonly Color GridFooterBorder     = Color.FromArgb(144, 181, 223);
+        private static readonly Color SkyBlueOutline       = Color.FromArgb(160, 210, 255);
+
+        private static readonly Color ButtonTopColor       = Color.FromArgb(234, 244, 255);
+        private static readonly Color ButtonBottomColor    = Color.FromArgb(152, 188, 235);
+        private static readonly Color ButtonBorderColor    = Color.FromArgb(73, 119, 184);
+        private static readonly Color ButtonTextBlue       = Color.FromArgb(14, 47, 108);
+
+        private static readonly Color PanelHoverTopColor   = Color.FromArgb(245, 250, 255);
+        private static readonly Color PanelHoverBottomColor= Color.FromArgb(170, 206, 244);
+
+        private static readonly Color PanelPressedTopColor = Color.FromArgb(205, 226, 248);
+        private static readonly Color PanelPressedBottomColor = Color.FromArgb(128, 170, 224);
+
+        // ════════════════════════════════════════════════════════════
+        //  Fields
+        // ════════════════════════════════════════════════════════════
+        private StockReportAdvanceRepo _reportRepo;
+        private Dropdowns _dropdownRepo;
+        private BackgroundWorker _searchWorker;
+        private bool _isChangingDates = false;
+
+        /// <summary>All rows fetched from the DB (before any in-memory filter)</summary>
+        private List<StockValuationRow> _allRows = new List<StockValuationRow>();
+
+        private Infragistics.Win.Misc.UltraPanel gridFooterPanel;
+        private readonly Dictionary<string, Label> _footerLabels = new Dictionary<string, Label>();
+        private readonly Dictionary<string, string> _columnAggregations = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        // ─── Column Chooser & Drag-Down to Hide State ────────────────────────────────
+        private ListBox columnChooserListBox;
+        private Form columnChooserForm;
+        private bool isDraggingHeaderToHide;
+        private UltraGridColumn columnBeingDragged;
+        private Point headerDragStartPoint;
+        private readonly System.Windows.Forms.ToolTip headerToolTip = new System.Windows.Forms.ToolTip();
+        private readonly HashSet<string> userHiddenColumnKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Cursor blackXCursor = CreateBlackXCursor();
+        private GridSideScrollFilter _sideScrollFilter;
+        private Label _lblRowSelectorSpacer;
+        private ReportColumnFilterManager _filterManager;
+
+        // ════════════════════════════════════════════════════════════
+        //  Constructor
+        // ════════════════════════════════════════════════════════════
+        private string _initialStockFilter = "Positive Stock";
+
+        public frmStockValuationReport() : this("Positive Stock")
+        {
+        }
+
+        public frmStockValuationReport(string initialStockFilter, int? groupId = null, int? categoryId = null)
+        {
+            _initialStockFilter = string.IsNullOrWhiteSpace(initialStockFilter) ? "Positive Stock" : initialStockFilter;
+            InitializeComponent();
+            this.Font = new Font("Segoe UI", 9F);
+            InitializeBackgroundWorker();
+            InitializeForm();
+            if (groupId.HasValue && groupId.Value > 0)
+            {
+                try { comboGroup.Value = groupId.Value; } catch { }
+            }
+            if (categoryId.HasValue && categoryId.Value > 0)
+            {
+                try { comboCategory.Value = categoryId.Value; } catch { }
+            }
+            this.Load += (s, e) => RunSearch();
+        }
+
+        // ════════════════════════════════════════════════════════════
+        //  Initialisation helpers
+        // ════════════════════════════════════════════════════════════
+        private void InitializeBackgroundWorker()
+        {
+            _searchWorker = new BackgroundWorker
+            {
+                WorkerSupportsCancellation = true,
+                WorkerReportsProgress = false
+            };
+            _searchWorker.DoWork             += SearchWorker_DoWork;
+            _searchWorker.RunWorkerCompleted += SearchWorker_RunWorkerCompleted;
+        }
+
+        private void InitializeForm()
+        {
+            try
+            {
+                _reportRepo   = new StockReportAdvanceRepo();
+                _dropdownRepo = new Dropdowns();
+
+                // Apply unified theme appearance
+                InitializeRuntimeAppearance();
+
+                // Default dates - Current Financial Year
+                DateTime now = DateTime.Now;
+                dtFrom.Value = new DateTime(now.Year, 1, 1);
+                dtTo.Value   = now;
+
+                InitializePeriodCombo();
+                InitializeStockFilterCombo();
+                if (!string.IsNullOrEmpty(_initialStockFilter))
+                {
+                    comboStockFilter.Text = _initialStockFilter;
+                    if (string.Equals(_initialStockFilter, "Dead Stock", StringComparison.OrdinalIgnoreCase))
+                    {
+                        dtFrom.Value = now.AddDays(-90);
+                        comboPeriod.Text = "Custom";
+                    }
+                }
+                LoadGroups();
+                LoadCategories();
+                UpdateDateControlVisibility();
+                StyleGrid();
+                StyleButtons();
+
+                LayoutSummaryCards();
+
+                // Register footer cell sync and column drag-to-hide handlers matching frmPurchaseReturn / frmStockReport
+                gridReport.Resize += (s, e) => UpdateFooterCellPositions();
+                gridReport.AfterColPosChanged += (s, e) =>
+                {
+                    UpdateFooterCellPositions();
+                    ReportGridLayoutHelper.SaveLayout("StockValuationReport", gridReport, userHiddenColumnKeys);
+                };
+                gridReport.AfterColRegionScroll += (s, e) => UpdateFooterCellPositions();
+                gridReport.AfterRowRegionScroll += (s, e) => UpdateFooterCellPositions();
+                gridReport.Paint += (s, e) => UpdateFooterCellPositions();
+                gridReport.AfterRowFilterChanged += (s, e) =>
+                {
+                    UpdateFooterValues();
+            _filterManager?.UpdateHeaderFilterIcons();
+                    UpdateFooterCellPositions();
+                };
+                gridReport.AfterSortChange += (s, e) => UpdateFooterValues();
+
+                SetupHeaderDragToHideAndColumnChooser();
+                _filterManager = new ReportColumnFilterManager(gridReport, () => { UpdateFooterCellPositions(); UpdateFooterValues(); });
+                InitializeGridFooter();
+
+                // Keyboard shortcuts
+                this.KeyPreview = true;
+                this.KeyDown    += FrmStockValuationReport_KeyDown;
+
+                // Events
+                btnSearch.Click  += BtnSearch_Click;
+                btnReset.Click   += BtnReset_Click;
+                btnExport.Click  += BtnExport_Click;
+                btnPrint.Click   += BtnPrint_Click;
+                btnClose.Click   += BtnClose_Click;
+                comboPeriod.ValueChanged  += ComboPeriod_ValueChanged;
+                comboStockFilter.ValueChanged += (s, e) => { if (_allRows.Count > 0) ApplyFilters(); };
+                txtSearch.TextChanged     += TxtSearch_TextChanged;
+                dtFrom.ValueChanged += DtDate_ValueChanged;
+                dtTo.ValueChanged   += DtDate_ValueChanged;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error initialising form: " + ex.Message, "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void InitializePeriodCombo()
+        {
+            comboPeriod.Items.Clear();
+            comboPeriod.Items.Add("ALL",          "ALL");
+            comboPeriod.Items.Add("Today",        "Today");
+            comboPeriod.Items.Add("This Week",    "This Week");
+            comboPeriod.Items.Add("This Month",   "This Month");
+            comboPeriod.Items.Add("Last Month",   "Last Month");
+            comboPeriod.Items.Add("This Quarter", "This Quarter");
+            comboPeriod.Items.Add("This Year",    "This Year");
+            comboPeriod.Items.Add("Custom",       "Custom");
+            comboPeriod.Text = "ALL";
+        }
+
+        private void InitializeStockFilterCombo()
+        {
+            comboStockFilter.Items.Clear();
+            comboStockFilter.Items.Add("All Items",        "All Items");
+            comboStockFilter.Items.Add("Positive Stock",   "Positive Stock");
+            comboStockFilter.Items.Add("Zero Stock",       "Zero Stock");
+            comboStockFilter.Items.Add("Negative Stock",   "Negative Stock");
+            comboStockFilter.Items.Add("Low Stock",        "Low Stock");
+            comboStockFilter.Items.Add("Excess Stock",     "Excess Stock");
+            comboStockFilter.Items.Add("Dead Stock",       "Dead Stock");
+            comboStockFilter.Text = "All Items";
+        }
+
+        private void InitializeRuntimeAppearance()
+        {
+            BackColor = FormBackColor;
+
+            if (panelFilters != null)
+            {
+                panelFilters.Appearance.BackColor = FilterPanelBackColor;
+                panelFilters.Appearance.BorderColor = BorderBlue;
+                panelFilters.BorderStyle = UIElementBorderStyle.Solid;
+            }
+
+            if (panelGrid != null)
+            {
+                panelGrid.Appearance.BackColor = FormBackColor;
+                panelGrid.Appearance.BorderColor = BorderBlue;
+                panelGrid.BorderStyle = UIElementBorderStyle.Solid;
+            }
+
+            // Style Labels
+            StyleLabel(lblPeriod);
+            StyleLabel(lblFromDate);
+            StyleLabel(lblToDate);
+            StyleLabel(lblGroup);
+            StyleLabel(lblCategory);
+            StyleLabel(lblStockFilter);
+            StyleLabel(lblSearch);
+
+            // Style Inputs
+            StyleFilterCombo(comboPeriod);
+            StyleFilterCombo(comboGroup);
+            StyleFilterCombo(comboCategory);
+            StyleFilterCombo(comboStockFilter);
+            StyleDateTimeEditor(dtFrom);
+            StyleDateTimeEditor(dtTo);
+            StyleTextEditor(txtSearch);
+        }
+
+        private static void StyleLabel(Infragistics.Win.Misc.UltraLabel lbl)
+        {
+            if (lbl == null) return;
+            lbl.Appearance.BackColor = Color.Transparent;
+            lbl.Appearance.ForeColor = Color.FromArgb(18, 47, 95);
+            lbl.Appearance.FontData.Bold = DefaultableBoolean.False;
+            lbl.Appearance.FontData.Name = "Microsoft Sans Serif";
+            lbl.Appearance.FontData.SizeInPoints = 9F;
+        }
+
+        private static void StyleFilterCombo(Infragistics.Win.UltraWinEditors.UltraComboEditor combo)
+        {
+            if (combo == null) return;
+            combo.UseAppStyling = false;
+            combo.UseOsThemes = DefaultableBoolean.False;
+            combo.DisplayStyle = EmbeddableElementDisplayStyle.Office2013;
+            combo.BorderStyle = UIElementBorderStyle.Solid;
+            combo.Appearance.BackColor = ControlBackColor;
+            combo.Appearance.BorderColor = SkyBlueOutline;
+            combo.Appearance.ForeColor = ControlTextColor;
+            combo.Appearance.FontData.Name = "Microsoft Sans Serif";
+            combo.Appearance.FontData.SizeInPoints = 9F;
+            combo.ButtonStyle = UIElementButtonStyle.Office2003ToolbarButton;
+        }
+
+        private static void StyleDateTimeEditor(Infragistics.Win.UltraWinEditors.UltraDateTimeEditor dtEditor)
+        {
+            if (dtEditor == null) return;
+            dtEditor.UseAppStyling = false;
+            dtEditor.UseOsThemes = DefaultableBoolean.False;
+            dtEditor.DisplayStyle = EmbeddableElementDisplayStyle.Office2013;
+            dtEditor.BorderStyle = UIElementBorderStyle.Solid;
+            dtEditor.Appearance.BackColor = ControlBackColor;
+            dtEditor.Appearance.BorderColor = SkyBlueOutline;
+            dtEditor.Appearance.ForeColor = ControlTextColor;
+            dtEditor.Appearance.FontData.Name = "Microsoft Sans Serif";
+            dtEditor.Appearance.FontData.SizeInPoints = 9F;
+            dtEditor.ButtonStyle = UIElementButtonStyle.Office2003ToolbarButton;
+        }
+
+        private static void StyleTextEditor(Infragistics.Win.UltraWinEditors.UltraTextEditor editor)
+        {
+            if (editor == null) return;
+            editor.UseAppStyling = false;
+            editor.UseOsThemes = DefaultableBoolean.False;
+            editor.DisplayStyle = EmbeddableElementDisplayStyle.Office2013;
+            editor.BorderStyle = UIElementBorderStyle.Solid;
+            editor.Appearance.BackColor = ControlBackColor;
+            editor.Appearance.BorderColor = SkyBlueOutline;
+            editor.Appearance.ForeColor = ControlTextColor;
+            editor.Appearance.FontData.Name = "Microsoft Sans Serif";
+            editor.Appearance.FontData.SizeInPoints = 9F;
+        }
+
+        private void LoadGroups()
+        {
+            try
+            {
+                var groups = _dropdownRepo.getGroupDDl();
+                if (groups?.List != null)
+                {
+                    comboGroup.DataSource    = groups.List.ToList();
+                    comboGroup.ValueMember   = "Id";
+                    comboGroup.DisplayMember = "GroupName";
+                }
+            }
+            catch { }
+        }
+
+        private void LoadCategories()
+        {
+            try
+            {
+                var cats = _dropdownRepo.getCategoryDDl("");
+                if (cats?.List != null)
+                {
+                    comboCategory.DataSource    = cats.List.ToList();
+                    comboCategory.ValueMember   = "Id";
+                    comboCategory.DisplayMember = "CategoryName";
+                }
+            }
+            catch { }
+        }
+
+        // ════════════════════════════════════════════════════════════
+        //  Grid styling
+        // ════════════════════════════════════════════════════════════
+        private void StyleGrid()
+        {
+            gridReport.UseAppStyling = false;
+            gridReport.UseOsThemes = DefaultableBoolean.False;
+            gridReport.DisplayLayout.Appearance.BackColor = FormBackColor;
+            gridReport.DisplayLayout.AutoFitStyle = AutoFitStyle.None;
+            gridReport.DisplayLayout.ScrollBounds = ScrollBounds.ScrollToFill;
+            gridReport.DisplayLayout.Scrollbars = Scrollbars.Both;
+            gridReport.DisplayLayout.MaxColScrollRegions = 1;
+            gridReport.DisplayLayout.MaxRowScrollRegions = 1;
+            gridReport.DisplayLayout.ScrollStyle = ScrollStyle.Immediate;
+
+            // Scroll bar appearance
+            gridReport.DisplayLayout.ScrollBarLook.Appearance.BackColor = ActionPanelBackColor;
+            gridReport.DisplayLayout.ScrollBarLook.Appearance.BorderColor = BorderBlue;
+            gridReport.DisplayLayout.ScrollBarLook.TrackAppearance.BackColor = Color.FromArgb(225, 236, 246);
+            gridReport.DisplayLayout.ScrollBarLook.ButtonAppearance.BackColor = GridHeaderBlue;
+            gridReport.DisplayLayout.ScrollBarLook.ButtonAppearance.BackColor2 = GridHeaderBlueDark;
+            gridReport.DisplayLayout.ScrollBarLook.ButtonAppearance.BackGradientStyle = GradientStyle.Vertical;
+            gridReport.DisplayLayout.ScrollBarLook.ButtonAppearance.BorderColor = BorderBlue;
+
+            gridReport.DisplayLayout.BorderStyle = UIElementBorderStyle.Solid;
+            gridReport.DisplayLayout.CaptionVisible = DefaultableBoolean.False;
+            gridReport.DisplayLayout.GroupByBox.Hidden = true;
+
+            gridReport.DisplayLayout.Override.HeaderStyle = HeaderStyle.Standard;
+            gridReport.DisplayLayout.Override.HeaderClickAction = HeaderClickAction.SortSingle;
+            gridReport.DisplayLayout.Override.AllowAddNew = AllowAddNew.No;
+            gridReport.DisplayLayout.Override.AllowDelete = DefaultableBoolean.False;
+            gridReport.DisplayLayout.Override.AllowUpdate = DefaultableBoolean.False;
+            gridReport.DisplayLayout.Override.AllowColMoving = AllowColMoving.WithinBand;
+            gridReport.DisplayLayout.Override.AllowColSizing = AllowColSizing.Free;
+            gridReport.DisplayLayout.Override.AllowRowFiltering = DefaultableBoolean.False;
+            gridReport.DisplayLayout.Override.CellClickAction = CellClickAction.RowSelect;
+
+            gridReport.DisplayLayout.Override.RowSelectors = DefaultableBoolean.True;
+            gridReport.DisplayLayout.Override.RowSelectorHeaderStyle = RowSelectorHeaderStyle.ColumnChooserButton;
+            gridReport.BeforeColumnChooserDisplayed += (s, e) =>
+            {
+                e.Cancel = true;
+                ShowColumnChooserForm();
+            };
+            gridReport.DisplayLayout.Override.RowSelectorWidth = 25;
+            gridReport.DisplayLayout.Override.RowSelectorNumberStyle = RowSelectorNumberStyle.RowIndex;
+            gridReport.DisplayLayout.Override.RowSelectorAppearance.BackColor = GridHeaderBlueDark;
+            gridReport.DisplayLayout.Override.RowSelectorAppearance.BackColor2 = GridHeaderBlue;
+            gridReport.DisplayLayout.Override.RowSelectorAppearance.BackGradientStyle = GradientStyle.Vertical;
+            gridReport.DisplayLayout.Override.RowSelectorAppearance.BorderColor = BorderBlue;
+            gridReport.DisplayLayout.Override.RowSelectorAppearance.ForeColor = Color.White;
+            gridReport.DisplayLayout.Override.RowSelectorAppearance.FontData.Bold = DefaultableBoolean.True;
+            gridReport.DisplayLayout.Override.RowSelectorAppearance.TextHAlign = HAlign.Center;
+
+            gridReport.DisplayLayout.Override.MinRowHeight = 24;
+            gridReport.DisplayLayout.Override.DefaultRowHeight = 24;
+            gridReport.DisplayLayout.Override.RowAppearance.BackColor = Color.White;
+            gridReport.DisplayLayout.Override.RowAppearance.ForeColor = ControlTextColor;
+            gridReport.DisplayLayout.Override.RowAppearance.BorderColor = GridRowLine;
+            gridReport.DisplayLayout.Override.RowAlternateAppearance.BackColor = GridAltRow;
+            gridReport.DisplayLayout.Override.RowAlternateAppearance.BorderColor = GridRowLine;
+            gridReport.DisplayLayout.Override.ActiveRowAppearance.BackColor = GridSelectedBlue;
+            gridReport.DisplayLayout.Override.ActiveRowAppearance.ForeColor = ControlTextColor;
+            gridReport.DisplayLayout.Override.SelectedRowAppearance.BackColor = GridSelectedBlue;
+            gridReport.DisplayLayout.Override.SelectedRowAppearance.ForeColor = ControlTextColor;
+
+            gridReport.DisplayLayout.Override.HeaderAppearance.BackColor = GridHeaderBlue;
+            gridReport.DisplayLayout.Override.HeaderAppearance.BackColor2 = GridHeaderBlueDark;
+            gridReport.DisplayLayout.Override.HeaderAppearance.BackGradientStyle = GradientStyle.Vertical;
+            gridReport.DisplayLayout.Override.HeaderAppearance.ForeColor = Color.White;
+            gridReport.DisplayLayout.Override.HeaderAppearance.BorderColor = BorderBlue;
+            gridReport.DisplayLayout.Override.HeaderAppearance.TextHAlign = HAlign.Center;
+            gridReport.DisplayLayout.Override.HeaderAppearance.TextVAlign = VAlign.Middle;
+            gridReport.DisplayLayout.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.False;
+            gridReport.DisplayLayout.Override.HeaderAppearance.FontData.Name = "Microsoft Sans Serif";
+            gridReport.DisplayLayout.Override.HeaderAppearance.FontData.SizeInPoints = 8.25F;
+            gridReport.DisplayLayout.Override.HeaderAppearance.ThemedElementAlpha = Alpha.Transparent;
+
+            gridReport.DisplayLayout.Override.BorderStyleHeader = UIElementBorderStyle.Solid;
+            gridReport.DisplayLayout.Override.BorderStyleCell = UIElementBorderStyle.Solid;
+            gridReport.DisplayLayout.Override.BorderStyleRow = UIElementBorderStyle.Solid;
+            gridReport.DisplayLayout.Override.CellAppearance.BorderColor = GridRowLine;
+            gridReport.DisplayLayout.Override.CellAppearance.ForeColor = ControlTextColor;
+            gridReport.DisplayLayout.Override.CellAppearance.FontData.Name = "Microsoft Sans Serif";
+            gridReport.DisplayLayout.Override.CellAppearance.FontData.SizeInPoints = 8.25F;
+            gridReport.DisplayLayout.Override.RowSizing = RowSizing.AutoFree;
+
+            gridReport.InitializeLayout += GridReport_InitializeLayout;
+            gridReport.InitializeRow    += GridReport_InitializeRow;
+        }
+
+        private void GridReport_InitializeLayout(object sender, InitializeLayoutEventArgs e)
+        {
+            if (e.Layout.Bands.Count == 0) return;
+            var band = e.Layout.Bands[0];
+
+            // Define column order and captions
+            var columns = new[]
+            {
+                ("Barcode",          "Barcode",            100,  HAlign.Left),
+                ("ItemName",         "Product",           220,  HAlign.Left),
+                ("GroupName",        "Group",             120,  HAlign.Left),
+                ("CategoryName",     "Category",          120,  HAlign.Left),
+                ("BaseUnitName",     "Unit",               70,  HAlign.Center),
+                ("ClosingStock",     "Qty",                90,  HAlign.Right),
+                ("Cost",             "Unit Cost",          90,  HAlign.Right),
+                ("RetailPrice",      "Unit Retail",        90,  HAlign.Right),
+                ("ValueAtCost",      "Value @ Cost",      110,  HAlign.Right),
+                ("ValueAtRetail",    "Value @ Retail",    120,  HAlign.Right),
+                ("PotentialProfit",  "Potential Profit",  120,  HAlign.Right),
+                ("MarginPercent",    "Margin %",           95,  HAlign.Right),
+            };
+
+            foreach (UltraGridColumn col in band.Columns)
+            {
+                col.ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
+            }
+
+            int pos = 0;
+            foreach (var (key, caption, width, align) in columns)
+            {
+                if (!band.Columns.Exists(key)) continue;
+                var col = band.Columns[key];
+                col.ExcludeFromColumnChooser = ExcludeFromColumnChooser.False;
+                col.Hidden         = userHiddenColumnKeys.Contains(key);
+                col.Header.Caption = caption;
+                col.Width          = width;
+                col.CellAppearance.TextHAlign = align;
+                col.Header.VisiblePosition    = pos++;
+                // Number formatting
+                if (key == "ClosingStock" || key == "Cost" || key == "RetailPrice" || key == "MarginPercent")
+                    col.Format = "N2";
+                // Currency formatting for value columns
+                if (key == "ValueAtCost" || key == "ValueAtRetail" || key == "PotentialProfit")
+                {
+                    col.Format = "N2";
+                    if (key == "PotentialProfit")
+                        col.CellAppearance.ForeColor = Color.FromArgb(0, 150, 60);
+                }
+            }
+
+            // Hide internal-only or unneeded columns
+            var hiddenCols = new[] { "ItemId", "SubCategoryName", "WholeSalePrice", "CreditPrice",
+                                     "OpeningStock", "Purchase", "PurchaseReturn", "StockAdjustmentIn",
+                                     "StockAdjustmentOut", "StockTransferIn", "StockTransferOut",
+                                     "Sales", "SalesReturn", "OrderedStock", "HoldQty",
+                                     "AvailableStock", "TotalIn", "TotalOut", "StockValue",
+                                     "Profit", "SaleAmount" };
+            foreach (var h in hiddenCols)
+            {
+                if (band.Columns.Exists(h))
+                {
+                    band.Columns[h].Hidden = true;
+                    band.Columns[h].ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
+                }
+            }
+
+            CreateFooterCells();
+            UpdateFooterCellPositions();
+            UpdateFooterValues();
+            _filterManager?.UpdateHeaderFilterIcons();
+            if (columnChooserForm != null && columnChooserForm.Visible)
+            {
+                PopulateColumnChooserListBox();
+            }
+        }
+
+        private void GridReport_InitializeRow(object sender, InitializeRowEventArgs e)
+        {
+            try
+            {
+                if (e.Row.Cells.Exists("ClosingStock"))
+                {
+                    decimal stock = Convert.ToDecimal(e.Row.Cells["ClosingStock"].Value ?? 0);
+                    if (stock < 0)
+                    {
+                        // Soft Red background for Negative Stock
+                        e.Row.Appearance.BackColor = Color.FromArgb(254, 226, 226);
+                        e.Row.Appearance.ForeColor = Color.FromArgb(153, 27, 27);
+                    }
+                    else if (stock == 0)
+                    {
+                        // Soft Orange background for Zero Stock
+                        e.Row.Appearance.BackColor = Color.FromArgb(255, 247, 237);
+                        e.Row.Appearance.ForeColor = Color.FromArgb(194, 65, 12);
+                    }
+                    else
+                    {
+                        // Clear general styling
+                        e.Row.Appearance.Reset();
+
+                        // Highlight High-Value Assets in bold green
+                        if (e.Row.Cells.Exists("ValueAtCost"))
+                        {
+                            decimal valAtCost = Convert.ToDecimal(e.Row.Cells["ValueAtCost"].Value ?? 0);
+                            if (valAtCost >= 10000)
+                            {
+                                e.Row.Cells["ValueAtCost"].Appearance.FontData.Bold = DefaultableBoolean.True;
+                                e.Row.Cells["ValueAtCost"].Appearance.ForeColor = Color.FromArgb(21, 128, 61);
+                            }
+                        }
+                    }
+                }
+            }
+            catch { }
+        }
+
+        #region Column Chooser & Drag-Down to Hide
+
+        private static Cursor CreateBlackXCursor()
+        {
+            try
+            {
+                using (Bitmap bmp = new Bitmap(32, 32))
+                using (Graphics g = Graphics.FromImage(bmp))
+                {
+                    g.SmoothingMode = SmoothingMode.AntiAlias;
+                    g.Clear(Color.Transparent);
+
+                    using (SolidBrush shadowBrush = new SolidBrush(Color.FromArgb(60, 0, 0, 0)))
+                    {
+                        g.FillEllipse(shadowBrush, 5, 5, 24, 24);
+                    }
+
+                    using (SolidBrush bgBrush = new SolidBrush(Color.FromArgb(220, 20, 20, 20)))
+                    {
+                        g.FillEllipse(bgBrush, 4, 4, 24, 24);
+                    }
+
+                    using (Pen whitePen = new Pen(Color.White, 3.5f))
+                    {
+                        whitePen.StartCap = LineCap.Round;
+                        whitePen.EndCap = LineCap.Round;
+                        g.DrawLine(whitePen, 11, 11, 21, 21);
+                        g.DrawLine(whitePen, 21, 11, 11, 21);
+                    }
+
+                    IntPtr hIcon = bmp.GetHicon();
+                    return new Cursor(hIcon);
+                }
+            }
+            catch
+            {
+                return Cursors.No;
+            }
+        }
+
+        private void SetupHeaderDragToHideAndColumnChooser()
+        {
+            gridReport.AllowDrop = true;
+            gridReport.MouseDown += Grid_MouseDown;
+            gridReport.MouseMove += Grid_MouseMove;
+            gridReport.MouseUp += Grid_MouseUp;
+            gridReport.DragOver += Grid_DragOver;
+            gridReport.DragDrop += Grid_DragDrop;
+
+            ContextMenuStrip headerMenu = new ContextMenuStrip { Font = new Font("Segoe UI", 9F) };
+            ToolStripMenuItem chooserItem = new ToolStripMenuItem("📋 Field / Column Chooser...", null, (s, e) => ShowColumnChooserForm());
+            chooserItem.Font = new Font("Segoe UI Semibold", 9.5F, FontStyle.Bold);
+            headerMenu.Items.Add(chooserItem);
+
+            ToolStripMenuItem showAllItem = new ToolStripMenuItem("🔓 Show / Unhide All Columns", null, (s, e) => UnhideAllColumns());
+            headerMenu.Items.Add(showAllItem);
+
+            gridReport.ContextMenuStrip = headerMenu;
+        }
+
+        private void Grid_MouseDown(object sender, MouseEventArgs e)
+        {
+            if (gridReport.DisplayLayout == null || gridReport.DisplayLayout.Bands.Count == 0)
+                return;
+
+            if (e.Button == MouseButtons.Left && _filterManager != null && _filterManager.HandleMouseDown(e)) { isDraggingHeaderToHide = false; columnBeingDragged = null; return; }
+            UIElement element = gridReport.DisplayLayout.UIElement?.ElementFromPoint(new Point(e.X, e.Y));
+            HeaderUIElement headerUI = element as HeaderUIElement ?? element?.GetAncestor(typeof(HeaderUIElement)) as HeaderUIElement;
+
+            UltraGridColumn col = headerUI?.Header?.Column;
+            if (headerUI != null && col != null)
+            {
+                if (e.Button == MouseButtons.Right)
+                {
+                    ShowHeaderContextMenu(col, e.Location);
+                    return;
+                }
+
+                if (e.Button == MouseButtons.Left)
+                {
+                    isDraggingHeaderToHide = true;
+                    columnBeingDragged = col;
+                    headerDragStartPoint = new Point(e.X, e.Y);
+                }
+            }
+        }
+
+        private void Grid_MouseMove(object sender, MouseEventArgs e)
+        {
+            if (!isDraggingHeaderToHide && _filterManager != null && _filterManager.HandleMouseMove(e, headerToolTip)) return;
+            if (!isDraggingHeaderToHide || columnBeingDragged == null || e.Button != MouseButtons.Left)
+                return;
+
+            int deltaX = Math.Abs(e.X - headerDragStartPoint.X);
+            int deltaY = e.Y - headerDragStartPoint.Y;
+
+            if (deltaY > 20 && deltaY > deltaX)
+            {
+                gridReport.Cursor = blackXCursor;
+                string colName = !string.IsNullOrEmpty(columnBeingDragged.Header.Caption) ? columnBeingDragged.Header.Caption : columnBeingDragged.Key;
+                headerToolTip.SetToolTip(gridReport, $"✖ Drag down to hide '{colName}' column");
+            }
+            else
+            {
+                gridReport.Cursor = Cursors.Default;
+                headerToolTip.SetToolTip(gridReport, string.Empty);
+            }
+        }
+
+        private void Grid_MouseUp(object sender, MouseEventArgs e)
+        {
+            if (isDraggingHeaderToHide)
+            {
+                if (columnBeingDragged != null && (e.Y - headerDragStartPoint.Y) > 40)
+                {
+                    HideColumn(columnBeingDragged);
+                }
+                isDraggingHeaderToHide = false;
+                columnBeingDragged = null;
+                gridReport.Cursor = Cursors.Default;
+                headerToolTip.SetToolTip(gridReport, string.Empty);
+            }
+        }
+
+        private void Grid_DragOver(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(typeof(ColumnChooserItem)))
+            {
+                e.Effect = DragDropEffects.Move;
+            }
+        }
+
+        private void Grid_DragDrop(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetData(typeof(ColumnChooserItem)) is ColumnChooserItem item)
+            {
+                Point clientPt = gridReport.PointToClient(new Point(e.X, e.Y));
+                int dropPosition = GetTargetColumnPositionFromPoint(clientPt);
+                UnhideColumn(item.ColumnKey, dropPosition);
+            }
+        }
+
+        private int GetTargetColumnPositionFromPoint(Point pt)
+        {
+            if (gridReport.DisplayLayout == null || gridReport.DisplayLayout.Bands.Count == 0)
+                return 0;
+
+            UIElement element = gridReport.DisplayLayout.UIElement?.ElementFromPoint(pt);
+            HeaderUIElement headerUI = element as HeaderUIElement ?? element?.GetAncestor(typeof(HeaderUIElement)) as HeaderUIElement;
+
+            if (headerUI != null && headerUI.Header?.Column != null)
+            {
+                return headerUI.Header.Column.Header.VisiblePosition;
+            }
+
+            UltraGridBand band = gridReport.DisplayLayout.Bands[0];
+            foreach (UltraGridColumn col in band.Columns.Cast<UltraGridColumn>().OrderBy(c => c.Header.VisiblePosition))
+            {
+                if (!col.Hidden)
+                {
+                    UIElement hUI = col.Header.GetUIElement();
+                    if (hUI != null && pt.X >= hUI.Rect.Left && pt.X <= hUI.Rect.Right)
+                    {
+                        return col.Header.VisiblePosition;
+                    }
+                }
+            }
+
+            return band.Columns.Count;
+        }
+
+        private void HideColumn(UltraGridColumn col)
+        {
+            if (col == null) return;
+            userHiddenColumnKeys.Add(col.Key);
+            col.Hidden = true;
+            CreateFooterCells();
+            UpdateFooterCellPositions();
+            UpdateFooterValues();
+            _filterManager?.UpdateHeaderFilterIcons();
+            ReportGridLayoutHelper.SaveLayout("StockValuationReport", gridReport, userHiddenColumnKeys);
+            if (columnChooserForm != null && columnChooserForm.Visible)
+            {
+                PopulateColumnChooserListBox();
+            }
+        }
+
+        private void ShowHeaderContextMenu(UltraGridColumn col, Point location)
+        {
+            if (col == null) return;
+            ContextMenuStrip menu = new ContextMenuStrip { Font = new Font("Segoe UI", 9F) };
+            string colName = !string.IsNullOrEmpty(col.Header.Caption) ? col.Header.Caption : col.Key;
+
+            _filterManager?.AddFilterContextMenuItems(menu, col, location);
+            ToolStripMenuItem hideItem = new ToolStripMenuItem($"🙈 Hide Column '{colName}'", null, (s, e) => HideColumn(col));
+            hideItem.Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold);
+            menu.Items.Add(hideItem);
+
+            menu.Items.Add(new ToolStripSeparator());
+
+            ToolStripMenuItem chooserItem = new ToolStripMenuItem("📋 Field / Column Chooser...", null, (s, e) => ShowColumnChooserForm());
+            menu.Items.Add(chooserItem);
+
+            ToolStripMenuItem showAllItem = new ToolStripMenuItem("🔓 Show / Unhide All Columns", null, (s, e) => UnhideAllColumns());
+            menu.Items.Add(showAllItem);
+
+            menu.Show(gridReport, location);
+        }
+
+        private void ShowColumnChooserForm()
+        {
+            if (columnChooserForm == null || columnChooserForm.IsDisposed)
+            {
+                CreateColumnChooserForm();
+            }
+
+            PopulateColumnChooserListBox();
+            columnChooserForm.Show(this);
+            PositionColumnChooser();
+        }
+
+        private void CreateColumnChooserForm()
+        {
+            columnChooserForm = new Form
+            {
+                Text = "Customization (Field Chooser)",
+                Size = new Size(240, 300),
+                FormBorderStyle = FormBorderStyle.FixedSingle,
+                StartPosition = FormStartPosition.Manual,
+                TopMost = true,
+                MaximizeBox = false,
+                MinimizeBox = false,
+                BackColor = Color.FromArgb(240, 244, 248),
+                ShowIcon = false,
+                ShowInTaskbar = false
+            };
+
+            columnChooserForm.FormClosing += (s, e) =>
+            {
+                e.Cancel = true;
+                columnChooserForm.Hide();
+            };
+
+            columnChooserListBox = new ListBox
+            {
+                Dock = DockStyle.Fill,
+                AllowDrop = true,
+                DrawMode = DrawMode.OwnerDrawFixed,
+                BorderStyle = BorderStyle.None,
+                BackColor = Color.FromArgb(240, 244, 248),
+                ItemHeight = 34,
+                IntegralHeight = false
+            };
+
+            columnChooserListBox.DrawItem += ColumnChooserListBox_DrawItem;
+            columnChooserListBox.DoubleClick += ColumnChooserListBox_DoubleClick;
+            columnChooserListBox.MouseDown += ColumnChooserListBox_MouseDown;
+
+            columnChooserForm.Controls.Add(columnChooserListBox);
+        }
+
+        private void ColumnChooserListBox_MouseDown(object sender, MouseEventArgs e)
+        {
+            if (e.Button == MouseButtons.Left && columnChooserListBox != null)
+            {
+                int index = columnChooserListBox.IndexFromPoint(e.Location);
+                if (index >= 0 && index < columnChooserListBox.Items.Count)
+                {
+                    if (columnChooserListBox.Items[index] is ColumnChooserItem item)
+                    {
+                        columnChooserListBox.DoDragDrop(item, DragDropEffects.Move);
+                    }
+                }
+            }
+        }
+
+        private void PopulateColumnChooserListBox()
+        {
+            if (columnChooserListBox == null || gridReport.DisplayLayout.Bands.Count == 0)
+                return;
+
+            columnChooserListBox.Items.Clear();
+            UltraGridBand band = gridReport.DisplayLayout.Bands[0];
+
+            foreach (UltraGridColumn col in band.Columns)
+            {
+                if (col.Hidden && !col.Key.EndsWith("Id", StringComparison.OrdinalIgnoreCase) && col.ExcludeFromColumnChooser != ExcludeFromColumnChooser.True)
+                {
+                    string caption = !string.IsNullOrEmpty(col.Header.Caption) ? col.Header.Caption : col.Key;
+                    columnChooserListBox.Items.Add(new ColumnChooserItem(col.Key, caption));
+                }
+            }
+        }
+
+        private void ColumnChooserListBox_DoubleClick(object sender, EventArgs e)
+        {
+            if (columnChooserListBox.SelectedItem is ColumnChooserItem item)
+            {
+                UnhideColumn(item.ColumnKey);
+            }
+        }
+
+        private void UnhideColumn(string columnKey, int? targetVisiblePosition = null)
+        {
+            userHiddenColumnKeys.Remove(columnKey);
+            if (gridReport.DisplayLayout.Bands.Count > 0 && gridReport.DisplayLayout.Bands[0].Columns.Exists(columnKey))
+            {
+                UltraGridColumn col = gridReport.DisplayLayout.Bands[0].Columns[columnKey];
+                col.Hidden = false;
+                if (targetVisiblePosition.HasValue)
+                {
+                    col.Header.VisiblePosition = targetVisiblePosition.Value;
+                }
+                CreateFooterCells();
+                UpdateFooterCellPositions();
+                UpdateFooterValues();
+            _filterManager?.UpdateHeaderFilterIcons();
+                ReportGridLayoutHelper.SaveLayout("StockValuationReport", gridReport, userHiddenColumnKeys);
+                PopulateColumnChooserListBox();
+            }
+        }
+
+        private void UnhideAllColumns()
+        {
+            userHiddenColumnKeys.Clear();
+            if (gridReport.DisplayLayout.Bands.Count == 0) return;
+            UltraGridBand band = gridReport.DisplayLayout.Bands[0];
+            foreach (UltraGridColumn col in band.Columns)
+            {
+                if (!col.Key.EndsWith("Id", StringComparison.OrdinalIgnoreCase) && col.ExcludeFromColumnChooser != ExcludeFromColumnChooser.True)
+                {
+                    col.Hidden = false;
+                }
+            }
+            CreateFooterCells();
+            UpdateFooterCellPositions();
+            UpdateFooterValues();
+            _filterManager?.UpdateHeaderFilterIcons();
+            ReportGridLayoutHelper.SaveLayout("StockValuationReport", gridReport, userHiddenColumnKeys);
+            PopulateColumnChooserListBox();
+        }
+
+        private void PositionColumnChooser()
+        {
+            if (columnChooserForm != null && !columnChooserForm.IsDisposed && columnChooserForm.Visible)
+            {
+                columnChooserForm.Location = new Point(
+                    Right - columnChooserForm.Width - 30,
+                    Bottom - columnChooserForm.Height - 30);
+                columnChooserForm.BringToFront();
+            }
+        }
+
+        private void ColumnChooserListBox_DrawItem(object sender, DrawItemEventArgs e)
+        {
+            if (e.Index < 0 || columnChooserListBox == null || e.Index >= columnChooserListBox.Items.Count)
+                return;
+
+            if (!(columnChooserListBox.Items[e.Index] is ColumnChooserItem item))
+                return;
+
+            Rectangle rect = e.Bounds;
+            rect.Inflate(-4, -3);
+
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
+
+            using (SolidBrush bgBrush = new SolidBrush(Color.FromArgb(0, 121, 211)))
+            using (GraphicsPath path = RoundedRect(rect, 4))
+            {
+                e.Graphics.FillPath(bgBrush, path);
+            }
+
+            using (SolidBrush textBrush = new SolidBrush(Color.White))
+            {
+                StringFormat sf = new StringFormat
+                {
+                    LineAlignment = StringAlignment.Center,
+                    Alignment = StringAlignment.Center
+                };
+                using (Font textFont = new Font("Segoe UI", 9F, FontStyle.Bold))
+                {
+                    e.Graphics.DrawString(item.DisplayText, textFont, textBrush, rect, sf);
+                }
+            }
+        }
+
+        private static GraphicsPath RoundedRect(Rectangle bounds, int radius)
+        {
+            int diameter = radius * 2;
+            Size size = new Size(diameter, diameter);
+            Rectangle arc = new Rectangle(bounds.Location, size);
+            GraphicsPath path = new GraphicsPath();
+
+            if (radius == 0)
+            {
+                path.AddRectangle(bounds);
+                return path;
+            }
+
+            path.AddArc(arc, 180, 90);
+
+            arc.X = bounds.Right - diameter;
+            path.AddArc(arc, 270, 90);
+
+            arc.Y = bounds.Bottom - diameter;
+            path.AddArc(arc, 0, 90);
+
+            arc.X = bounds.Left;
+            path.AddArc(arc, 90, 90);
+
+            path.CloseFigure();
+            return path;
+        }
+
+        private sealed class ColumnChooserItem
+        {
+            public string ColumnKey { get; }
+            public string DisplayText { get; }
+
+            public ColumnChooserItem(string key, string text)
+            {
+                ColumnKey = key;
+                DisplayText = text;
+            }
+
+            public override string ToString()
+            {
+                return DisplayText;
+            }
+        }
+
+        #endregion
+
+        #region GridFooterPanel Dynamic Alignment & Calculation
+
+        private void InitializeGridFooter()
+        {
+            if (gridFooterPanel == null && panelGrid != null)
+            {
+                gridFooterPanel = new Infragistics.Win.Misc.UltraPanel();
+                gridFooterPanel.Dock = DockStyle.Bottom;
+                gridFooterPanel.Height = 28;
+                gridFooterPanel.Appearance.BackColor = GridHeaderBlue;
+                gridFooterPanel.Appearance.BackColor2 = GridHeaderBlue;
+                gridFooterPanel.Appearance.BackGradientStyle = GradientStyle.None;
+                gridFooterPanel.Appearance.BorderColor = GridFooterBorder;
+                gridFooterPanel.BorderStyle = UIElementBorderStyle.Solid;
+                gridFooterPanel.MouseWheel += GridFooter_MouseWheel;
+                panelGrid.ClientArea.Controls.Add(gridFooterPanel);
+                gridReport.BringToFront();
+                panelGrid.ClientArea.PerformLayout();
+            }
+
+            CreateFooterCells();
+            UpdateFooterCellPositions();
+            UpdateFooterValues();
+            _filterManager?.UpdateHeaderFilterIcons();
+        }
+
+        private void CreateFooterCells()
+        {
+            if (gridFooterPanel == null) return;
+            gridFooterPanel.ClientArea.Controls.Clear();
+            _footerLabels.Clear();
+
+            int rowSelectorWidth = gridReport.DisplayLayout.Override.RowSelectors == DefaultableBoolean.True
+                ? gridReport.DisplayLayout.Override.RowSelectorWidth
+                : 0;
+
+            if (rowSelectorWidth > 0)
+            {
+                _lblRowSelectorSpacer = new Label
+                {
+                    Name = "footer_row_selector_spacer",
+                    Text = "Σ",
+                    TextAlign = ContentAlignment.MiddleCenter,
+                    BackColor = GridHeaderBlueDark,
+                    BorderStyle = BorderStyle.None,
+                    AutoSize = false,
+                    Width = rowSelectorWidth,
+                    Height = gridFooterPanel.Height,
+                    Left = 0,
+                    Top = 0,
+                    ForeColor = Color.White,
+                    Font = new Font("Segoe UI", 9F, FontStyle.Bold)
+                };
+                _lblRowSelectorSpacer.Paint += (s, e) =>
+                {
+                    using (Pen borderPen = new Pen(BorderBlue, 1))
+                    {
+                        e.Graphics.DrawLine(borderPen, _lblRowSelectorSpacer.Width - 1, 0, _lblRowSelectorSpacer.Width - 1, _lblRowSelectorSpacer.Height);
+                    }
+                };
+                _lblRowSelectorSpacer.MouseWheel += GridFooter_MouseWheel;
+                gridFooterPanel.ClientArea.Controls.Add(_lblRowSelectorSpacer);
+                _lblRowSelectorSpacer.BringToFront();
+            }
+
+            if (gridReport.DisplayLayout == null || gridReport.DisplayLayout.Bands.Count == 0)
+                return;
+
+            UltraGridBand band = gridReport.DisplayLayout.Bands[0];
+            int xOffset = rowSelectorWidth;
+
+            foreach (UltraGridColumn column in band.Columns.Cast<UltraGridColumn>().OrderBy(c => c.Header.VisiblePosition))
+            {
+                if (column.Hidden)
+                    continue;
+
+                Label footerLabel = new Label
+                {
+                    Name = "footer_" + column.Key,
+                    Text = string.Empty,
+                    TextAlign = ContentAlignment.MiddleCenter,
+                    BackColor = GridHeaderBlue,
+                    BorderStyle = BorderStyle.None,
+                    AutoSize = false,
+                    Width = column.Width,
+                    Height = Math.Max(gridFooterPanel.Height - 2, 20),
+                    Left = xOffset,
+                    Top = 1,
+                    Tag = Tuple.Create(column.Key, string.Empty),
+                    ForeColor = Color.White,
+                    Font = new Font("Microsoft Sans Serif", 8.25F, FontStyle.Regular, GraphicsUnit.Point, 0),
+                    ContextMenuStrip = CreateFooterContextMenu(column.Key)
+                };
+
+                footerLabel.Paint += FooterLabel_Paint;
+                footerLabel.MouseWheel += GridFooter_MouseWheel;
+                gridFooterPanel.ClientArea.Controls.Add(footerLabel);
+                _footerLabels[column.Key] = footerLabel;
+
+                if (!_columnAggregations.ContainsKey(column.Key))
+                {
+                    _columnAggregations[column.Key] = "None";
+                }
+
+                xOffset += column.Width;
+            }
+        }
+
+        private void FooterLabel_Paint(object sender, PaintEventArgs e)
+        {
+            Label lbl = sender as Label;
+            if (lbl == null) return;
+
+            using (Pen borderPen = new Pen(Color.FromArgb(118, 154, 198), 1))
+            {
+                e.Graphics.DrawLine(borderPen, lbl.Width - 1, 0, lbl.Width - 1, lbl.Height);
+            }
+        }
+
+        private ContextMenuStrip CreateFooterContextMenu(string columnKey)
+        {
+            ContextMenuStrip menu = new ContextMenuStrip();
+            menu.Tag = columnKey;
+
+            bool isNumeric = gridReport.DisplayLayout.Bands.Count > 0 &&
+                             gridReport.DisplayLayout.Bands[0].Columns.Exists(columnKey) &&
+                             IsSummableColumn(gridReport.DisplayLayout.Bands[0].Columns[columnKey]);
+
+            ToolStripMenuItem itemSum = new ToolStripMenuItem("Sum");
+            itemSum.Tag = "Sum";
+            itemSum.Enabled = isNumeric;
+            itemSum.Click += FooterContextMenu_Click;
+
+            ToolStripMenuItem itemMin = new ToolStripMenuItem("Min");
+            itemMin.Tag = "Min";
+            itemMin.Click += FooterContextMenu_Click;
+
+            ToolStripMenuItem itemMax = new ToolStripMenuItem("Max");
+            itemMax.Tag = "Max";
+            itemMax.Click += FooterContextMenu_Click;
+
+            ToolStripMenuItem itemCount = new ToolStripMenuItem("Count");
+            itemCount.Tag = "Count";
+            itemCount.Click += FooterContextMenu_Click;
+
+            ToolStripMenuItem itemAverage = new ToolStripMenuItem("Average");
+            itemAverage.Tag = "Avg";
+            itemAverage.Enabled = isNumeric;
+            itemAverage.Click += FooterContextMenu_Click;
+
+            ToolStripMenuItem itemNone = new ToolStripMenuItem("None");
+            itemNone.Tag = "None";
+            itemNone.Click += FooterContextMenu_Click;
+
+            menu.Items.Add(itemSum);
+            menu.Items.Add(itemMin);
+            menu.Items.Add(itemMax);
+            menu.Items.Add(itemCount);
+            menu.Items.Add(itemAverage);
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add(itemNone);
+
+            menu.Opening += (sender, e) =>
+            {
+                string currentAggregation = _columnAggregations.ContainsKey(columnKey)
+                    ? _columnAggregations[columnKey]
+                    : "None";
+
+                foreach (ToolStripItem menuItem in menu.Items)
+                {
+                    ToolStripMenuItem toolStripMenuItem = menuItem as ToolStripMenuItem;
+                    if (toolStripMenuItem != null && toolStripMenuItem.Tag != null)
+                    {
+                        toolStripMenuItem.Checked = string.Equals(toolStripMenuItem.Tag.ToString(), currentAggregation, StringComparison.OrdinalIgnoreCase);
+                    }
+                }
+            };
+
+            return menu;
+        }
+
+        private bool IsSummableColumn(UltraGridColumn column)
+        {
+            if (column == null || column.DataType == null) return false;
+            Type t = System.Nullable.GetUnderlyingType(column.DataType) ?? column.DataType;
+            return t == typeof(decimal) || t == typeof(double) || t == typeof(float) ||
+                   t == typeof(int) || t == typeof(long) || t == typeof(short);
+        }
+
+        private void FooterContextMenu_Click(object sender, EventArgs e)
+        {
+            ToolStripMenuItem item = sender as ToolStripMenuItem;
+            if (item == null)
+                return;
+
+            ContextMenuStrip menu = item.Owner as ContextMenuStrip;
+            if (menu == null || menu.Tag == null || item.Tag == null)
+                return;
+
+            string columnKey = menu.Tag.ToString();
+            string aggregation = item.Tag.ToString();
+
+            _columnAggregations[columnKey] = aggregation;
+            UpdateFooterValues();
+            _filterManager?.UpdateHeaderFilterIcons();
+        }
+
+        private void UpdateFooterCellPositions()
+        {
+            if (gridReport.DisplayLayout == null || gridReport.DisplayLayout.Bands.Count == 0 || _footerLabels.Count == 0 || gridFooterPanel == null)
+                return;
+
+            UltraGridBand band = gridReport.DisplayLayout.Bands[0];
+            int rowSelectorWidth = gridReport.DisplayLayout.Override.RowSelectors == DefaultableBoolean.True
+                ? gridReport.DisplayLayout.Override.RowSelectorWidth
+                : 0;
+            int scrollOffset = 0;
+            if (gridReport.ActiveColScrollRegion != null)
+            {
+                scrollOffset = gridReport.ActiveColScrollRegion.Position;
+            }
+
+            int calculatedX = rowSelectorWidth - scrollOffset;
+
+            foreach (UltraGridColumn column in band.Columns.Cast<UltraGridColumn>().OrderBy(c => c.Header.VisiblePosition))
+            {
+                if (column.Hidden || !_footerLabels.ContainsKey(column.Key))
+                    continue;
+
+                Label footerLabel = _footerLabels[column.Key];
+                var headerUI = column.Header.GetUIElement();
+                int left, width;
+
+                if (headerUI != null)
+                {
+                    left = headerUI.Rect.Left;
+                    width = headerUI.Rect.Width;
+                }
+                else
+                {
+                    left = calculatedX;
+                    width = column.Width;
+                }
+
+                calculatedX += width;
+
+                footerLabel.Left = left;
+                footerLabel.Width = width;
+                footerLabel.Top = 0;
+                footerLabel.Height = gridFooterPanel.Height;
+                footerLabel.Visible = (left + width > rowSelectorWidth && left < gridFooterPanel.Width);
+                footerLabel.Invalidate();
+            }
+
+            if (_lblRowSelectorSpacer != null)
+            {
+                _lblRowSelectorSpacer.BringToFront();
+            }
+        }
+
+        private void UpdateFooterValues()
+        {
+            if (_footerLabels.Count == 0)
+                return;
+
+            List<UltraGridRow> visibleRows = GetVisibleDataRows().ToList();
+            foreach (KeyValuePair<string, Label> footerEntry in _footerLabels)
+            {
+                string columnKey = footerEntry.Key;
+                Label footerLabel = footerEntry.Value;
+
+                if (!_columnAggregations.ContainsKey(columnKey) ||
+                    string.Equals(_columnAggregations[columnKey], "None", StringComparison.OrdinalIgnoreCase))
+                {
+                    footerLabel.Text = string.Empty;
+                    footerLabel.Tag = Tuple.Create(columnKey, string.Empty);
+                    footerLabel.Invalidate();
+                    continue;
+                }
+
+                object result = CalculateAggregation(columnKey, _columnAggregations[columnKey], visibleRows);
+                string displayValue = FormatAggregationResult(columnKey, _columnAggregations[columnKey], result);
+
+                footerLabel.Text = displayValue;
+                footerLabel.Tag = Tuple.Create(columnKey, displayValue);
+                footerLabel.ForeColor = Color.White;
+                footerLabel.Invalidate();
+            }
+        }
+
+        private IEnumerable<UltraGridRow> GetVisibleDataRows()
+        {
+            if (gridReport.Rows != null) { foreach (UltraGridRow row in gridReport.Rows) { if (row != null && row.IsDataRow && !row.IsFilteredOut && !row.Hidden) yield return row; } } yield break;
+            foreach (UltraGridRow row in GetVisibleDataRows())
+            {
+                if (row != null && row.IsDataRow && !row.IsFilteredOut && !row.Hidden)
+                    yield return row;
+            }
+        }
+
+        private object CalculateAggregation(string columnKey, string aggregation, List<UltraGridRow> visibleRows)
+        {
+            if (visibleRows == null || visibleRows.Count == 0)
+                return null;
+
+            switch (aggregation)
+            {
+                case "Sum":
+                    return visibleRows
+                        .Where(row => row.Cells.Exists(columnKey))
+                        .Select(row => GetNumericValue(row.Cells[columnKey].Value))
+                        .Where(value => value.HasValue)
+                        .Sum(value => value.Value);
+                case "Min":
+                    return visibleRows
+                        .Where(row => row.Cells.Exists(columnKey))
+                        .Select(row => row.Cells[columnKey].Value)
+                        .Where(HasCellValue)
+                        .Cast<IComparable>()
+                        .OrderBy(value => value)
+                        .FirstOrDefault();
+                case "Max":
+                    return visibleRows
+                        .Where(row => row.Cells.Exists(columnKey))
+                        .Select(row => row.Cells[columnKey].Value)
+                        .Where(HasCellValue)
+                        .Cast<IComparable>()
+                        .OrderByDescending(value => value)
+                        .FirstOrDefault();
+                case "Count":
+                    return visibleRows.Count(row => row.Cells.Exists(columnKey) && HasCellValue(row.Cells[columnKey].Value));
+                case "Avg":
+                    List<decimal> values = visibleRows
+                        .Where(row => row.Cells.Exists(columnKey))
+                        .Select(row => GetNumericValue(row.Cells[columnKey].Value))
+                        .Where(value => value.HasValue)
+                        .Select(value => value.Value)
+                        .ToList();
+                    return values.Count == 0 ? 0m : values.Average();
+                default:
+                    return null;
+            }
+        }
+
+        private string FormatAggregationResult(string columnKey, string aggregation, object result)
+        {
+            if (string.Equals(aggregation, "None", StringComparison.OrdinalIgnoreCase))
+                return string.Empty;
+
+            if (result == null)
+            {
+                if (string.Equals(aggregation, "Count", StringComparison.OrdinalIgnoreCase))
+                    return "0";
+                if (string.Equals(aggregation, "Sum", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(aggregation, "Avg", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(aggregation, "Min", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(aggregation, "Max", StringComparison.OrdinalIgnoreCase))
+                    return "0.00";
+                return string.Empty;
+            }
+
+            if (aggregation == "Count")
+                return Convert.ToString(result);
+
+            if (gridReport.DisplayLayout != null &&
+                gridReport.DisplayLayout.Bands.Count > 0 &&
+                gridReport.DisplayLayout.Bands[0].Columns.Exists(columnKey))
+            {
+                UltraGridColumn column = gridReport.DisplayLayout.Bands[0].Columns[columnKey];
+                decimal? numericValue = GetNumericValue(result);
+                if (numericValue.HasValue)
+                {
+                    if (!string.IsNullOrWhiteSpace(column.Format))
+                        return numericValue.Value.ToString(column.Format);
+
+                    return numericValue.Value.ToString("N2");
+                }
+            }
+
+            return Convert.ToString(result);
+        }
+
+        private static decimal? GetNumericValue(object rawValue)
+        {
+            if (rawValue == null || rawValue == DBNull.Value)
+                return null;
+
+            if (rawValue is decimal decVal) return decVal;
+            if (rawValue is double dblVal) return Convert.ToDecimal(dblVal);
+            if (rawValue is float fltVal) return Convert.ToDecimal(fltVal);
+            if (rawValue is int intVal) return intVal;
+            if (rawValue is long longVal) return longVal;
+            if (rawValue is short shortVal) return shortVal;
+
+            return decimal.TryParse(Convert.ToString(rawValue), out decimal parsed) ? parsed : (decimal?)null;
+        }
+
+        private static bool HasCellValue(object value)
+        {
+            return value != null && value != DBNull.Value && !string.IsNullOrWhiteSpace(Convert.ToString(value));
+        }
+
+        #endregion
+
+        // ════════════════════════════════════════════════════════════
+        //  Button styling
+        // ════════════════════════════════════════════════════════════
+        private void StyleButtons()
+        {
+            StyleButton(btnSearch);
+            StyleButton(btnReset);
+            StyleButton(btnExport);
+            StyleButton(btnPrint);
+            StyleButton(btnClose);
+        }
+
+        private static void StyleButton(Infragistics.Win.Misc.UltraButton btn)
+        {
+            if (btn == null) return;
+            btn.UseAppStyling  = false;
+            btn.UseOsThemes    = DefaultableBoolean.False;
+            btn.ButtonStyle = UIElementButtonStyle.Office2013Button;
+            btn.Appearance.BackColor = ButtonTopColor;
+            btn.Appearance.BackColor2 = ButtonBottomColor;
+            btn.Appearance.BackGradientStyle = GradientStyle.Vertical;
+            btn.Appearance.BorderColor = ButtonBorderColor;
+            btn.Appearance.ForeColor = ButtonTextBlue;
+            btn.Appearance.FontData.Name = "Microsoft Sans Serif";
+            btn.Appearance.FontData.SizeInPoints = 9F;
+            btn.Appearance.FontData.Bold = DefaultableBoolean.False;
+
+            btn.HotTrackAppearance.BackColor = PanelHoverTopColor;
+            btn.HotTrackAppearance.BackColor2 = PanelHoverBottomColor;
+            btn.HotTrackAppearance.BorderColor = ButtonBorderColor;
+            btn.HotTrackAppearance.ForeColor = ButtonTextBlue;
+
+            btn.PressedAppearance.BackColor = PanelPressedTopColor;
+            btn.PressedAppearance.BackColor2 = PanelPressedBottomColor;
+            btn.PressedAppearance.BorderColor = ButtonBorderColor;
+            btn.PressedAppearance.ForeColor = ButtonTextBlue;
+        }
+
+        // ════════════════════════════════════════════════════════════
+        //  Summary card layout
+        // ════════════════════════════════════════════════════════════
+        private void LayoutSummaryCards()
+        {
+            // First apply card settings at runtime to avoid Designer parse bugs
+            SetupCardControls(cardItems, lblItemsCaption, lblItemsValue, "TOTAL UNIQUE ITEMS", "pnlCardItems");
+            SetupCardControls(cardQty, lblQtyCaption, lblQtyValue, "TOTAL STOCK QUANTITY", "pnlCardQty");
+            SetupCardControls(cardCostVal, lblCostCaption, lblCostValue, "TOTAL VALUE @ COST", "pnlCardCostVal");
+            SetupCardControls(cardRetailVal, lblRetailCaption, lblRetailValue, "TOTAL VALUE @ RETAIL", "pnlCardRetailVal");
+            SetupCardControls(cardProfit, lblProfitCaption, lblProfitValue, "POTENTIAL MARGIN PROFIT", "pnlCardProfit");
+
+            var cards = new[]
+            {
+                (cardItems,     lblItemsValue,     Color.FromArgb(25, 118, 210)),
+                (cardQty,       lblQtyValue,       Color.FromArgb(0, 137, 123)),
+                (cardCostVal,   lblCostValue,      Color.FromArgb(56, 142, 60)),
+                (cardRetailVal, lblRetailValue,    Color.FromArgb(123, 31, 162)),
+                (cardProfit,    lblProfitValue,    Color.FromArgb(211, 47, 47)),
+            };
+
+            int x = 15, y = 6, w = 238, h = 62, gap = 10;
+            foreach (var (card, val, valColor) in cards)
+            {
+                card.Location = new Point(x, y);
+                card.Size = new Size(w, h);
+
+                // Add a top colored accent line to each card
+                var accentLine = new Panel
+                {
+                    Dock = DockStyle.Top,
+                    Height = 3,
+                    BackColor = valColor
+                };
+                card.ClientArea.Controls.Add(accentLine);
+                accentLine.BringToFront();
+
+                // Style the value label color
+                val.Appearance.ForeColor = valColor;
+
+                x += w + gap;
+            }
+        }
+
+        private void SetupCardControls(Infragistics.Win.Misc.UltraPanel card, Infragistics.Win.Misc.UltraLabel caption, Infragistics.Win.Misc.UltraLabel value, string captionText, string cardName)
+        {
+            card.Name = cardName;
+            card.Size = new System.Drawing.Size(238, 62);
+            card.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
+            card.UseAppStyling = false;
+            card.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
+            card.Appearance.BackColor = System.Drawing.Color.White;
+            card.Appearance.BorderColor = System.Drawing.Color.FromArgb(226, 232, 240);
+
+            // Caption
+            caption.Text = captionText;
+            caption.Location = new Point(12, 8);
+            caption.Size = new System.Drawing.Size(210, 15);
+            caption.Font = new Font("Segoe UI", 7.5F, FontStyle.Bold);
+            caption.Appearance.ForeColor = Color.FromArgb(100, 116, 139);
+            caption.UseAppStyling = false;
+            caption.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
+
+            // Value label
+            value.Location = new Point(12, 26);
+            value.Size = new System.Drawing.Size(210, 28);
+            value.Font = new Font("Segoe UI Semibold", 14F, FontStyle.Bold);
+            value.Text = "–";
+            value.UseAppStyling = false;
+            value.UseOsThemes = Infragistics.Win.DefaultableBoolean.False;
+        }
+
+        // ════════════════════════════════════════════════════════════
+        //  Search / Filter
+        // ════════════════════════════════════════════════════════════
+        private void BtnSearch_Click(object sender, EventArgs e) => RunSearch();
+
+        private void RunSearch()
+        {
+            if (_searchWorker.IsBusy) return;
+
+            bool isAll = string.Equals(Convert.ToString(comboPeriod.Value ?? comboPeriod.Text), "ALL", StringComparison.OrdinalIgnoreCase);
+
+            if (!isAll && (dtFrom.Value == null || dtTo.Value == null))
+            {
+                MessageBox.Show("Please select a valid date range.", "Validation",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            btnSearch.Text    = "⏳ Searching…";
+            btnSearch.Enabled = false;
+            this.Cursor       = Cursors.WaitCursor;
+            SetStatus("Loading data…");
+
+            var filter = new StockReportFilter
+            {
+                FromDate   = isAll ? new DateTime(1753, 1, 1) : ((DateTime)dtFrom.Value).Date,
+                ToDate     = isAll ? DateTime.Today.AddDays(1).AddTicks(-1) : ((DateTime)dtTo.Value).Date.AddDays(1).AddTicks(-1),
+                CompanyId  = !string.IsNullOrEmpty(DataBase.CompanyId)  ? int.Parse(DataBase.CompanyId)  : 1,
+                BranchId   = !string.IsNullOrEmpty(DataBase.BranchId)   ? (int.TryParse(DataBase.BranchId, out int bid) ? bid : 0) : 1,
+                FinYearId  = !string.IsNullOrEmpty(DataBase.FinyearId)  ? int.Parse(DataBase.FinyearId)  : 1,
+                GroupId    = GetComboIntValue(comboGroup),
+                CategoryId = GetComboIntValue(comboCategory),
+            };
+
+            _searchWorker.RunWorkerAsync(filter);
+        }
+
+        private void SearchWorker_DoWork(object sender, DoWorkEventArgs e)
+        {
+            var filter = (StockReportFilter)e.Argument;
+            e.Result = _reportRepo.GetStockReport(filter);
+        }
+
+        private void SearchWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+        {
+            try
+            {
+                if (e.Error != null || e.Result is Exception)
+                {
+                    string msg = e.Error?.Message ?? ((Exception)e.Result).Message;
+                    MessageBox.Show("Error loading data: " + msg, "Error",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    SetStatus("Error loading data.");
+                    return;
+                }
+
+                var raw = e.Result as List<StockReportItem>;
+                if (raw == null || raw.Count == 0)
+                {
+                    _allRows = new List<StockValuationRow>();
+                    gridReport.DataSource = null;
+            _filterManager?.ClearFilters();
+            _filterManager?.UpdateHeaderFilterIcons();
+                    UpdateSummaryCards();
+                    UpdateFooterValues();
+            _filterManager?.UpdateHeaderFilterIcons();
+                    SetStatus("No records found for the selected criteria.");
+                    MessageBox.Show("No records found.", "No Data",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                // Map to valuation rows
+                _allRows = raw.Select(r => new StockValuationRow
+                {
+                    ItemId          = r.ItemId,
+                    Barcode         = r.Barcode,
+                    ItemName        = r.ItemName,
+                    GroupName       = r.GroupName,
+                    CategoryName    = r.CategoryName,
+                    SubCategoryName = r.SubCategoryName,
+                    BaseUnitName    = r.BaseUnitName,
+                    ClosingStock    = r.ClosingStock,
+                    Sales           = r.Sales,
+                    Cost            = r.Cost,
+                    RetailPrice     = r.RetailPrice,
+                    ValueAtCost     = r.ClosingStock * r.Cost,
+                    ValueAtRetail   = r.ClosingStock * r.RetailPrice,
+                    PotentialProfit = (r.ClosingStock * r.RetailPrice) - (r.ClosingStock * r.Cost),
+                }).ToList();
+
+                ApplyFilters();
+            }
+            finally
+            {
+                btnSearch.Text    = "🔍  Search";
+                btnSearch.Enabled = true;
+                this.Cursor       = Cursors.Default;
+            }
+        }
+
+        private void ApplyFilters()
+        {
+            string search = txtSearch.Text.Trim();
+            string stockFilter = comboStockFilter.Text;
+
+            var filtered = _allRows.AsEnumerable();
+
+            // Text search
+            if (!string.IsNullOrEmpty(search))
+            {
+                filtered = filtered.Where(r =>
+                    (r.Barcode   ?? "").IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    (r.ItemName  ?? "").IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    (r.GroupName ?? "").IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0 ||
+                    (r.CategoryName ?? "").IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0
+                );
+            }
+
+            // Stock filter
+            switch (stockFilter)
+            {
+                case "Positive Stock":  filtered = filtered.Where(r => r.ClosingStock > 0);  break;
+                case "Zero Stock":      filtered = filtered.Where(r => r.ClosingStock == 0); break;
+                case "Negative Stock":  filtered = filtered.Where(r => r.ClosingStock < 0);  break;
+                case "Low Stock":       filtered = filtered.Where(r => r.ClosingStock > 0 && r.ClosingStock < 5); break;
+                case "Excess Stock":    filtered = filtered.Where(r => r.ClosingStock > 100); break;
+                case "Dead Stock":      filtered = filtered.Where(r => r.ClosingStock > 0 && r.Sales == 0); break;
+            }
+
+            var result = filtered.ToList();
+            gridReport.DataSource = result;
+            _filterManager?.ClearFilters();
+            UpdateSummaryCards(result);
+            UpdateFooterValues();
+            _filterManager?.UpdateHeaderFilterIcons();
+            SetStatus($"Showing {result.Count} of {_allRows.Count} item(s)  |  F5 = Search  |  Ctrl+E = Export  |  Ctrl+P = Print  |  Esc = Close");
+        }
+
+        private void UpdateSummaryCards(List<StockValuationRow> rows = null)
+        {
+            rows = rows ?? _allRows;
+            lblItemsValue.Text  = rows.Count.ToString("N0");
+            lblQtyValue.Text    = rows.Sum(r => r.ClosingStock).ToString("N2");
+            lblCostValue.Text   = rows.Sum(r => r.ValueAtCost).ToString("N2");
+            lblRetailValue.Text = rows.Sum(r => r.ValueAtRetail).ToString("N2");
+            lblProfitValue.Text = rows.Sum(r => r.PotentialProfit).ToString("N2");
+        }
+
+        // ════════════════════════════════════════════════════════════
+        //  Helpers
+        // ════════════════════════════════════════════════════════════
+        private int? GetComboIntValue(Infragistics.Win.UltraWinEditors.UltraComboEditor combo)
+        {
+            if (combo.Value == null) return null;
+            if (int.TryParse(combo.Value.ToString(), out int id) && id > 0) return id;
+            return null;
+        }
+
+        private void SetStatus(string message)
+        {
+            if (lblStatus.InvokeRequired)
+                lblStatus.Invoke(new Action(() => lblStatus.Text = message));
+            else
+                lblStatus.Text = message;
+        }
+
+        // ════════════════════════════════════════════════════════════
+        //  Event handlers
+        // ════════════════════════════════════════════════════════════
+        public void RibbonClear() => BtnReset_Click(this, EventArgs.Empty);
+        public void Clear() => BtnReset_Click(this, EventArgs.Empty);
+
+        private void BtnReset_Click(object sender, EventArgs e)
+        {
+            DateTime now = DateTime.Now;
+            dtFrom.Value = new DateTime(now.Year, 1, 1);
+            dtTo.Value   = now;
+            comboPeriod.Text      = "ALL";
+            UpdateDateControlVisibility();
+            comboGroup.Value      = null;
+            comboCategory.Value   = null;
+            comboStockFilter.Text = "All Items";
+            txtSearch.Text        = "";
+            _allRows              = new List<StockValuationRow>();
+            gridReport.DataSource = null;
+            _filterManager?.ClearFilters();
+            _filterManager?.UpdateHeaderFilterIcons();
+            UpdateSummaryCards();
+            UpdateFooterValues();
+            _filterManager?.UpdateHeaderFilterIcons();
+            SetStatus("Filters reset.  |  F5 = Search  |  Esc = Close");
+        }
+
+        private void BtnClose_Click(object sender, EventArgs e) => this.Close();
+
+        private void BtnPrint_Click(object sender, EventArgs e) => gridReport.PrintPreview();
+
+        private void BtnExport_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                var dlg = new SaveFileDialog
+                {
+                    Filter = ReportPdfExporter.CsvAndPdfFilter,
+                    FileName = $"StockValuation_{DateTime.Now:yyyyMMdd_HHmm}.csv"
+                };
+                if (dlg.ShowDialog() != DialogResult.OK) return;
+                if (ReportPdfExporter.CheckAndExportPdf(dlg, gridReport, "Stock Valuation Report")) return;
+                if (gridReport.Rows.Count == 0)
+                {
+                    MessageBox.Show("No data to export.", "Info",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+                ExportToCsv(dlg.FileName);
+                MessageBox.Show("Export completed successfully!", "Success",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Export failed: " + ex.Message, "Error",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private void ExportToCsv(string path)
+        {
+            var sb = new StringBuilder();
+            var band = gridReport.DisplayLayout.Bands[0];
+            
+            // Header
+            foreach (UltraGridColumn col in band.Columns)
+                if (!col.Hidden) sb.Append(col.Header.Caption + ",");
+            if (sb.Length > 0) sb.Length--;
+            sb.AppendLine();
+            
+            // Data
+
+            foreach (UltraGridRow row in GetVisibleDataRows())
+            {
+                foreach (UltraGridColumn col in band.Columns)
+                {
+                    if (!col.Hidden)
+                    {
+                        string v = row.Cells[col].Value?.ToString() ?? "";
+                        if (v.Contains(",")) v = "\"" + v + "\"";
+                        sb.Append(v + ",");
+                    }
+                }
+                if (sb.Length > 0) sb.Length--;
+                sb.AppendLine();
+            }
+
+            // Summary Row at the bottom
+            sb.AppendLine();
+            
+            int itemsCount = GetVisibleDataRows().Count();
+            decimal totalQty = 0;
+            decimal totalValueCost = 0;
+            decimal totalValueRetail = 0;
+            decimal totalProfit = 0;
+            
+            foreach (UltraGridRow row in GetVisibleDataRows())
+            {
+                totalQty         += Convert.ToDecimal(row.Cells["ClosingStock"].Value ?? 0);
+                totalValueCost   += Convert.ToDecimal(row.Cells["ValueAtCost"].Value ?? 0);
+                totalValueRetail += Convert.ToDecimal(row.Cells["ValueAtRetail"].Value ?? 0);
+                totalProfit      += Convert.ToDecimal(row.Cells["PotentialProfit"].Value ?? 0);
+            }
+
+            foreach (UltraGridColumn col in band.Columns)
+            {
+                if (!col.Hidden)
+                {
+                    if (col.Key == "Barcode")
+                        sb.Append("TOTALS,");
+                    else if (col.Key == "ItemName")
+                        sb.Append($"({itemsCount} Items),");
+                    else if (col.Key == "ClosingStock")
+                        sb.Append($"{totalQty:F2},");
+                    else if (col.Key == "ValueAtCost")
+                        sb.Append($"{totalValueCost:F2},");
+                    else if (col.Key == "ValueAtRetail")
+                        sb.Append($"{totalValueRetail:F2},");
+                    else if (col.Key == "PotentialProfit")
+                        sb.Append($"{totalProfit:F2},");
+                    else if (col.Key == "MarginPercent")
+                        sb.Append($"{(totalValueRetail > 0 ? (totalProfit / totalValueRetail * 100) : 0):F2}%,");
+                    else
+                        sb.Append(",");
+                }
+            }
+            if (sb.Length > 0) sb.Length--;
+            sb.AppendLine();
+
+            File.WriteAllText(path, sb.ToString(), Encoding.UTF8);
+        }
+
+        private void ComboPeriod_ValueChanged(object sender, EventArgs e)
+        {
+            if (_isChangingDates) return;
+            if (comboPeriod.Value == null && comboPeriod.Text == null) return;
+
+            _isChangingDates = true;
+            try
+            {
+                string val = Convert.ToString(comboPeriod.Value ?? comboPeriod.Text);
+                DateTime now = DateTime.Now;
+                switch (val)
+                {
+                    case "ALL":
+                    case "All":           dtFrom.Value = new DateTime(1753, 1, 1);              dtTo.Value = now.Date;                              break;
+                    case "Today":         dtFrom.Value = now.Date;                              dtTo.Value = now.Date;                              break;
+                    case "This Week":     dtFrom.Value = now.Date.AddDays(-(int)now.DayOfWeek); dtTo.Value = now.Date;                              break;
+                    case "This Month":    dtFrom.Value = new DateTime(now.Year, now.Month, 1);  dtTo.Value = now.Date;                              break;
+                    case "Last Month":    var lm = now.AddMonths(-1); dtFrom.Value = new DateTime(lm.Year, lm.Month, 1); dtTo.Value = new DateTime(now.Year, now.Month, 1).AddDays(-1); break;
+                    case "This Quarter":  int q = (now.Month - 1) / 3; dtFrom.Value = new DateTime(now.Year, q * 3 + 1, 1); dtTo.Value = now.Date; break;
+                    case "This Year":     dtFrom.Value = new DateTime(now.Year, 1, 1);           dtTo.Value = now.Date;                              break;
+                }
+            }
+            finally
+            {
+                _isChangingDates = false;
+            }
+            UpdateDateControlVisibility();
+        }
+
+        private void DtDate_ValueChanged(object sender, EventArgs e)
+        {
+            if (_isChangingDates) return;
+
+            _isChangingDates = true;
+            try
+            {
+                if (comboPeriod.Text != "Custom") comboPeriod.Text = "Custom";
+            }
+            finally
+            {
+                _isChangingDates = false;
+            }
+            UpdateDateControlVisibility();
+        }
+
+        private void UpdateDateControlVisibility()
+        {
+            string val = Convert.ToString(comboPeriod.Value ?? comboPeriod.Text);
+            bool isAll = string.IsNullOrWhiteSpace(val) || string.Equals(val, "ALL", StringComparison.OrdinalIgnoreCase);
+
+            lblPeriod.Location = new Point(15, 20);
+            comboPeriod.Location = new Point(68, 16);
+
+            lblFromDate.Visible = !isAll;
+            dtFrom.Visible = !isAll;
+            lblToDate.Visible = !isAll;
+            dtTo.Visible = !isAll;
+
+            if (isAll)
+            {
+                lblSearch.Location = new Point(203, 20);
+                txtSearch.Location = new Point(255, 16);
+            }
+            else
+            {
+                lblFromDate.Location = new Point(203, 20);
+                dtFrom.Location = new Point(275, 16);
+                lblToDate.Location = new Point(398, 20);
+                dtTo.Location = new Point(455, 16);
+
+                lblSearch.Location = new Point(585, 20);
+                txtSearch.Location = new Point(640, 16);
+            }
+        }
+
+        private void TxtSearch_TextChanged(object sender, EventArgs e)
+        {
+            if (_allRows.Count > 0) ApplyFilters();
+        }
+
+        private void FrmStockValuationReport_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.KeyCode == Keys.F5)                         { e.Handled = true; RunSearch(); }
+            else if (e.Control && e.KeyCode == Keys.E)        { e.Handled = true; BtnExport_Click(sender, e); }
+            else if (e.Control && e.KeyCode == Keys.P)        { e.Handled = true; BtnPrint_Click(sender, e); }
+            else if (e.KeyCode == Keys.Escape)                { e.Handled = true; this.Close(); }
+            else if (e.Control && e.KeyCode == Keys.Right)    { e.Handled = true; ScrollGridHorizontally(1); }
+            else if (e.Control && e.KeyCode == Keys.Left)     { e.Handled = true; ScrollGridHorizontally(-1); }
+        }
+
+        #region Side / Horizontal Scrolling Helpers
+
+        private void GridReport_MouseWheel(object sender, MouseEventArgs e)
+        {
+            if ((Control.ModifierKeys & Keys.Shift) == Keys.Shift)
+            {
+                if (e is HandledMouseEventArgs handled)
+                {
+                    handled.Handled = true;
+                }
+
+                int steps = Math.Max(1, Math.Abs(e.Delta) / 120);
+                ScrollGridHorizontally(e.Delta > 0 ? -1 : 1, steps);
+            }
+        }
+
+        private void GridFooter_MouseWheel(object sender, MouseEventArgs e)
+        {
+            if (e is HandledMouseEventArgs handled)
+            {
+                handled.Handled = true;
+            }
+
+            int steps = Math.Max(1, Math.Abs(e.Delta) / 120);
+            ScrollGridHorizontally(e.Delta > 0 ? -1 : 1, steps);
+        }
+
+        public void ScrollGridHorizontally(int direction, int steps = 1)
+        {
+            try
+            {
+                if (gridReport.DisplayLayout == null || gridReport.DisplayLayout.ColScrollRegions.Count == 0)
+                    return;
+
+                ColScrollRegion region = gridReport.ActiveColScrollRegion ?? gridReport.DisplayLayout.ColScrollRegions[0];
+                if (region == null)
+                    return;
+
+                steps = Math.Max(1, Math.Min(steps, 5));
+                for (int i = 0; i < steps; i++)
+                {
+                    if (direction < 0)
+                    {
+                        region.Scroll(ColScrollAction.LineLeft);
+                    }
+                    else if (direction > 0)
+                    {
+                        region.Scroll(ColScrollAction.LineRight);
+                    }
+                }
+
+                UpdateFooterCellPositions();
+            }
+            catch { }
+        }
+
+        private sealed class GridSideScrollFilter : NativeWindow
+        {
+            private const int WM_MOUSEHWHEEL = 0x020E;
+            private readonly frmStockValuationReport _form;
+
+            public GridSideScrollFilter(frmStockValuationReport form, UltraGrid grid)
+            {
+                _form = form;
+                if (grid.IsHandleCreated)
+                    AssignHandle(grid.Handle);
+                grid.HandleCreated += (s, e) => AssignHandle(grid.Handle);
+                grid.HandleDestroyed += (s, e) => ReleaseHandle();
+            }
+
+            protected override void WndProc(ref Message m)
+            {
+                if (m.Msg == WM_MOUSEHWHEEL)
+                {
+                    short delta = (short)((m.WParam.ToInt64() >> 16) & 0xFFFF);
+                    if (delta != 0)
+                    {
+                        int steps = Math.Max(1, Math.Abs(delta) / 120);
+                        _form.ScrollGridHorizontally(delta > 0 ? 1 : -1, steps);
+                        m.Result = IntPtr.Zero;
+                        return;
+                    }
+                }
+                base.WndProc(ref m);
+            }
+        }
+
+        #endregion
+
+    }
+
+    // ════════════════════════════════════════════════════════════
+    //  Valuation Row Model (calculated in-memory from StockReportItem)
+    // ════════════════════════════════════════════════════════════
+    public class StockValuationRow
+    {
+        public int     ItemId          { get; set; }
+        public string  Barcode         { get; set; }
+        public string  ItemName        { get; set; }
+        public string  GroupName       { get; set; }
+        public string  CategoryName    { get; set; }
+        public string  SubCategoryName { get; set; }
+        public string  BaseUnitName    { get; set; }
+        public decimal ClosingStock    { get; set; }
+        public decimal Sales           { get; set; }
+        public decimal Cost            { get; set; }
+        public decimal RetailPrice     { get; set; }
+        public decimal ValueAtCost     { get; set; }
+        public decimal ValueAtRetail   { get; set; }
+        public decimal PotentialProfit { get; set; }
+        public decimal MarginPercent   => RetailPrice > 0 ? ((RetailPrice - Cost) / RetailPrice) * 100 : 0;
+    }
+}

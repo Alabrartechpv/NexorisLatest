@@ -1461,6 +1461,7 @@ namespace PosBranch_Win.Accounts
 
         private void UltraGrid1_BeforeCellUpdate(object sender, BeforeCellUpdateEventArgs e)
         {
+            if (isAdjusting) return;
             if (e.Cell.Column.Key == "AdjustedAmount")
             {
                 if (!decimal.TryParse(e.NewValue?.ToString(), out decimal newAmount))
@@ -1981,33 +1982,41 @@ namespace PosBranch_Win.Accounts
 
         private void ClearForm()
         {
-            txtVendorName.Text = "";
-            textBox4.Text = "";
-            txtPurchaseNo.Text = "";
-            ultraTextEditor4.Text = "";
-            currentVendorLedgerId = 0;
-            currentPaymentMasterId = 0;
-            // Restore the user's preferred payment method (defaults to Cash on first load)
-            if (_userSelectedPayModeId != null)
-                CmboPayment.Value = _userSelectedPayModeId;
-            else
-                CmboPayment.SelectedIndex = -1;
-            textBox1.Text = "0";
-            textBox2.Text = "";
-            ultraTextEditor2.Value = PaymentStatusActive;
-            richTextBox2.Text = "";
-            dtpPurchaseDate.Value = DateTime.Now;
-            rdbtnoutstanding.Checked = true;
-            ultraGrid1.DataSource = CreateEmptyInvoiceTable();
-            ConfigureGridColumns();
-            ultraTextEditor1.Text = "0.00";
-            ultraTextEditor3.Text = string.Empty;    // clear cancelled GRN display
-            txtOutstanding.Text = "0.00";
-            totalPaymentAmount = 0;
-            // Re-initialize the repository to ensure connection string is set
-            paymentRepo = new VendorPaymentRepository();
-            UpdateSummaryFooter();
-            RefreshSummaryFooter();
+            isAdjusting = true;
+            try
+            {
+                txtVendorName.Text = "";
+                textBox4.Text = "";
+                txtPurchaseNo.Text = "";
+                ultraTextEditor4.Text = "";
+                currentVendorLedgerId = 0;
+                currentPaymentMasterId = 0;
+                // Restore the user's preferred payment method (defaults to Cash on first load)
+                if (_userSelectedPayModeId != null)
+                    CmboPayment.Value = _userSelectedPayModeId;
+                else
+                    CmboPayment.SelectedIndex = -1;
+                textBox1.Text = "0";
+                textBox2.Text = "";
+                ultraTextEditor2.Value = PaymentStatusActive;
+                richTextBox2.Text = "";
+                dtpPurchaseDate.Value = DateTime.Now;
+                rdbtnoutstanding.Checked = true;
+                totalPaymentAmount = 0;
+                ultraGrid1.DataSource = CreateEmptyInvoiceTable();
+                ConfigureGridColumns();
+                ultraTextEditor1.Text = "0.00";
+                ultraTextEditor3.Text = string.Empty;    // clear cancelled GRN display
+                txtOutstanding.Text = "0.00";
+                // Re-initialize the repository to ensure connection string is set
+                paymentRepo = new VendorPaymentRepository();
+                UpdateSummaryFooter();
+                RefreshSummaryFooter();
+            }
+            finally
+            {
+                isAdjusting = false;
+            }
         }
 
         private bool IsCancelStatusSelected()
@@ -2396,6 +2405,9 @@ namespace PosBranch_Win.Accounts
                 }
                 ultraGrid1.DataSource = dtGrid;
                 ConfigureGridColumns();
+                UpdateBalances();
+                UpdateRemainingAmount();
+                RefreshSummaryFooter();
 
                 isAdjusting = false;
             }
