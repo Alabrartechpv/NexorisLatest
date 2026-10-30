@@ -37,7 +37,7 @@ namespace Repository.MasterRepositry
                 if (string.IsNullOrWhiteSpace(resolvedName) && roleId > 0)
                 {
                     var matchedRole = allRoles.FirstOrDefault(r => 
-                        r.RoleID == roleId || (r.UserLevelID.HasValue && r.UserLevelID.Value == roleId));
+                        r.RoleID == roleId);
                     if (matchedRole != null && !string.IsNullOrWhiteSpace(matchedRole.RoleName))
                     {
                         resolvedName = matchedRole.RoleName.Trim();
@@ -46,7 +46,7 @@ namespace Repository.MasterRepositry
 
                 if (!string.IsNullOrWhiteSpace(resolvedName))
                 {
-                    var byName = allRoles.Where(r => string.Equals(r.RoleName?.Trim(), resolvedName, StringComparison.OrdinalIgnoreCase));
+                    bool isTargetAdmin = string.Equals(resolvedName, "Admin", StringComparison.OrdinalIgnoreCase) || string.Equals(resolvedName, "Administrator", StringComparison.OrdinalIgnoreCase); var byName = allRoles.Where(r => !string.IsNullOrWhiteSpace(r.RoleName) && (isTargetAdmin ? (string.Equals(r.RoleName.Trim(), "Admin", StringComparison.OrdinalIgnoreCase) || string.Equals(r.RoleName.Trim(), "Administrator", StringComparison.OrdinalIgnoreCase)) : string.Equals(r.RoleName.Trim(), resolvedName, StringComparison.OrdinalIgnoreCase)));
                     foreach (var r in byName)
                     {
                         if (r.RoleID > 0) ids.Add(r.RoleID);
@@ -56,7 +56,7 @@ namespace Repository.MasterRepositry
                 else
                 {
                     var matched = allRoles.Where(r =>
-                        roleId > 0 && (r.RoleID == roleId || (r.UserLevelID.HasValue && r.UserLevelID.Value == roleId))).ToList();
+                        roleId > 0 && r.RoleID == roleId).ToList();
                     foreach (var r in matched)
                     {
                         if (r.RoleID > 0) ids.Add(r.RoleID);
@@ -69,7 +69,7 @@ namespace Repository.MasterRepositry
             return ids.Count > 0 ? ids.ToList() : (roleId > 0 ? new List<int> { roleId } : new List<int>());
         }
 
-        private List<int> GetTargetRoleIds_Old(int roleId, string roleName = null) { return GetTargetRoleIds(roleId, roleName); } private List<int> DummyUnused()
+#if false
         {
             var ids = new HashSet<int>();
             if (roleId > 0) ids.Add(roleId);
@@ -128,7 +128,7 @@ BEGIN
     WHERE ISNULL(u.UserLevel, '') <> ''
     ORDER BY u.UserLevelID;
 END
-ELSE IF OBJECT_ID('dbo.UserLevel', 'U') IS NOT NULL
+    */
     INSERT INTO @Names SELECT UserLevel FROM dbo.UserLevel WHERE UserLevelID = @RId;
 
 IF ISNULL(@RName, '') <> ''
@@ -151,7 +151,7 @@ BEGIN
     WHERE ISNULL(u.UserLevel, '') <> ''
     ORDER BY u.UserLevelID;
 END
-ELSE IF OBJECT_ID('dbo.UserLevel', 'U') IS NOT NULL
+    */
     SELECT DISTINCT UserLevelID FROM dbo.UserLevel u INNER JOIN @Names n ON UPPER(RTRIM(LTRIM(u.UserLevel))) = UPPER(RTRIM(LTRIM(n.RoleName)));
 ", (SqlConnection)DataConnection))
                 {
@@ -178,6 +178,7 @@ ELSE IF OBJECT_ID('dbo.UserLevel', 'U') IS NOT NULL
             return ids.Count > 0 ? ids.ToList() : new List<int> { roleId };
         }
 
+#endif
         public List<RolePermission> GetPermissionsByRoleId(int roleId, string roleName = null)
         {
             List<RolePermission> savedPermissions = new List<RolePermission>();
@@ -187,7 +188,7 @@ ELSE IF OBJECT_ID('dbo.UserLevel', 'U') IS NOT NULL
             try
             {
                 var allRoles = GetAllRoles();
-                var currentRole = allRoles.FirstOrDefault(r => r.RoleID == roleId || (r.UserLevelID.HasValue && r.UserLevelID.Value == roleId));
+                var currentRole = allRoles.FirstOrDefault(r => r.RoleID == roleId);
                 if (currentRole != null && !string.IsNullOrWhiteSpace(currentRole.RoleName))
                 {
                     var matchingRoles = allRoles.Where(r => string.Equals(r.RoleName, currentRole.RoleName, StringComparison.OrdinalIgnoreCase));
@@ -281,7 +282,7 @@ END", (SqlConnection)DataConnection))
             }
 
             // Check if role is Admin
-            string roleName = "";
+            if (string.IsNullOrWhiteSpace(roleName) && roleId > 0)
             try
             {
                 var roleObj = GetAllRoles().FirstOrDefault(r => r.RoleID == roleId);
@@ -357,12 +358,12 @@ END", (SqlConnection)DataConnection))
             return resultPermissions;
         }
 
-        private List<RolePermission> GenerateDefaultPermissionsForRole(int roleId)
+        private List<RolePermission> GenerateDefaultPermissionsForRole(int roleId, string roleName = null)
         {
             var result = new List<RolePermission>();
             var allForms = GetFormsFromDatabase();
 
-            string roleName = "";
+            if (string.IsNullOrWhiteSpace(roleName) && roleId > 0)
             try
             {
                 var roleObj = GetAllRoles().FirstOrDefault(r => r.RoleID == roleId);
@@ -543,7 +544,7 @@ BEGIN
     WHERE ISNULL(u.UserLevel, '') <> ''
     ORDER BY u.UserLevelID;
 END
-ELSE IF OBJECT_ID('dbo.UserLevel', 'U') IS NOT NULL
+    */
 BEGIN
     SELECT UserLevelID AS RoleID, UserLevel AS RoleName, UserLevelID 
     FROM dbo.UserLevel 
@@ -584,7 +585,7 @@ END", (SqlConnection)DataConnection))
                     new Role { RoleID = 1, RoleName = "Admin", UserLevelID = 1 },
                     new Role { RoleID = 2, RoleName = "Manager", UserLevelID = 2 },
                     new Role { RoleID = 3, RoleName = "Cashier", UserLevelID = 3 },
-                    new Role { RoleID = 4, RoleName = "Administrator", UserLevelID = 4 },
+
                     new Role { RoleID = 5, RoleName = "Supervisor", UserLevelID = 5 },
                     new Role { RoleID = 6, RoleName = "Sales Man", UserLevelID = 6 },
                     new Role { RoleID = 7, RoleName = "Accountant", UserLevelID = 7 },
@@ -593,7 +594,7 @@ END", (SqlConnection)DataConnection))
                 };
             }
 
-            return roles;
+            if (roles != null && roles.Count > 0) { var clean = new List<Role>(); bool adminAdded = false; foreach (var r in roles) { if (string.IsNullOrWhiteSpace(r.RoleName)) continue; string name = r.RoleName.Trim(); bool isAdminName = string.Equals(name, "Admin", StringComparison.OrdinalIgnoreCase) || string.Equals(name, "Administrator", StringComparison.OrdinalIgnoreCase); if (isAdminName) { if (!adminAdded) { adminAdded = true; clean.Add(new Role { RoleID = r.RoleID, RoleName = "Admin", UserLevelID = r.UserLevelID }); } } else if (!clean.Any(c => string.Equals(c.RoleName, name, StringComparison.OrdinalIgnoreCase))) { clean.Add(r); } } roles = clean; } return roles;
         }
 
         /// <summary>
@@ -857,7 +858,7 @@ IF OBJECT_ID('dbo.Roles', 'U') IS NOT NULL
 BEGIN
     CREATE TABLE #DefaultRoles (RoleName NVARCHAR(100));
     INSERT INTO #DefaultRoles (RoleName) VALUES 
-    (N'Administrator'),
+    (N'Admin'),
     (N'Manager'),
     (N'Supervisor'),
     (N'Cashier'),
@@ -866,7 +867,7 @@ BEGIN
     (N'Inventory Manager'),
     (N'Standard User');
 
-    IF OBJECT_ID('dbo.Roles', 'U') IS NOT NULL AND OBJECT_ID('dbo.UserLevel', 'U') IS NOT NULL
+    IF OBJECT_ID('dbo.UserLevel', 'U') IS NOT NULL /*
 BEGIN
     SELECT 
         u.UserLevelID AS RoleID,
@@ -877,7 +878,7 @@ BEGIN
     WHERE ISNULL(u.UserLevel, '') <> ''
     ORDER BY u.UserLevelID;
 END
-ELSE IF OBJECT_ID('dbo.UserLevel', 'U') IS NOT NULL
+    */
     BEGIN
         INSERT INTO #DefaultRoles (RoleName)
         SELECT DISTINCT UserLevel FROM dbo.UserLevel WHERE ISNULL(UserLevel, '') <> '';
@@ -886,7 +887,7 @@ ELSE IF OBJECT_ID('dbo.UserLevel', 'U') IS NOT NULL
         SELECT d.RoleName 
         FROM #DefaultRoles d
         WHERE NOT EXISTS (
-            SELECT 1 FROM dbo.UserLevel u WHERE UPPER(RTRIM(LTRIM(u.UserLevel))) = UPPER(RTRIM(LTRIM(d.RoleName)))
+            SELECT 1 FROM dbo.UserLevel u WHERE UPPER(RTRIM(LTRIM(u.UserLevel))) = UPPER(RTRIM(LTRIM(d.RoleName))) OR (d.RoleName IN (N'Admin', N'Administrator') AND UPPER(RTRIM(LTRIM(u.UserLevel))) IN (N'ADMIN', N'ADMINISTRATOR'))
         );
     END;
 
@@ -904,7 +905,7 @@ ELSE IF OBJECT_ID('dbo.UserLevel', 'U') IS NOT NULL
         CASE WHEN @HasIsDelete = 1 THEN N', 0' ELSE N'' END + N'
     FROM #DefaultRoles d
     WHERE NOT EXISTS (
-        SELECT 1 FROM dbo.Roles r WHERE UPPER(RTRIM(LTRIM(r.RoleName))) = UPPER(RTRIM(LTRIM(d.RoleName)))
+        SELECT 1 FROM dbo.Roles r WHERE UPPER(RTRIM(LTRIM(r.RoleName))) = UPPER(RTRIM(LTRIM(d.RoleName))) OR (d.RoleName IN (N'Admin', N'Administrator') AND UPPER(RTRIM(LTRIM(r.RoleName))) IN (N'ADMIN', N'ADMINISTRATOR'))
     );';
 
     EXEC sp_executesql @Sql;
@@ -1248,7 +1249,7 @@ END", (SqlConnection)DataConnection))
             try
             {
                 var allRoles = GetAllRoles();
-                var currentRole = allRoles.FirstOrDefault(r => r.RoleID == roleId || (r.UserLevelID.HasValue && r.UserLevelID.Value == roleId));
+                var currentRole = allRoles.FirstOrDefault(r => r.RoleID == roleId);
                 if (currentRole != null && !string.IsNullOrWhiteSpace(currentRole.RoleName))
                 {
                     var matchingRoles = allRoles.Where(r => string.Equals(r.RoleName, currentRole.RoleName, StringComparison.OrdinalIgnoreCase));
