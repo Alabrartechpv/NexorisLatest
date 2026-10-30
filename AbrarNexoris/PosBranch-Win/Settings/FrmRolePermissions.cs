@@ -305,7 +305,7 @@ namespace PosBranch_Win.Settings
         {
             try
             {
-                _currentPermissions = _permRepo.GetFormsWithPermissions(roleId);
+                _currentPermissions = _permRepo.GetFormsWithPermissions(roleId, cmbRoles.Text?.Trim());
                 LoadCategoryFilter();
                 ApplyFilter();
             }
@@ -411,7 +411,6 @@ namespace PosBranch_Win.Settings
 
         private void btnSave_Click(object sender, EventArgs e)
         {
-            if (cmbRoles.SelectedValue != null && int.TryParse(cmbRoles.SelectedValue.ToString(), out int cboVal) && cboVal > 0) _selectedRoleId = cboVal; else if (cmbRoles.SelectedItem is Role selRole && selRole.RoleID > 0) _selectedRoleId = selRole.RoleID;
             if (_selectedRoleId <= 0)
             {
                 MessageBox.Show("Please select a role first.", "Validation",
@@ -488,11 +487,18 @@ namespace PosBranch_Win.Settings
 
         private void BtnGrantViewAll_Click(object sender, EventArgs e)
         {
-            if (_currentPermissions != null) { foreach (var p in _currentPermissions) { p.CanView = true; } }
-            BtnGrantViewAll_Impl(sender, e);
+            dgvPermissions.EndEdit();
+            if (_currentPermissions != null)
+            {
+                foreach (var item in _currentPermissions)
+                {
+                    item.CanView = true;
+                }
+            }
+            ApplyFilter();
         }
 
-        private void BtnGrantViewAll_Impl(object sender, EventArgs e)
+        private void BtnGrantViewAll_Click_Old(object sender, EventArgs e)
         {
             dgvPermissions.EndEdit();
             foreach (DataGridViewRow row in dgvPermissions.Rows)
@@ -510,11 +516,21 @@ namespace PosBranch_Win.Settings
         /// </summary>
         private void btnGrantAll_Click(object sender, EventArgs e)
         {
-            if (_currentPermissions != null) { foreach (var p in _currentPermissions) { p.CanView = true; p.CanAdd = true; p.CanEdit = true; p.CanDelete = true; } }
-            btnGrantAll_Impl(sender, e);
+            dgvPermissions.EndEdit();
+            if (_currentPermissions != null)
+            {
+                foreach (var item in _currentPermissions)
+                {
+                    item.CanView = true;
+                    item.CanAdd = true;
+                    item.CanEdit = true;
+                    item.CanDelete = true;
+                }
+            }
+            ApplyFilter();
         }
 
-        private void btnGrantAll_Impl(object sender, EventArgs e)
+        private void btnGrantAll_Click_Old(object sender, EventArgs e)
         {
             dgvPermissions.EndEdit();
             foreach (DataGridViewRow row in dgvPermissions.Rows)
@@ -540,11 +556,21 @@ namespace PosBranch_Win.Settings
         /// </summary>
         private void btnRevokeAll_Click(object sender, EventArgs e)
         {
-            if (_currentPermissions != null) { foreach (var p in _currentPermissions) { p.CanView = false; p.CanAdd = false; p.CanEdit = false; p.CanDelete = false; } }
-            btnRevokeAll_Impl(sender, e);
+            dgvPermissions.EndEdit();
+            if (_currentPermissions != null)
+            {
+                foreach (var item in _currentPermissions)
+                {
+                    item.CanView = false;
+                    item.CanAdd = false;
+                    item.CanEdit = false;
+                    item.CanDelete = false;
+                }
+            }
+            ApplyFilter();
         }
 
-        private void btnRevokeAll_Impl(object sender, EventArgs e)
+        private void btnRevokeAll_Click_Old(object sender, EventArgs e)
         {
             dgvPermissions.EndEdit();
             foreach (DataGridViewRow row in dgvPermissions.Rows)
