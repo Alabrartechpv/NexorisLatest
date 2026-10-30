@@ -2619,39 +2619,6 @@ namespace PosBranch_Win
                     catch { }
                 }
 
-                // Ensure Dashboard tools have valid icons assigned if resource was missing or corrupted
-                try
-                {
-                    if (ultraToolbarsManager1.Tools.Exists("Overview"))
-                    {
-                        var t = ultraToolbarsManager1.Tools["Overview"];
-                        var img = global::PosBranch_Win.Properties.Resources.market_share;
-                        if (t.SharedProps.AppearancesLarge.Appearance == null) t.SharedProps.AppearancesLarge.Appearance = new Infragistics.Win.Appearance();
-                        if (t.SharedProps.AppearancesSmall.Appearance == null) t.SharedProps.AppearancesSmall.Appearance = new Infragistics.Win.Appearance();
-                        t.SharedProps.AppearancesLarge.Appearance.Image = img;
-                        t.SharedProps.AppearancesSmall.Appearance.Image = img;
-                    }
-                    if (ultraToolbarsManager1.Tools.Exists("BusinessSummary"))
-                    {
-                        var t = ultraToolbarsManager1.Tools["BusinessSummary"];
-                        var img = global::PosBranch_Win.Properties.Resources.revenue;
-                        if (t.SharedProps.AppearancesLarge.Appearance == null) t.SharedProps.AppearancesLarge.Appearance = new Infragistics.Win.Appearance();
-                        if (t.SharedProps.AppearancesSmall.Appearance == null) t.SharedProps.AppearancesSmall.Appearance = new Infragistics.Win.Appearance();
-                        t.SharedProps.AppearancesLarge.Appearance.Image = img;
-                        t.SharedProps.AppearancesSmall.Appearance.Image = img;
-                    }
-                    if (ultraToolbarsManager1.Tools.Exists("ExecutiveDashboard"))
-                    {
-                        var t = ultraToolbarsManager1.Tools["ExecutiveDashboard"];
-                        var img = global::PosBranch_Win.Properties.Resources.rate_of_return;
-                        if (t.SharedProps.AppearancesLarge.Appearance == null) t.SharedProps.AppearancesLarge.Appearance = new Infragistics.Win.Appearance();
-                        if (t.SharedProps.AppearancesSmall.Appearance == null) t.SharedProps.AppearancesSmall.Appearance = new Infragistics.Win.Appearance();
-                        t.SharedProps.AppearancesLarge.Appearance.Image = img;
-                        t.SharedProps.AppearancesSmall.Appearance.Image = img;
-                    }
-                }
-                catch { }
-
                 // 1. Iterate Shared Tools
                 foreach (Infragistics.Win.UltraWinToolbars.ToolBase tool in ultraToolbarsManager1.Tools)
                 {
@@ -2689,9 +2656,9 @@ namespace PosBranch_Win
 
                             if (!string.IsNullOrEmpty(toolKey))
                             {
-                                if (!_originalSmallImages.ContainsKey(toolKey))
+                                if (!_originalSmallImages.ContainsKey(toolKey) || _originalSmallImages[toolKey] == null)
                                     _originalSmallImages[toolKey] = tool.SharedProps.AppearancesSmall?.Appearance?.Image as Image;
-                                if (!_originalLargeImages.ContainsKey(toolKey))
+                                if (!_originalLargeImages.ContainsKey(toolKey) || _originalLargeImages[toolKey] == null)
                                     _originalLargeImages[toolKey] = tool.SharedProps.AppearancesLarge?.Appearance?.Image as Image;
                                 if (_originalSmallImages[toolKey] == null && _originalLargeImages[toolKey] != null) _originalSmallImages[toolKey] = _originalLargeImages[toolKey];
                                 if (_originalLargeImages[toolKey] == null && _originalSmallImages[toolKey] != null) _originalLargeImages[toolKey] = _originalSmallImages[toolKey];
@@ -2771,14 +2738,14 @@ namespace PosBranch_Win
 
                             if (!string.IsNullOrEmpty(toolKey))
                             {
-                                if (!_originalSmallImages.ContainsKey(toolKey))
+                                if (!_originalSmallImages.ContainsKey(toolKey) || _originalSmallImages[toolKey] == null)
                                 {
                                     Image sImg = tool.SharedProps.AppearancesSmall?.Appearance?.Image as Image;
                                     if (sImg == null && tool.InstanceProps?.AppearancesSmall?.Appearance?.Image != null)
                                         sImg = tool.InstanceProps.AppearancesSmall.Appearance.Image as Image;
                                     _originalSmallImages[toolKey] = sImg;
                                 }
-                                if (!_originalLargeImages.ContainsKey(toolKey))
+                                if (!_originalLargeImages.ContainsKey(toolKey) || _originalLargeImages[toolKey] == null)
                                 {
                                     Image lImg = tool.SharedProps.AppearancesLarge?.Appearance?.Image as Image;
                                     if (lImg == null && tool.InstanceProps?.AppearancesLarge?.Appearance?.Image != null)
