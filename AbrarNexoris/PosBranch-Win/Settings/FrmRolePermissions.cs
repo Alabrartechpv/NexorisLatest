@@ -264,6 +264,8 @@ namespace PosBranch_Win.Settings
             dgvPermissions.CellFormatting += DgvPermissions_CellFormatting;
             dgvPermissions.CurrentCellDirtyStateChanged += DgvPermissions_CurrentCellDirtyStateChanged;
             dgvPermissions.CellValueChanged += DgvPermissions_CellValueChanged;
+            dgvPermissions.CellBeginEdit += DgvPermissions_CellBeginEdit;
+            dgvPermissions.CellContentClick += DgvPermissions_CellContentClick;
         }
 
         /// <summary>
@@ -380,6 +382,73 @@ namespace PosBranch_Win.Settings
             if (row.DataBoundItem is FormPermissionGrid item)
             {
                 bool isGranted = item.CanView || item.CanAdd || item.CanEdit || item.CanDelete;
+                if (isGranted && item.CanView)
+                {
+                    row.DefaultCellStyle.BackColor = Color.FromArgb(238, 252, 238);
+                    row.DefaultCellStyle.ForeColor = Color.FromArgb(30, 30, 30);
+                    if (e.ColumnIndex >= 0 && e.ColumnIndex < dgvPermissions.Columns.Count && dgvPermissions.Columns[e.ColumnIndex].Name == "FormName")
+                    {
+                        e.CellStyle.Font = new Font(dgvPermissions.Font, FontStyle.Bold);
+                        e.CellStyle.ForeColor = Color.FromArgb(0, 100, 0);
+                    }
+                }
+                else
+                {
+                    // Disabled form: show in grey, unclickable/muted appearance
+                    row.DefaultCellStyle.BackColor = Color.FromArgb(245, 245, 245);
+                    row.DefaultCellStyle.ForeColor = Color.FromArgb(130, 130, 130);
+                    if (e.ColumnIndex >= 0 && e.ColumnIndex < dgvPermissions.Columns.Count && dgvPermissions.Columns[e.ColumnIndex].Name == "FormName")
+                    {
+                        e.CellStyle.Font = new Font(dgvPermissions.Font, FontStyle.Regular);
+                        e.CellStyle.ForeColor = Color.FromArgb(120, 120, 120);
+                    }
+                    else if (e.ColumnIndex >= 0 && e.ColumnIndex < dgvPermissions.Columns.Count && dgvPermissions.Columns[e.ColumnIndex].Name == "Category")
+                    {
+                        e.CellStyle.ForeColor = Color.FromArgb(150, 150, 150);
+                    }
+                }
+            }
+        }
+
+        private void DgvPermissions_CellBeginEdit(object sender, DataGridViewCellCancelEventArgs e)
+        {
+            if (e.RowIndex >= 0 && e.RowIndex < dgvPermissions.Rows.Count)
+            {
+                var row = dgvPermissions.Rows[e.RowIndex];
+                if (row.DataBoundItem is FormPermissionGrid item)
+                {
+                    string colName = dgvPermissions.Columns[e.ColumnIndex].Name;
+                    if (!item.CanView && (colName == "CanAdd" || colName == "CanEdit" || colName == "CanDelete"))
+                    {
+                        e.Cancel = true;
+                    }
+                }
+            }
+        }
+
+        private void DgvPermissions_CellContentClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex >= 0 && e.RowIndex < dgvPermissions.Rows.Count)
+            {
+                var row = dgvPermissions.Rows[e.RowIndex];
+                if (row.DataBoundItem is FormPermissionGrid item)
+                {
+                    string colName = dgvPermissions.Columns[e.ColumnIndex].Name;
+                    if (!item.CanView && (colName == "CanAdd" || colName == "CanEdit" || colName == "CanDelete"))
+                    {
+                        dgvPermissions.CancelEdit();
+                    }
+                }
+            }
+        }
+
+        private void DgvPermissions_CellFormatting_Old(object sender, DataGridViewCellFormattingEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.RowIndex >= dgvPermissions.Rows.Count) return;
+            var row = dgvPermissions.Rows[e.RowIndex];
+            if (row.DataBoundItem is FormPermissionGrid item)
+            {
+                bool isGranted = item.CanView || item.CanAdd || item.CanEdit || item.CanDelete;
                 if (isGranted)
                 {
                     row.DefaultCellStyle.BackColor = Color.FromArgb(238, 252, 238);
@@ -401,6 +470,36 @@ namespace PosBranch_Win.Settings
         }
 
         private void DgvPermissions_CellValueChanged(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex >= 0 && _currentPermissions != null)
+            {
+                var row = dgvPermissions.Rows[e.RowIndex];
+                if (row.DataBoundItem is FormPermissionGrid item)
+                {
+                    string colName = e.ColumnIndex >= 0 && e.ColumnIndex < dgvPermissions.Columns.Count ? dgvPermissions.Columns[e.ColumnIndex].Name : "";
+                    if (colName == "CanView" && !item.CanView)
+                    {
+                        item.CanAdd = false;
+                        item.CanEdit = false;
+                        item.CanDelete = false;
+                        if (row.Cells["CanAdd"] != null) row.Cells["CanAdd"].Value = false;
+                        if (row.Cells["CanEdit"] != null) row.Cells["CanEdit"].Value = false;
+                        if (row.Cells["CanDelete"] != null) row.Cells["CanDelete"].Value = false;
+                    }
+                    else if ((colName == "CanAdd" || colName == "CanEdit" || colName == "CanDelete") && (item.CanAdd || item.CanEdit || item.CanDelete))
+                    {
+                        if (!item.CanView)
+                        {
+                            item.CanView = true;
+                            if (row.Cells["CanView"] != null) row.Cells["CanView"].Value = true;
+                        }
+                    }
+                }
+                dgvPermissions.InvalidateRow(e.RowIndex);
+                UpdateStatusCounts();
+            }
+        }
+        private void DgvPermissions_CellValueChanged_Old(object sender, DataGridViewCellEventArgs e)
         {
             if (e.RowIndex >= 0 && _currentPermissions != null)
             {
