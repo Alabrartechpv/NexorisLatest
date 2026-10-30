@@ -32,6 +32,51 @@ namespace Repository.MasterRepositry
             try
             {
                 var allRoles = GetAllRoles();
+                string resolvedName = roleName?.Trim();
+
+                if (string.IsNullOrWhiteSpace(resolvedName) && roleId > 0)
+                {
+                    var matchedRole = allRoles.FirstOrDefault(r => 
+                        r.RoleID == roleId || (r.UserLevelID.HasValue && r.UserLevelID.Value == roleId));
+                    if (matchedRole != null && !string.IsNullOrWhiteSpace(matchedRole.RoleName))
+                    {
+                        resolvedName = matchedRole.RoleName.Trim();
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(resolvedName))
+                {
+                    var byName = allRoles.Where(r => string.Equals(r.RoleName?.Trim(), resolvedName, StringComparison.OrdinalIgnoreCase));
+                    foreach (var r in byName)
+                    {
+                        if (r.RoleID > 0) ids.Add(r.RoleID);
+                        if (r.UserLevelID.HasValue && r.UserLevelID.Value > 0) ids.Add(r.UserLevelID.Value);
+                    }
+                }
+                else
+                {
+                    var matched = allRoles.Where(r =>
+                        roleId > 0 && (r.RoleID == roleId || (r.UserLevelID.HasValue && r.UserLevelID.Value == roleId))).ToList();
+                    foreach (var r in matched)
+                    {
+                        if (r.RoleID > 0) ids.Add(r.RoleID);
+                        if (r.UserLevelID.HasValue && r.UserLevelID.Value > 0) ids.Add(r.UserLevelID.Value);
+                    }
+                }
+            }
+            catch { }
+
+            return ids.Count > 0 ? ids.ToList() : (roleId > 0 ? new List<int> { roleId } : new List<int>());
+        }
+
+        private List<int> GetTargetRoleIds_Old(int roleId, string roleName = null) { return GetTargetRoleIds(roleId, roleName); } private List<int> DummyUnused()
+        {
+            var ids = new HashSet<int>();
+            if (roleId > 0) ids.Add(roleId);
+
+            try
+            {
+                var allRoles = GetAllRoles();
                 var matched = allRoles.Where(r =>
                     (roleId > 0 && (r.RoleID == roleId || (r.UserLevelID.HasValue && r.UserLevelID.Value == roleId))) ||
                     (!string.IsNullOrWhiteSpace(roleName) && string.Equals(r.RoleName?.Trim(), roleName.Trim(), StringComparison.OrdinalIgnoreCase))
@@ -133,12 +178,12 @@ ELSE IF OBJECT_ID('dbo.UserLevel', 'U') IS NOT NULL
             return ids.Count > 0 ? ids.ToList() : new List<int> { roleId };
         }
 
-        public List<RolePermission> GetPermissionsByRoleId(int roleId)
+        public List<RolePermission> GetPermissionsByRoleId(int roleId, string roleName = null)
         {
             List<RolePermission> savedPermissions = new List<RolePermission>();
 
             // Resolve all matching role IDs (e.g., both RoleID=4 and UserLevelID=3 for Cashier)
-            List<int> targetRoleIds = GetTargetRoleIds(roleId);
+            List<int> targetRoleIds = GetTargetRoleIds(roleId, roleName);
             try
             {
                 var allRoles = GetAllRoles();
@@ -556,9 +601,9 @@ END", (SqlConnection)DataConnection))
         /// </summary>
         /// <param name="roleId">Role ID to get permissions for</param>
         /// <returns>List of FormPermissionGrid objects</returns>
-        public List<FormPermissionGrid> GetFormsWithPermissions(int roleId)
+        public List<FormPermissionGrid> GetFormsWithPermissions(int roleId, string roleName = null)
         {
-            var rolePerms = GetPermissionsByRoleId(roleId);
+            var rolePerms = GetPermissionsByRoleId(roleId, roleName);
             var staticList = GetFormsFromDatabase();
             var resultGrid = new List<FormPermissionGrid>();
 
@@ -1191,7 +1236,7 @@ END", (SqlConnection)DataConnection))
         /// <summary>
         /// Saves multiple permissions for a role (bulk save for admin UI)
         /// </summary>
-        public string SavePermissions(int roleId, List<FormPermissionGrid> permissions)
+        public string SavePermissions(int roleId, List<FormPermissionGrid> permissions, string roleName = null)
         {
             EnsureRolesSeededInDatabase();
             EnsureAllFormsSeededInDatabase();
@@ -1199,7 +1244,7 @@ END", (SqlConnection)DataConnection))
 
             if (permissions == null || permissions.Count == 0) return "Success";
 
-            List<int> targetRoleIds = GetTargetRoleIds(roleId);
+            List<int> targetRoleIds = GetTargetRoleIds(roleId, roleName);
             try
             {
                 var allRoles = GetAllRoles();
