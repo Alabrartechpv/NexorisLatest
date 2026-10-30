@@ -293,7 +293,7 @@ namespace PosBranch_Win.Settings
             if (roleId > 0)
             {
                 _selectedRoleId = roleId;
-                LoadPermissionsForRole(roleId);
+                string selRoleName = (cmbRoles.SelectedItem is Role rSel) ? rSel.RoleName : cmbRoles.Text?.Trim(); LoadPermissionsForRole(roleId, selRoleName);
             }
         }
 
@@ -301,11 +301,11 @@ namespace PosBranch_Win.Settings
         /// Loads permissions for the selected role
         /// </summary>
         /// <param name="roleId">Role ID to load permissions for</param>
-        private void LoadPermissionsForRole(int roleId)
+        private void LoadPermissionsForRole(int roleId, string roleName = null)
         {
             try
             {
-                _currentPermissions = _permRepo.GetFormsWithPermissions(roleId, cmbRoles.Text?.Trim());
+                string resolvedRoleName = !string.IsNullOrWhiteSpace(roleName) ? roleName.Trim() : ((cmbRoles.SelectedItem is Role rRole) ? rRole.RoleName?.Trim() : cmbRoles.Text?.Trim()); _currentPermissions = _permRepo.GetFormsWithPermissions(roleId, resolvedRoleName);
                 LoadCategoryFilter();
                 ApplyFilter();
             }
@@ -446,7 +446,7 @@ namespace PosBranch_Win.Settings
                 }
 
                 // Save master permissions list to database
-                string result = _permRepo.SavePermissions(_selectedRoleId, _currentPermissions, cmbRoles.Text?.Trim());
+                string roleName = (cmbRoles.SelectedItem is Role rSave) ? rSave.RoleName : cmbRoles.Text?.Trim(); string result = _permRepo.SavePermissions(_selectedRoleId, _currentPermissions, roleName);
 
                 if (result == "Success")
                 {
@@ -456,8 +456,8 @@ namespace PosBranch_Win.Settings
 
                     try
                     {
-                        var targetIds = _permRepo.GetTargetRoleIds(_selectedRoleId, cmbRoles.Text?.Trim());
-                        if (targetIds.Contains(SessionContext.RoleId) || string.Equals(cmbRoles.Text?.Trim(), SessionContext.UserLevel?.Trim(), StringComparison.OrdinalIgnoreCase))
+                        var targetIds = _permRepo.GetTargetRoleIds(_selectedRoleId, roleName);
+                        if (targetIds.Contains(SessionContext.RoleId) || string.Equals(roleName, SessionContext.UserLevel?.Trim(), StringComparison.OrdinalIgnoreCase))
                         {
                             var updatedPerms = _permRepo.GetPermissionsByRoleId(SessionContext.RoleId);
                             SessionContext.LoadPermissions(updatedPerms);
@@ -598,7 +598,7 @@ namespace PosBranch_Win.Settings
         {
             if (_selectedRoleId > 0)
             {
-                LoadPermissionsForRole(_selectedRoleId);
+                string refName = (cmbRoles.SelectedItem is Role rRef) ? rRef.RoleName : cmbRoles.Text?.Trim(); LoadPermissionsForRole(_selectedRoleId, refName);
             }
         }
 
@@ -673,7 +673,7 @@ namespace PosBranch_Win.Settings
 
                 if (_selectedRoleId > 0)
                 {
-                    LoadPermissionsForRole(_selectedRoleId);
+                    string refName = (cmbRoles.SelectedItem is Role rRef) ? rRef.RoleName : cmbRoles.Text?.Trim(); LoadPermissionsForRole(_selectedRoleId, refName);
                 }
 
                 LoadCategoryFilter();
@@ -794,7 +794,7 @@ namespace PosBranch_Win.Settings
                     {
                         if (_selectedRoleId > 0)
                         {
-                            LoadPermissionsForRole(_selectedRoleId);
+                            string refName = (cmbRoles.SelectedItem is Role rRef) ? rRef.RoleName : cmbRoles.Text?.Trim(); LoadPermissionsForRole(_selectedRoleId, refName);
                         }
                         LoadCategoryFilter();
                         MessageBox.Show($"Form '{formName}' registered successfully and added to permissions list!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
