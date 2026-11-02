@@ -47,6 +47,36 @@ namespace Repository.ReportRepository
                         DataTable table = new DataTable();
                         adapter.Fill(table);
 
+                        var lastPaymentDates = new Dictionary<long, DateTime>();
+                        try
+                        {
+                            const string payDateQuery = @"
+                                SELECT VPD.BillNo, MAX(VPM.VoucherDate) AS LastPaymentDate
+                                FROM VendorPaymentDetails VPD
+                                INNER JOIN VendorPaymentMaster VPM ON VPM.Id = VPD.PaymentMasterId
+                                WHERE VPD.CancelFlag = 0 AND VPM.CancelFlag = 0
+                                  AND (@BranchId IS NULL OR @BranchId = 0 OR VPD.BranchId = @BranchId)
+                                GROUP BY VPD.BillNo";
+
+                            using (SqlCommand payDateCmd = new SqlCommand(payDateQuery, (SqlConnection)DataConnection))
+                            {
+                                payDateCmd.Parameters.Add("@BranchId", SqlDbType.Int).Value = branchId > 0 ? (object)branchId : DBNull.Value;
+                                using (SqlDataReader rdr = payDateCmd.ExecuteReader())
+                                {
+                                    while (rdr.Read())
+                                    {
+                                        long bNo = Convert.ToInt64(rdr["BillNo"]);
+                                        DateTime pDate = Convert.ToDateTime(rdr["LastPaymentDate"]);
+                                        lastPaymentDates[bNo] = pDate;
+                                    }
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Error fetching last payment dates: {ex.Message}");
+                        }
+
                         foreach (DataRow row in table.Rows)
                         {
                             decimal docAmt = ToDecimal(row, "DocAmt");
@@ -57,19 +87,23 @@ namespace Repository.ReportRepository
                                     ? Convert.ToDecimal(row["PayedAmount"])
                                     : Math.Max(0m, docAmt - balance));
 
+                            long purchaseNo = ToLong(row, "PurchaseNo");
+                            DateTime? paymentDate = lastPaymentDates.TryGetValue(purchaseNo, out DateTime pDate) ? (DateTime?)pDate : null;
+
                             rows.Add(new VendorOutstandingReportRow
                             {
                                 AcctCode = ToInt(row, "AcctCode"),
                                 Company = ToString(row, "Company"),
                                 Name = ToString(row, "Name"),
                                 Phone = ToString(row, "Phone"),
-                                PurchaseNo = ToLong(row, "PurchaseNo"),
+                                PurchaseNo = purchaseNo,
                                 Date = ToDateTime(row, "Date"),
                                 Reference = ToString(row, "Reference"),
                                 InvoiceDate = ToNullableDateTime(row, "InvoiceDate"),
                                 PostDate = ToNullableDateTime(row, "PostDate"),
                                 DocAmt = docAmt,
                                 PaidAmount = paidAmt,
+                                PaymentDate = paymentDate,
                                 Balance = balance,
                                 IsPR = ToInt(row, "IsPR")
                             });
@@ -106,7 +140,7 @@ namespace Repository.ReportRepository
 
             int effectiveBranchId = branchId > 0 ? branchId : GetContextValue(SessionContext.BranchId, DataBase.BranchId);
 
-            // 1. Fetch Payment History using Stored Procedure STOREDPROCEDURE._VendorPaymentMaster (Operation: VIEWPAYMENT)
+            // 1. Fetch Payment History with full details (VoucherId, PaymentDate, PaymentMode, Remarks)
             try
             {
                 if (DataConnection.State != ConnectionState.Open)
@@ -115,13 +149,31 @@ namespace Repository.ReportRepository
                 DataTable dt = new DataTable();
                 try
                 {
-                    using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._VendorPaymentMaster, (SqlConnection)DataConnection))
+                    const string detailQuery = @"
+                        SELECT 
+                            VPD.BillNo,
+                            VPM.VoucherDate AS PaymentDate,
+                            ISNULL(VPM.VoucherId, VPM.Id) AS VoucherId,
+                            ISNULL(PM.PayModeName, 'Cash') AS PaymentMode,
+                            VPD.BillAmount,
+                            VPD.PaymentAmount,
+                            VPD.BalanceAmount,
+                            ISNULL(VPM.Narration, '') AS Remarks
+                        FROM VendorPaymentDetails VPD
+                        INNER JOIN VendorPaymentMaster VPM ON VPM.Id = VPD.PaymentMasterId
+                        LEFT JOIN PayMode PM ON PM.PayModeID = VPM.PaymentMethodLedgerId
+                        WHERE (VPD.BillNo = @BillNo OR @BillNo IS NULL OR @BillNo = 0)
+                          AND (VPM.VendorLedgerId = @VendorLedgerId OR @VendorLedgerId IS NULL OR @VendorLedgerId = 0)
+                          AND (@BranchId IS NULL OR @BranchId = 0 OR VPD.BranchId = @BranchId)
+                          AND VPD.CancelFlag = 0
+                          AND VPM.CancelFlag = 0
+                        ORDER BY VPM.VoucherDate ASC, VPM.VoucherId ASC";
+
+                    using (SqlCommand cmd = new SqlCommand(detailQuery, (SqlConnection)DataConnection))
                     {
-                        cmd.CommandType = CommandType.StoredProcedure;
-                        cmd.Parameters.AddWithValue("@VendorLedgerId", vendorLedgerId);
-                        cmd.Parameters.AddWithValue("@BillNoUntil", purchaseNo);
-                        cmd.Parameters.AddWithValue("@BranchId", effectiveBranchId);
-                        cmd.Parameters.AddWithValue("@_Operation", "VIEWPAYMENT");
+                        cmd.Parameters.AddWithValue("@VendorLedgerId", vendorLedgerId > 0 ? (object)vendorLedgerId : DBNull.Value);
+                        cmd.Parameters.AddWithValue("@BillNo", purchaseNo > 0 ? (object)purchaseNo : DBNull.Value);
+                        cmd.Parameters.AddWithValue("@BranchId", effectiveBranchId > 0 ? (object)effectiveBranchId : DBNull.Value);
 
                         using (SqlDataAdapter da = new SqlDataAdapter(cmd))
                         {
@@ -131,7 +183,32 @@ namespace Repository.ReportRepository
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Error calling SP _VendorPaymentMaster VIEWPAYMENT: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"Error querying vendor payment details direct: {ex.Message}");
+                }
+
+                // Fallback to Stored Procedure STOREDPROCEDURE._VendorPaymentMaster (VIEWPAYMENT) if direct query returned no rows
+                if (dt == null || dt.Rows.Count == 0)
+                {
+                    try
+                    {
+                        using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._VendorPaymentMaster, (SqlConnection)DataConnection))
+                        {
+                            cmd.CommandType = CommandType.StoredProcedure;
+                            cmd.Parameters.AddWithValue("@VendorLedgerId", vendorLedgerId);
+                            cmd.Parameters.AddWithValue("@BillNoUntil", purchaseNo);
+                            cmd.Parameters.AddWithValue("@BranchId", effectiveBranchId);
+                            cmd.Parameters.AddWithValue("@_Operation", "VIEWPAYMENT");
+
+                            using (SqlDataAdapter da = new SqlDataAdapter(cmd))
+                            {
+                                da.Fill(dt);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Error calling SP _VendorPaymentMaster VIEWPAYMENT: {ex.Message}");
+                    }
                 }
 
                 // 2. If no records returned, fetch via Stored Procedure STOREDPROCEDURE._VendorPaymentDetails (Operation: GETBYBILLNO)

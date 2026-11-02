@@ -381,6 +381,29 @@ namespace Repository.Accounts
             return voucher.LedgerId;
         }
 
+        private int GetPayModeLedgerId(int paymentMethodId, SqlTransaction transaction = null)
+        {
+            if (paymentMethodId <= 0) return 0;
+            try
+            {
+                const string query = "SELECT ISNULL(LedgerID, 0) FROM PayMode WHERE PayModeID = @PayModeId";
+                using (SqlCommand paymodeCmd = new SqlCommand(query, (SqlConnection)DataConnection, transaction))
+                {
+                    paymodeCmd.Parameters.AddWithValue("@PayModeId", paymentMethodId);
+                    object result = paymodeCmd.ExecuteScalar();
+                    if (result != null && result != DBNull.Value)
+                    {
+                        return Convert.ToInt32(result);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error fetching LedgerID from PayMode table for vendor payment: {ex.Message}");
+            }
+            return 0;
+        }
+
         private int ResolvePaymentAccountLedgerId(int paymentMethodId, string paymentMethod, int branchId, SqlTransaction transaction = null)
         {
             try
@@ -388,24 +411,9 @@ namespace Repository.Accounts
                 // Resolve the actual Ledger ID for the selected payment mode from the PayMode table or LedgerRepository
                 if (paymentMethodId > 0)
                 {
-                    try
-                    {
-                        using (SqlCommand paymodeCmd = new SqlCommand("SELECT LedgerID FROM PayMode WHERE PayModeID = @PayModeID", (SqlConnection)DataConnection, transaction))
-                        {
-                            paymodeCmd.Parameters.AddWithValue("@PayModeID", paymentMethodId);
-                            object result = paymodeCmd.ExecuteScalar();
-                            if (result != null && result != DBNull.Value)
-                            {
-                                int ledgerId = Convert.ToInt32(result);
-                                if (ledgerId > 0)
-                                    return ledgerId;
-                            }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        System.Diagnostics.Debug.WriteLine($"Error fetching LedgerID from PayMode table for vendor payment: {ex.Message}");
-                    }
+                    int paymodeLedgerId = GetPayModeLedgerId(paymentMethodId, transaction);
+                    if (paymodeLedgerId > 0)
+                        return paymodeLedgerId;
                 }
 
                 var ledgerRepository = new Repository.MasterRepositry.LedgerRepository();
@@ -1755,18 +1763,32 @@ namespace Repository.Accounts
             try
             {
                 if (wasClosed) DataConnection.Open();
-                string query = @"
+
+                var ledgerRepo = new Repository.MasterRepositry.LedgerRepository();
+                int cashLedgerId = ledgerRepo.GetLedgerId(ModelClass.DefaultLedgers.CASH, (int)ModelClass.AccountGroup.CASH_IN_HAND, branchId);
+                if (cashLedgerId <= 0)
+                    cashLedgerId = ledgerRepo.GetLedgerId("CASH", (int)ModelClass.AccountGroup.CASH_IN_HAND, branchId);
+
+                const string query = @"
                     SELECT ISNULL(SUM((ISNULL(lm.OpnDebit, 0) - ISNULL(lm.OpnCredit, 0)) + (ISNULL(v.Debit, 0) - ISNULL(v.Credit, 0))), 0)
                     FROM LedgerMaster lm
-                    LEFT JOIN (SELECT LedgerID, SUM(ISNULL(Debit, 0)) AS Debit, SUM(ISNULL(Credit, 0)) AS Credit FROM Vouchers WHERE (@BranchId = 0 OR BranchID = @BranchId) AND ISNULL(CancelFlag, 0) = 0 GROUP BY LedgerID) v ON lm.LedgerID = v.LedgerID
+                    LEFT JOIN (
+                        SELECT LedgerID, SUM(ISNULL(Debit, 0)) AS Debit, SUM(ISNULL(Credit, 0)) AS Credit 
+                        FROM Vouchers 
+                        WHERE (@BranchId = 0 OR BranchID = @BranchId) AND ISNULL(CancelFlag, 0) = 0 
+                        GROUP BY LedgerID
+                    ) v ON lm.LedgerID = v.LedgerID
                     WHERE (@BranchId = 0 OR lm.BranchID = @BranchId)
-
-                      AND (lm.GroupID = 14
-                           OR UPPER(lm.LedgerName) LIKE '%CASH%');";
+                      AND (lm.GroupID = @CashGroupId 
+                           OR lm.LedgerID = @CashLedgerId
+                           OR UPPER(lm.LedgerName) LIKE @CashPattern);";
 
                 using (SqlCommand cmd = new SqlCommand(query, (SqlConnection)DataConnection))
                 {
                     cmd.Parameters.AddWithValue("@BranchId", branchId);
+                    cmd.Parameters.AddWithValue("@CashGroupId", (int)ModelClass.AccountGroup.CASH_IN_HAND);
+                    cmd.Parameters.AddWithValue("@CashLedgerId", cashLedgerId);
+                    cmd.Parameters.AddWithValue("@CashPattern", "%CASH%");
                     object res = cmd.ExecuteScalar();
                     if (res != null && res != DBNull.Value)
                     {
@@ -1792,7 +1814,8 @@ namespace Repository.Accounts
         public bool IsCashPaymentMethod(int paymentMethodId, string paymentMethodName)
         {
             string name = (paymentMethodName ?? "").Trim();
-            if (name.Equals("Cash", StringComparison.OrdinalIgnoreCase) || name.ToLower().Contains("cash"))
+            if (name.Equals("Cash", StringComparison.OrdinalIgnoreCase) ||
+                name.IndexOf("cash", StringComparison.OrdinalIgnoreCase) >= 0)
                 return true;
 
             if (paymentMethodId <= 0)
@@ -1802,16 +1825,20 @@ namespace Repository.Accounts
             try
             {
                 if (wasClosed) DataConnection.Open();
-                string query = @"
+                const string query = @"
                     SELECT COUNT(1)
                     FROM PayMode pm
                     LEFT JOIN LedgerMaster lm ON pm.LedgerID = lm.LedgerID
                     WHERE pm.PayModeID = @PayModeId
-                      AND (pm.PayModeName LIKE '%CASH%' OR lm.GroupID = 14 OR UPPER(lm.LedgerName) LIKE '%CASH%');";
+                      AND (UPPER(pm.PayModeName) LIKE @CashPattern 
+                           OR lm.GroupID = @CashGroupId 
+                           OR UPPER(lm.LedgerName) LIKE @CashPattern);";
 
                 using (SqlCommand cmd = new SqlCommand(query, (SqlConnection)DataConnection))
                 {
                     cmd.Parameters.AddWithValue("@PayModeId", paymentMethodId);
+                    cmd.Parameters.AddWithValue("@CashGroupId", (int)ModelClass.AccountGroup.CASH_IN_HAND);
+                    cmd.Parameters.AddWithValue("@CashPattern", "%CASH%");
                     int count = Convert.ToInt32(cmd.ExecuteScalar());
                     return count > 0;
                 }
@@ -1829,3 +1856,4 @@ namespace Repository.Accounts
         }
     }
 }
+

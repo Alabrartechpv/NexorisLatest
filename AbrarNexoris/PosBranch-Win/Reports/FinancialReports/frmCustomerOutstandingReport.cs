@@ -184,9 +184,8 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             ultraComboDateMode.Items.Clear();
             ultraComboDateMode.Items.Add("ALL", "ALL");
-            ultraComboDateMode.Items.Add("DOC_DATE", "Doc. Date by Range");
-            ultraComboDateMode.Items.Add("INV_DATE", "Inv. Date by Range");
-            ultraComboDateMode.Items.Add("POST_DATE", "Post. Date by Range");
+            ultraComboDateMode.Items.Add("DOC_DATE", "Sales Date by Range");
+            ultraComboDateMode.Items.Add("INV_DATE", "Invoice Date by Range");
             ultraComboDateMode.Value = "ALL";
 
             chkPaymentDueOnly.Checked = false;
@@ -548,10 +547,10 @@ namespace PosBranch_Win.Reports.FinancialReports
                     (!string.IsNullOrWhiteSpace(x.SalesPerson) && x.SalesPerson.IndexOf(customerSearchText, StringComparison.OrdinalIgnoreCase) >= 0));
             }
 
-            // Positive balance / payment due filter
+            // Positive balance / hide fully paid filter
             if (chkPaymentDueOnly.Checked)
             {
-                filteredRows = filteredRows.Where(x => x.Balance > 0);
+                filteredRows = filteredRows.Where(x => x.Balance != 0);
             }
 
             List<CustomerOutstandingReportRow> boundRows = filteredRows
@@ -657,11 +656,12 @@ namespace PosBranch_Win.Reports.FinancialReports
                 ConfigureColumn(band, "LedgerName", "Customer Name", 200, HAlign.Left, visiblePosition: 1);
                 ConfigureColumn(band, "SalesPerson", "Salesperson", 140, HAlign.Left, visiblePosition: 2);
                 ConfigureColumn(band, "BillNo", "Bill No", 80, HAlign.Center, visiblePosition: 3);
-                ConfigureColumn(band, "BillDate", "Date", 90, HAlign.Center, "{date}", "dd/MM/yyyy", visiblePosition: 4);
+                ConfigureColumn(band, "BillDate", "Sales Date", 90, HAlign.Center, "{date}", "dd/MM/yyyy", visiblePosition: 4);
                 ConfigureColumn(band, "DueDate", "Due Date", 90, HAlign.Center, "{date}", "dd/MM/yyyy", visiblePosition: 5);
-                ConfigureColumn(band, "InvoiceAmount", "Invoice Amount", 120, HAlign.Right, "{currency}", "#,##0.00", visiblePosition: 6);
-                ConfigureColumn(band, "ReceivedAmount", "Received Amount", 120, HAlign.Right, "{currency}", "#,##0.00", visiblePosition: 7);
-                ConfigureColumn(band, "Balance", "Balance", 120, HAlign.Right, "{currency}", "#,##0.00", visiblePosition: 8);
+                ConfigureColumn(band, "ReceiptDate", "Receipt Date", 95, HAlign.Center, "{date}", "dd/MM/yyyy", visiblePosition: 6);
+                ConfigureColumn(band, "InvoiceAmount", "Invoice Amount", 120, HAlign.Right, "{currency}", "#,##0.00", visiblePosition: 7);
+                ConfigureColumn(band, "ReceivedAmount", "Received Amount", 120, HAlign.Right, "{currency}", "#,##0.00", visiblePosition: 8);
+                ConfigureColumn(band, "Balance", "Balance", 120, HAlign.Right, "{currency}", "#,##0.00", visiblePosition: 9);
 
                 SetDefaultAggregation("InvoiceAmount", "Sum");
                 SetDefaultAggregation("ReceivedAmount", "Sum");
@@ -1207,7 +1207,7 @@ namespace PosBranch_Win.Reports.FinancialReports
         private void filter_CheckedChanged(object sender, EventArgs e)
         {
             if (_isLoading) return;
-            UpdateDateControlState();
+            ApplyClientFilters();
         }
 
         private void ultraComboCustomer_ValueChanged(object sender, EventArgs e)
@@ -1349,10 +1349,10 @@ namespace PosBranch_Win.Reports.FinancialReports
             dtFrom.Visible = dateRange;
             dtTo.Visible = dateRange;
 
-            ultraLabel1.Visible = paymentDue;
-            ultraLabel2.Visible = paymentDue;
-            ultraDateTimeEditor1.Visible = paymentDue;
-            ultraDateTimeEditor2.Visible = paymentDue;
+            ultraLabel1.Visible = false;
+            ultraLabel2.Visible = false;
+            ultraDateTimeEditor1.Visible = false;
+            ultraDateTimeEditor2.Visible = false;
         }
 
         private void OpenCustomerDialog()
@@ -1577,7 +1577,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                 ? $"{Convert.ToDateTime(dtFrom.Value):dd-MMM-yyyy} to {Convert.ToDateTime(dtTo.Value):dd-MMM-yyyy}"
                 : "All dates";
 
-            return $"Customer: {(string.IsNullOrWhiteSpace(custMode) ? "ALL" : custMode)}    |    Date: {dateText}    |    Payment Due Only: {(chkPaymentDueOnly.Checked ? "Yes" : "No")}";
+            return $"Customer: {(string.IsNullOrWhiteSpace(custMode) ? "ALL" : custMode)}    |    Date: {dateText}    |    Hide Fully Paid: {(chkPaymentDueOnly.Checked ? "Yes" : "No")}";
         }
 
         private void ExportCsv()
@@ -1601,7 +1601,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                     StringBuilder sb = new StringBuilder();
                     if (ReportPdfExporter.CheckAndExportPdf(dialog, gridReport, "Customer Outstanding Report")) return;
 
-                    sb.AppendLine("Cust ID,Customer Name,Salesperson,Bill No,Date,Due Date,Invoice Amount,Received Amount,Balance");
+                    sb.AppendLine("Cust ID,Customer Name,Salesperson,Bill No,Sales Date,Due Date,Receipt Date,Invoice Amount,Received Amount,Balance");
 
                     foreach (var row in rows)
                     {
@@ -1612,6 +1612,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                             EscapeCsv(row.BillNo.ToString()),
                             EscapeCsv(row.BillDate.HasValue ? row.BillDate.Value.ToString("dd/MM/yyyy") : ""),
                             EscapeCsv(row.DueDate.HasValue ? row.DueDate.Value.ToString("dd/MM/yyyy") : ""),
+                            EscapeCsv(row.ReceiptDate.HasValue ? row.ReceiptDate.Value.ToString("dd/MM/yyyy") : ""),
                             row.InvoiceAmount.ToString("F2"),
                             row.ReceivedAmount.ToString("F2"),
                             row.Balance.ToString("F2")));

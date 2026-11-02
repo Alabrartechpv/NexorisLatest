@@ -20,6 +20,7 @@ namespace ModelClass.Report
             get { return _paidAmount ?? Math.Max(0m, DocAmt - Balance); }
             set { _paidAmount = value; }
         }
+        public DateTime? PaymentDate { get; set; }
         public decimal Balance { get; set; }
         public int IsPR { get; set; }
 
