@@ -42,6 +42,39 @@ namespace Repository.ReportRepository
                         DataTable table = new DataTable();
                         adapter.Fill(table);
 
+                        var lastReceiptDates = new Dictionary<long, DateTime>();
+                        try
+                        {
+                            const string rcptDateQuery = @"
+                                SELECT CRD.BillNo, MAX(CRM.ReceiptDate) AS LastReceiptDate
+                                FROM CustomerReceiptDetails CRD
+                                INNER JOIN CustomerReceiptMaster CRM ON CRM.ReceiptId = CRD.ReceiptMasterId
+                                WHERE (CRD.CancelFlag = 0 OR CRD.CancelFlag IS NULL)
+                                  AND (CRM.CancelFlag = 0 OR CRM.CancelFlag IS NULL)
+                                  AND (@BranchId IS NULL OR @BranchId = 0 OR CRD.BranchId = @BranchId)
+                                GROUP BY CRD.BillNo";
+
+                            using (SqlCommand rcptCmd = new SqlCommand(rcptDateQuery, (SqlConnection)DataConnection))
+                            {
+                                rcptCmd.Parameters.Add("@BranchId", SqlDbType.Int).Value = branchId > 0 ? (object)branchId : DBNull.Value;
+                                using (SqlDataReader rdr = rcptCmd.ExecuteReader())
+                                {
+                                    while (rdr.Read())
+                                    {
+                                        if (long.TryParse(rdr["BillNo"]?.ToString(), out long bNo))
+                                        {
+                                            DateTime rDate = Convert.ToDateTime(rdr["LastReceiptDate"]);
+                                            lastReceiptDates[bNo] = rDate;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            System.Diagnostics.Debug.WriteLine($"Error fetching last receipt dates: {ex.Message}");
+                        }
+
                         foreach (DataRow row in table.Rows)
                         {
                             long billNo = ToLong(row, "BillNo");
@@ -77,6 +110,7 @@ namespace Repository.ReportRepository
                                 DocNo = docNo,
                                 BillDate = ToNullableDateTime(row, "BillDate"),
                                 DueDate = ToNullableDateTime(row, "DueDate"),
+                                ReceiptDate = lastReceiptDates.TryGetValue(billNo, out DateTime rDate) ? (DateTime?)rDate : null,
                                 InvoiceAmount = ToDecimal(row, "InvoiceAmount"),
                                 ReceivedAmount = ToDecimal(row, "ReceivedAmount"),
                                 Balance = ToDecimal(row, "Balance"),

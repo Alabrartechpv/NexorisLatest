@@ -59,6 +59,8 @@ namespace PosBranch_Win.Reports.FinancialReports
             btnClearFilters.Click += btnClearFilters_Click;
             btnExport.Click += btnExport_Click;
             comboBox1.ValueChanged += comboBox1_ValueChanged;
+            dtFrom.ValueChanged += DateEditor_ValueChanged;
+            dtTo.ValueChanged += DateEditor_ValueChanged;
             ultraComboPreset.ValueChanged += ultraComboPreset_ValueChanged;
             txtSearch.TextChanged += txtSearch_TextChanged;
             txtSearch.KeyDown += txtSearch_KeyDown;
@@ -110,7 +112,7 @@ namespace PosBranch_Win.Reports.FinancialReports
         private void InitializeDateControls()
         {
             DateTime today = DateTime.Today;
-            dtFrom.Value = new DateTime(2000, 1, 1);
+            dtFrom.Value = new DateTime(today.Year, today.Month, 1);
             dtTo.Value = today;
 
             dtFrom.MaskInput = "{date}";
@@ -143,15 +145,16 @@ namespace PosBranch_Win.Reports.FinancialReports
         private void ApplyQuickDateSelection()
         {
             string preset = Convert.ToString(comboBox1.Value);
+            bool isAll = string.IsNullOrWhiteSpace(preset) || string.Equals(preset, "ALL", StringComparison.OrdinalIgnoreCase);
             bool isRange = string.Equals(preset, "ByRange", StringComparison.OrdinalIgnoreCase);
             DateTime today = DateTime.Today;
-            DateTime fromDate = Convert.ToDateTime(dtFrom.Value).Date;
-            DateTime toDate = Convert.ToDateTime(dtTo.Value).Date;
+            DateTime fromDate = new DateTime(today.Year, today.Month, 1);
+            DateTime toDate = today;
 
             switch (preset)
             {
                 case "ALL":
-                    fromDate = new DateTime(2000, 1, 1);
+                    fromDate = new DateTime(today.Year, today.Month, 1);
                     toDate = today;
                     break;
                 case "Today":
@@ -178,10 +181,18 @@ namespace PosBranch_Win.Reports.FinancialReports
                     break;
             }
 
-            if (!isRange)
+            if (!isRange && !isAll)
             {
-                dtFrom.Value = fromDate;
-                dtTo.Value = toDate;
+                _isLoading = true;
+                try
+                {
+                    dtFrom.Value = fromDate;
+                    dtTo.Value = toDate;
+                }
+                finally
+                {
+                    _isLoading = false;
+                }
             }
 
             UpdateDateControlState();
@@ -189,16 +200,36 @@ namespace PosBranch_Win.Reports.FinancialReports
 
         private void UpdateDateControlState()
         {
-            string preset = Convert.ToString(comboBox1.Value);
-            bool isRange = string.Equals(preset, "ByRange", StringComparison.OrdinalIgnoreCase);
-
             lblFromDate.Visible = true;
             dtFrom.Visible = true;
-            dtFrom.Enabled = isRange;
+            dtFrom.Enabled = true;
 
             lblToDate.Visible = true;
             dtTo.Visible = true;
-            dtTo.Enabled = isRange;
+            dtTo.Enabled = true;
+        }
+
+        private void DateEditor_ValueChanged(object sender, EventArgs e)
+        {
+            if (_isLoading) return;
+            string preset = Convert.ToString(comboBox1.Value);
+            if (!string.Equals(preset, "ByRange", StringComparison.OrdinalIgnoreCase))
+            {
+                _isLoading = true;
+                try
+                {
+                    comboBox1.Value = "ByRange";
+                }
+                finally
+                {
+                    _isLoading = false;
+                }
+            }
+
+            if (_reportRows != null && _reportRows.Count > 0)
+            {
+                LoadReport();
+            }
         }
 
         private void InitializePanels()
@@ -546,7 +577,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             {
                 DateTime today = DateTime.Today;
                 comboBox1.Value = "ALL";
-                dtFrom.Value = new DateTime(2000, 1, 1);
+                dtFrom.Value = new DateTime(today.Year, today.Month, 1);
                 dtTo.Value = today;
                 ultraComboPreset.Value = "ALL";
                 ultraComboVendor.Value = 0;
@@ -572,6 +603,13 @@ namespace PosBranch_Win.Reports.FinancialReports
             string preset = Convert.ToString(comboBox1.Value);
             if (string.IsNullOrWhiteSpace(preset) || string.Equals(preset, "ALL", StringComparison.OrdinalIgnoreCase))
                 return true;
+
+            if (dtFrom.Value == null || dtTo.Value == null)
+            {
+                MessageBox.Show("Please enter valid From and To dates.", "Validation",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return false;
+            }
 
             DateTime fromDate = Convert.ToDateTime(dtFrom.Value).Date;
             DateTime toDate = Convert.ToDateTime(dtTo.Value).Date;
@@ -707,6 +745,11 @@ namespace PosBranch_Win.Reports.FinancialReports
                 return;
 
             ApplyQuickDateSelection();
+
+            if (_reportRows != null && _reportRows.Count > 0)
+            {
+                LoadReport();
+            }
         }
 
         private void txtSearch_TextChanged(object sender, EventArgs e)

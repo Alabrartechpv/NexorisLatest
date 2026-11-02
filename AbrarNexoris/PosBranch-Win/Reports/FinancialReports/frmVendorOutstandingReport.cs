@@ -232,9 +232,8 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             ultraComboDateMode.Items.Clear();
             ultraComboDateMode.Items.Add("ALL", "ALL");
-            ultraComboDateMode.Items.Add("DOC_DATE", "Doc. Date by Range");
-            ultraComboDateMode.Items.Add("INV_DATE", "Inv. Date by Range");
-            ultraComboDateMode.Items.Add("POST_DATE", "Post. Date by Range");
+            ultraComboDateMode.Items.Add("DOC_DATE", "Purchase Date by Range");
+            ultraComboDateMode.Items.Add("INV_DATE", "Invoice Date by Range");
             ultraComboDateMode.Value = "ALL";
 
             chkPaymentDueOnly.Checked = false;
@@ -1326,9 +1325,6 @@ namespace PosBranch_Win.Reports.FinancialReports
             if (!ValidateDateRange())
                 return;
 
-            if (chkPaymentDueOnly.Checked && !ValidatePaymentDueDateRange())
-                return;
-
             Cursor previousCursor = Cursor;
             Cursor = Cursors.WaitCursor;
 
@@ -1340,9 +1336,9 @@ namespace PosBranch_Win.Reports.FinancialReports
                     GetUnallocatedReturnsOnly = _getUnallocatedReturnsOnly,
                     FromDate = dtFrom.Value == null ? DateTime.MinValue : Convert.ToDateTime(dtFrom.Value).Date,
                     ToDate = dtTo.Value == null ? DateTime.MaxValue : Convert.ToDateTime(dtTo.Value).Date,
-                    DateFilterMode = chkPaymentDueOnly.Checked ? "DOC_DATE" : Convert.ToString(ultraComboDateMode.Value),
-                    UseDateFilter = chkPaymentDueOnly.Checked || IsDateRangeMode(),
-                    PaymentDueOnly = chkPaymentDueOnly.Checked,
+                    DateFilterMode = Convert.ToString(ultraComboDateMode.Value),
+                    UseDateFilter = IsDateRangeMode(),
+                    PaymentDueOnly = false,
                     LedgerId = GetSelectedLedgerId(),
                     FromLedgerId = GetLedgerId(ultraComboVendorFrom),
                     ToLedgerId = GetLedgerId(ultraComboVendorTo)
@@ -1411,7 +1407,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                     x.AcctCode.ToString().IndexOf(searchText, StringComparison.OrdinalIgnoreCase) >= 0);
             }
 
-            if (!_getUnallocatedReturnsOnly)
+            if (chkPaymentDueOnly.Checked)
             {
                 filteredRows = filteredRows.Where(x => x.Balance != 0);
             }
@@ -1432,26 +1428,6 @@ namespace PosBranch_Win.Reports.FinancialReports
 
         private bool ValidatePaymentDueDateRange()
         {
-            if (!chkPaymentDueOnly.Checked) return true;
-
-            if (ultraDateTimeEditor1.Value == null || ultraDateTimeEditor2.Value == null)
-            {
-                MessageBox.Show("Please select both Payment Due From and To dates.", "Validation",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return false;
-            }
-
-            DateTime fromDate = Convert.ToDateTime(ultraDateTimeEditor1.Value).Date;
-            DateTime toDate = Convert.ToDateTime(ultraDateTimeEditor2.Value).Date;
-
-            if (fromDate > toDate)
-            {
-                MessageBox.Show("Payment Due From date cannot be greater than To date.", "Validation",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                ultraDateTimeEditor1.Focus();
-                return false;
-            }
-
             return true;
         }
 
@@ -1540,11 +1516,11 @@ namespace PosBranch_Win.Reports.FinancialReports
                 if (ReportPdfExporter.CheckAndExportPdf(dialog, gridReport, "Vendor Outstanding Report")) return;
                 StringBuilder builder = new StringBuilder();
                 string docNoHeader = _getUnallocatedReturnsOnly ? "Return No" : "Doc No";
-                string dateHeader = _getUnallocatedReturnsOnly ? "Return Date" : "Date";
+                string dateHeader = _getUnallocatedReturnsOnly ? "Return Date" : "Purchase Date";
                 string docAmtHeader = _getUnallocatedReturnsOnly ? "Return Amt" : "Doc Amt";
                 string paidAmtHeader = _getUnallocatedReturnsOnly ? "Adjusted Amt" : "Paid Amt";
                 string balanceHeader = _getUnallocatedReturnsOnly ? "Unallocated Amt" : "Balance";
-                builder.AppendLine($"AcctCode,Company,Name,Phone,{docNoHeader},{dateHeader},Reference,Invoice Date,Post Date,{docAmtHeader},{paidAmtHeader},{balanceHeader}");
+                builder.AppendLine($"AcctCode,Company,Name,Phone,{docNoHeader},{dateHeader},Reference,Invoice Date,Payment Date,{docAmtHeader},{paidAmtHeader},{balanceHeader}");
 
                 var visibleRows = GetVisibleDataRows().Select(r => r.ListObject as VendorOutstandingReportRow).Where(r => r != null).ToList();
                 foreach (VendorOutstandingReportRow row in visibleRows)
@@ -1558,7 +1534,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                         EscapeCsv(row.Date == DateTime.MinValue ? string.Empty : row.Date.ToString("yyyy-MM-dd")),
                         EscapeCsv(row.Reference),
                         EscapeCsv(row.InvoiceDate.HasValue ? row.InvoiceDate.Value.ToString("yyyy-MM-dd") : string.Empty),
-                        EscapeCsv(row.PostDate.HasValue ? row.PostDate.Value.ToString("yyyy-MM-dd") : string.Empty),
+                        EscapeCsv(row.PaymentDate.HasValue ? row.PaymentDate.Value.ToString("yyyy-MM-dd") : string.Empty),
                         row.DocAmt.ToString("F2"),
                         row.PaidAmount.ToString("F2"),
                         row.Balance.ToString("F2")));
@@ -1642,10 +1618,15 @@ namespace PosBranch_Win.Reports.FinancialReports
             ConfigureGridColumn(band, "Name", "Name", 170, null, HAlign.Left, 2);
             ConfigureGridColumn(band, "Phone", "Phone", 120, null, HAlign.Left, 3);
             ConfigureGridColumn(band, "DocNo", _getUnallocatedReturnsOnly ? "Return No" : "Doc No", 102, null, HAlign.Left, 4);
-            ConfigureGridColumn(band, "Date", _getUnallocatedReturnsOnly ? "Return Date" : "Date", 105, "dd-MMM-yyyy", HAlign.Left, 5);
+            ConfigureGridColumn(band, "Date", _getUnallocatedReturnsOnly ? "Return Date" : "Purchase Date", 105, "dd-MMM-yyyy", HAlign.Left, 5);
             ConfigureGridColumn(band, "Reference", "Reference", 128, null, HAlign.Left, 6);
             ConfigureGridColumn(band, "InvoiceDate", "Invoice Date", 105, "dd-MMM-yyyy", HAlign.Left, 7);
-            ConfigureGridColumn(band, "PostDate", "Post Date", 105, "dd-MMM-yyyy", HAlign.Left, 8);
+            if (band.Columns.Exists("PostDate"))
+            {
+                band.Columns["PostDate"].Hidden = true;
+                band.Columns["PostDate"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
+            }
+            ConfigureGridColumn(band, "PaymentDate", "Payment Date", 105, "dd-MMM-yyyy", HAlign.Left, 8);
             ConfigureGridColumn(band, "DocAmt", _getUnallocatedReturnsOnly ? "Return Amt" : "Doc Amt", 95, "#,##0.00", HAlign.Right, 9);
             ConfigureGridColumn(band, "PaidAmount", _getUnallocatedReturnsOnly ? "Adjusted Amt" : "Paid Amt", 95, "#,##0.00", HAlign.Right, 10);
             ConfigureGridColumn(band, "Balance", _getUnallocatedReturnsOnly ? "Unallocated Amt" : "Balance", 95, "#,##0.00", HAlign.Right, 11);
@@ -1904,12 +1885,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             if (_isLoading)
                 return;
 
-            UpdateDateControlState();
-
-            if (chkPaymentDueOnly.Checked)
-            {
-                ValidatePaymentDueDateRange();
-            }
+            ApplyClientFilters();
         }
 
         private void frmVendorOutstandingReport_KeyDown(object sender, KeyEventArgs e)
@@ -1957,7 +1933,6 @@ namespace PosBranch_Win.Reports.FinancialReports
         private void UpdateDateControlState()
         {
             bool dateRange = IsDateRangeMode();
-            bool paymentDue = chkPaymentDueOnly.Checked;
             dtFrom.Enabled = dateRange;
             dtTo.Enabled = dateRange;
             lblFromDate.Visible = true;
@@ -1965,10 +1940,10 @@ namespace PosBranch_Win.Reports.FinancialReports
             dtFrom.Visible = true;
             dtTo.Visible = true;
            
-            ultraLabel1.Visible = paymentDue;
-            ultraLabel2.Visible = paymentDue;
-            ultraDateTimeEditor1.Visible = paymentDue;
-            ultraDateTimeEditor2.Visible = paymentDue;
+            ultraLabel1.Visible = false;
+            ultraLabel2.Visible = false;
+            ultraDateTimeEditor1.Visible = false;
+            ultraDateTimeEditor2.Visible = false;
         }
 
         private void UpdateVendorControlState()
@@ -2126,28 +2101,15 @@ namespace PosBranch_Win.Reports.FinancialReports
         {
             string vendorMode = Convert.ToString(ultraComboVendorMode.Value);
             string dateMode = Convert.ToString(ultraComboDateMode.Value);
-            string dateText;
+            string dateText = IsDateRangeMode()
+                ? string.Format("{0:dd-MMM-yyyy} to {1:dd-MMM-yyyy}", Convert.ToDateTime(dtFrom.Value), Convert.ToDateTime(dtTo.Value))
+                : "All dates";
 
-            if (chkPaymentDueOnly.Checked)
-            {
-                dateText = string.Format("{0:dd-MMM-yyyy} to {1:dd-MMM-yyyy}", 
-                    Convert.ToDateTime(ultraDateTimeEditor1.Value), 
-                    Convert.ToDateTime(ultraDateTimeEditor2.Value));
-            }
-            else
-            {
-                dateText = IsDateRangeMode()
-                    ? string.Format("{0:dd-MMM-yyyy} to {1:dd-MMM-yyyy}", Convert.ToDateTime(dtFrom.Value), Convert.ToDateTime(dtTo.Value))
-                    : "All dates";
-            }
-
-            return string.Format("Vendor: {0}    |    Date: {1}    |    Payment Due Only: {2}",
+            return string.Format("Vendor: {0}    |    Date: {1}    |    Hide Fully Paid: {2}",
                 string.IsNullOrWhiteSpace(vendorMode) ? "All" : vendorMode,
-                chkPaymentDueOnly.Checked 
-                    ? dateText 
-                    : (string.IsNullOrWhiteSpace(dateMode) || string.Equals(dateMode, "ALL", StringComparison.OrdinalIgnoreCase)
-                        ? dateText
-                        : string.Format("{0} ({1})", dateText, dateMode)),
+                (string.IsNullOrWhiteSpace(dateMode) || string.Equals(dateMode, "ALL", StringComparison.OrdinalIgnoreCase)
+                    ? dateText
+                    : string.Format("{0} ({1})", dateText, dateMode)),
                 chkPaymentDueOnly.Checked ? "Yes" : "No");
         }
 

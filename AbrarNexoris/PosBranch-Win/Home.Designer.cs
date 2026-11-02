@@ -78,6 +78,7 @@ namespace PosBranch_Win
             Infragistics.Win.UltraWinToolbars.RibbonGroup ribbonGroup16 = new Infragistics.Win.UltraWinToolbars.RibbonGroup("Dashboard");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolOverviewInstance = new Infragistics.Win.UltraWinToolbars.ButtonTool("Overview");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolBusinessSummaryHome = new Infragistics.Win.UltraWinToolbars.ButtonTool("BusinessSummary");
+            Infragistics.Win.UltraWinToolbars.RibbonGroup ribbonGroupExecDashboard = new Infragistics.Win.UltraWinToolbars.RibbonGroup("ribbonGroupExecDashboard");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolExecutiveDashboardHome = new Infragistics.Win.UltraWinToolbars.ButtonTool("ExecutiveDashboard");
             Infragistics.Win.UltraWinToolbars.RibbonTab ribbonTab2 = new Infragistics.Win.UltraWinToolbars.RibbonTab("ribbonGeneralSetup");
             Infragistics.Win.UltraWinToolbars.RibbonGroup ribbonGroup17 = new Infragistics.Win.UltraWinToolbars.RibbonGroup("CompanyProfile");
@@ -623,11 +624,13 @@ namespace PosBranch_Win
             buttonToolOverviewInstance.InstanceProps.MinimumSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
             buttonToolOverviewInstance.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
             buttonToolBusinessSummaryHome.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
-            buttonToolExecutiveDashboardHome.InstanceProps.MinimumSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
-            buttonToolExecutiveDashboardHome.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
             ribbonGroup16.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
             buttonToolOverviewInstance,
-            buttonToolBusinessSummaryHome,
+            buttonToolBusinessSummaryHome});
+            ribbonGroupExecDashboard.Caption = "Dashboard";
+            buttonToolExecutiveDashboardHome.InstanceProps.MinimumSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
+            buttonToolExecutiveDashboardHome.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
+            ribbonGroupExecDashboard.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
             buttonToolExecutiveDashboardHome});
             ribbonTab1.Groups.AddRange(new Infragistics.Win.UltraWinToolbars.RibbonGroup[] {
             ribbonGroup1,
@@ -636,16 +639,16 @@ namespace PosBranch_Win
             ribbonGroup4,
             ribbonGroup5,
             ribbonGroup6,
+            ribbonGroup13,
             ribbonGroup7,
             ribbonGroup8,
             ribbonGroup9,
             ribbonGroup10,
             ribbonGroup11,
             ribbonGroup12,
-            ribbonGroup13,
             ribbonGroup14,
             ribbonGroup15,
-            ribbonGroup16});
+            ribbonGroupExecDashboard});
             ribbonTab2.Caption = "General Setup";
             ribbonGroup17.Caption = "Company Profile";
             buttonToolGSCompany.InstanceProps.MinimumSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
@@ -927,6 +930,7 @@ namespace PosBranch_Win
             ribbonGroup44.Tools.AddRange(new Infragistics.Win.UltraWinToolbars.ToolBase[] {
             buttonToolDatabaseInstance});
             ribbonTab7.Groups.AddRange(new Infragistics.Win.UltraWinToolbars.RibbonGroup[] {
+            ribbonGroup16,
             ribbonGroup41,
             ribbonGroup42,
             ribbonGroup43,
