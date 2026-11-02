@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -17,6 +17,7 @@ namespace ModelClass
         public string Counter { get; set; }
         public long CounterSessionId { get; set; }
         public int UserId { get; set; }
+        public string UserName { get; set; }
         public DateTime TransactionDate { get; set; }
         public string ReportSelection { get; set; }
         public string DocNo { get; set; }

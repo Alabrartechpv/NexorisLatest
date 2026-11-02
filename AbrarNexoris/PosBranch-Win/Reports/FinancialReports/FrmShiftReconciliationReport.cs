@@ -132,7 +132,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             lblPreset.Location = new Point(12, 52);
             ultraComboPreset.Location = new Point(86, 49);
 
-            txtCounterFilter.NullText = "Search Counter...";
+            txtCounterFilter.NullText = "Search Counter or Cashier...";
         }
 
         private void InitializePanels()
@@ -455,7 +455,10 @@ namespace PosBranch_Win.Reports.FinancialReports
             string counterText = txtCounterFilter.Text.Trim();
             if (!string.IsNullOrWhiteSpace(counterText))
             {
-                filtered = filtered.Where(x => x.Counter != null && x.Counter.IndexOf(counterText, StringComparison.OrdinalIgnoreCase) >= 0);
+                filtered = filtered.Where(x => 
+                    (x.Counter != null && x.Counter.IndexOf(counterText, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                    (x.UserName != null && x.UserName.IndexOf(counterText, StringComparison.OrdinalIgnoreCase) >= 0)
+                );
             }
 
             List<ClosingModel> boundRows = filtered.OrderByDescending(x => x.TransactionDate).ToList();
@@ -567,7 +570,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             if (rows == null) return;
 
             StringBuilder builder = new StringBuilder();
-            builder.AppendLine("Closing Date,Counter,Gross Sales,Returns,Net Sales,Expected Cash,Physical Cash,Difference,Status");
+            builder.AppendLine("Closing Date,Counter,Closed By,Gross Sales,Returns,Net Sales,Expected Cash,Physical Cash,Difference,Status");
 
             foreach (UltraGridRow gridRow in gridReport.Rows.GetFilteredInNonGroupByRows())
             if (gridRow != null && gridRow.IsDataRow && !gridRow.Hidden && gridRow.ListObject is ClosingModel row)
@@ -575,6 +578,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                 builder.AppendLine(string.Join(",",
                     EscapeCsv(row.TransactionDate.ToString("yyyy-MM-dd HH:mm:ss")),
                     EscapeCsv(row.Counter),
+                    EscapeCsv(row.UserName),
                     row.TotalGrossSales.ToString("F2"),
                     row.TotalReturn.ToString("F2"),
                     row.NetSales.ToString("F2"),
@@ -658,7 +662,8 @@ namespace PosBranch_Win.Reports.FinancialReports
                         ev.Graphics.DrawString($"Status: {selectedModel.Status}", dataFont, Brushes.Black, margin + colWidth, y);
                         y += 18;
 
-                        ev.Graphics.DrawString($"Type: {selectedModel.ReportSelection}", dataFont, Brushes.Black, margin, y);
+                        ev.Graphics.DrawString($"Closed By: {selectedModel.UserName}", dataFont, Brushes.Black, margin, y);
+                        ev.Graphics.DrawString($"Type: {selectedModel.ReportSelection}", dataFont, Brushes.Black, margin + colWidth, y);
                         y += 15;
 
                         ev.Graphics.DrawLine(Pens.Gray, margin, y, width + margin, y);
@@ -815,7 +820,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             }
         }
 
-        private void ConfigureGridColumn(UltraGridBand band, string key, string header, int width, string format, HAlign align)
+        private void ConfigureGridColumn(UltraGridBand band, string key, string header, int width, string format, HAlign align, int? visiblePosition = null)
         {
             if (!band.Columns.Exists(key))
                 return;
@@ -825,6 +830,11 @@ namespace PosBranch_Win.Reports.FinancialReports
             column.Header.Caption = header;
             column.Width = width;
             column.CellAppearance.TextHAlign = align;
+
+            if (visiblePosition.HasValue)
+            {
+                column.Header.VisiblePosition = visiblePosition.Value;
+            }
 
             if (!string.IsNullOrWhiteSpace(format))
             {
@@ -948,15 +958,18 @@ namespace PosBranch_Win.Reports.FinancialReports
                 column.Hidden = true;
             }
 
-            ConfigureGridColumn(band, "TransactionDate", "Closing Date & Time", 150, "dd-MMM-yyyy hh:mm tt", HAlign.Left);
-            ConfigureGridColumn(band, "Counter", "Counter Name", 120, null, HAlign.Left);
-            ConfigureGridColumn(band, "TotalGrossSales", "Gross Sales", 110, "#,##0.00", HAlign.Right);
-            ConfigureGridColumn(band, "TotalReturn", "Returns", 100, "#,##0.00", HAlign.Right);
-            ConfigureGridColumn(band, "NetSales", "Net Sales", 110, "#,##0.00", HAlign.Right);
-            ConfigureGridColumn(band, "SystemExpectedCash", "Expected Cash", 115, "#,##0.00", HAlign.Right);
-            ConfigureGridColumn(band, "PhysicalCashCounted", "Counted Cash", 115, "#,##0.00", HAlign.Right);
-            ConfigureGridColumn(band, "CashDifference", "Cash Variance", 115, "#,##0.00", HAlign.Right);
-            ConfigureGridColumn(band, "Status", "Status", 90, null, HAlign.Center);
+            int pos = 0;
+            ConfigureGridColumn(band, "Counter", "Counter Name", 120, null, HAlign.Left, pos++);
+            ConfigureGridColumn(band, "UserName", "Closed By", 110, null, HAlign.Left, pos++);
+            ConfigureGridColumn(band, "TransactionDate", "Closing Date & Time", 150, "dd-MMM-yyyy hh:mm tt", HAlign.Left, pos++);
+
+            ConfigureGridColumn(band, "TotalGrossSales", "Gross Sales", 110, "#,##0.00", HAlign.Right, pos++);
+            ConfigureGridColumn(band, "TotalReturn", "Returns", 100, "#,##0.00", HAlign.Right, pos++);
+            ConfigureGridColumn(band, "NetSales", "Net Sales", 110, "#,##0.00", HAlign.Right, pos++);
+            ConfigureGridColumn(band, "SystemExpectedCash", "Expected Cash", 115, "#,##0.00", HAlign.Right, pos++);
+            ConfigureGridColumn(band, "PhysicalCashCounted", "Counted Cash", 115, "#,##0.00", HAlign.Right, pos++);
+            ConfigureGridColumn(band, "CashDifference", "Cash Variance", 115, "#,##0.00", HAlign.Right, pos++);
+            ConfigureGridColumn(band, "Status", "Status", 90, null, HAlign.Center, pos++);
 
             band.Columns["NetSales"].CellAppearance.ForeColor = Color.FromArgb(13, 71, 161);
             band.Columns["PhysicalCashCounted"].CellAppearance.ForeColor = Color.FromArgb(27, 94, 32);

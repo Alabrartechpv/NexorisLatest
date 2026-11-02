@@ -264,6 +264,8 @@ namespace PosBranch_Win.Settings
             dgvPermissions.CellFormatting += DgvPermissions_CellFormatting;
             dgvPermissions.CurrentCellDirtyStateChanged += DgvPermissions_CurrentCellDirtyStateChanged;
             dgvPermissions.CellValueChanged += DgvPermissions_CellValueChanged;
+            dgvPermissions.CellBeginEdit += DgvPermissions_CellBeginEdit;
+            dgvPermissions.CellContentClick += DgvPermissions_CellContentClick;
         }
 
         /// <summary>
@@ -293,7 +295,7 @@ namespace PosBranch_Win.Settings
             if (roleId > 0)
             {
                 _selectedRoleId = roleId;
-                LoadPermissionsForRole(roleId);
+                string selRoleName = (cmbRoles.SelectedItem is Role rSel) ? rSel.RoleName : cmbRoles.Text?.Trim(); LoadPermissionsForRole(roleId, selRoleName);
             }
         }
 
@@ -301,11 +303,11 @@ namespace PosBranch_Win.Settings
         /// Loads permissions for the selected role
         /// </summary>
         /// <param name="roleId">Role ID to load permissions for</param>
-        private void LoadPermissionsForRole(int roleId)
+        private void LoadPermissionsForRole(int roleId, string roleName = null)
         {
             try
             {
-                _currentPermissions = _permRepo.GetFormsWithPermissions(roleId);
+                string resolvedRoleName = !string.IsNullOrWhiteSpace(roleName) ? roleName.Trim() : ((cmbRoles.SelectedItem is Role rRole) ? rRole.RoleName?.Trim() : cmbRoles.Text?.Trim()); _currentPermissions = _permRepo.GetFormsWithPermissions(roleId, resolvedRoleName);
                 LoadCategoryFilter();
                 ApplyFilter();
             }
@@ -380,6 +382,73 @@ namespace PosBranch_Win.Settings
             if (row.DataBoundItem is FormPermissionGrid item)
             {
                 bool isGranted = item.CanView || item.CanAdd || item.CanEdit || item.CanDelete;
+                if (isGranted && item.CanView)
+                {
+                    row.DefaultCellStyle.BackColor = Color.FromArgb(238, 252, 238);
+                    row.DefaultCellStyle.ForeColor = Color.FromArgb(30, 30, 30);
+                    if (e.ColumnIndex >= 0 && e.ColumnIndex < dgvPermissions.Columns.Count && dgvPermissions.Columns[e.ColumnIndex].Name == "FormName")
+                    {
+                        e.CellStyle.Font = new Font(dgvPermissions.Font, FontStyle.Bold);
+                        e.CellStyle.ForeColor = Color.FromArgb(0, 100, 0);
+                    }
+                }
+                else
+                {
+                    // Disabled form: show in grey, unclickable/muted appearance
+                    row.DefaultCellStyle.BackColor = Color.FromArgb(245, 245, 245);
+                    row.DefaultCellStyle.ForeColor = Color.FromArgb(130, 130, 130);
+                    if (e.ColumnIndex >= 0 && e.ColumnIndex < dgvPermissions.Columns.Count && dgvPermissions.Columns[e.ColumnIndex].Name == "FormName")
+                    {
+                        e.CellStyle.Font = new Font(dgvPermissions.Font, FontStyle.Regular);
+                        e.CellStyle.ForeColor = Color.FromArgb(120, 120, 120);
+                    }
+                    else if (e.ColumnIndex >= 0 && e.ColumnIndex < dgvPermissions.Columns.Count && dgvPermissions.Columns[e.ColumnIndex].Name == "Category")
+                    {
+                        e.CellStyle.ForeColor = Color.FromArgb(150, 150, 150);
+                    }
+                }
+            }
+        }
+
+        private void DgvPermissions_CellBeginEdit(object sender, DataGridViewCellCancelEventArgs e)
+        {
+            if (e.RowIndex >= 0 && e.RowIndex < dgvPermissions.Rows.Count)
+            {
+                var row = dgvPermissions.Rows[e.RowIndex];
+                if (row.DataBoundItem is FormPermissionGrid item)
+                {
+                    string colName = dgvPermissions.Columns[e.ColumnIndex].Name;
+                    if (!item.CanView && (colName == "CanAdd" || colName == "CanEdit" || colName == "CanDelete"))
+                    {
+                        e.Cancel = true;
+                    }
+                }
+            }
+        }
+
+        private void DgvPermissions_CellContentClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex >= 0 && e.RowIndex < dgvPermissions.Rows.Count)
+            {
+                var row = dgvPermissions.Rows[e.RowIndex];
+                if (row.DataBoundItem is FormPermissionGrid item)
+                {
+                    string colName = dgvPermissions.Columns[e.ColumnIndex].Name;
+                    if (!item.CanView && (colName == "CanAdd" || colName == "CanEdit" || colName == "CanDelete"))
+                    {
+                        dgvPermissions.CancelEdit();
+                    }
+                }
+            }
+        }
+
+        private void DgvPermissions_CellFormatting_Old(object sender, DataGridViewCellFormattingEventArgs e)
+        {
+            if (e.RowIndex < 0 || e.RowIndex >= dgvPermissions.Rows.Count) return;
+            var row = dgvPermissions.Rows[e.RowIndex];
+            if (row.DataBoundItem is FormPermissionGrid item)
+            {
+                bool isGranted = item.CanView || item.CanAdd || item.CanEdit || item.CanDelete;
                 if (isGranted)
                 {
                     row.DefaultCellStyle.BackColor = Color.FromArgb(238, 252, 238);
@@ -401,6 +470,36 @@ namespace PosBranch_Win.Settings
         }
 
         private void DgvPermissions_CellValueChanged(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex >= 0 && _currentPermissions != null)
+            {
+                var row = dgvPermissions.Rows[e.RowIndex];
+                if (row.DataBoundItem is FormPermissionGrid item)
+                {
+                    string colName = e.ColumnIndex >= 0 && e.ColumnIndex < dgvPermissions.Columns.Count ? dgvPermissions.Columns[e.ColumnIndex].Name : "";
+                    if (colName == "CanView" && !item.CanView)
+                    {
+                        item.CanAdd = false;
+                        item.CanEdit = false;
+                        item.CanDelete = false;
+                        if (row.Cells["CanAdd"] != null) row.Cells["CanAdd"].Value = false;
+                        if (row.Cells["CanEdit"] != null) row.Cells["CanEdit"].Value = false;
+                        if (row.Cells["CanDelete"] != null) row.Cells["CanDelete"].Value = false;
+                    }
+                    else if ((colName == "CanAdd" || colName == "CanEdit" || colName == "CanDelete") && (item.CanAdd || item.CanEdit || item.CanDelete))
+                    {
+                        if (!item.CanView)
+                        {
+                            item.CanView = true;
+                            if (row.Cells["CanView"] != null) row.Cells["CanView"].Value = true;
+                        }
+                    }
+                }
+                dgvPermissions.InvalidateRow(e.RowIndex);
+                UpdateStatusCounts();
+            }
+        }
+        private void DgvPermissions_CellValueChanged_Old(object sender, DataGridViewCellEventArgs e)
         {
             if (e.RowIndex >= 0 && _currentPermissions != null)
             {
@@ -446,7 +545,7 @@ namespace PosBranch_Win.Settings
                 }
 
                 // Save master permissions list to database
-                string result = _permRepo.SavePermissions(_selectedRoleId, _currentPermissions);
+                string roleName = (cmbRoles.SelectedItem is Role rSave) ? rSave.RoleName : cmbRoles.Text?.Trim(); string result = _permRepo.SavePermissions(_selectedRoleId, _currentPermissions, roleName);
 
                 if (result == "Success")
                 {
@@ -456,8 +555,8 @@ namespace PosBranch_Win.Settings
 
                     try
                     {
-                        var targetIds = _permRepo.GetTargetRoleIds(_selectedRoleId, cmbRoles.Text?.Trim());
-                        if (targetIds.Contains(SessionContext.RoleId) || string.Equals(cmbRoles.Text?.Trim(), SessionContext.UserLevel?.Trim(), StringComparison.OrdinalIgnoreCase))
+                        var targetIds = _permRepo.GetTargetRoleIds(_selectedRoleId, roleName);
+                        if (targetIds.Contains(SessionContext.RoleId) || string.Equals(roleName, SessionContext.UserLevel?.Trim(), StringComparison.OrdinalIgnoreCase))
                         {
                             var updatedPerms = _permRepo.GetPermissionsByRoleId(SessionContext.RoleId);
                             SessionContext.LoadPermissions(updatedPerms);
@@ -488,6 +587,19 @@ namespace PosBranch_Win.Settings
         private void BtnGrantViewAll_Click(object sender, EventArgs e)
         {
             dgvPermissions.EndEdit();
+            if (_currentPermissions != null)
+            {
+                foreach (var item in _currentPermissions)
+                {
+                    item.CanView = true;
+                }
+            }
+            ApplyFilter();
+        }
+
+        private void BtnGrantViewAll_Click_Old(object sender, EventArgs e)
+        {
+            dgvPermissions.EndEdit();
             foreach (DataGridViewRow row in dgvPermissions.Rows)
             {
                 row.Cells["CanView"].Value = true;
@@ -502,6 +614,22 @@ namespace PosBranch_Win.Settings
         /// Grants all permissions to the selected role
         /// </summary>
         private void btnGrantAll_Click(object sender, EventArgs e)
+        {
+            dgvPermissions.EndEdit();
+            if (_currentPermissions != null)
+            {
+                foreach (var item in _currentPermissions)
+                {
+                    item.CanView = true;
+                    item.CanAdd = true;
+                    item.CanEdit = true;
+                    item.CanDelete = true;
+                }
+            }
+            ApplyFilter();
+        }
+
+        private void btnGrantAll_Click_Old(object sender, EventArgs e)
         {
             dgvPermissions.EndEdit();
             foreach (DataGridViewRow row in dgvPermissions.Rows)
@@ -526,6 +654,22 @@ namespace PosBranch_Win.Settings
         /// Revokes all permissions from the selected role
         /// </summary>
         private void btnRevokeAll_Click(object sender, EventArgs e)
+        {
+            dgvPermissions.EndEdit();
+            if (_currentPermissions != null)
+            {
+                foreach (var item in _currentPermissions)
+                {
+                    item.CanView = false;
+                    item.CanAdd = false;
+                    item.CanEdit = false;
+                    item.CanDelete = false;
+                }
+            }
+            ApplyFilter();
+        }
+
+        private void btnRevokeAll_Click_Old(object sender, EventArgs e)
         {
             dgvPermissions.EndEdit();
             foreach (DataGridViewRow row in dgvPermissions.Rows)
@@ -553,7 +697,7 @@ namespace PosBranch_Win.Settings
         {
             if (_selectedRoleId > 0)
             {
-                LoadPermissionsForRole(_selectedRoleId);
+                string refName = (cmbRoles.SelectedItem is Role rRef) ? rRef.RoleName : cmbRoles.Text?.Trim(); LoadPermissionsForRole(_selectedRoleId, refName);
             }
         }
 
@@ -628,7 +772,7 @@ namespace PosBranch_Win.Settings
 
                 if (_selectedRoleId > 0)
                 {
-                    LoadPermissionsForRole(_selectedRoleId);
+                    string refName = (cmbRoles.SelectedItem is Role rRef) ? rRef.RoleName : cmbRoles.Text?.Trim(); LoadPermissionsForRole(_selectedRoleId, refName);
                 }
 
                 LoadCategoryFilter();
@@ -749,7 +893,7 @@ namespace PosBranch_Win.Settings
                     {
                         if (_selectedRoleId > 0)
                         {
-                            LoadPermissionsForRole(_selectedRoleId);
+                            string refName = (cmbRoles.SelectedItem is Role rRef) ? rRef.RoleName : cmbRoles.Text?.Trim(); LoadPermissionsForRole(_selectedRoleId, refName);
                         }
                         LoadCategoryFilter();
                         MessageBox.Show($"Form '{formName}' registered successfully and added to permissions list!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
