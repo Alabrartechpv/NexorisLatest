@@ -251,9 +251,9 @@ namespace PosBranch_Win.Reports.FinancialReports
             // 
             this.chkPaymentDueOnly.Location = new System.Drawing.Point(122, 69);
             this.chkPaymentDueOnly.Name = "chkPaymentDueOnly";
-            this.chkPaymentDueOnly.Size = new System.Drawing.Size(150, 20);
+            this.chkPaymentDueOnly.Size = new System.Drawing.Size(160, 20);
             this.chkPaymentDueOnly.TabIndex = 17;
-            this.chkPaymentDueOnly.Text = "Payment Due Only";
+            this.chkPaymentDueOnly.Text = "Hide Fully Paid Bills";
             // 
             // ultraLabel1
             // 

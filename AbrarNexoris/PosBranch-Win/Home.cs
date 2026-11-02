@@ -1787,7 +1787,20 @@ namespace PosBranch_Win
 
                 if (homeTab == null) return;
 
-                // 3. Ensure ribbon group exists in Home tab
+                // 3. Find Log Off group so Search sits immediately after it (Exit -> Log Off -> Search)
+                int logOffIndex = -1;
+                for (int i = 0; i < homeTab.Groups.Count; i++)
+                {
+                    var g = homeTab.Groups[i];
+                    if (g.Key == "ribbonGroup5" ||
+                        (g.Caption != null && g.Caption.Equals("Ctrl+O", StringComparison.OrdinalIgnoreCase)) ||
+                        g.Tools.Exists("LogIn"))
+                    {
+                        logOffIndex = i;
+                        break;
+                    }
+                }
+
                 Infragistics.Win.UltraWinToolbars.RibbonGroup searchGroup = null;
                 if (homeTab.Groups.Exists(GROUP_KEY))
                 {
@@ -1805,29 +1818,47 @@ namespace PosBranch_Win
                     }
                 }
 
+                int targetIndex = (logOffIndex >= 0) ? logOffIndex + 1 : -1;
+
                 if (searchGroup == null)
                 {
                     searchGroup = new Infragistics.Win.UltraWinToolbars.RibbonGroup(GROUP_KEY, "Ctrl+S");
-
-                    // Insert before Dashboard / Hold / LastBill if present so it sits cleanly alongside Log Off
-                    int insertIdx = -1;
-                    for (int i = 0; i < homeTab.Groups.Count; i++)
+                    if (targetIndex >= 0 && targetIndex <= homeTab.Groups.Count)
                     {
-                        if (homeTab.Groups[i].Key == "Dashboard" || homeTab.Groups[i].Caption == "Dashboard" ||
-                            homeTab.Groups[i].Key == "ribbonGroupHold" || homeTab.Groups[i].Key == "ribbonGroupLastBill")
-                        {
-                            insertIdx = i;
-                            break;
-                        }
-                    }
-
-                    if (insertIdx >= 0)
-                    {
-                        homeTab.Groups.Insert(insertIdx, searchGroup);
+                        homeTab.Groups.Insert(targetIndex, searchGroup);
                     }
                     else
                     {
                         homeTab.Groups.Add(searchGroup);
+                    }
+                }
+                else
+                {
+                    int currentIndex = homeTab.Groups.IndexOf(searchGroup);
+                    if (targetIndex >= 0 && currentIndex != targetIndex)
+                    {
+                        homeTab.Groups.Remove(searchGroup);
+                        int newLogOffIndex = -1;
+                        for (int i = 0; i < homeTab.Groups.Count; i++)
+                        {
+                            var g = homeTab.Groups[i];
+                            if (g.Key == "ribbonGroup5" ||
+                                (g.Caption != null && g.Caption.Equals("Ctrl+O", StringComparison.OrdinalIgnoreCase)) ||
+                                g.Tools.Exists("LogIn"))
+                            {
+                                newLogOffIndex = i;
+                                break;
+                            }
+                        }
+                        int newTarget = (newLogOffIndex >= 0) ? newLogOffIndex + 1 : homeTab.Groups.Count;
+                        if (newTarget <= homeTab.Groups.Count)
+                        {
+                            homeTab.Groups.Insert(newTarget, searchGroup);
+                        }
+                        else
+                        {
+                            homeTab.Groups.Add(searchGroup);
+                        }
                     }
                 }
 
@@ -2133,21 +2164,25 @@ namespace PosBranch_Win
                     ("ribbonGroupReceiptHome", "Ctrl+F11", "Receipt")
                 };
 
-                // Find index of Exit group ("ribbonGroup3", caption "F4" or contains tool "Remove" / "Exit")
-                int exitIndex = -1;
-                for (int i = 0; i < homeTab.Groups.Count; i++)
+                // Find index after Search group or Log Off group so transaction buttons follow them
+                int insertIndex = homeTab.Groups.Count;
+                if (homeTab.Groups.Exists("ribbonGroupSearch"))
                 {
-                    var grp = homeTab.Groups[i];
-                    if (grp.Key == "ribbonGroup3" ||
-                        (grp.Caption != null && (grp.Caption.Equals("F4", StringComparison.OrdinalIgnoreCase) || grp.Caption.Equals("Exit", StringComparison.OrdinalIgnoreCase))) ||
-                        grp.Tools.Exists("Remove") || grp.Tools.Exists("Exit"))
+                    insertIndex = homeTab.Groups.IndexOf(homeTab.Groups["ribbonGroupSearch"]) + 1;
+                }
+                else
+                {
+                    for (int i = 0; i < homeTab.Groups.Count; i++)
                     {
-                        exitIndex = i;
-                        break;
+                        var grp = homeTab.Groups[i];
+                        if (grp.Key == "ribbonGroup5" ||
+                            (grp.Caption != null && (grp.Caption.Equals("Ctrl+O", StringComparison.OrdinalIgnoreCase) || grp.Caption.Equals("Ctrl+S", StringComparison.OrdinalIgnoreCase))) ||
+                            grp.Tools.Exists("LogIn") || grp.Tools.Exists("Search"))
+                        {
+                            insertIndex = i + 1;
+                        }
                     }
                 }
-
-                int insertIndex = (exitIndex >= 0) ? exitIndex + 1 : homeTab.Groups.Count;
 
                 foreach (var item in items)
                 {

@@ -202,11 +202,13 @@ namespace PosBranch_Win.Accounts
             // Add Adjusted Amount column if not exists
             if (!band.Columns.Exists("AdjustedAmount"))
             {
-                band.Columns.Add("AdjustedAmount", "Adjusted Amount");
-                band.Columns["AdjustedAmount"].DataType = typeof(decimal);
-                band.Columns["AdjustedAmount"].CellActivation = Activation.AllowEdit;
-                band.Columns["AdjustedAmount"].Format = "##,##0.00";
+                var col = band.Columns.Add("AdjustedAmount", "Adjusted Amount");
+                col.DataType = typeof(decimal);
             }
+            band.Columns["AdjustedAmount"].Header.Caption = "Adjusted Amount";
+            band.Columns["AdjustedAmount"].Format = "##,##0.00";
+            band.Columns["AdjustedAmount"].CellActivation = Activation.AllowEdit;
+            band.Columns["AdjustedAmount"].CellAppearance.TextHAlign = Infragistics.Win.HAlign.Right;
 
             if (band.Columns.Exists("Paymode")) band.Columns["Paymode"].Hidden = true;
             if (band.Columns.Exists("PayMode")) band.Columns["PayMode"].Hidden = true;
@@ -359,7 +361,8 @@ namespace PosBranch_Win.Accounts
         private static decimal SafeToDecimal(object value, decimal defaultValue = 0m)
         {
             if (value == null || value == DBNull.Value) return defaultValue;
-            if (decimal.TryParse(value.ToString(), out decimal result)) return result;
+            if (decimal.TryParse(value.ToString(), out decimal result))
+                return Math.Round(result, 2, MidpointRounding.AwayFromZero);
             return defaultValue;
         }
 
@@ -564,11 +567,14 @@ namespace PosBranch_Win.Accounts
                 // Add Adjusted Amount column if not exists
                 if (!band.Columns.Exists("AdjustedAmount"))
                 {
-                    band.Columns.Add("AdjustedAmount", "Adjusted Amount");
-                    band.Columns["AdjustedAmount"].DataType = typeof(decimal);
-                    band.Columns["AdjustedAmount"].CellActivation = Activation.AllowEdit;
-                    band.Columns["AdjustedAmount"].Format = "##,##0.00";
+                    var col = band.Columns.Add("AdjustedAmount", "Adjusted Amount");
+                    col.DataType = typeof(decimal);
                 }
+                band.Columns["AdjustedAmount"].Header.Caption = "Adjusted Amount";
+                band.Columns["AdjustedAmount"].Width = 120;
+                band.Columns["AdjustedAmount"].Format = "##,##0.00";
+                band.Columns["AdjustedAmount"].CellActivation = Activation.AllowEdit;
+                band.Columns["AdjustedAmount"].CellAppearance.TextHAlign = Infragistics.Win.HAlign.Right;
 
                 if (band.Columns.Exists("Paymode")) band.Columns["Paymode"].Hidden = true;
                 if (band.Columns.Exists("PayMode")) band.Columns["PayMode"].Hidden = true;
@@ -1568,14 +1574,14 @@ namespace PosBranch_Win.Accounts
                 {
                     // For negative balance, we can pay back up to the absolute value
                     decimal maxAdjustment = Math.Abs(originalBalance);
-                    adjustedAmount = Math.Min(remainingAmount, maxAdjustment);
+                    adjustedAmount = Math.Round(Math.Min(remainingAmount, maxAdjustment), 2, MidpointRounding.AwayFromZero);
                 }
                 else
                 {
                     // Normal case: positive balance
-                    adjustedAmount = Math.Min(remainingAmount, originalBalance);
+                    adjustedAmount = Math.Round(Math.Min(remainingAmount, originalBalance), 2, MidpointRounding.AwayFromZero);
                 }
-                remainingAmount -= adjustedAmount;
+                remainingAmount = Math.Round(remainingAmount - adjustedAmount, 2, MidpointRounding.AwayFromZero);
                 row.Cells["AdjustedAmount"].Value = adjustedAmount;
                 UpdateRowBalance(row);
             }
@@ -1602,8 +1608,8 @@ namespace PosBranch_Win.Accounts
 
             // Calculate the new balance: Original outstanding balance - adjusted amount
             // Original outstanding balance = InvoiceAmount - PayedAmount - ReturnedAmount
-            decimal originalOutstandingBalance = invoiceAmount - paidAmount - returnedAmount;
-            decimal newBalance = originalOutstandingBalance - adjustedAmount;
+            decimal originalOutstandingBalance = Math.Round(invoiceAmount - paidAmount - returnedAmount, 2, MidpointRounding.AwayFromZero);
+            decimal newBalance = Math.Round(originalOutstandingBalance - adjustedAmount, 2, MidpointRounding.AwayFromZero);
 
             row.Cells["Balance"].Value = newBalance;
         }
@@ -2276,8 +2282,8 @@ namespace PosBranch_Win.Accounts
                 if (row.Cells.Exists("Select") && row.Cells["Select"].Value != null)
                     isSelected = Convert.ToBoolean(row.Cells["Select"].Value);
 
-                decimal invoiceAmount = row.Cells.Exists("InvoiceAmount") && row.Cells["InvoiceAmount"].Value != null ? Convert.ToDecimal(row.Cells["InvoiceAmount"].Value) : 0m;
-                decimal paidAmount = row.Cells.Exists("PayedAmount") && row.Cells["PayedAmount"].Value != null ? Convert.ToDecimal(row.Cells["PayedAmount"].Value) : 0m;
+                decimal invoiceAmount = row.Cells.Exists("InvoiceAmount") && row.Cells["InvoiceAmount"].Value != null ? SafeToDecimal(row.Cells["InvoiceAmount"].Value) : 0m;
+                decimal paidAmount = row.Cells.Exists("PayedAmount") && row.Cells["PayedAmount"].Value != null ? SafeToDecimal(row.Cells["PayedAmount"].Value) : 0m;
                 decimal returnedAmount = row.Cells.Exists("ReturnedAmount") && row.Cells["ReturnedAmount"].Value != null && row.Cells["ReturnedAmount"].Value != DBNull.Value 
                     ? SafeToDecimal(row.Cells["ReturnedAmount"].Value) 
                     : 0m;
@@ -2290,16 +2296,16 @@ namespace PosBranch_Win.Accounts
                     {
                         // If balance is negative, allow adjustment up to the absolute value
                         decimal maxAdjustment = Math.Abs(originalBalance);
-                        decimal adjusted = Math.Min(remaining, maxAdjustment);
+                        decimal adjusted = Math.Round(Math.Min(remaining, maxAdjustment), 2, MidpointRounding.AwayFromZero);
                         row.Cells["AdjustedAmount"].Value = adjusted;
-                        remaining -= adjusted;
+                        remaining = Math.Round(remaining - adjusted, 2, MidpointRounding.AwayFromZero);
                     }
                     else
                     {
                         // Normal case: positive balance
-                        decimal adjusted = Math.Min(originalBalance, remaining);
+                        decimal adjusted = Math.Round(Math.Min(originalBalance, remaining), 2, MidpointRounding.AwayFromZero);
                         row.Cells["AdjustedAmount"].Value = adjusted;
-                        remaining -= adjusted;
+                        remaining = Math.Round(remaining - adjusted, 2, MidpointRounding.AwayFromZero);
                     }
                 }
                 else

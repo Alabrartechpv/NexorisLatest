@@ -11,6 +11,7 @@ namespace ModelClass.Report
         public string DocNo { get; set; }
         public DateTime? BillDate { get; set; }
         public DateTime? DueDate { get; set; }
+        public DateTime? ReceiptDate { get; set; }
         public decimal InvoiceAmount { get; set; }
         public decimal ReceivedAmount { get; set; }
         public decimal Balance { get; set; }
