@@ -92,9 +92,11 @@ namespace PosBranch_Win
             new ReportNavigatorDefinition("Customer", "Customer Outstanding Listing", "CustomerOutstandingReport"),
             new ReportNavigatorDefinition("Customer", "Customer Receipt Report", "CustomerReceiptReport"),
             new ReportNavigatorDefinition("Customer", "Customer Ledger Statement", "CustomerLedgerReport"),
+            new ReportNavigatorDefinition("Customer", "Customer Report Details", "CustomerReportDetails"),
             new ReportNavigatorDefinition("Vendor", "Vendor Outstanding Listing", "VendorOutstandingReport"),
             new ReportNavigatorDefinition("Vendor", "Vendor Payment Report", "VendorPaymentReport"),
             new ReportNavigatorDefinition("Vendor", "Unallocated Purchase Returns", "UnallocatedPurchaseReturns"),
+            new ReportNavigatorDefinition("Vendor", "Vendor Report Details", "VendorReportDetails"),
             new ReportNavigatorDefinition("Analysis", "Executive Dashboard (30 KPIs)", "ExecutiveDashboard"),
             new ReportNavigatorDefinition("Analysis", "Trading Account", "TradingAccount"),
             new ReportNavigatorDefinition("Analysis", "Profit & Loss Account", "ProfitLossAccount"),
@@ -4004,6 +4006,11 @@ namespace PosBranch_Win
                 PosBranch_Win.Reports.FinancialReports.frmCustomerLedgerReport customerLedgerReport = new PosBranch_Win.Reports.FinancialReports.frmCustomerLedgerReport();
                 OpenFormInTab(customerLedgerReport, "Customer Ledger Statement");
             }
+            if (e.Tool.Key == "CustomerReportDetails" || e.Tool.Key == "frmcustomerreportdetails" || e.Tool.Key == "CustomerDetailsReport")
+            {
+                PosBranch_Win.Reports.FinancialReports.frmcustomerreportdetails customerDetailsReport = new PosBranch_Win.Reports.FinancialReports.frmcustomerreportdetails();
+                OpenFormInTab(customerDetailsReport, "Customer Report Details");
+            }
             if (e.Tool.Key == "VendorOutstandingReport")
             {
                 PosBranch_Win.Reports.FinancialReports.frmVendorOutstandingReport vendorOutstandingReport = new PosBranch_Win.Reports.FinancialReports.frmVendorOutstandingReport();
@@ -4018,6 +4025,11 @@ namespace PosBranch_Win
             {
                 PosBranch_Win.Reports.FinancialReports.frmVendorOutstandingReport unallocatedReturnsReport = new PosBranch_Win.Reports.FinancialReports.frmVendorOutstandingReport(true);
                 OpenFormInTab(unallocatedReturnsReport, "Unallocated Purchase Returns");
+            }
+            if (e.Tool.Key == "VendorReportDetails" || e.Tool.Key == "frmvendorreportdetails" || e.Tool.Key == "VendorDetailsReport")
+            {
+                PosBranch_Win.Reports.FinancialReports.frmvendorreportdetails vendorDetailsReport = new PosBranch_Win.Reports.FinancialReports.frmvendorreportdetails();
+                OpenFormInTab(vendorDetailsReport, "Vendor Report Details");
             }
             if (e.Tool.Key == "InputGSTReport" || e.Tool.Key == "frmInputGSTReport")
             {
@@ -6468,8 +6480,10 @@ namespace PosBranch_Win
                     keyToExecute == "SalesReturnAuditReport" ||
                     keyToExecute == "VendorDNPaymentReport" ||
                     keyToExecute == "VendorPaymentReport" ||
+                    keyToExecute == "VendorReportDetails" ||
                     keyToExecute == "CustomerReceiptReport" ||
                     keyToExecute == "CustomerLedgerReport" ||
+                    keyToExecute == "CustomerReportDetails" ||
                     keyToExecute == "StockValuationReport" ||
                     keyToExecute == "LowStockAlertReport" ||
                     keyToExecute == "StockAdjustmentReport" ||

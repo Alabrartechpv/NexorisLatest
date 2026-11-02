@@ -9,21 +9,17 @@ using System.Linq;
 namespace Repository.MasterRepositry
 {
     /// <summary>
-    /// Repository for Role-Based Access Control (RBAC) operations
+    /// Repository for Role-Based Access Control (RBAC) operations.
+    /// All database operations are executed via clean stored procedures (POS_RolePermission).
     /// </summary>
     public class RolePermissionRepository : BaseRepostitory
     {
-        /// <summary>
-        /// Gets all permissions for a specific role
-        /// </summary>
-        /// <param name="roleId">Role ID to get permissions for</param>
-        /// <returns>List of RolePermission objects</returns>
-        /// <summary>
-        /// Resolves all matching Role IDs across dbo.Roles and dbo.UserLevel for a given Role ID or Role Name
-        /// </summary>
         private static bool _rolesSeeded = false;
         private static bool _formsSeeded = false;
 
+        /// <summary>
+        /// Resolves all matching Role IDs across dbo.Roles and dbo.UserLevel for a given Role ID or Role Name.
+        /// </summary>
         public List<int> GetTargetRoleIds(int roleId, string roleName = null)
         {
             var ids = new HashSet<int>();
@@ -36,8 +32,7 @@ namespace Repository.MasterRepositry
 
                 if (string.IsNullOrWhiteSpace(resolvedName) && roleId > 0)
                 {
-                    var matchedRole = allRoles.FirstOrDefault(r => 
-                        r.RoleID == roleId);
+                    var matchedRole = allRoles.FirstOrDefault(r => r.RoleID == roleId);
                     if (matchedRole != null && !string.IsNullOrWhiteSpace(matchedRole.RoleName))
                     {
                         resolvedName = matchedRole.RoleName.Trim();
@@ -46,7 +41,15 @@ namespace Repository.MasterRepositry
 
                 if (!string.IsNullOrWhiteSpace(resolvedName))
                 {
-                    bool isTargetAdmin = string.Equals(resolvedName, "Admin", StringComparison.OrdinalIgnoreCase) || string.Equals(resolvedName, "Administrator", StringComparison.OrdinalIgnoreCase); var byName = allRoles.Where(r => !string.IsNullOrWhiteSpace(r.RoleName) && (isTargetAdmin ? (string.Equals(r.RoleName.Trim(), "Admin", StringComparison.OrdinalIgnoreCase) || string.Equals(r.RoleName.Trim(), "Administrator", StringComparison.OrdinalIgnoreCase)) : string.Equals(r.RoleName.Trim(), resolvedName, StringComparison.OrdinalIgnoreCase)));
+                    bool isTargetAdmin = string.Equals(resolvedName, "Admin", StringComparison.OrdinalIgnoreCase) ||
+                                         string.Equals(resolvedName, "Administrator", StringComparison.OrdinalIgnoreCase);
+
+                    var byName = allRoles.Where(r => !string.IsNullOrWhiteSpace(r.RoleName) &&
+                        (isTargetAdmin
+                            ? (string.Equals(r.RoleName.Trim(), "Admin", StringComparison.OrdinalIgnoreCase) ||
+                               string.Equals(r.RoleName.Trim(), "Administrator", StringComparison.OrdinalIgnoreCase))
+                            : string.Equals(r.RoleName.Trim(), resolvedName, StringComparison.OrdinalIgnoreCase)));
+
                     foreach (var r in byName)
                     {
                         if (r.RoleID > 0) ids.Add(r.RoleID);
@@ -55,8 +58,7 @@ namespace Repository.MasterRepositry
                 }
                 else
                 {
-                    var matched = allRoles.Where(r =>
-                        roleId > 0 && r.RoleID == roleId).ToList();
+                    var matched = allRoles.Where(r => roleId > 0 && r.RoleID == roleId).ToList();
                     foreach (var r in matched)
                     {
                         if (r.RoleID > 0) ids.Add(r.RoleID);
@@ -69,116 +71,12 @@ namespace Repository.MasterRepositry
             return ids.Count > 0 ? ids.ToList() : (roleId > 0 ? new List<int> { roleId } : new List<int>());
         }
 
-#if false
-        {
-            var ids = new HashSet<int>();
-            if (roleId > 0) ids.Add(roleId);
-
-            try
-            {
-                var allRoles = GetAllRoles();
-                var matched = allRoles.Where(r =>
-                    (roleId > 0 && (r.RoleID == roleId || (r.UserLevelID.HasValue && r.UserLevelID.Value == roleId))) ||
-                    (!string.IsNullOrWhiteSpace(roleName) && string.Equals(r.RoleName?.Trim(), roleName.Trim(), StringComparison.OrdinalIgnoreCase))
-                ).ToList();
-
-                string resolvedName = roleName;
-                if (string.IsNullOrWhiteSpace(resolvedName) && matched.Count > 0)
-                {
-                    resolvedName = matched.FirstOrDefault(m => !string.IsNullOrWhiteSpace(m.RoleName))?.RoleName;
-                }
-
-                if (!string.IsNullOrWhiteSpace(resolvedName))
-                {
-                    var byName = allRoles.Where(r => string.Equals(r.RoleName?.Trim(), resolvedName.Trim(), StringComparison.OrdinalIgnoreCase));
-                    foreach (var r in byName)
-                    {
-                        if (r.RoleID > 0) ids.Add(r.RoleID);
-                        if (r.UserLevelID.HasValue && r.UserLevelID.Value > 0) ids.Add(r.UserLevelID.Value);
-                    }
-                }
-                else
-                {
-                    foreach (var r in matched)
-                    {
-                        if (r.RoleID > 0) ids.Add(r.RoleID);
-                        if (r.UserLevelID.HasValue && r.UserLevelID.Value > 0) ids.Add(r.UserLevelID.Value);
-                    }
-                }
-            }
-            catch { }
-
-            try
-            {
-                if (DataConnection.State != ConnectionState.Open) DataConnection.Open();
-                using (SqlCommand cmd = new SqlCommand(@"
-DECLARE @Names TABLE (RoleName NVARCHAR(100));
-
-IF OBJECT_ID('dbo.Roles', 'U') IS NOT NULL
-    INSERT INTO @Names SELECT RoleName FROM dbo.Roles WHERE RoleID = @RId OR UserLevelID = @RId;
-
-IF OBJECT_ID('dbo.Roles', 'U') IS NOT NULL AND OBJECT_ID('dbo.UserLevel', 'U') IS NOT NULL
-BEGIN
-    SELECT 
-        u.UserLevelID AS RoleID,
-        u.UserLevel AS RoleName,
-        ISNULL(r.RoleID, u.UserLevelID) AS UserLevelID
-    FROM dbo.UserLevel u
-    LEFT JOIN dbo.Roles r ON UPPER(RTRIM(LTRIM(u.UserLevel))) = UPPER(RTRIM(LTRIM(r.RoleName)))
-    WHERE ISNULL(u.UserLevel, '') <> ''
-    ORDER BY u.UserLevelID;
-END
-    */
-    INSERT INTO @Names SELECT UserLevel FROM dbo.UserLevel WHERE UserLevelID = @RId;
-
-IF ISNULL(@RName, '') <> ''
-    INSERT INTO @Names VALUES (@RName);
-
-IF OBJECT_ID('dbo.Roles', 'U') IS NOT NULL
-BEGIN
-    SELECT DISTINCT RoleID FROM dbo.Roles r INNER JOIN @Names n ON UPPER(RTRIM(LTRIM(r.RoleName))) = UPPER(RTRIM(LTRIM(n.RoleName)));
-    SELECT DISTINCT UserLevelID FROM dbo.Roles r INNER JOIN @Names n ON UPPER(RTRIM(LTRIM(r.RoleName))) = UPPER(RTRIM(LTRIM(n.RoleName))) WHERE UserLevelID IS NOT NULL;
-END
-
-IF OBJECT_ID('dbo.Roles', 'U') IS NOT NULL AND OBJECT_ID('dbo.UserLevel', 'U') IS NOT NULL
-BEGIN
-    SELECT 
-        u.UserLevelID AS RoleID,
-        u.UserLevel AS RoleName,
-        ISNULL(r.RoleID, u.UserLevelID) AS UserLevelID
-    FROM dbo.UserLevel u
-    LEFT JOIN dbo.Roles r ON UPPER(RTRIM(LTRIM(u.UserLevel))) = UPPER(RTRIM(LTRIM(r.RoleName)))
-    WHERE ISNULL(u.UserLevel, '') <> ''
-    ORDER BY u.UserLevelID;
-END
-    */
-    SELECT DISTINCT UserLevelID FROM dbo.UserLevel u INNER JOIN @Names n ON UPPER(RTRIM(LTRIM(u.UserLevel))) = UPPER(RTRIM(LTRIM(n.RoleName)));
-", (SqlConnection)DataConnection))
-                {
-                    cmd.Parameters.AddWithValue("@RId", roleId);
-                    cmd.Parameters.AddWithValue("@RName", roleName ?? "");
-                    using (SqlDataReader reader = cmd.ExecuteReader())
-                    {
-                        do
-                        {
-                            while (reader.Read())
-                            {
-                                if (!reader.IsDBNull(0))
-                                {
-                                    int val = Convert.ToInt32(reader[0]);
-                                    if (val > 0) ids.Add(val);
-                                }
-                            }
-                        } while (reader.NextResult());
-                    }
-                }
-            }
-            catch { }
-
-            return ids.Count > 0 ? ids.ToList() : new List<int> { roleId };
-        }
-
-#endif
+        /// <summary>
+        /// Gets all permissions for a specific role.
+        /// </summary>
+        /// <param name="roleId">Role ID to get permissions for</param>
+        /// <param name="roleName">Optional Role Name</param>
+        /// <returns>List of RolePermission objects</returns>
         public List<RolePermission> GetPermissionsByRoleId(int roleId, string roleName = null)
         {
             List<RolePermission> savedPermissions = new List<RolePermission>();
@@ -209,27 +107,14 @@ END
 
                 if (DataConnection.State != ConnectionState.Open) DataConnection.Open();
 
-                // 1. Query saved rows from dbo.RolePermissions DB table matching any target role ID
-                using (SqlCommand cmd = new SqlCommand($@"
-IF OBJECT_ID('dbo.RolePermissions', 'U') IS NOT NULL
-BEGIN
-    DECLARE @HasFormKey BIT = CASE WHEN EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.RolePermissions') AND name = 'FormKey') THEN 1 ELSE 0 END;
-    DECLARE @HasFormName BIT = CASE WHEN EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.RolePermissions') AND name = 'FormName') THEN 1 ELSE 0 END;
-
-    IF @HasFormKey = 1 AND @HasFormName = 1
-    BEGIN
-        SELECT RoleID, FormID, FormKey, FormName, CanView, CanAdd, CanEdit, CanDelete 
-        FROM dbo.RolePermissions 
-        WHERE RoleID IN ({idListStr});
-    END
-    ELSE
-    BEGIN
-        SELECT RoleID, FormID, '' AS FormKey, '' AS FormName, CanView, CanAdd, CanEdit, CanDelete 
-        FROM dbo.RolePermissions 
-        WHERE RoleID IN ({idListStr});
-    END
-END", (SqlConnection)DataConnection))
+                // 1. Query saved rows via stored procedure POS_RolePermission with GETBYROLE
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_RolePermission, (SqlConnection)DataConnection))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@RoleID", roleId);
+                    cmd.Parameters.AddWithValue("@RoleIds", idListStr);
+                    cmd.Parameters.AddWithValue("@_Operation", "GETBYROLE");
+
                     using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
                     {
                         DataSet ds = new DataSet();
@@ -241,8 +126,8 @@ END", (SqlConnection)DataConnection))
                     }
                 }
 
-                // 2. If direct table query returned no rows, try stored procedure GETBYROLE
-                if (savedPermissions == null || savedPermissions.Count == 0)
+                // 2. Fallback: if multi-role query returned empty, query for each target role ID individually
+                if ((savedPermissions == null || savedPermissions.Count == 0) && targetRoleIds.Count > 0)
                 {
                     foreach (int tid in targetRoleIds)
                     {
@@ -250,21 +135,20 @@ END", (SqlConnection)DataConnection))
                         {
                             cmd.CommandType = CommandType.StoredProcedure;
                             cmd.Parameters.AddWithValue("@RoleID", tid);
-                            cmd.Parameters.AddWithValue("@FormID", 0);
-                            cmd.Parameters.AddWithValue("@CanView", 0);
-                            cmd.Parameters.AddWithValue("@CanAdd", 0);
-                            cmd.Parameters.AddWithValue("@CanEdit", 0);
-                            cmd.Parameters.AddWithValue("@CanDelete", 0);
                             cmd.Parameters.AddWithValue("@_Operation", "GETBYROLE");
 
                             using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
                             {
                                 DataSet ds = new DataSet();
                                 adapt.Fill(ds);
-                                if ((ds != null) && (ds.Tables.Count > 0) && (ds.Tables[0] != null) && (ds.Tables[0].Rows.Count > 0))
+                                if (ds != null && ds.Tables.Count > 0 && ds.Tables[0] != null && ds.Tables[0].Rows.Count > 0)
                                 {
-                                    savedPermissions = ds.Tables[0].ToListOfObject<RolePermission>();
-                                    if (savedPermissions.Count > 0) break;
+                                    var list = ds.Tables[0].ToListOfObject<RolePermission>();
+                                    if (list != null && list.Count > 0)
+                                    {
+                                        if (savedPermissions == null) savedPermissions = new List<RolePermission>();
+                                        savedPermissions.AddRange(list);
+                                    }
                                 }
                             }
                         }
@@ -283,12 +167,14 @@ END", (SqlConnection)DataConnection))
 
             // Check if role is Admin
             if (string.IsNullOrWhiteSpace(roleName) && roleId > 0)
-            try
             {
-                var roleObj = GetAllRoles().FirstOrDefault(r => r.RoleID == roleId);
-                if (roleObj != null) roleName = roleObj.RoleName ?? "";
+                try
+                {
+                    var roleObj = GetAllRoles().FirstOrDefault(r => r.RoleID == roleId);
+                    if (roleObj != null) roleName = roleObj.RoleName ?? "";
+                }
+                catch { }
             }
-            catch { }
 
             bool isAdmin = string.Equals(roleName, "Admin", StringComparison.OrdinalIgnoreCase) ||
                            string.Equals(roleName, "Administrator", StringComparison.OrdinalIgnoreCase);
@@ -299,10 +185,11 @@ END", (SqlConnection)DataConnection))
 
             foreach (var sf in staticForms)
             {
-                var matchingList = savedPermissions?.Where(p => 
+                var matchingList = savedPermissions?.Where(p =>
                     (p.FormID > 0 && p.FormID == sf.FormID) ||
                     (!string.IsNullOrEmpty(p.FormKey) && string.Equals(p.FormKey, sf.FormKey, StringComparison.OrdinalIgnoreCase)) ||
                     (!string.IsNullOrEmpty(p.FormName) && string.Equals(p.FormName, sf.FormName, StringComparison.OrdinalIgnoreCase))).ToList();
+
                 var saved = (matchingList != null && matchingList.Count > 0)
                     ? new RolePermission
                     {
@@ -317,10 +204,6 @@ END", (SqlConnection)DataConnection))
                         CanDelete = matchingList.Any(m => m.CanDelete)
                     }
                     : null;
-                var ignoredSaved = savedPermissions?.FirstOrDefault(p => 
-                    (p.FormID > 0 && p.FormID == sf.FormID) ||
-                    (!string.IsNullOrEmpty(p.FormKey) && string.Equals(p.FormKey, sf.FormKey, StringComparison.OrdinalIgnoreCase)) ||
-                    (!string.IsNullOrEmpty(p.FormName) && string.Equals(p.FormName, sf.FormName, StringComparison.OrdinalIgnoreCase)));
 
                 if (saved != null)
                 {
@@ -364,12 +247,14 @@ END", (SqlConnection)DataConnection))
             var allForms = GetFormsFromDatabase();
 
             if (string.IsNullOrWhiteSpace(roleName) && roleId > 0)
-            try
             {
-                var roleObj = GetAllRoles().FirstOrDefault(r => r.RoleID == roleId);
-                if (roleObj != null) roleName = roleObj.RoleName ?? "";
+                try
+                {
+                    var roleObj = GetAllRoles().FirstOrDefault(r => r.RoleID == roleId);
+                    if (roleObj != null) roleName = roleObj.RoleName ?? "";
+                }
+                catch { }
             }
-            catch { }
 
             bool isAdminRole = string.Equals(roleName, "Admin", StringComparison.OrdinalIgnoreCase) ||
                                string.Equals(roleName, "Administrator", StringComparison.OrdinalIgnoreCase);
@@ -395,7 +280,7 @@ END", (SqlConnection)DataConnection))
                 });
             }
 
-            // Asynchronously save these initial default permissions to database so admin UI reflects them
+            // Save these initial default permissions to database so admin UI reflects them
             try
             {
                 var gridList = result.Select(r => new FormPermissionGrid
@@ -410,7 +295,7 @@ END", (SqlConnection)DataConnection))
                     CanDelete = r.CanDelete
                 }).ToList();
 
-                SavePermissions(roleId, gridList);
+                SavePermissions(roleId, gridList, roleName);
             }
             catch { }
 
@@ -425,7 +310,7 @@ END", (SqlConnection)DataConnection))
         public int GetRoleIdByName(string roleName)
         {
             int roleId = 0;
-            DataConnection.Open();
+            if (DataConnection.State != ConnectionState.Open) DataConnection.Open();
 
             try
             {
@@ -439,7 +324,7 @@ END", (SqlConnection)DataConnection))
                     {
                         DataSet ds = new DataSet();
                         adapt.Fill(ds);
-                        if ((ds != null) && (ds.Tables.Count > 0) && (ds.Tables[0] != null) && (ds.Tables[0].Rows.Count > 0))
+                        if (ds != null && ds.Tables.Count > 0 && ds.Tables[0] != null && ds.Tables[0].Rows.Count > 0)
                         {
                             roleId = Convert.ToInt32(ds.Tables[0].Rows[0]["RoleID"]);
                         }
@@ -461,7 +346,7 @@ END", (SqlConnection)DataConnection))
                 try
                 {
                     string clean = roleName.Trim();
-                    var matchingRole = GetAllRoles().FirstOrDefault(r => 
+                    var matchingRole = GetAllRoles().FirstOrDefault(r =>
                         string.Equals(r.RoleName, clean, StringComparison.OrdinalIgnoreCase) ||
                         r.RoleID.ToString() == clean ||
                         (r.UserLevelID.HasValue && r.UserLevelID.Value.ToString() == clean));
@@ -482,21 +367,21 @@ END", (SqlConnection)DataConnection))
         public int GetRoleIdByUserLevelId(int userLevelId)
         {
             int roleId = 0;
-            DataConnection.Open();
+            if (DataConnection.State != ConnectionState.Open) DataConnection.Open();
 
             try
             {
                 using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_RolePermission, (SqlConnection)DataConnection))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
-                    cmd.Parameters.AddWithValue("@RoleID", userLevelId);  // Reuse RoleID param for UserLevelID lookup
+                    cmd.Parameters.AddWithValue("@RoleID", userLevelId);
                     cmd.Parameters.AddWithValue("@_Operation", "GETROLEBYLEVELID");
 
                     using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
                     {
                         DataSet ds = new DataSet();
                         adapt.Fill(ds);
-                        if ((ds != null) && (ds.Tables.Count > 0) && (ds.Tables[0] != null) && (ds.Tables[0].Rows.Count > 0))
+                        if (ds != null && ds.Tables.Count > 0 && ds.Tables[0] != null && ds.Tables[0].Rows.Count > 0)
                         {
                             roleId = Convert.ToInt32(ds.Tables[0].Rows[0]["RoleID"]);
                         }
@@ -527,35 +412,16 @@ END", (SqlConnection)DataConnection))
             // 0. Ensure default roles and IDs exist in database
             EnsureRolesSeededInDatabase();
 
-            // 1. Query roles prioritizing dbo.UserLevel table matching exact database UserLevelID
+            // 1. Query roles via stored procedure
             try
             {
                 if (DataConnection.State != ConnectionState.Open) DataConnection.Open();
 
-                using (SqlCommand cmd = new SqlCommand(@"
-IF OBJECT_ID('dbo.Roles', 'U') IS NOT NULL AND OBJECT_ID('dbo.UserLevel', 'U') IS NOT NULL
-BEGIN
-    SELECT 
-        u.UserLevelID AS RoleID,
-        u.UserLevel AS RoleName,
-        ISNULL(r.RoleID, u.UserLevelID) AS UserLevelID
-    FROM dbo.UserLevel u
-    LEFT JOIN dbo.Roles r ON UPPER(RTRIM(LTRIM(u.UserLevel))) = UPPER(RTRIM(LTRIM(r.RoleName)))
-    WHERE ISNULL(u.UserLevel, '') <> ''
-    ORDER BY u.UserLevelID;
-END
-    */
-BEGIN
-    SELECT UserLevelID AS RoleID, UserLevel AS RoleName, UserLevelID 
-    FROM dbo.UserLevel 
-    WHERE ISNULL(UserLevel, '') <> ''
-    ORDER BY UserLevelID;
-END
-ELSE IF OBJECT_ID('dbo.Roles', 'U') IS NOT NULL
-BEGIN
-    SELECT RoleID, RoleName, UserLevelID FROM dbo.Roles ORDER BY RoleID;
-END", (SqlConnection)DataConnection))
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_RolePermission, (SqlConnection)DataConnection))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@_Operation", "GETALLROLES");
+
                     using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
                     {
                         DataSet ds = new DataSet();
@@ -585,7 +451,6 @@ END", (SqlConnection)DataConnection))
                     new Role { RoleID = 1, RoleName = "Admin", UserLevelID = 1 },
                     new Role { RoleID = 2, RoleName = "Manager", UserLevelID = 2 },
                     new Role { RoleID = 3, RoleName = "Cashier", UserLevelID = 3 },
-
                     new Role { RoleID = 5, RoleName = "Supervisor", UserLevelID = 5 },
                     new Role { RoleID = 6, RoleName = "Sales Man", UserLevelID = 6 },
                     new Role { RoleID = 7, RoleName = "Accountant", UserLevelID = 7 },
@@ -594,13 +459,40 @@ END", (SqlConnection)DataConnection))
                 };
             }
 
-            if (roles != null && roles.Count > 0) { var clean = new List<Role>(); bool adminAdded = false; foreach (var r in roles) { if (string.IsNullOrWhiteSpace(r.RoleName)) continue; string name = r.RoleName.Trim(); bool isAdminName = string.Equals(name, "Admin", StringComparison.OrdinalIgnoreCase) || string.Equals(name, "Administrator", StringComparison.OrdinalIgnoreCase); if (isAdminName) { if (!adminAdded) { adminAdded = true; clean.Add(new Role { RoleID = r.RoleID, RoleName = "Admin", UserLevelID = r.UserLevelID }); } } else if (!clean.Any(c => string.Equals(c.RoleName, name, StringComparison.OrdinalIgnoreCase))) { clean.Add(r); } } roles = clean; } return roles;
+            if (roles != null && roles.Count > 0)
+            {
+                var clean = new List<Role>();
+                bool adminAdded = false;
+                foreach (var r in roles)
+                {
+                    if (string.IsNullOrWhiteSpace(r.RoleName)) continue;
+                    string name = r.RoleName.Trim();
+                    bool isAdminName = string.Equals(name, "Admin", StringComparison.OrdinalIgnoreCase) ||
+                                       string.Equals(name, "Administrator", StringComparison.OrdinalIgnoreCase);
+                    if (isAdminName)
+                    {
+                        if (!adminAdded)
+                        {
+                            adminAdded = true;
+                            clean.Add(new Role { RoleID = r.RoleID, RoleName = "Admin", UserLevelID = r.UserLevelID });
+                        }
+                    }
+                    else if (!clean.Any(c => string.Equals(c.RoleName, name, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        clean.Add(r);
+                    }
+                }
+                roles = clean;
+            }
+
+            return roles;
         }
 
         /// <summary>
         /// Gets all forms with their permissions for a specific role (for admin UI)
         /// </summary>
         /// <param name="roleId">Role ID to get permissions for</param>
+        /// <param name="roleName">Optional Role Name</param>
         /// <returns>List of FormPermissionGrid objects</returns>
         public List<FormPermissionGrid> GetFormsWithPermissions(int roleId, string roleName = null)
         {
@@ -639,18 +531,11 @@ END", (SqlConnection)DataConnection))
 
                 if (DataConnection.State != ConnectionState.Open) DataConnection.Open();
 
-                using (SqlCommand cmd = new SqlCommand(@"
-IF OBJECT_ID('dbo.Forms', 'U') IS NOT NULL
-BEGIN
-    SELECT FormID, 
-           ISNULL(FormKey, '') AS FormKey, 
-           ISNULL(FormName, '') AS FormName, 
-           ISNULL(Category, 'General') AS Category 
-    FROM dbo.Forms 
-    WHERE ISNULL(IsActive, 1) = 1
-    ORDER BY Category, FormName;
-END", (SqlConnection)DataConnection))
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_RolePermission, (SqlConnection)DataConnection))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@_Operation", "GETFORMS");
+
                     using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
                     {
                         DataTable dt = new DataTable();
@@ -853,74 +738,10 @@ END", (SqlConnection)DataConnection))
             {
                 if (DataConnection.State != ConnectionState.Open) DataConnection.Open();
 
-                using (SqlCommand cmd = new SqlCommand(@"
-IF OBJECT_ID('dbo.Roles', 'U') IS NOT NULL
-BEGIN
-    CREATE TABLE #DefaultRoles (RoleName NVARCHAR(100));
-    INSERT INTO #DefaultRoles (RoleName) VALUES 
-    (N'Admin'),
-    (N'Manager'),
-    (N'Supervisor'),
-    (N'Cashier'),
-    (N'Sales Man'),
-    (N'Accountant'),
-    (N'Inventory Manager'),
-    (N'Standard User');
-
-    IF OBJECT_ID('dbo.UserLevel', 'U') IS NOT NULL /*
-BEGIN
-    SELECT 
-        u.UserLevelID AS RoleID,
-        u.UserLevel AS RoleName,
-        ISNULL(r.RoleID, u.UserLevelID) AS UserLevelID
-    FROM dbo.UserLevel u
-    LEFT JOIN dbo.Roles r ON UPPER(RTRIM(LTRIM(u.UserLevel))) = UPPER(RTRIM(LTRIM(r.RoleName)))
-    WHERE ISNULL(u.UserLevel, '') <> ''
-    ORDER BY u.UserLevelID;
-END
-    */
-    BEGIN
-        INSERT INTO #DefaultRoles (RoleName)
-        SELECT DISTINCT UserLevel FROM dbo.UserLevel WHERE ISNULL(UserLevel, '') <> '';
-
-        INSERT INTO dbo.UserLevel (UserLevel)
-        SELECT d.RoleName 
-        FROM #DefaultRoles d
-        WHERE NOT EXISTS (
-            SELECT 1 FROM dbo.UserLevel u WHERE UPPER(RTRIM(LTRIM(u.UserLevel))) = UPPER(RTRIM(LTRIM(d.RoleName))) OR (d.RoleName IN (N'Admin', N'Administrator') AND UPPER(RTRIM(LTRIM(u.UserLevel))) IN (N'ADMIN', N'ADMINISTRATOR'))
-        );
-    END;
-
-    DECLARE @HasIsActive BIT = CASE WHEN EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Roles') AND name = 'IsActive') THEN 1 ELSE 0 END;
-    DECLARE @HasIsDelete BIT = CASE WHEN EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Roles') AND name = 'IsDelete') THEN 1 ELSE 0 END;
-    DECLARE @HasUserLevelID BIT = CASE WHEN EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.Roles') AND name = 'UserLevelID') THEN 1 ELSE 0 END;
-    DECLARE @Sql NVARCHAR(MAX);
-
-    SET @Sql = N'
-    INSERT INTO dbo.Roles (RoleName' + 
-        CASE WHEN @HasIsActive = 1 THEN N', IsActive' ELSE N'' END + 
-        CASE WHEN @HasIsDelete = 1 THEN N', IsDelete' ELSE N'' END + N')
-    SELECT DISTINCT d.RoleName' + 
-        CASE WHEN @HasIsActive = 1 THEN N', 1' ELSE N'' END + 
-        CASE WHEN @HasIsDelete = 1 THEN N', 0' ELSE N'' END + N'
-    FROM #DefaultRoles d
-    WHERE NOT EXISTS (
-        SELECT 1 FROM dbo.Roles r WHERE UPPER(RTRIM(LTRIM(r.RoleName))) = UPPER(RTRIM(LTRIM(d.RoleName))) OR (d.RoleName IN (N'Admin', N'Administrator') AND UPPER(RTRIM(LTRIM(r.RoleName))) IN (N'ADMIN', N'ADMINISTRATOR'))
-    );';
-
-    EXEC sp_executesql @Sql;
-
-    IF @HasUserLevelID = 1 AND OBJECT_ID('dbo.UserLevel', 'U') IS NOT NULL
-    BEGIN
-        EXEC sp_executesql N'
-        UPDATE r
-        SET r.UserLevelID = u.UserLevelID
-        FROM dbo.Roles r
-        INNER JOIN dbo.UserLevel u ON UPPER(RTRIM(LTRIM(r.RoleName))) = UPPER(RTRIM(LTRIM(u.UserLevel)));';
-    END;
-    DROP TABLE #DefaultRoles;
-END", (SqlConnection)DataConnection))
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_RolePermission, (SqlConnection)DataConnection))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@_Operation", "SEEDROLES");
                     cmd.ExecuteNonQuery();
                 }
             }
@@ -948,219 +769,23 @@ END", (SqlConnection)DataConnection))
         {
             try
             {
-                using (SqlCommand cmd = new SqlCommand(@"
-DECLARE @SchemaName SYSNAME;
-DECLARE @TableName SYSNAME;
-DECLARE @FullName NVARCHAR(300);
-DECLARE @Sql NVARCHAR(MAX);
-DECLARE @ObjectId INT;
-DECLARE @HasCategory BIT;
-DECLARE @HasIsActive BIT;
+                if (DataConnection.State != ConnectionState.Open) DataConnection.Open();
 
-SELECT TOP (1)
-    @SchemaName = s.name,
-    @TableName = t.name
-FROM sys.tables t
-INNER JOIN sys.schemas s ON s.schema_id = t.schema_id
-WHERE EXISTS (
-        SELECT 1
-        FROM sys.columns c
-        WHERE c.object_id = t.object_id
-          AND c.name = 'FormKey'
-    )
-  AND EXISTS (
-        SELECT 1
-        FROM sys.columns c
-        WHERE c.object_id = t.object_id
-          AND c.name = 'FormName'
-    )
-ORDER BY CASE
-    WHEN t.name IN ('Forms', 'FormMaster', 'RoleForms', 'POS_Forms', 'ApplicationForms') THEN 0
-    ELSE 1
-END, t.name;
-
-IF @TableName IS NOT NULL
-BEGIN
-    SET @FullName = QUOTENAME(@SchemaName) + N'.' + QUOTENAME(@TableName);
-    SET @ObjectId = OBJECT_ID(@FullName);
-
-    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = @ObjectId AND name = 'FormKey')
-        EXEC(N'ALTER TABLE ' + @FullName + N' ADD FormKey NVARCHAR(100) NULL');
-    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = @ObjectId AND name = 'Category')
-        EXEC(N'ALTER TABLE ' + @FullName + N' ADD Category NVARCHAR(100) NULL');
-    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = @ObjectId AND name = 'IsActive')
-        EXEC(N'ALTER TABLE ' + @FullName + N' ADD IsActive BIT NULL DEFAULT 1');
-
-    SET @HasCategory = 1;
-    SET @HasIsActive = 1;
-
-    CREATE TABLE #FormsToEnsure (
-        FormKey NVARCHAR(100),
-        FormName NVARCHAR(200),
-        Category NVARCHAR(100)
-    );
-
-    INSERT INTO #FormsToEnsure (FormKey, FormName, Category) VALUES
-    -- Master
-    ('company', 'Company Setup', 'Master'),
-    ('branch', 'Branch Setup', 'Master'),
-    ('state', 'State Master', 'Master'),
-    ('country', 'Country Master', 'Master'),
-    ('currency', 'Currency Master', 'Master'),
-    ('group', 'Group Master', 'Master'),
-    ('category', 'Category Master', 'Master'),
-    ('brand', 'Brand Master', 'Master'),
-    ('ItemMaster', 'Item Master', 'Master'),
-    ('itemtype', 'Item Type Master', 'Master'),
-    ('unit', 'Unit Master', 'Master'),
-    ('line', 'Line Master', 'Master'),
-    ('rack', 'Rack Master', 'Master'),
-    ('row', 'Row Master', 'Master'),
-    ('reason', 'Reason Master', 'Master'),
-    ('users', 'Users & Security Setup', 'Master'),
-    ('paymode', 'General Paymode Setup', 'Master'),
-    ('TaxManagement', 'Tax Management & Rates', 'Master'),
-    ('counter', 'Counter Master', 'Master'),
-    ('pricesetting', 'Price Level Settings', 'Master'),
-
-    -- Transaction
-    ('pos', 'POS Terminal', 'Transaction'),
-    ('sales', 'Sales Invoice', 'Transaction'),
-    ('salesreturn', 'Sales Return', 'Transaction'),
-    ('purchase', 'Purchase Invoice', 'Transaction'),
-    ('purchaseorder', 'Purchase Order', 'Transaction'),
-    ('purchasereturn', 'Purchase Return', 'Transaction'),
-    ('stockadjustment', 'Stock Adjustment', 'Transaction'),
-    ('stocktransfer', 'Stock Transfer', 'Transaction'),
-    ('grn', 'Goods Received Notes (GRN)', 'Transaction'),
-    ('quotation', 'Sales Quotation / Estimate', 'Transaction'),
-    ('deliverychallan', 'Delivery Challan', 'Transaction'),
-
-    -- Accounts
-    ('customer', 'Customer Management', 'Accounts'),
-    ('vendor', 'Vendor Management', 'Accounts'),
-    ('ledgers', 'Account Ledgers', 'Accounts'),
-    ('accountgroup', 'Account Group Setup', 'Accounts'),
-    ('chartofaccount', 'Chart of Accounts', 'Accounts'),
-    ('receipt', 'Customer Receipt', 'Accounts'),
-    ('payment', 'Vendor Payment', 'Accounts'),
-    ('generalpayment', 'General Payment Voucher', 'Accounts'),
-    ('generalreceipt', 'General Receipt Voucher', 'Accounts'),
-    ('contra', 'Contra Voucher', 'Accounts'),
-    ('journal', 'Journal Voucher', 'Accounts'),
-    ('debitnote', 'Debit Note Voucher', 'Accounts'),
-    ('creditnote', 'Credit Note Voucher', 'Accounts'),
-    ('bankreconciliation', 'Bank Reconciliation', 'Accounts'),
-    ('manualpartybalance', 'Manual Party Balance Entry', 'Accounts'),
-    ('expenseentry', 'Expense Voucher Entry', 'Accounts'),
-
-    -- Reports & Analytics
-    ('dashboard', 'Executive Dashboard & KPIs', 'Reports'),
-    ('salesanalytics', 'Sales Analytics Dashboard', 'Reports'),
-    ('purchaseanalytics', 'Purchase Analytics Dashboard', 'Reports'),
-    ('stockanalytics', 'Stock Analytics Dashboard', 'Reports'),
-    ('smartreorder', 'Smart Reorder Dashboard', 'Reports'),
-    ('itemreport', 'Item Report & Details', 'Reports'),
-    ('stockreport', 'Stock Report', 'Reports'),
-    ('salesreport', 'Sales Summary Report', 'Reports'),
-    ('purchasereport', 'Purchase Summary Report', 'Reports'),
-    ('vendorpurchasereport', 'Vendor Purchase Report', 'Reports'),
-    ('tradingpl', 'Trading & Profit / Loss Account', 'Reports'),
-    ('balancesheet', 'Balance Sheet', 'Reports'),
-    ('trialbalance', 'Trial Balance', 'Reports'),
-    ('cashbankbook', 'Cash & Bank Book', 'Reports'),
-    ('daybook', 'Day Book', 'Reports'),
-    ('bankstatement', 'Bank Statement Report', 'Reports'),
-    ('shiftreconciliation', 'Shift Reconciliation Report', 'Reports'),
-    ('vendoroutstanding', 'Vendor Outstanding Report', 'Reports'),
-    ('customerledger', 'Customer Ledger Report', 'Reports'),
-    ('customeroutstanding', 'Customer Outstanding Report', 'Reports'),
-    ('customerreceiptreport', 'Customer Receipt Report', 'Reports'),
-    ('salesprofit', 'Sales Profit Report', 'Reports'),
-    ('counterreport', 'Counter Sales Report', 'Reports'),
-    ('salesmanincentive', 'Salesman Incentive Report', 'Reports'),
-    ('customerwisesalessummary', 'Customerwise Sales Summary Report', 'Reports'),
-    ('salesmanwisesalessummary', 'Salesmanwise Sales Summary Report', 'Reports'),
-    ('itemwisesalessummary', 'Itemwise Sales Summary Report', 'Reports'),
-    ('stockvaluation', 'Stock Valuation Report', 'Reports'),
-    ('lowstockalert', 'Low Stock Alert Report', 'Reports'),
-    ('stockadjustmentreport', 'Stock Adjustment Report', 'Reports'),
-    ('inactiveitemsreport', 'Inactive Items Report', 'Reports'),
-    ('manualpartybalancereport', 'Manual Party Balance Report', 'Reports'),
-    ('combinedpartybalancereport', 'Combined Party Balance Report', 'Reports'),
-    ('stockreportadvanced', 'Advanced Stock Report', 'Reports'),
-    ('stockaudit', 'Stock Audit Report', 'Reports'),
-    ('salesdetails', 'Sales Details Report', 'Reports'),
-    ('salesreturnreport', 'Sales Return Report', 'Reports'),
-    ('salesreturndetails', 'Sales Return Details Report', 'Reports'),
-    ('purchasedetails', 'Purchase Details Report', 'Reports'),
-    ('purchasereturnreport', 'Purchase Return Report', 'Reports'),
-    ('purchasereturndetails', 'Purchase Return Details Report', 'Reports'),
-    ('grnreport', 'Goods Received (GRN) Report', 'Reports'),
-    ('cashinout', 'Cash In / Out Report', 'Reports'),
-    ('profitloss', 'Profit and Loss Account', 'Reports'),
-    ('businessexpense', 'Business Expense Report', 'Reports'),
-    ('inputgst', 'Input GST Report', 'Reports'),
-    ('outputgst', 'Output GST Report', 'Reports'),
-    ('govtgst', 'Government GST Return Report', 'Reports'),
-
-    -- Settings & Utilities
-    ('possettings', 'Sale Settings & Preferences', 'Settings'),
-    ('excelimport', 'Excel Import / Export Utility', 'Utilities'),
-    ('rolepermissions', 'Role Permissions Management', 'Settings'),
-    ('ActivityLog', 'Activity Log (Master)', 'Settings'),
-    ('itemhistory', 'Item History Log', 'Settings'),
-    ('transactionactivity', 'Transaction Activity Log', 'Settings'),
-    ('useractivity', 'User Activity Log', 'Settings'),
-    ('itemstockactivity', 'Stock Activity Log', 'Settings'),
-    ('yearclosing', 'Financial Year Closing', 'Settings'),
-    ('applanguage', 'Application Language Settings', 'Settings'),
-    ('nexorisai', 'Nexoris AI Copilot', 'Utilities'),
-    ('barcode', 'Barcode Label Designer & Print', 'Utilities'),
-    ('plu', 'PLU Weighing Scale Setup', 'Utilities'),
-    ('openingstock', 'Opening Stock Entry Utility', 'Utilities'),
-    ('counterclosing', 'Counter Shift Closing Utility', 'Utilities'),
-    ('changeitemno', 'Change Item Number Utility', 'Utilities'),
-    ('databasemaintenance', 'Database Backup & Maintenance', 'Utilities'),
-    ('printsetup', 'Receipt & Invoice Print Setup', 'Settings'),
-    ('systemsettings', 'System Preferences & Hardware', 'Settings'),
-    ('dataaudit', 'Data Integrity Audit Utility', 'Utilities');
-
-    DECLARE @IsIdent BIT = COLUMNPROPERTY(@ObjectId, 'FormID', 'IsIdentity');
-
-    SET @Sql = N'
-    DECLARE @MaxID INT = ISNULL((SELECT MAX(FormID) FROM ' + @FullName + N'), 0);
-    INSERT INTO ' + @FullName + N' (' + CASE WHEN @IsIdent = 0 THEN N'FormID, ' ELSE N'' END + N'FormKey, FormName, Category, IsActive)
-    SELECT ' + CASE WHEN @IsIdent = 0 THEN N'@MaxID + ROW_NUMBER() OVER (ORDER BY f.Category, f.FormName), ' ELSE N'' END + N'f.FormKey, f.FormName, f.Category, 1
-    FROM #FormsToEnsure f
-    WHERE NOT EXISTS (
-        SELECT 1 FROM ' + @FullName + N' t 
-        WHERE (ISNULL(t.FormKey, '''') <> '''' AND UPPER(RTRIM(LTRIM(t.FormKey))) = UPPER(RTRIM(LTRIM(f.FormKey))))
-           OR (ISNULL(t.FormName, '''') <> '''' AND UPPER(RTRIM(LTRIM(t.FormName))) = UPPER(RTRIM(LTRIM(f.FormName))))
-    );';
-
-    EXEC sp_executesql @Sql;
-
-    SET @Sql = N'
-    UPDATE t
-    SET t.Category = CASE WHEN ISNULL(t.Category, '''') = '''' THEN f.Category ELSE t.Category END,
-        t.FormKey = CASE WHEN ISNULL(t.FormKey, '''') = '''' THEN f.FormKey ELSE t.FormKey END,
-        t.IsActive = ISNULL(t.IsActive, 1)
-    FROM ' + @FullName + N' t
-    INNER JOIN #FormsToEnsure f ON UPPER(RTRIM(LTRIM(t.FormName))) = UPPER(RTRIM(LTRIM(f.FormName)))
-                                OR UPPER(RTRIM(LTRIM(t.FormKey))) = UPPER(RTRIM(LTRIM(f.FormKey)));';
-
-    EXEC sp_executesql @Sql;
-
-    DROP TABLE #FormsToEnsure;
-END", (SqlConnection)DataConnection))
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_RolePermission, (SqlConnection)DataConnection))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@_Operation", "SEEDFORMS");
                     cmd.ExecuteNonQuery();
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Unable to ensure permission forms: {ex.Message}");
+            }
+            finally
+            {
+                if (DataConnection.State == ConnectionState.Open)
+                    DataConnection.Close();
             }
         }
 
@@ -1212,25 +837,21 @@ END", (SqlConnection)DataConnection))
             {
                 if (DataConnection.State != ConnectionState.Open) DataConnection.Open();
 
-                using (SqlCommand cmd = new SqlCommand(@"
-IF OBJECT_ID('dbo.RolePermissions', 'U') IS NOT NULL
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.RolePermissions') AND name = 'FormKey')
-    BEGIN
-        ALTER TABLE dbo.RolePermissions ADD FormKey NVARCHAR(100) NULL;
-    END
-    IF NOT EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.RolePermissions') AND name = 'FormName')
-    BEGIN
-        ALTER TABLE dbo.RolePermissions ADD FormName NVARCHAR(200) NULL;
-    END
-END", (SqlConnection)DataConnection))
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_RolePermission, (SqlConnection)DataConnection))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    cmd.Parameters.AddWithValue("@_Operation", "ENSURESCHEMA");
                     cmd.ExecuteNonQuery();
                 }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"EnsureRolePermissionColumnsExist warning: {ex.Message}");
+            }
+            finally
+            {
+                if (DataConnection.State == ConnectionState.Open)
+                    DataConnection.Close();
             }
         }
 
@@ -1265,118 +886,51 @@ END", (SqlConnection)DataConnection))
             try
             {
                 if (DataConnection.State != ConnectionState.Open) DataConnection.Open();
+                var trans = DataConnection.BeginTransaction();
 
-                using (SqlCommand cmd = new SqlCommand(@"
-DECLARE @RealFormID INT = @FormID;
-
-IF OBJECT_ID('dbo.Forms', 'U') IS NOT NULL
-BEGIN
-    IF @RealFormID <= 0 OR NOT EXISTS (SELECT 1 FROM dbo.Forms WHERE FormID = @RealFormID)
-    BEGIN
-        SELECT TOP 1 @RealFormID = FormID 
-        FROM dbo.Forms 
-        WHERE (ISNULL(@FormKey, '') <> '' AND UPPER(RTRIM(LTRIM(FormKey))) = UPPER(RTRIM(LTRIM(@FormKey))))
-           OR (ISNULL(@FormName, '') <> '' AND UPPER(RTRIM(LTRIM(FormName))) = UPPER(RTRIM(LTRIM(@FormName))));
-
-        IF @RealFormID IS NULL OR @RealFormID <= 0 OR NOT EXISTS (SELECT 1 FROM dbo.Forms WHERE FormID = @RealFormID)
-        BEGIN
-            DECLARE @IsIdent BIT = COLUMNPROPERTY(OBJECT_ID('dbo.Forms'), 'FormID', 'IsIdentity');
-            IF @IsIdent = 1
-            BEGIN
-                INSERT INTO dbo.Forms (FormKey, FormName, Category, IsActive)
-                VALUES (@FormKey, @FormName, @Category, 1);
-                SET @RealFormID = SCOPE_IDENTITY();
-            END
-            ELSE
-            BEGIN
-                SELECT @RealFormID = ISNULL(MAX(FormID), 0) + 1 FROM dbo.Forms;
-                INSERT INTO dbo.Forms (FormID, FormKey, FormName, Category, IsActive)
-                VALUES (@RealFormID, @FormKey, @FormName, @Category, 1);
-            END
-        END
-    END
-END
-
-IF OBJECT_ID('dbo.RolePermissions', 'U') IS NOT NULL
-BEGIN
-    DECLARE @HasFK BIT = CASE WHEN EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.RolePermissions') AND name = 'FormKey') THEN 1 ELSE 0 END;
-    DECLARE @HasFN BIT = CASE WHEN EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('dbo.RolePermissions') AND name = 'FormName') THEN 1 ELSE 0 END;
-
-    IF @HasFK = 1 AND @HasFN = 1
-    BEGIN
-        IF EXISTS (SELECT 1 FROM dbo.RolePermissions WHERE RoleID = @RoleID AND FormID = @RealFormID)
-        BEGIN
-            UPDATE dbo.RolePermissions
-            SET CanView = @CanView, CanAdd = @CanAdd, CanEdit = @CanEdit, CanDelete = @CanDelete,
-                FormKey = @FormKey, FormName = @FormName
-            WHERE RoleID = @RoleID AND FormID = @RealFormID;
-        END
-        ELSE
-        BEGIN
-            INSERT INTO dbo.RolePermissions (RoleID, FormID, FormKey, FormName, CanView, CanAdd, CanEdit, CanDelete)
-            VALUES (@RoleID, @RealFormID, @FormKey, @FormName, @CanView, @CanAdd, @CanEdit, @CanDelete);
-        END
-    END
-    ELSE
-    BEGIN
-        IF EXISTS (SELECT 1 FROM dbo.RolePermissions WHERE RoleID = @RoleID AND FormID = @RealFormID)
-        BEGIN
-            UPDATE dbo.RolePermissions
-            SET CanView = @CanView, CanAdd = @CanAdd, CanEdit = @CanEdit, CanDelete = @CanDelete
-            WHERE RoleID = @RoleID AND FormID = @RealFormID;
-        END
-        ELSE
-        BEGIN
-            INSERT INTO dbo.RolePermissions (RoleID, FormID, CanView, CanAdd, CanEdit, CanDelete)
-            VALUES (@RoleID, @RealFormID, @CanView, @CanAdd, @CanEdit, @CanDelete);
-        END
-    END
-END
-ELSE IF OBJECT_ID('dbo.POS_RolePermissions', 'U') IS NOT NULL
-BEGIN
-    IF EXISTS (SELECT 1 FROM dbo.POS_RolePermissions WHERE RoleID = @RoleID AND FormID = @RealFormID)
-    BEGIN
-        UPDATE dbo.POS_RolePermissions
-        SET CanView = @CanView, CanAdd = @CanAdd, CanEdit = @CanEdit, CanDelete = @CanDelete
-        WHERE RoleID = @RoleID AND FormID = @RealFormID;
-    END
-    ELSE
-    BEGIN
-        INSERT INTO dbo.POS_RolePermissions (RoleID, FormID, CanView, CanAdd, CanEdit, CanDelete)
-        VALUES (@RoleID, @RealFormID, @CanView, @CanAdd, @CanEdit, @CanDelete);
-    END
-END", (SqlConnection)DataConnection))
+                try
                 {
-                    cmd.Parameters.Add("@RoleID", SqlDbType.Int);
-                    cmd.Parameters.Add("@FormID", SqlDbType.Int);
-                    cmd.Parameters.Add("@FormKey", SqlDbType.NVarChar, 100);
-                    cmd.Parameters.Add("@FormName", SqlDbType.NVarChar, 200);
-                    cmd.Parameters.Add("@Category", SqlDbType.NVarChar, 100);
-                    cmd.Parameters.Add("@CanView", SqlDbType.Bit);
-                    cmd.Parameters.Add("@CanAdd", SqlDbType.Bit);
-                    cmd.Parameters.Add("@CanEdit", SqlDbType.Bit);
-                    cmd.Parameters.Add("@CanDelete", SqlDbType.Bit);
-
-                    foreach (var tid in targetRoleIds)
+                    using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_RolePermission, (SqlConnection)DataConnection, (SqlTransaction)trans))
                     {
-                        foreach (var perm in permissions)
-                        {
-                            cmd.Parameters["@RoleID"].Value = tid;
-                            cmd.Parameters["@FormID"].Value = perm.FormID;
-                            cmd.Parameters["@FormKey"].Value = perm.FormKey ?? "";
-                            cmd.Parameters["@FormName"].Value = perm.FormName ?? "";
-                            cmd.Parameters["@Category"].Value = perm.Category ?? "General";
-                            cmd.Parameters["@CanView"].Value = perm.CanView;
-                            cmd.Parameters["@CanAdd"].Value = perm.CanAdd;
-                            cmd.Parameters["@CanEdit"].Value = perm.CanEdit;
-                            cmd.Parameters["@CanDelete"].Value = perm.CanDelete;
+                        cmd.CommandType = CommandType.StoredProcedure;
+                        cmd.Parameters.Add("@RoleID", SqlDbType.Int);
+                        cmd.Parameters.Add("@FormID", SqlDbType.Int);
+                        cmd.Parameters.Add("@FormKey", SqlDbType.NVarChar, 100);
+                        cmd.Parameters.Add("@FormName", SqlDbType.NVarChar, 200);
+                        cmd.Parameters.Add("@Category", SqlDbType.NVarChar, 100);
+                        cmd.Parameters.Add("@CanView", SqlDbType.Bit);
+                        cmd.Parameters.Add("@CanAdd", SqlDbType.Bit);
+                        cmd.Parameters.Add("@CanEdit", SqlDbType.Bit);
+                        cmd.Parameters.Add("@CanDelete", SqlDbType.Bit);
+                        cmd.Parameters.Add("@_Operation", SqlDbType.NVarChar, 50).Value = "SAVE";
 
-                            cmd.ExecuteNonQuery();
+                        foreach (var tid in targetRoleIds)
+                        {
+                            foreach (var perm in permissions)
+                            {
+                                cmd.Parameters["@RoleID"].Value = tid;
+                                cmd.Parameters["@FormID"].Value = perm.FormID;
+                                cmd.Parameters["@FormKey"].Value = (object)(perm.FormKey ?? "") ?? DBNull.Value;
+                                cmd.Parameters["@FormName"].Value = (object)(perm.FormName ?? "") ?? DBNull.Value;
+                                cmd.Parameters["@Category"].Value = (object)(perm.Category ?? "General") ?? DBNull.Value;
+                                cmd.Parameters["@CanView"].Value = perm.CanView;
+                                cmd.Parameters["@CanAdd"].Value = perm.CanAdd;
+                                cmd.Parameters["@CanEdit"].Value = perm.CanEdit;
+                                cmd.Parameters["@CanDelete"].Value = perm.CanDelete;
+
+                                cmd.ExecuteNonQuery();
+                            }
                         }
                     }
-                }
 
-                return "Success";
+                    trans.Commit();
+                    return "Success";
+                }
+                catch (Exception)
+                {
+                    trans.Rollback();
+                    throw;
+                }
             }
             catch (Exception ex)
             {
@@ -1403,63 +957,13 @@ END", (SqlConnection)DataConnection))
             {
                 if (DataConnection.State != ConnectionState.Open) DataConnection.Open();
 
-                using (SqlCommand cmd = new SqlCommand(@"
-IF OBJECT_ID('dbo.Forms', 'U') IS NOT NULL
-BEGIN
-    DECLARE @RealFormID INT = 0;
-    SELECT TOP 1 @RealFormID = FormID 
-    FROM dbo.Forms 
-    WHERE (ISNULL(@FormKey, '') <> '' AND UPPER(RTRIM(LTRIM(FormKey))) = UPPER(RTRIM(LTRIM(@FormKey))))
-       OR (ISNULL(@FormName, '') <> '' AND UPPER(RTRIM(LTRIM(FormName))) = UPPER(RTRIM(LTRIM(@FormName))));
-
-    IF @RealFormID IS NULL OR @RealFormID <= 0
-    BEGIN
-        DECLARE @IsIdent BIT = COLUMNPROPERTY(OBJECT_ID('dbo.Forms'), 'FormID', 'IsIdentity');
-        IF @IsIdent = 1
-        BEGIN
-            INSERT INTO dbo.Forms (FormKey, FormName, Category, IsActive)
-            VALUES (@FormKey, @FormName, @Category, 1);
-            SET @RealFormID = SCOPE_IDENTITY();
-        END
-        ELSE
-        BEGIN
-            SELECT @RealFormID = ISNULL(MAX(FormID), 0) + 1 FROM dbo.Forms;
-            INSERT INTO dbo.Forms (FormID, FormKey, FormName, Category, IsActive)
-            VALUES (@RealFormID, @FormKey, @FormName, @Category, 1);
-        END
-    END
-    ELSE
-    BEGIN
-        UPDATE dbo.Forms
-        SET FormKey = CASE WHEN ISNULL(FormKey, '') = '' THEN @FormKey ELSE FormKey END,
-            FormName = CASE WHEN ISNULL(FormName, '') = '' THEN @FormName ELSE FormName END,
-            Category = CASE WHEN ISNULL(Category, '') = '' THEN @Category ELSE Category END,
-            IsActive = 1
-        WHERE FormID = @RealFormID;
-    END
-
-    -- Ensure Admin role gets view/add/edit/delete permissions automatically
-    IF OBJECT_ID('dbo.RolePermissions', 'U') IS NOT NULL
-    BEGIN
-        DECLARE @AdminRoleID INT = 0;
-        SELECT TOP 1 @AdminRoleID = RoleID FROM dbo.Roles WHERE UPPER(RTRIM(LTRIM(RoleName))) IN ('ADMIN', 'ADMINISTRATOR');
-        IF @AdminRoleID <= 0 AND OBJECT_ID('dbo.UserLevel', 'U') IS NOT NULL
-            SELECT TOP 1 @AdminRoleID = UserLevelID FROM dbo.UserLevel WHERE UPPER(RTRIM(LTRIM(UserLevel))) IN ('ADMIN', 'ADMINISTRATOR');
-
-        IF @AdminRoleID > 0
-        BEGIN
-            IF NOT EXISTS (SELECT 1 FROM dbo.RolePermissions WHERE RoleID = @AdminRoleID AND FormID = @RealFormID)
-            BEGIN
-                INSERT INTO dbo.RolePermissions (RoleID, FormID, CanView, CanAdd, CanEdit, CanDelete)
-                VALUES (@AdminRoleID, @RealFormID, 1, 1, 1, 1);
-            END
-        END
-    END
-END", (SqlConnection)DataConnection))
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_RolePermission, (SqlConnection)DataConnection))
                 {
+                    cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@FormKey", formKey?.Trim() ?? "");
                     cmd.Parameters.AddWithValue("@FormName", formName?.Trim() ?? "");
                     cmd.Parameters.AddWithValue("@Category", string.IsNullOrWhiteSpace(category) ? "General" : category.Trim());
+                    cmd.Parameters.AddWithValue("@_Operation", "REGISTERFORM");
                     cmd.ExecuteNonQuery();
                 }
 

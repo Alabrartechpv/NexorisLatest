@@ -1275,6 +1275,18 @@
     <Compile Include="Reports\FinancialReports\frmCustomerLedgerReport.Designer.cs">
       <DependentUpon>frmCustomerLedgerReport.cs</DependentUpon>
     </Compile>
+    <Compile Include="Reports\FinancialReports\frmcustomerreportdetails.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Reports\FinancialReports\frmvendorreportdetails.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Reports\FinancialReports\frmvendorreportdetails.Designer.cs">
+      <DependentUpon>frmvendorreportdetails.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Reports\FinancialReports\frmcustomerreportdetails.Designer.cs">
+      <DependentUpon>frmcustomerreportdetails.cs</DependentUpon>
+    </Compile>
     <Compile Include="Reports\InventoryReport\frmStockValuationReport.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -1935,6 +1947,28 @@
     <EmbeddedResource Include="Reports\FinancialReports\frmCustomerLedgerReport.resx">
       <DependentUpon>frmCustomerLedgerReport.cs</DependentUpon>
     </EmbeddedResource>
+    <EmbeddedResource Include="Reports\FinancialReports\frmvendorreportdetails.resx">
+      <DependentUpon>frmvendorreportdetails.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Reports\FinancialReports\frmcustomerreportdetails.resx">
+      <DependentUpon>frmcustomerreportdetails.cs</DependentUpon>
+    </EmbeddedResource>
+    <!--
+      <DependentUpon>frmCustomerLedgerReport.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Reports\FinancialReports\frmcustomerreportdetails.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Reports\FinancialReports\frmvendorreportdetails.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Reports\FinancialReports\frmvendorreportdetails.Designer.cs">
+      <DependentUpon>frmvendorreportdetails.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Reports\FinancialReports\frmcustomerreportdetails.Designer.cs">
+      <DependentUpon>frmcustomerreportdetails.cs</DependentUpon>
+    </EmbeddedResource>
+    -->
     <EmbeddedResource Include="Reports\InventoryReport\frmStockValuationReport.resx">
       <DependentUpon>frmStockValuationReport.cs</DependentUpon>
     </EmbeddedResource>
