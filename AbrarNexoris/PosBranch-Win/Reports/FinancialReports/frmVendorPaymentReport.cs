@@ -200,13 +200,16 @@ namespace PosBranch_Win.Reports.FinancialReports
 
         private void UpdateDateControlState()
         {
-            lblFromDate.Visible = true;
-            dtFrom.Visible = true;
-            dtFrom.Enabled = true;
+            string preset = Convert.ToString(comboBox1.Value);
+            bool isAll = string.IsNullOrWhiteSpace(preset) || string.Equals(preset, "ALL", StringComparison.OrdinalIgnoreCase);
 
-            lblToDate.Visible = true;
-            dtTo.Visible = true;
-            dtTo.Enabled = true;
+            lblFromDate.Visible = !isAll;
+            dtFrom.Visible = !isAll;
+            dtFrom.Enabled = !isAll;
+
+            lblToDate.Visible = !isAll;
+            dtTo.Visible = !isAll;
+            dtTo.Enabled = !isAll;
         }
 
         private void DateEditor_ValueChanged(object sender, EventArgs e)
@@ -328,6 +331,7 @@ namespace PosBranch_Win.Reports.FinancialReports
 
         private static void StyleFilterCombo(Infragistics.Win.UltraWinEditors.UltraComboEditor combo, bool isDropDownList)
         {
+            if (combo == null) return;
             combo.UseAppStyling = false;
             combo.UseOsThemes = DefaultableBoolean.False;
             combo.DisplayStyle = EmbeddableElementDisplayStyle.Office2013;
@@ -338,6 +342,8 @@ namespace PosBranch_Win.Reports.FinancialReports
             combo.Appearance.FontData.Name = "Tahoma";
             combo.Appearance.FontData.SizeInPoints = 10;
             combo.ButtonStyle = UIElementButtonStyle.Office2003ToolbarButton;
+            combo.ReadOnly = false;
+            combo.Enabled = true;
             combo.DropDownStyle = isDropDownList
                 ? Infragistics.Win.DropDownStyle.DropDownList
                 : Infragistics.Win.DropDownStyle.DropDown;

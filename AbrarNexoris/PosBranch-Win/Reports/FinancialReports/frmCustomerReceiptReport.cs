@@ -276,13 +276,16 @@ namespace PosBranch_Win.Reports.FinancialReports
 
         private void UpdateDateControlState()
         {
-            lblFromDate.Visible = true;
-            dtFrom.Visible = true;
-            dtFrom.Enabled = true;
+            string preset = Convert.ToString(comboBox1.Value);
+            bool isAll = string.IsNullOrWhiteSpace(preset) || string.Equals(preset, "ALL", StringComparison.OrdinalIgnoreCase);
 
-            lblToDate.Visible = true;
-            dtTo.Visible = true;
-            dtTo.Enabled = true;
+            lblFromDate.Visible = !isAll;
+            dtFrom.Visible = !isAll;
+            dtFrom.Enabled = !isAll;
+
+            lblToDate.Visible = !isAll;
+            dtTo.Visible = !isAll;
+            dtTo.Enabled = !isAll;
         }
 
         private void DateEditor_ValueChanged(object sender, EventArgs e)
@@ -409,7 +412,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             StyleDateEditor(dtTo);
         }
 
-        private static void StyleFilterCombo(Infragistics.Win.UltraWinEditors.UltraComboEditor combo, bool readOnly)
+        private static void StyleFilterCombo(Infragistics.Win.UltraWinEditors.UltraComboEditor combo, bool isDropDownList)
         {
             if (combo == null) return;
             combo.UseAppStyling = false;
@@ -423,7 +426,11 @@ namespace PosBranch_Win.Reports.FinancialReports
             combo.Appearance.FontData.SizeInPoints = 8.25F;
             combo.Font = new Font("Microsoft Sans Serif", 8.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
             combo.ButtonStyle = UIElementButtonStyle.Office2003ToolbarButton;
-            combo.ReadOnly = readOnly;
+            combo.ReadOnly = false;
+            combo.Enabled = true;
+            combo.DropDownStyle = isDropDownList
+                ? Infragistics.Win.DropDownStyle.DropDownList
+                : Infragistics.Win.DropDownStyle.DropDown;
         }
 
         private static void StyleDateEditor(Infragistics.Win.UltraWinEditors.UltraDateTimeEditor editor)
