@@ -85,6 +85,7 @@
     <Compile Include="Report\SmartReorderItemModel.cs" />
     <Compile Include="Report\AuditTrailModel.cs" />
     <Compile Include="Report\PurchaseReportMaster.cs" />
+    <Compile Include="Report\DatewisePurchaseReportModel.cs" />
     <Compile Include="Report\PurchaseReturnReport.cs" />
     <Compile Include="Report\Reports.cs" />
     <Compile Include="Report\CounterReportModel.cs" />

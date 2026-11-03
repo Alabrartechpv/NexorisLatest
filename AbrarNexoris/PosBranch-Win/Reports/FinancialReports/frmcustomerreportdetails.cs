@@ -2224,7 +2224,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                 if (ReportPdfExporter.CheckAndExportPdf(dialog, gridReport, "Customer Report Details", BuildPreviewSubtitle()))
                     return;
 
-                StringBuilder builder = new StringBuilder();
+                /* [Legacy export retained for reference]
                 builder.AppendLine("CustID,CustomerName,Phone,Email,TotalBills,CustomerInvoiceAmount,CustomerReceivedAmount,CustomerBalance,BillNo,DocNo,BillDate,DueDate,BillInvoiceAmount,BillReceivedAmount,BillBalance,SalesPerson");
 
                 DataTable summary = _currentDataSet.Tables["CustomerSummary"];
@@ -2273,10 +2273,110 @@ namespace PosBranch_Win.Reports.FinancialReports
                     }
                 }
 
-                File.WriteAllText(dialog.FileName, builder.ToString(), Encoding.UTF8);
+                */
+                File.WriteAllText(dialog.FileName, BuildCustomerExportCsv().ToString(), Encoding.UTF8);
                 MessageBox.Show("Customer Report Details exported successfully.", "Export",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
+        }
+
+        private StringBuilder BuildCustomerExportCsv()
+        {
+            StringBuilder builder = new StringBuilder();
+
+            bool anyRowExpanded = gridReport.Rows != null && gridReport.Rows.Cast<UltraGridRow>().Any(r => r.IsDataRow && !r.Hidden && !r.IsFilteredOut && r.Expanded);
+
+            if (!anyRowExpanded)
+            {
+                // Grid report is NOT expanded: export as same as in gridreport (Band 0 visible columns only)
+                var visibleCols = gridReport.DisplayLayout.Bands[0].Columns
+                    .Cast<UltraGridColumn>()
+                    .Where(c => !c.Hidden && !c.IsChaptered)
+                    .OrderBy(c => c.Header.VisiblePosition)
+                    .ToList();
+
+                builder.AppendLine(string.Join(",", visibleCols.Select(c => EscapeCsv(!string.IsNullOrEmpty(c.Header.Caption) ? c.Header.Caption : c.Key))));
+
+                foreach (UltraGridRow row in gridReport.Rows)
+                {
+                    if (!row.IsDataRow || row.Hidden || row.IsFilteredOut) continue;
+
+                    builder.AppendLine(string.Join(",", visibleCols.Select(c =>
+                    {
+                        if (!row.Cells.Exists(c.Key)) return string.Empty;
+                        var cell = row.Cells[c.Key];
+                        string text = cell.Text;
+                        if (!string.IsNullOrEmpty(text)) return EscapeCsv(text.Replace("₹", "").Trim());
+                        return cell.Value != null && cell.Value != DBNull.Value ? EscapeCsv(cell.Value.ToString()) : string.Empty;
+                    })));
+                }
+            }
+            else
+            {
+                // At least one row is expanded: include bill details only for rows that are expanded
+                builder.AppendLine("CustID,CustomerName,Phone,Email,TotalBills,CustomerInvoiceAmount,CustomerReceivedAmount,CustomerBalance,BillNo,DocNo,BillDate,DueDate,BillInvoiceAmount,BillReceivedAmount,BillBalance,SalesPerson");
+
+                DataTable bills = _currentDataSet != null && _currentDataSet.Tables.Contains("CustomerBills") ? _currentDataSet.Tables["CustomerBills"] : null;
+
+                foreach (UltraGridRow row in gridReport.Rows)
+                {
+                    if (!row.IsDataRow || row.Hidden || row.IsFilteredOut) continue;
+
+                    string custIdStr = row.Cells.Exists("CustID") ? Convert.ToString(row.Cells["CustID"].Value) : "0";
+                    string custName = row.Cells.Exists("CustomerName") ? Convert.ToString(row.Cells["CustomerName"].Value) : "";
+                    string phone = row.Cells.Exists("Phone") ? Convert.ToString(row.Cells["Phone"].Value) : "";
+                    string email = row.Cells.Exists("Email") ? Convert.ToString(row.Cells["Email"].Value) : "";
+                    string totalBills = row.Cells.Exists("TotalBills") ? Convert.ToString(row.Cells["TotalBills"].Value) : "0";
+                    string invAmt = row.Cells.Exists("InvoiceAmount") && row.Cells["InvoiceAmount"].Value != DBNull.Value ? Convert.ToDecimal(row.Cells["InvoiceAmount"].Value).ToString("F2") : "0.00";
+                    string recAmt = row.Cells.Exists("ReceivedAmount") && row.Cells["ReceivedAmount"].Value != DBNull.Value ? Convert.ToDecimal(row.Cells["ReceivedAmount"].Value).ToString("F2") : "0.00";
+                    string balAmt = row.Cells.Exists("Balance") && row.Cells["Balance"].Value != DBNull.Value ? Convert.ToDecimal(row.Cells["Balance"].Value).ToString("F2") : "0.00";
+
+                    int custId;
+                    int.TryParse(custIdStr, out custId);
+
+                    if (row.Expanded && bills != null)
+                    {
+                        DataRow[] childBills = bills.Select($"CustID = {custId}");
+                        if (childBills.Length > 0)
+                        {
+                            foreach (DataRow b in childBills)
+                            {
+                                builder.AppendLine(string.Join(",",
+                                    EscapeCsv(custIdStr),
+                                    EscapeCsv(custName),
+                                    EscapeCsv(phone),
+                                    EscapeCsv(email),
+                                    EscapeCsv(totalBills),
+                                    EscapeCsv(invAmt),
+                                    EscapeCsv(recAmt),
+                                    EscapeCsv(balAmt),
+                                    EscapeCsv(b["BillNo"].ToString()),
+                                    EscapeCsv(b["DocNo"].ToString()),
+                                    b["BillDate"] != DBNull.Value ? EscapeCsv(Convert.ToDateTime(b["BillDate"]).ToString("yyyy-MM-dd")) : "",
+                                    b["DueDate"] != DBNull.Value ? EscapeCsv(Convert.ToDateTime(b["DueDate"]).ToString("yyyy-MM-dd")) : "",
+                                    EscapeCsv(Convert.ToDecimal(b["InvoiceAmount"]).ToString("F2")),
+                                    EscapeCsv(Convert.ToDecimal(b["ReceivedAmount"]).ToString("F2")),
+                                    EscapeCsv(Convert.ToDecimal(b["Balance"]).ToString("F2")),
+                                    EscapeCsv(b["SalesPerson"].ToString())));
+                            }
+                            continue;
+                        }
+                    }
+
+                    builder.AppendLine(string.Join(",",
+                        EscapeCsv(custIdStr),
+                        EscapeCsv(custName),
+                        EscapeCsv(phone),
+                        EscapeCsv(email),
+                        EscapeCsv(totalBills),
+                        EscapeCsv(invAmt),
+                        EscapeCsv(recAmt),
+                        EscapeCsv(balAmt),
+                        "", "", "", "", "0.00", "0.00", "0.00", ""));
+                }
+            }
+
+            return builder;
         }
 
         private static string EscapeCsv(string value)

@@ -92,6 +92,7 @@
     <Compile Include="ReportRepository\ItemReportRepo.cs" />
     <Compile Include="ReportRepository\AuditTrailReportRepository.cs" />
     <Compile Include="ReportRepository\PurchaseReportRepository.cs" />
+    <Compile Include="ReportRepository\DatewisePurchaseReportRepository.cs" />
     <Compile Include="ReportRepository\PurchaseReturnReportRepositoty.cs" />
     <Compile Include="ReportRepository\SalesAnalyticsRepository.cs" />
     <Compile Include="ReportRepository\PurchaseAnalyticsRepository.cs" />
@@ -162,6 +163,7 @@
   <ItemGroup>
     <None Include="packages.config" />
     <None Include="Scripts\POS_RolePermission.sql" />
+    <None Include="Scripts\POS_DatewisePurchaseReport.sql" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

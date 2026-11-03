@@ -1230,6 +1230,12 @@
     <Compile Include="Reports\PurchaseReports\frmpurchaseAuditreport.Designer.cs">
       <DependentUpon>frmpurchaseAuditreport.cs</DependentUpon>
     </Compile>
+    <Compile Include="Reports\PurchaseReports\frmdatewisepurchasereport.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Reports\PurchaseReports\frmdatewisepurchasereport.Designer.cs">
+      <DependentUpon>frmdatewisepurchasereport.cs</DependentUpon>
+    </Compile>
     <Compile Include="Reports\PurchaseReports\purchasereturnauditreport.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -1949,6 +1955,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Reports\FinancialReports\frmvendorreportdetails.resx">
       <DependentUpon>frmvendorreportdetails.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Reports\PurchaseReports\frmdatewisepurchasereport.resx">
+      <DependentUpon>frmdatewisepurchasereport.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Reports\FinancialReports\frmcustomerreportdetails.resx">
       <DependentUpon>frmcustomerreportdetails.cs</DependentUpon>

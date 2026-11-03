@@ -89,6 +89,7 @@ namespace PosBranch_Win
             new ReportNavigatorDefinition("Purchase", "Purchase Return Report", "PurchaseReturnReport", "PurchaseReturn"),
             new ReportNavigatorDefinition("Purchase", "Purchase Return Audit Report", "PurchaseReturnAuditReport"),
             new ReportNavigatorDefinition("Purchase", "Vendor Purchase Report", "VendorPurchaseReport"),
+            new ReportNavigatorDefinition("Purchase", "Date-wise Purchase Report", "DatewisePurchaseReport"),
             new ReportNavigatorDefinition("Customer", "Customer Outstanding Listing", "CustomerOutstandingReport"),
             new ReportNavigatorDefinition("Customer", "Customer Receipt Report", "CustomerReceiptReport"),
             new ReportNavigatorDefinition("Customer", "Customer Ledger Statement", "CustomerLedgerReport"),
@@ -2975,6 +2976,7 @@ namespace PosBranch_Win
             if (tk == "VendorPaymentReport") return "vendorpaymentreport";
             if (tk == "Sales Details") return "salesdetails";
             if (tk == "Purchase Details") return "purchasedetails";
+            if (tk == "DatewisePurchaseReport") return "datewisepurchasereport";
             if (tk == "ItemwiseSalesSummaryReport") return "itemwisesalessummary";
             if (tk == "DSales") return "salesreport";
             if (tk == "CounterReport") return "counterreport";
@@ -3917,6 +3919,11 @@ namespace PosBranch_Win
             {
                 Reports.PurchaseReports.frmpurchaseAuditreport purchaseAuditReport = new Reports.PurchaseReports.frmpurchaseAuditreport();
                 OpenFormInTab(purchaseAuditReport, "Purchase Audit Report");
+            }
+            if (e.Tool.Key == "DatewisePurchaseReport")
+            {
+                Reports.PurchaseReports.frmdatewisepurchasereport datewiseReport = new Reports.PurchaseReports.frmdatewisepurchasereport();
+                OpenFormInTab(datewiseReport, "Date-wise Purchase Report");
             }
             if (e.Tool.Key == "PurchaseReturnAuditReport")
             {
@@ -6510,6 +6517,7 @@ namespace PosBranch_Win
                     keyToExecute == "AuditTrail" ||
                     keyToExecute == "VendorPurchaseReport" ||
                     keyToExecute == "PurchaseAuditReport" ||
+                    keyToExecute == "DatewisePurchaseReport" ||
                     keyToExecute == "PurchaseReturnAuditReport" ||
                     keyToExecute == "SalesAuditReport" ||
                     keyToExecute == "SalesReturnAuditReport" ||

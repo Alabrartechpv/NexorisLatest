@@ -109,7 +109,7 @@ namespace PosBranch_Win.Reports
                 var rowData = new PdfRowData { Cells = rowValues, IsMaster = true };
 
                 // Check child bands for hierarchical master-detail rows
-                if (hasChildBands && gridRow.ChildBands != null && gridRow.ChildBands.Count > 0)
+                if (hasChildBands && gridRow.ChildBands != null && gridRow.ChildBands.Count > 0 && gridRow.Expanded)
                 {
                     var childBand = gridRow.ChildBands[0];
                     if (childBand.Rows.Count > 0)
