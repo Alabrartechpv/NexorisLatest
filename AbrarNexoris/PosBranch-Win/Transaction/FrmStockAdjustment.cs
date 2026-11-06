@@ -1248,6 +1248,7 @@ namespace PosBranch_Win.Transaction
             dgv.Columns.Add("Qty On Hand", "Qty On Hand");
             dgv.Columns.Add("Adjustment Qty", "Adjustment Qty"); // Amount to add/subtract
             dgv.Columns.Add("New Balance", "New Balance");
+            dgv.Columns.Add("Qty Difference", "Qty Difference");
 
             return dgv;
         }
@@ -1283,6 +1284,7 @@ namespace PosBranch_Win.Transaction
                     repositoryGrid.Rows[rowIndex].Cells["Qty On Hand"].Value = row.Cells["Qty On Hand"].Value ?? 0;
                     repositoryGrid.Rows[rowIndex].Cells["Adjustment Qty"].Value = row.Cells["Adjustment Qty"].Value ?? 0;
                     repositoryGrid.Rows[rowIndex].Cells["New Balance"].Value = row.Cells["New Balance"].Value ?? 0;
+                    repositoryGrid.Rows[rowIndex].Cells["Qty Difference"].Value = row.Cells["Qty Difference"].Value ?? 0;
 
                     System.Diagnostics.Debug.WriteLine($"  Added row {rowIndex}: ItemNo={repositoryGrid.Rows[rowIndex].Cells["ItemNo"].Value}, " +
                         $"BarCode={repositoryGrid.Rows[rowIndex].Cells["BarCode"].Value}, " +

@@ -385,9 +385,27 @@ namespace Repository.TransactionRepository
 
                         // Calculate physical stock and quantity difference
                         detailRecord.SystemStock = Convert.ToSingle(row.Cells["Qty On Hand"].Value?.ToString() ?? "0");
-                        // Physical Stock = System Stock + Adjustment Qty (new way)
-                        // If using old "Physical Qty" column, it's already the physical count
-                        if (itemsGrid.Columns.Contains("Adjustment Qty"))
+                        if (itemsGrid.Columns.Contains("Qty Difference") && row.Cells["Qty Difference"].Value != null &&
+                            !string.IsNullOrWhiteSpace(row.Cells["Qty Difference"].Value.ToString()))
+                        {
+                            detailRecord.QtyDifference = Convert.ToSingle(row.Cells["Qty Difference"].Value);
+                            if (itemsGrid.Columns.Contains("New Balance") && row.Cells["New Balance"].Value != null &&
+                                !string.IsNullOrWhiteSpace(row.Cells["New Balance"].Value.ToString()))
+                            {
+                                detailRecord.PhysicalStock = Convert.ToSingle(row.Cells["New Balance"].Value);
+                            }
+                            else
+                            {
+                                detailRecord.PhysicalStock = detailRecord.SystemStock + detailRecord.QtyDifference;
+                            }
+                        }
+                        else if (itemsGrid.Columns.Contains("New Balance") && row.Cells["New Balance"].Value != null &&
+                            !string.IsNullOrWhiteSpace(row.Cells["New Balance"].Value.ToString()))
+                        {
+                            detailRecord.PhysicalStock = Convert.ToSingle(row.Cells["New Balance"].Value);
+                            detailRecord.QtyDifference = detailRecord.PhysicalStock - detailRecord.SystemStock;
+                        }
+                        else if (itemsGrid.Columns.Contains("Adjustment Qty"))
                         {
                             detailRecord.PhysicalStock = detailRecord.SystemStock + adjustmentQty;
                             detailRecord.QtyDifference = adjustmentQty;
@@ -820,9 +838,27 @@ namespace Repository.TransactionRepository
                         }
 
                         stkdet.SystemStock = Convert.ToSingle(dgv_stockadjustment.Rows[i].Cells["Qty On Hand"].Value?.ToString() ?? "0");
-                        // Physical Stock = System Stock + Adjustment Qty (new way)
-                        // If using old "Physical Qty" column, it's already the physical count
-                        if (dgv_stockadjustment.Columns.Contains("Adjustment Qty"))
+                        if (dgv_stockadjustment.Columns.Contains("Qty Difference") && dgv_stockadjustment.Rows[i].Cells["Qty Difference"].Value != null &&
+                            !string.IsNullOrWhiteSpace(dgv_stockadjustment.Rows[i].Cells["Qty Difference"].Value.ToString()))
+                        {
+                            stkdet.QtyDifference = Convert.ToSingle(dgv_stockadjustment.Rows[i].Cells["Qty Difference"].Value);
+                            if (dgv_stockadjustment.Columns.Contains("New Balance") && dgv_stockadjustment.Rows[i].Cells["New Balance"].Value != null &&
+                                !string.IsNullOrWhiteSpace(dgv_stockadjustment.Rows[i].Cells["New Balance"].Value.ToString()))
+                            {
+                                stkdet.PhysicalStock = Convert.ToSingle(dgv_stockadjustment.Rows[i].Cells["New Balance"].Value);
+                            }
+                            else
+                            {
+                                stkdet.PhysicalStock = stkdet.SystemStock + stkdet.QtyDifference;
+                            }
+                        }
+                        else if (dgv_stockadjustment.Columns.Contains("New Balance") && dgv_stockadjustment.Rows[i].Cells["New Balance"].Value != null &&
+                            !string.IsNullOrWhiteSpace(dgv_stockadjustment.Rows[i].Cells["New Balance"].Value.ToString()))
+                        {
+                            stkdet.PhysicalStock = Convert.ToSingle(dgv_stockadjustment.Rows[i].Cells["New Balance"].Value);
+                            stkdet.QtyDifference = stkdet.PhysicalStock - stkdet.SystemStock;
+                        }
+                        else if (dgv_stockadjustment.Columns.Contains("Adjustment Qty"))
                         {
                             stkdet.PhysicalStock = stkdet.SystemStock + adjustmentQty;
                             stkdet.QtyDifference = adjustmentQty;
