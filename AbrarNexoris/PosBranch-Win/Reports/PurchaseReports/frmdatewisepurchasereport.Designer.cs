@@ -46,6 +46,9 @@ namespace PosBranch_Win.Reports.PurchaseReports
             this.btnExportGrid = new Infragistics.Win.Misc.UltraButton();
             this.btnClearFilters = new Infragistics.Win.Misc.UltraButton();
             this.btnColumnChooser = new Infragistics.Win.Misc.UltraButton();
+            this.btnToggleValueMode = new Infragistics.Win.Misc.UltraButton();
+            this.btnExpandAll = new Infragistics.Win.Misc.UltraButton();
+            this.btnCollapseAll = new Infragistics.Win.Misc.UltraButton();
             this.btnToggleSelection = new Infragistics.Win.Misc.UltraButton();
             this.ultraPanelMaster = new Infragistics.Win.Misc.UltraPanel();
             this.ultraPanelGridFooter = new Infragistics.Win.Misc.UltraPanel();
@@ -251,6 +254,9 @@ namespace PosBranch_Win.Reports.PurchaseReports
             this.ultraPanelAction.ClientArea.Controls.Add(this.btnExportGrid);
             this.ultraPanelAction.ClientArea.Controls.Add(this.btnClearFilters);
             this.ultraPanelAction.ClientArea.Controls.Add(this.btnColumnChooser);
+            this.ultraPanelAction.ClientArea.Controls.Add(this.btnToggleValueMode);
+            this.ultraPanelAction.ClientArea.Controls.Add(this.btnExpandAll);
+            this.ultraPanelAction.ClientArea.Controls.Add(this.btnCollapseAll);
             this.ultraPanelAction.ClientArea.Controls.Add(this.btnToggleSelection);
             this.ultraPanelAction.Dock = System.Windows.Forms.DockStyle.Top;
             this.ultraPanelAction.Location = new System.Drawing.Point(0, 80);
@@ -306,13 +312,37 @@ namespace PosBranch_Win.Reports.PurchaseReports
             this.btnColumnChooser.TabIndex = 5;
             this.btnColumnChooser.Text = "Column Chooser";
             // 
+            // btnToggleValueMode
+            // 
+            this.btnToggleValueMode.Location = new System.Drawing.Point(812, 8);
+            this.btnToggleValueMode.Name = "btnToggleValueMode";
+            this.btnToggleValueMode.Size = new System.Drawing.Size(125, 28);
+            this.btnToggleValueMode.TabIndex = 6;
+            this.btnToggleValueMode.Text = "Show Amount";
+            // 
+            // btnExpandAll
+            // 
+            this.btnExpandAll.Location = new System.Drawing.Point(945, 8);
+            this.btnExpandAll.Name = "btnExpandAll";
+            this.btnExpandAll.Size = new System.Drawing.Size(105, 28);
+            this.btnExpandAll.TabIndex = 7;
+            this.btnExpandAll.Text = "Expand All";
+            // 
+            // btnCollapseAll
+            // 
+            this.btnCollapseAll.Location = new System.Drawing.Point(1058, 8);
+            this.btnCollapseAll.Name = "btnCollapseAll";
+            this.btnCollapseAll.Size = new System.Drawing.Size(105, 28);
+            this.btnCollapseAll.TabIndex = 8;
+            this.btnCollapseAll.Text = "Collapse All";
+            // 
             // btnToggleSelection
             // 
             this.btnToggleSelection.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
             this.btnToggleSelection.Location = new System.Drawing.Point(1215, 8);
             this.btnToggleSelection.Name = "btnToggleSelection";
             this.btnToggleSelection.Size = new System.Drawing.Size(135, 28);
-            this.btnToggleSelection.TabIndex = 6;
+            this.btnToggleSelection.TabIndex = 9;
             this.btnToggleSelection.Text = "Hide Selection";
             // 
             // ultraPanelMaster
@@ -415,6 +445,9 @@ namespace PosBranch_Win.Reports.PurchaseReports
         private Infragistics.Win.Misc.UltraButton btnExportGrid;
         private Infragistics.Win.Misc.UltraButton btnClearFilters;
         private Infragistics.Win.Misc.UltraButton btnColumnChooser;
+        private Infragistics.Win.Misc.UltraButton btnToggleValueMode;
+        private Infragistics.Win.Misc.UltraButton btnExpandAll;
+        private Infragistics.Win.Misc.UltraButton btnCollapseAll;
         private Infragistics.Win.Misc.UltraButton btnToggleSelection;
     }
 }

@@ -695,6 +695,7 @@ namespace Repository.MasterRepositry
             add("trialbalance", "Trial Balance", "Reports");
             add("businessexpense", "Business Expense Report", "Reports");
             add("inputgst", "Input GST Report", "Reports");
+
             add("outputgst", "Output GST Report", "Reports");
             add("govtgst", "Government GST Return Report", "Reports");
 

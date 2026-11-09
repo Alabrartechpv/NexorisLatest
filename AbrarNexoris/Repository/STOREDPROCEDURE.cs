@@ -101,6 +101,9 @@ namespace Repository
         public static string _POS_Purchase_Details_for_Report = "_POS_Purchase_Details_for_Report";
         public static string POS_VendorPurchaseReport = "POS_VendorPurchaseReport";
         public static string POS_DatewisePurchaseReport = "POS_DatewisePurchaseReport";
+        public static string POS_DatewiseSalesReport = "POS_DatewiseSalesReport";
+        public static string POS_DatewiseStockAdjustmentReport = "POS_DatewiseStockAdjustmentReport";
+        public static string POS_DatewiseProfitReport = "POS_DatewiseProfitReport";
         public static string _POS_SalesReturn_Master_for_Report = "_POS_SalesReturn_Master_for_Report";
         public static string _POS_SalesReturn_Details_for_Report = "_POS_SalesReturn_Details_for_Report";
         public static string _POS_PurchaseReturn_Master_for_Report = "_POS_PurchaseReturn_Master_for_Report";

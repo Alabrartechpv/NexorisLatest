@@ -71,6 +71,7 @@ namespace PosBranch_Win
             new ReportNavigatorDefinition("Item", "Low Stock Alert Report", "LowStockAlertReport"),
             new ReportNavigatorDefinition("Item", "Stock Adjustment Report", "StockAdjustmentReport"),
             new ReportNavigatorDefinition("Item", "Stock Adjustment Audit Report", "StockAdjustmentAuditReport"),
+            new ReportNavigatorDefinition("Item", "Date-wise Stock Adjustment Report", "DatewiseStockAdjustmentReport"),
             new ReportNavigatorDefinition("Item", "Inactive Items Report", "InactiveItemsReport"),
             new ReportNavigatorDefinition("Sales", "Sales Details", "Sales Details"),
             new ReportNavigatorDefinition("Sales", "Sales Audit Report", "SalesAuditReport"),
@@ -84,6 +85,8 @@ namespace PosBranch_Win
             new ReportNavigatorDefinition("Sales", "Sales Hold Report", "SalesHoldReport"),
             new ReportNavigatorDefinition("Sales", "Daily Sales", "DSales"),
             new ReportNavigatorDefinition("Sales", "Counter Report", "CounterReport"),
+            new ReportNavigatorDefinition("Sales", "Date-wise Sales Report", "DatewiseSalesReport"),
+            new ReportNavigatorDefinition("Sales", "Date-wise Profit Report", "DatewiseProfitReport"),
             new ReportNavigatorDefinition("Purchase", "Purchase Details", "Purchase Details"),
             new ReportNavigatorDefinition("Purchase", "Purchase Audit Report", "PurchaseAuditReport"),
             new ReportNavigatorDefinition("Purchase", "Purchase Return Report", "PurchaseReturnReport", "PurchaseReturn"),
@@ -2977,6 +2980,9 @@ namespace PosBranch_Win
             if (tk == "Sales Details") return "salesdetails";
             if (tk == "Purchase Details") return "purchasedetails";
             if (tk == "DatewisePurchaseReport") return "datewisepurchasereport";
+            if (tk == "DatewiseSalesReport") return "datewisesalesreport";
+            if (tk == "DatewiseStockAdjustmentReport") return "datewisestockadjustmentreport";
+            if (tk == "DatewiseProfitReport") return "datewiseprofitreport";
             if (tk == "ItemwiseSalesSummaryReport") return "itemwisesalessummary";
             if (tk == "DSales") return "salesreport";
             if (tk == "CounterReport") return "counterreport";
@@ -3924,6 +3930,21 @@ namespace PosBranch_Win
             {
                 Reports.PurchaseReports.frmdatewisepurchasereport datewiseReport = new Reports.PurchaseReports.frmdatewisepurchasereport();
                 OpenFormInTab(datewiseReport, "Date-wise Purchase Report");
+            }
+            if (e.Tool.Key == "DatewiseSalesReport")
+            {
+                Reports.SalesReports.frmdatewisesalesreport datewiseSalesReport = new Reports.SalesReports.frmdatewisesalesreport();
+                OpenFormInTab(datewiseSalesReport, "Date-wise Sales Report");
+            }
+            if (e.Tool.Key == "DatewiseStockAdjustmentReport")
+            {
+                Reports.InventoryReport.frmdatewisestockadjustmentreport datewiseStockAdjReport = new Reports.InventoryReport.frmdatewisestockadjustmentreport();
+                OpenFormInTab(datewiseStockAdjReport, "Date-wise Stock Adjustment Report");
+            }
+            if (e.Tool.Key == "DatewiseProfitReport")
+            {
+                Reports.SalesReports.frmdatewiseprofitreport datewiseProfitReport = new Reports.SalesReports.frmdatewiseprofitreport();
+                OpenFormInTab(datewiseProfitReport, "Date-wise Profit Report");
             }
             if (e.Tool.Key == "PurchaseReturnAuditReport")
             {
@@ -6518,6 +6539,9 @@ namespace PosBranch_Win
                     keyToExecute == "VendorPurchaseReport" ||
                     keyToExecute == "PurchaseAuditReport" ||
                     keyToExecute == "DatewisePurchaseReport" ||
+                    keyToExecute == "DatewiseStockAdjustmentReport" ||
+                    keyToExecute == "DatewiseSalesReport" ||
+                    keyToExecute == "DatewiseProfitReport" ||
                     keyToExecute == "PurchaseReturnAuditReport" ||
                     keyToExecute == "SalesAuditReport" ||
                     keyToExecute == "SalesReturnAuditReport" ||

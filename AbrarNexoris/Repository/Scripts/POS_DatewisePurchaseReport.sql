@@ -67,11 +67,11 @@ BEGIN
             M.PurchaseNo,
             ISNULL(M.InvoiceNo, '') AS InvoiceNo,
             ISNULL(M.InvoiceDate, M.PurchaseDate) AS InvoiceDate,
-            ISNULL(NULLIF(M.VendorName, ''), ISNULL(L.LedgerName, 'Unknown Vendor')) AS VendorName,
+            ISNULL(NULLIF(M.VendorName, ''), 'Unknown Vendor') AS VendorName,
             ISNULL(M.LedgerID, 0) AS VendorLedgerId,
             ISNULL(D.SlNo, 1) AS SlNo,
             ISNULL(D.ItemID, 0) AS ItemID,
-            ISNULL(D.BarCode, '') AS BarCode,
+            ISNULL(PS.BarCode, '') AS BarCode,
             ISNULL(D.ItemName, '') AS ItemName,
             ISNULL(D.Unit, '') AS Unit,
             CAST(ISNULL(D.Packing, '1') AS NVARCHAR(50)) AS Packing,
@@ -79,20 +79,26 @@ BEGIN
             CAST(ISNULL(D.Free, 0) AS DECIMAL(18,2)) AS Free,
             CAST((ISNULL(D.Qty, 0) + ISNULL(D.Free, 0)) AS DECIMAL(18,2)) AS TotalQty,
             CAST(ISNULL(D.Cost, 0) AS DECIMAL(18,2)) AS Cost,
-            CAST(ISNULL(D.Amount, 0) AS DECIMAL(18,2)) AS Amount,
+            CAST(ISNULL(D.Qty, 0) * ISNULL(D.Cost, 0) AS DECIMAL(18,2)) AS Amount,
             CAST(ISNULL(D.TaxAmt, 0) AS DECIMAL(18,2)) AS TaxAmt,
-            CAST((ISNULL(D.Amount, 0) + ISNULL(D.TaxAmt, 0)) AS DECIMAL(18,2)) AS NetAmount,
+            CAST((ISNULL(D.Qty, 0) * ISNULL(D.Cost, 0)) + ISNULL(D.TaxAmt, 0) AS DECIMAL(18,2)) AS NetAmount,
             ISNULL(M.Paymode, '') AS Paymode,
             ISNULL(M.BilledBy, '') AS BilledBy
         FROM dbo.PMaster M WITH (NOLOCK)
         INNER JOIN dbo.PDetails D WITH (NOLOCK) ON M.PurchaseNo = D.PurchaseNo
-        LEFT JOIN dbo.Ledger L WITH (NOLOCK) ON M.LedgerID = L.LedgerID
+        OUTER APPLY (
+            SELECT TOP 1 ps.BarCode
+            FROM dbo.PriceSettings ps WITH (NOLOCK)
+            WHERE ps.ItemId = D.ItemID
+              AND (@BranchId = 0 OR ps.BranchId = @BranchId)
+            ORDER BY CASE WHEN ps.UnitId = D.UnitId THEN 0 WHEN ps.IsBaseUnit = 'Y' THEN 1 ELSE 2 END
+        ) PS
         WHERE ISNULL(M.CancelFlag, 0) = 0
           AND (@CompanyId = 0 OR ISNULL(M.CompanyId, 0) = @CompanyId)
           AND (@BranchId = 0 OR ISNULL(M.BranchId, 0) = @BranchId)
           AND (@FinYearId = 0 OR ISNULL(M.FinYearId, 0) = @FinYearId)
           AND (@VendorLedgerId = 0 OR ISNULL(M.LedgerID, 0) = @VendorLedgerId)
-          AND (@CleanSearch IS NULL OR D.ItemName LIKE '%' + @CleanSearch + '%' OR D.BarCode LIKE '%' + @CleanSearch + '%')
+          AND (@CleanSearch IS NULL OR D.ItemName LIKE '%' + @CleanSearch + '%' OR PS.BarCode LIKE '%' + @CleanSearch + '%')
           AND (
                 @Mode = 'ALL'
                 OR (@Mode = 'DATE_RANGE' AND CAST(M.PurchaseDate AS DATE) >= @StartDate AND CAST(M.PurchaseDate AS DATE) <= @EndDate)
@@ -106,9 +112,9 @@ BEGIN
     END
 
     -- ========================================================================
-    -- VIEW MODE 2: DATE_ITEM_SUMMARY (Aggregated by Purchase Date + Item)
+    -- VIEW MODE 2: DATE_ITEM_SUMMARY / DATE_MATRIX (Aggregated by Date and Item)
     -- ========================================================================
-    ELSE IF @View = 'DATE_ITEM_SUMMARY'
+    ELSE IF @View = 'DATE_ITEM_SUMMARY' OR @View = 'DATE_MATRIX'
     BEGIN
         SELECT 
             CAST(M.PurchaseDate AS DATE) AS PurchaseDate,
@@ -119,7 +125,7 @@ BEGIN
             0 AS VendorLedgerId,
             ROW_NUMBER() OVER(PARTITION BY CAST(M.PurchaseDate AS DATE) ORDER BY D.ItemName) AS SlNo,
             ISNULL(D.ItemID, 0) AS ItemID,
-            ISNULL(D.BarCode, '') AS BarCode,
+            ISNULL(MAX(PS.BarCode), '') AS BarCode,
             ISNULL(D.ItemName, '') AS ItemName,
             ISNULL(D.Unit, '') AS Unit,
             '1' AS Packing,
@@ -127,23 +133,29 @@ BEGIN
             CAST(SUM(ISNULL(D.Free, 0)) AS DECIMAL(18,2)) AS Free,
             CAST(SUM(ISNULL(D.Qty, 0) + ISNULL(D.Free, 0)) AS DECIMAL(18,2)) AS TotalQty,
             CAST(CASE WHEN SUM(ISNULL(D.Qty, 0)) > 0 
-                      THEN SUM(ISNULL(D.Amount, 0)) / SUM(ISNULL(D.Qty, 0)) 
+                      THEN SUM(ISNULL(D.Qty, 0) * ISNULL(D.Cost, 0)) / SUM(ISNULL(D.Qty, 0)) 
                       ELSE MAX(ISNULL(D.Cost, 0)) 
                  END AS DECIMAL(18,2)) AS Cost,
-            CAST(SUM(ISNULL(D.Amount, 0)) AS DECIMAL(18,2)) AS Amount,
+            CAST(SUM(ISNULL(D.Qty, 0) * ISNULL(D.Cost, 0)) AS DECIMAL(18,2)) AS Amount,
             CAST(SUM(ISNULL(D.TaxAmt, 0)) AS DECIMAL(18,2)) AS TaxAmt,
-            CAST(SUM(ISNULL(D.Amount, 0) + ISNULL(D.TaxAmt, 0)) AS DECIMAL(18,2)) AS NetAmount,
+            CAST(SUM((ISNULL(D.Qty, 0) * ISNULL(D.Cost, 0)) + ISNULL(D.TaxAmt, 0)) AS DECIMAL(18,2)) AS NetAmount,
             '' AS Paymode,
             '' AS BilledBy
         FROM dbo.PMaster M WITH (NOLOCK)
         INNER JOIN dbo.PDetails D WITH (NOLOCK) ON M.PurchaseNo = D.PurchaseNo
-        LEFT JOIN dbo.Ledger L WITH (NOLOCK) ON M.LedgerID = L.LedgerID
+        OUTER APPLY (
+            SELECT TOP 1 ps.BarCode
+            FROM dbo.PriceSettings ps WITH (NOLOCK)
+            WHERE ps.ItemId = D.ItemID
+              AND (@BranchId = 0 OR ps.BranchId = @BranchId)
+            ORDER BY CASE WHEN ps.UnitId = D.UnitId THEN 0 WHEN ps.IsBaseUnit = 'Y' THEN 1 ELSE 2 END
+        ) PS
         WHERE ISNULL(M.CancelFlag, 0) = 0
           AND (@CompanyId = 0 OR ISNULL(M.CompanyId, 0) = @CompanyId)
           AND (@BranchId = 0 OR ISNULL(M.BranchId, 0) = @BranchId)
           AND (@FinYearId = 0 OR ISNULL(M.FinYearId, 0) = @FinYearId)
           AND (@VendorLedgerId = 0 OR ISNULL(M.LedgerID, 0) = @VendorLedgerId)
-          AND (@CleanSearch IS NULL OR D.ItemName LIKE '%' + @CleanSearch + '%' OR D.BarCode LIKE '%' + @CleanSearch + '%')
+          AND (@CleanSearch IS NULL OR D.ItemName LIKE '%' + @CleanSearch + '%' OR PS.BarCode LIKE '%' + @CleanSearch + '%')
           AND (
                 @Mode = 'ALL'
                 OR (@Mode = 'DATE_RANGE' AND CAST(M.PurchaseDate AS DATE) >= @StartDate AND CAST(M.PurchaseDate AS DATE) <= @EndDate)
@@ -153,7 +165,7 @@ BEGIN
                 ))
                 OR (@Mode = 'YEAR_WISE' AND (@Year = 0 OR YEAR(M.PurchaseDate) = @Year))
               )
-        GROUP BY CAST(M.PurchaseDate AS DATE), D.ItemID, D.BarCode, D.ItemName, D.Unit
+        GROUP BY CAST(M.PurchaseDate AS DATE), D.ItemID, D.ItemName, D.Unit
         ORDER BY CAST(M.PurchaseDate AS DATE) DESC, D.ItemName ASC;
     END
 
@@ -171,7 +183,7 @@ BEGIN
             0 AS VendorLedgerId,
             ROW_NUMBER() OVER(ORDER BY D.ItemName) AS SlNo,
             ISNULL(D.ItemID, 0) AS ItemID,
-            ISNULL(D.BarCode, '') AS BarCode,
+            ISNULL(MAX(PS.BarCode), '') AS BarCode,
             ISNULL(D.ItemName, '') AS ItemName,
             ISNULL(D.Unit, '') AS Unit,
             '1' AS Packing,
@@ -179,23 +191,29 @@ BEGIN
             CAST(SUM(ISNULL(D.Free, 0)) AS DECIMAL(18,2)) AS Free,
             CAST(SUM(ISNULL(D.Qty, 0) + ISNULL(D.Free, 0)) AS DECIMAL(18,2)) AS TotalQty,
             CAST(CASE WHEN SUM(ISNULL(D.Qty, 0)) > 0 
-                      THEN SUM(ISNULL(D.Amount, 0)) / SUM(ISNULL(D.Qty, 0)) 
+                      THEN SUM(ISNULL(D.Qty, 0) * ISNULL(D.Cost, 0)) / SUM(ISNULL(D.Qty, 0)) 
                       ELSE MAX(ISNULL(D.Cost, 0)) 
                  END AS DECIMAL(18,2)) AS Cost,
-            CAST(SUM(ISNULL(D.Amount, 0)) AS DECIMAL(18,2)) AS Amount,
+            CAST(SUM(ISNULL(D.Qty, 0) * ISNULL(D.Cost, 0)) AS DECIMAL(18,2)) AS Amount,
             CAST(SUM(ISNULL(D.TaxAmt, 0)) AS DECIMAL(18,2)) AS TaxAmt,
-            CAST(SUM(ISNULL(D.Amount, 0) + ISNULL(D.TaxAmt, 0)) AS DECIMAL(18,2)) AS NetAmount,
+            CAST(SUM((ISNULL(D.Qty, 0) * ISNULL(D.Cost, 0)) + ISNULL(D.TaxAmt, 0)) AS DECIMAL(18,2)) AS NetAmount,
             '' AS Paymode,
             '' AS BilledBy
         FROM dbo.PMaster M WITH (NOLOCK)
         INNER JOIN dbo.PDetails D WITH (NOLOCK) ON M.PurchaseNo = D.PurchaseNo
-        LEFT JOIN dbo.Ledger L WITH (NOLOCK) ON M.LedgerID = L.LedgerID
+        OUTER APPLY (
+            SELECT TOP 1 ps.BarCode
+            FROM dbo.PriceSettings ps WITH (NOLOCK)
+            WHERE ps.ItemId = D.ItemID
+              AND (@BranchId = 0 OR ps.BranchId = @BranchId)
+            ORDER BY CASE WHEN ps.UnitId = D.UnitId THEN 0 WHEN ps.IsBaseUnit = 'Y' THEN 1 ELSE 2 END
+        ) PS
         WHERE ISNULL(M.CancelFlag, 0) = 0
           AND (@CompanyId = 0 OR ISNULL(M.CompanyId, 0) = @CompanyId)
           AND (@BranchId = 0 OR ISNULL(M.BranchId, 0) = @BranchId)
           AND (@FinYearId = 0 OR ISNULL(M.FinYearId, 0) = @FinYearId)
           AND (@VendorLedgerId = 0 OR ISNULL(M.LedgerID, 0) = @VendorLedgerId)
-          AND (@CleanSearch IS NULL OR D.ItemName LIKE '%' + @CleanSearch + '%' OR D.BarCode LIKE '%' + @CleanSearch + '%')
+          AND (@CleanSearch IS NULL OR D.ItemName LIKE '%' + @CleanSearch + '%' OR PS.BarCode LIKE '%' + @CleanSearch + '%')
           AND (
                 @Mode = 'ALL'
                 OR (@Mode = 'DATE_RANGE' AND CAST(M.PurchaseDate AS DATE) >= @StartDate AND CAST(M.PurchaseDate AS DATE) <= @EndDate)
@@ -205,7 +223,7 @@ BEGIN
                 ))
                 OR (@Mode = 'YEAR_WISE' AND (@Year = 0 OR YEAR(M.PurchaseDate) = @Year))
               )
-        GROUP BY D.ItemID, D.BarCode, D.ItemName, D.Unit
+        GROUP BY D.ItemID, D.ItemName, D.Unit
         ORDER BY D.ItemName ASC;
     END
 END;

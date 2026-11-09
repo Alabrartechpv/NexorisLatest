@@ -1248,6 +1248,24 @@
     <Compile Include="Reports\SalesReports\frmSalesDetailsReport.Designer.cs">
       <DependentUpon>frmSalesDetailsReport.cs</DependentUpon>
     </Compile>
+    <Compile Include="Reports\SalesReports\frmdatewisesalesreport.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Reports\SalesReports\frmdatewisesalesreport.Designer.cs">
+      <DependentUpon>frmdatewisesalesreport.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Reports\SalesReports\frmdatewiseprofitreport.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Reports\SalesReports\frmdatewiseprofitreport.Designer.cs">
+      <DependentUpon>frmdatewiseprofitreport.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Reports\InventoryReport\frmdatewisestockadjustmentreport.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Reports\InventoryReport\frmdatewisestockadjustmentreport.Designer.cs">
+      <DependentUpon>frmdatewisestockadjustmentreport.cs</DependentUpon>
+    </Compile>
     <Compile Include="Reports\SalesReports\salesauditreport.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -1931,6 +1949,15 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Reports\SalesReports\frmSalesDetailsReport.resx">
       <DependentUpon>frmSalesDetailsReport.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Reports\SalesReports\frmdatewisesalesreport.resx">
+      <DependentUpon>frmdatewisesalesreport.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Reports\SalesReports\frmdatewiseprofitreport.resx">
+      <DependentUpon>frmdatewiseprofitreport.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Reports\InventoryReport\frmdatewisestockadjustmentreport.resx">
+      <DependentUpon>frmdatewisestockadjustmentreport.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Reports\SalesReports\salesauditreport.resx">
       <DependentUpon>salesauditreport.cs</DependentUpon>

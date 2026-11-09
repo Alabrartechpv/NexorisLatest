@@ -53,7 +53,11 @@ namespace PosBranch_Win.Reports.PurchaseReports
         #region Private Fields
         private readonly DatewisePurchaseReportRepository _repository;
         private List<DatewisePurchaseReportRow> _reportRows;
+        private readonly List<PivotDateColumnInfo> _currentMatrixDateColumns = new List<PivotDateColumnInfo>();
+        private DataSet _matrixDataSet;
+        private DataTable _matrixTable;
         private bool _isLoading;
+        private bool _isAmountMode = false;
 
         // Dynamic footer panel and cell controls
         private readonly Dictionary<string, Label> _footerLabels;
@@ -68,7 +72,9 @@ namespace PosBranch_Win.Reports.PurchaseReports
             "Cost",
             "Amount",
             "TaxAmt",
-            "NetAmount"
+            "NetAmount",
+            "Total",
+            "TotalAmount"
         };
 
         // Header drag-to-hide & Column Chooser
@@ -84,6 +90,26 @@ namespace PosBranch_Win.Reports.PurchaseReports
         #endregion
 
         #region Helper Classes
+        private sealed class ItemMatrixInfo
+        {
+            public int ItemID { get; set; }
+            public string ItemName { get; set; }
+            public string Unit { get; set; }
+            public string BarCode { get; set; }
+            public decimal TotalQty { get; set; }
+            public decimal TotalAmount { get; set; }
+        }
+
+        private sealed class PivotDateColumnInfo
+        {
+            public string ColumnKey { get; set; }
+            public string HeaderCaption { get; set; }
+            public string Tooltip { get; set; }
+            public DateTime? Date { get; set; }
+            public int DayNumber { get; set; }
+            public int MonthNumber { get; set; }
+        }
+
         private sealed class ColumnChooserItem
         {
             public string ColumnKey { get; }
@@ -121,6 +147,9 @@ namespace PosBranch_Win.Reports.PurchaseReports
             btnExportGrid.Click += btnExportGrid_Click;
             btnClearFilters.Click += btnClearFilters_Click;
             btnColumnChooser.Click += btnColumnChooser_Click;
+            btnToggleValueMode.Click += btnToggleValueMode_Click;
+            btnExpandAll.Click += btnExpandAll_Click;
+            btnCollapseAll.Click += btnCollapseAll_Click;
             btnToggleSelection.Click += btnToggleSelection_Click;
             btnItemPicker.Click += btnItemPicker_Click;
             btnVendorPicker.Click += btnVendorPicker_Click;
@@ -128,6 +157,11 @@ namespace PosBranch_Win.Reports.PurchaseReports
             // Filter value changes
             ultraComboPeriodMode.ValueChanged += ultraComboPeriodMode_ValueChanged;
             ultraComboViewMode.ValueChanged += (s, e) => { if (!_isLoading) LoadReport(); };
+            ultraComboMonth.ValueChanged += (s, e) => { if (!_isLoading) LoadReport(); };
+            ultraComboYear.ValueChanged += (s, e) => { if (!_isLoading) LoadReport(); };
+            dtFrom.ValueChanged += (s, e) => { if (!_isLoading) LoadReport(); };
+            dtTo.ValueChanged += (s, e) => { if (!_isLoading) LoadReport(); };
+            ultraComboVendor.ValueChanged += (s, e) => { if (!_isLoading) LoadReport(); };
             txtItemSearch.KeyDown += (s, e) =>
             {
                 if (e.KeyCode == Keys.Enter) { LoadReport(); e.Handled = true; }
@@ -138,11 +172,20 @@ namespace PosBranch_Win.Reports.PurchaseReports
             gridReport.InitializeLayout += gridReport_InitializeLayout;
             gridReport.InitializeRow += gridReport_InitializeRow;
             gridReport.Resize += (s, e) => UpdateFooterCellPositions();
+            gridReport.AfterRowExpanded += (s, e) => UpdateFooterCellPositions();
+            gridReport.AfterRowCollapsed += (s, e) => UpdateFooterCellPositions();
+            gridReport.DoubleClickRow += (s, e) =>
+            {
+                if (e.Row != null && e.Row.Band.Index == 0)
+                {
+                    e.Row.Expanded = !e.Row.Expanded;
+                }
+            };
             gridReport.AfterColPosChanged += (s, e) =>
             {
                 CreateFooterCells();
                 UpdateFooterCellPositions();
-                UpdateFooterValues(gridReport.DataSource as IList<DatewisePurchaseReportRow>);
+                UpdateFooterValues();
                 ReportGridLayoutHelper.SaveLayout(GetLayoutKey(), gridReport, userHiddenColumnKeys);
             };
             gridReport.AfterColRegionScroll += (s, e) => UpdateFooterCellPositions();
@@ -150,10 +193,10 @@ namespace PosBranch_Win.Reports.PurchaseReports
             gridReport.Paint += (s, e) => UpdateFooterCellPositions();
             gridReport.AfterRowFilterChanged += (s, e) =>
             {
-                UpdateFooterValues(gridReport.DataSource as IList<DatewisePurchaseReportRow>);
+                UpdateFooterValues();
                 UpdateFooterCellPositions();
             };
-            gridReport.AfterSortChange += (s, e) => UpdateFooterValues(gridReport.DataSource as IList<DatewisePurchaseReportRow>);
+            gridReport.AfterSortChange += (s, e) => UpdateFooterValues();
 
             if (ultraPanelGridFooter != null)
             {
@@ -161,7 +204,11 @@ namespace PosBranch_Win.Reports.PurchaseReports
             }
         }
 
-        private string GetLayoutKey() => "DatewisePurchaseReport";
+        private string GetLayoutKey()
+        {
+            string viewMode = Convert.ToString(ultraComboViewMode?.Value) ?? "DATE_MATRIX";
+            return $"DatewisePurchaseReport_{viewMode}";
+        }
 
         private void frmdatewisepurchasereport_Load(object sender, EventArgs e)
         {
@@ -211,6 +258,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 InitializeFilterControls();
                 InitializePanels();
                 StyleButtons();
+                UpdateValueModeButtonText();
                 StyleFilterControls();
                 SetupGrid();
                 LoadVendors();
@@ -267,10 +315,11 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
             // View Mode Selector
             ultraComboViewMode.Items.Clear();
+            ultraComboViewMode.Items.Add("DATE_MATRIX", "Date Matrix (Item vs Dates)");
             ultraComboViewMode.Items.Add("DETAILED", "Detailed (Bill & Item Wise)");
             ultraComboViewMode.Items.Add("DATE_ITEM_SUMMARY", "Daily Summary (Date & Item)");
             ultraComboViewMode.Items.Add("ITEM_SUMMARY", "Item Summary (Total by Item)");
-            ultraComboViewMode.Value = "DETAILED";
+            ultraComboViewMode.Value = "DATE_MATRIX";
 
             txtItemSearch.Text = string.Empty;
 
@@ -408,6 +457,9 @@ namespace PosBranch_Win.Reports.PurchaseReports
             StyleActionButton(btnExportGrid);
             StyleActionButton(btnClearFilters);
             StyleActionButton(btnColumnChooser);
+            StyleActionButton(btnToggleValueMode);
+            StyleActionButton(btnExpandAll);
+            StyleActionButton(btnCollapseAll);
             StyleActionButton(btnToggleSelection);
 
             StyleSmallPickerButton(btnItemPicker);
@@ -526,6 +578,9 @@ namespace PosBranch_Win.Reports.PurchaseReports
             layout.GroupByBox.Hidden = false; // Enable Outlook GroupByBox so user can group by Date or Item!
             layout.GroupByBox.Prompt = "Drag a column header here (such as Purchase Date or Item Name) to group records.";
 
+            layout.ViewStyleBand = ViewStyleBand.Vertical;
+            layout.Override.ExpansionIndicator = ShowExpansionIndicator.CheckOnDisplay;
+
             layout.Override.AllowAddNew = AllowAddNew.No;
             layout.Override.AllowDelete = DefaultableBoolean.False;
             layout.Override.AllowUpdate = DefaultableBoolean.False;
@@ -622,7 +677,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
             CreateFooterCells();
             UpdateFooterCellPositions();
-            UpdateFooterValues(new List<DatewisePurchaseReportRow>());
+            UpdateFooterValues();
         }
 
         private void CreateFooterCells()
@@ -639,7 +694,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
             foreach (UltraGridColumn column in band.Columns.Cast<UltraGridColumn>().OrderBy(c => c.Header.VisiblePosition))
             {
-                if (column.Hidden)
+                if (column.Hidden || column.IsChaptered || string.Equals(column.Key, "ItemPurchaseBreakdown", StringComparison.OrdinalIgnoreCase))
                     continue;
 
                 ContentAlignment align = ContentAlignment.MiddleCenter;
@@ -672,7 +727,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
                 if (!_columnAggregations.ContainsKey(column.Key))
                 {
-                    _columnAggregations[column.Key] = summaryDefaultNumericColumns.Contains(column.Key) ? "Sum" : "None";
+                    _columnAggregations[column.Key] = (summaryDefaultNumericColumns.Contains(column.Key) || IsSummableColumn(column)) ? "Sum" : "None";
                 }
 
                 xOffset += column.Width;
@@ -710,7 +765,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
             {
                 string current = _columnAggregations.ContainsKey(columnKey)
                     ? _columnAggregations[columnKey]
-                    : (summaryDefaultNumericColumns.Contains(columnKey) ? "Sum" : "None");
+                    : ((summaryDefaultNumericColumns.Contains(columnKey) || (gridReport.DisplayLayout.Bands.Count > 0 && gridReport.DisplayLayout.Bands[0].Columns.Exists(columnKey) && IsSummableColumn(gridReport.DisplayLayout.Bands[0].Columns[columnKey]))) ? "Sum" : "None");
 
                 foreach (ToolStripItem item in menu.Items)
                 {
@@ -736,7 +791,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
             if (sender is ToolStripMenuItem item && item.Owner is ContextMenuStrip menu && menu.Tag != null && item.Tag != null)
             {
                 _columnAggregations[menu.Tag.ToString()] = item.Tag.ToString();
-                UpdateFooterValues(gridReport.DataSource as IList<DatewisePurchaseReportRow>);
+                UpdateFooterValues();
             }
         }
 
@@ -760,7 +815,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
             foreach (UltraGridColumn column in band.Columns.Cast<UltraGridColumn>().OrderBy(c => c.Header.VisiblePosition))
             {
-                if (column.Hidden || !_footerLabels.ContainsKey(column.Key))
+                if (column.Hidden || column.IsChaptered || string.Equals(column.Key, "ItemPurchaseBreakdown", StringComparison.OrdinalIgnoreCase) || !_footerLabels.ContainsKey(column.Key))
                     continue;
 
                 Label footerLabel = _footerLabels[column.Key];
@@ -789,16 +844,43 @@ namespace PosBranch_Win.Reports.PurchaseReports
             }
         }
 
-        private void UpdateFooterValues(IList<DatewisePurchaseReportRow> rows = null)
+        private void UpdateFooterValues()
         {
             if (_footerLabels.Count == 0 || gridReport.DisplayLayout == null || gridReport.DisplayLayout.Bands.Count == 0)
                 return;
 
             List<UltraGridRow> visibleRows = GetVisibleDataRows().ToList();
+
             foreach (KeyValuePair<string, Label> footerEntry in _footerLabels)
             {
                 string columnKey = footerEntry.Key;
                 Label footerLabel = footerEntry.Value;
+
+                if (string.Equals(columnKey, "ItemName", StringComparison.OrdinalIgnoreCase))
+                {
+                    footerLabel.Text = $"Total ({visibleRows.Count} Items)";
+                    footerLabel.TextAlign = ContentAlignment.MiddleLeft;
+                    footerLabel.Tag = Tuple.Create(columnKey, footerLabel.Text);
+                    footerLabel.ForeColor = Color.White;
+                    footerLabel.Invalidate();
+                    continue;
+                }
+
+                if (string.Equals(columnKey, "Unit", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(columnKey, "AvgCost", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(columnKey, "ItemID", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(columnKey, "BarCode", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(columnKey, "SlNo", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(columnKey, "PurchaseNo", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(columnKey, "InvoiceNo", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(columnKey, "Paymode", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(columnKey, "BilledBy", StringComparison.OrdinalIgnoreCase))
+                {
+                    footerLabel.Text = string.Empty;
+                    footerLabel.Tag = Tuple.Create(columnKey, string.Empty);
+                    footerLabel.Invalidate();
+                    continue;
+                }
 
                 if (!_columnAggregations.ContainsKey(columnKey) ||
                     string.Equals(_columnAggregations[columnKey], "None", StringComparison.OrdinalIgnoreCase))
@@ -903,7 +985,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
             if (gridReport.Rows == null) yield break;
             foreach (UltraGridRow row in gridReport.Rows)
             {
-                if (row != null && row.IsDataRow && !row.IsFilteredOut && !row.Hidden)
+                if (row != null && row.IsDataRow && !row.IsFilteredOut && !row.Hidden && (row.Band == null || row.Band.Index == 0))
                 {
                     yield return row;
                 }
@@ -928,6 +1010,8 @@ namespace PosBranch_Win.Reports.PurchaseReports
             return string.Equals(column.Key, "Qty", StringComparison.OrdinalIgnoreCase) ||
                    string.Equals(column.Key, "Free", StringComparison.OrdinalIgnoreCase) ||
                    string.Equals(column.Key, "TotalQty", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(column.Key, "TotalAmount", StringComparison.OrdinalIgnoreCase) ||
+                   string.Equals(column.Key, "Total", StringComparison.OrdinalIgnoreCase) ||
                    string.Equals(column.Key, "Cost", StringComparison.OrdinalIgnoreCase) ||
                    string.Equals(column.Key, "Amount", StringComparison.OrdinalIgnoreCase) ||
                    string.Equals(column.Key, "TaxAmt", StringComparison.OrdinalIgnoreCase) ||
@@ -985,7 +1069,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
             _filterManager = new ReportColumnFilterManager(gridReport, () =>
             {
                 UpdateFooterCellPositions();
-                UpdateFooterValues(_reportRows ?? new List<DatewisePurchaseReportRow>());
+                UpdateFooterValues();
             });
         }
 
@@ -1083,7 +1167,8 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
         private void GridReport_DragDrop(object sender, DragEventArgs e)
         {
-            if (e.Data.GetData(typeof(ColumnChooserItem)) is ColumnChooserItem item)
+            ColumnChooserItem item = e.Data.GetData(typeof(ColumnChooserItem)) as ColumnChooserItem;
+            if (item != null)
             {
                 Point clientPt = gridReport.PointToClient(new Point(e.X, e.Y));
                 int dropPosition = GetTargetColumnPositionFromPoint(clientPt);
@@ -1128,7 +1213,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
             ReportGridLayoutHelper.SaveLayout(GetLayoutKey(), gridReport, userHiddenColumnKeys);
             CreateFooterCells();
             UpdateFooterCellPositions();
-            UpdateFooterValues(gridReport.DataSource as IList<DatewisePurchaseReportRow>);
+            UpdateFooterValues();
             if (columnChooserForm != null && columnChooserForm.Visible)
             {
                 PopulateColumnChooserListBox();
@@ -1233,7 +1318,8 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
         private void ColumnChooserListBox_DoubleClick(object sender, EventArgs e)
         {
-            if (columnChooserListBox?.SelectedItem is ColumnChooserItem item)
+            ColumnChooserItem item = columnChooserListBox != null ? columnChooserListBox.SelectedItem as ColumnChooserItem : null;
+            if (item != null)
             {
                 int pos = gridReport.DisplayLayout.Bands.Count > 0 ? gridReport.DisplayLayout.Bands[0].Columns.Count : 0;
                 UnhideColumn(item.ColumnKey, pos);
@@ -1251,7 +1337,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
             UltraGridBand band = gridReport.DisplayLayout.Bands[0];
             foreach (UltraGridColumn col in band.Columns.Cast<UltraGridColumn>().OrderBy(c => c.Header.Caption))
             {
-                if (col.Hidden && col.ExcludeFromColumnChooser != ExcludeFromColumnChooser.True)
+                if (col.Hidden && col.ExcludeFromColumnChooser != ExcludeFromColumnChooser.True && !col.IsChaptered && !string.Equals(col.Key, "ItemPurchaseBreakdown", StringComparison.OrdinalIgnoreCase))
                 {
                     string caption = !string.IsNullOrEmpty(col.Header.Caption) ? col.Header.Caption : col.Key;
                     if (string.IsNullOrEmpty(filter) || caption.IndexOf(filter, StringComparison.OrdinalIgnoreCase) >= 0)
@@ -1267,7 +1353,8 @@ namespace PosBranch_Win.Reports.PurchaseReports
             int index = columnChooserListBox.IndexFromPoint(e.Location);
             if (index >= 0 && index < columnChooserListBox.Items.Count)
             {
-                if (columnChooserListBox.Items[index] is ColumnChooserItem item)
+                ColumnChooserItem item = columnChooserListBox.Items[index] as ColumnChooserItem;
+                if (item != null)
                 {
                     columnChooserListBox.DoDragDrop(item, DragDropEffects.Move);
                 }
@@ -1347,7 +1434,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 ReportGridLayoutHelper.SaveLayout(GetLayoutKey(), gridReport, userHiddenColumnKeys);
                 CreateFooterCells();
                 UpdateFooterCellPositions();
-                UpdateFooterValues(gridReport.DataSource as IList<DatewisePurchaseReportRow>);
+                UpdateFooterValues();
                 PopulateColumnChooserListBox();
             }
         }
@@ -1361,7 +1448,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
             UltraGridBand band = gridReport.DisplayLayout.Bands[0];
             foreach (UltraGridColumn col in band.Columns)
             {
-                if (col.ExcludeFromColumnChooser != ExcludeFromColumnChooser.True)
+                if (col.ExcludeFromColumnChooser != ExcludeFromColumnChooser.True && !col.IsChaptered && !string.Equals(col.Key, "ItemPurchaseBreakdown", StringComparison.OrdinalIgnoreCase))
                 {
                     col.Hidden = false;
                 }
@@ -1369,7 +1456,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
             ReportGridLayoutHelper.SaveLayout(GetLayoutKey(), gridReport, userHiddenColumnKeys);
             CreateFooterCells();
             UpdateFooterCellPositions();
-            UpdateFooterValues(gridReport.DataSource as IList<DatewisePurchaseReportRow>);
+            UpdateFooterValues();
             PopulateColumnChooserListBox();
         }
 
@@ -1386,6 +1473,372 @@ namespace PosBranch_Win.Reports.PurchaseReports
         #endregion
 
         #region Data Loading & Grid Binding
+        private DataTable BuildMatrixDataTable(List<DatewisePurchaseReportRow> rawRows, DatewisePurchaseReportFilter filter, out List<PivotDateColumnInfo> dateColumns)
+        {
+            dateColumns = new List<PivotDateColumnInfo>();
+            string mode = (filter.PeriodMode ?? "DATE_RANGE").ToUpperInvariant();
+
+            if (mode == "MONTH_WISE")
+            {
+                int month = filter.Month > 0 ? filter.Month : DateTime.Today.Month;
+                int year = filter.Year > 0 ? filter.Year : DateTime.Today.Year;
+
+                if (filter.Month > 0)
+                {
+                    int daysInMonth = DateTime.DaysInMonth(year, month);
+                    // Generate 1 to 31 columns for month view
+                    for (int day = 1; day <= 31; day++)
+                    {
+                        string key = $"Day_{day:D2}";
+                        string caption = day.ToString();
+                        string tip;
+                        DateTime? dt = null;
+
+                        if (day <= daysInMonth)
+                        {
+                            dt = new DateTime(year, month, day);
+                            tip = $"{dt.Value:dd-MMM-yyyy (dddd)}";
+                        }
+                        else
+                        {
+                            tip = $"Day {day} (N/A for {CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(month)})";
+                        }
+
+                        dateColumns.Add(new PivotDateColumnInfo
+                        {
+                            ColumnKey = key,
+                            HeaderCaption = caption,
+                            Tooltip = tip,
+                            Date = dt,
+                            DayNumber = day
+                        });
+                    }
+                }
+                else
+                {
+                    // ALL Months: 12 month columns
+                    for (int m = 1; m <= 12; m++)
+                    {
+                        string mName = CultureInfo.CurrentCulture.DateTimeFormat.GetAbbreviatedMonthName(m);
+                        dateColumns.Add(new PivotDateColumnInfo
+                        {
+                            ColumnKey = $"Month_{m:D2}",
+                            HeaderCaption = mName,
+                            Tooltip = $"{CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(m)} {year}",
+                            MonthNumber = m
+                        });
+                    }
+                }
+            }
+            else if (mode == "YEAR_WISE")
+            {
+                int year = filter.Year > 0 ? filter.Year : DateTime.Today.Year;
+                for (int m = 1; m <= 12; m++)
+                {
+                    string mName = CultureInfo.CurrentCulture.DateTimeFormat.GetAbbreviatedMonthName(m);
+                    dateColumns.Add(new PivotDateColumnInfo
+                    {
+                        ColumnKey = $"Month_{m:D2}",
+                        HeaderCaption = mName,
+                        Tooltip = $"{CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(m)} {year}",
+                        MonthNumber = m
+                    });
+                }
+            }
+            else if (mode == "DATE_RANGE")
+            {
+                DateTime start = filter.FromDate.Date;
+                DateTime end = filter.ToDate.Date;
+                if (start > end) { DateTime tmp = start; start = end; end = tmp; }
+
+                // If user selected an entire month in Date Range mode:
+                if (start.Year == end.Year && start.Month == end.Month && start.Day == 1 && end.Day == DateTime.DaysInMonth(start.Year, start.Month))
+                {
+                    int daysInMonth = DateTime.DaysInMonth(start.Year, start.Month);
+                    for (int day = 1; day <= 31; day++)
+                    {
+                        string key = $"Day_{day:D2}";
+                        string caption = day.ToString();
+                        string tip;
+                        DateTime? dt = null;
+
+                        if (day <= daysInMonth)
+                        {
+                            dt = new DateTime(start.Year, start.Month, day);
+                            tip = $"{dt.Value:dd-MMM-yyyy (dddd)}";
+                        }
+                        else
+                        {
+                            tip = $"Day {day} (N/A for {CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(start.Month)})";
+                        }
+
+                        dateColumns.Add(new PivotDateColumnInfo
+                        {
+                            ColumnKey = key,
+                            HeaderCaption = caption,
+                            Tooltip = tip,
+                            Date = dt,
+                            DayNumber = day
+                        });
+                    }
+                }
+                else
+                {
+                    int totalDays = (int)(end - start).TotalDays + 1;
+                    if (totalDays <= 93)
+                    {
+                        for (DateTime d = start; d <= end; d = d.AddDays(1))
+                        {
+                            string key = $"Date_{d:yyyyMMdd}";
+                            string caption = (start.Year == end.Year && start.Month == end.Month)
+                                ? d.Day.ToString()
+                                : d.ToString("dd-MMM");
+
+                            dateColumns.Add(new PivotDateColumnInfo
+                            {
+                                ColumnKey = key,
+                                HeaderCaption = caption,
+                                Tooltip = $"{d:dd-MMM-yyyy (dddd)}",
+                                Date = d,
+                                DayNumber = d.Day
+                            });
+                        }
+                    }
+                    else
+                    {
+                        var distinctDates = (rawRows ?? new List<DatewisePurchaseReportRow>())
+                            .Select(r => r.PurchaseDate.Date)
+                            .Distinct()
+                            .OrderBy(d => d)
+                            .ToList();
+
+                        if (distinctDates.Count == 0)
+                        {
+                            distinctDates.Add(start);
+                        }
+
+                        foreach (var d in distinctDates)
+                        {
+                            dateColumns.Add(new PivotDateColumnInfo
+                            {
+                                ColumnKey = $"Date_{d:yyyyMMdd}",
+                                HeaderCaption = d.ToString("dd-MMM"),
+                                Tooltip = $"{d:dd-MMM-yyyy (dddd)}",
+                                Date = d,
+                                DayNumber = d.Day
+                            });
+                        }
+                    }
+                }
+            }
+            else // ALL
+            {
+                var distinctDates = (rawRows ?? new List<DatewisePurchaseReportRow>())
+                    .Select(r => r.PurchaseDate.Date)
+                    .Distinct()
+                    .OrderBy(d => d)
+                    .ToList();
+
+                if (distinctDates.Count == 0)
+                {
+                    distinctDates.Add(DateTime.Today);
+                }
+
+                foreach (var d in distinctDates)
+                {
+                    dateColumns.Add(new PivotDateColumnInfo
+                    {
+                        ColumnKey = $"Date_{d:yyyyMMdd}",
+                        HeaderCaption = d.ToString("dd-MMM"),
+                        Tooltip = $"{d:dd-MMM-yyyy (dddd)}",
+                        Date = d,
+                        DayNumber = d.Day
+                    });
+                }
+            }
+
+            // Build DataTable
+            DataTable table = new DataTable("PurchaseMatrix");
+            table.Columns.Add("ItemKey", typeof(string));
+            table.Columns.Add("ItemID", typeof(int));
+            table.Columns.Add("BarCode", typeof(string));
+            table.Columns.Add("ItemName", typeof(string));
+            table.Columns.Add("Unit", typeof(string));
+
+            foreach (var col in dateColumns)
+            {
+                var dc = table.Columns.Add(col.ColumnKey, typeof(decimal));
+                dc.DefaultValue = 0m;
+            }
+
+            var cTotal = table.Columns.Add("Total", typeof(decimal));
+            cTotal.DefaultValue = 0m;
+
+            var cTotalQty = table.Columns.Add("TotalQty", typeof(decimal));
+            cTotalQty.DefaultValue = 0m;
+
+            var cTotalAmt = table.Columns.Add("TotalAmount", typeof(decimal));
+            cTotalAmt.DefaultValue = 0m;
+
+            var cAvgRate = table.Columns.Add("AvgCost", typeof(decimal));
+            cAvgRate.DefaultValue = 0m;
+
+            if (rawRows == null || rawRows.Count == 0)
+            {
+                return table;
+            }
+
+            // Fast pre-aggregation by item and date for both Quantity and Net Amount
+            Dictionary<string, decimal> dateQtyMap = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, decimal> dateAmtMap = new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase);
+            Dictionary<string, ItemMatrixInfo> itemInfoMap = new Dictionary<string, ItemMatrixInfo>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (DatewisePurchaseReportRow r in rawRows)
+            {
+                string itemKey = (r.ItemID > 0 ? r.ItemID.ToString() : (r.ItemName ?? string.Empty)) + "_" + (r.Unit ?? string.Empty);
+
+                ItemMatrixInfo itemInfo;
+                if (!itemInfoMap.TryGetValue(itemKey, out itemInfo))
+                {
+                    itemInfo = new ItemMatrixInfo
+                    {
+                        ItemID = r.ItemID,
+                        ItemName = !string.IsNullOrEmpty(r.ItemName) ? r.ItemName : "Unknown Item",
+                        Unit = r.Unit ?? string.Empty,
+                        BarCode = r.BarCode ?? string.Empty,
+                        TotalQty = 0m,
+                        TotalAmount = 0m
+                    };
+                    itemInfoMap[itemKey] = itemInfo;
+                }
+                else if (string.IsNullOrEmpty(itemInfo.BarCode) && !string.IsNullOrEmpty(r.BarCode))
+                {
+                    itemInfo.BarCode = r.BarCode;
+                }
+
+                decimal rowAmount = (r.NetAmount != 0m) ? r.NetAmount : r.Amount;
+                itemInfo.TotalQty += r.Qty;
+                itemInfo.TotalAmount += rowAmount;
+
+                foreach (PivotDateColumnInfo dateCol in dateColumns)
+                {
+                    bool matches = false;
+                    if (dateCol.Date.HasValue)
+                    {
+                        matches = (r.PurchaseDate.Date == dateCol.Date.Value.Date);
+                    }
+                    else if (dateCol.MonthNumber > 0)
+                    {
+                        matches = (r.PurchaseDate.Month == dateCol.MonthNumber);
+                    }
+                    else if (dateCol.DayNumber > 0)
+                    {
+                        matches = (r.PurchaseDate.Day == dateCol.DayNumber);
+                    }
+
+                    if (matches)
+                    {
+                        string cellKey = itemKey + "_" + dateCol.ColumnKey;
+
+                        decimal currentQty = 0m;
+                        dateQtyMap.TryGetValue(cellKey, out currentQty);
+                        dateQtyMap[cellKey] = currentQty + r.Qty;
+
+                        decimal currentAmt = 0m;
+                        dateAmtMap.TryGetValue(cellKey, out currentAmt);
+                        dateAmtMap[cellKey] = currentAmt + rowAmount;
+                    }
+                }
+            }
+
+            foreach (ItemMatrixInfo item in itemInfoMap.Values.OrderBy(x => x.ItemName))
+            {
+                DataRow dr = table.NewRow();
+                string itemKey = (item.ItemID > 0 ? item.ItemID.ToString() : item.ItemName) + "_" + (item.Unit ?? string.Empty);
+                dr["ItemKey"] = itemKey;
+                dr["ItemID"] = item.ItemID;
+                dr["BarCode"] = item.BarCode;
+                dr["ItemName"] = item.ItemName;
+                dr["Unit"] = item.Unit;
+
+                foreach (PivotDateColumnInfo dateCol in dateColumns)
+                {
+                    string cellKey = itemKey + "_" + dateCol.ColumnKey;
+                    decimal cellVal = 0m;
+                    if (_isAmountMode)
+                    {
+                        dateAmtMap.TryGetValue(cellKey, out cellVal);
+                    }
+                    else
+                    {
+                        dateQtyMap.TryGetValue(cellKey, out cellVal);
+                    }
+                    dr[dateCol.ColumnKey] = cellVal;
+                }
+
+                dr["Total"] = _isAmountMode ? item.TotalAmount : item.TotalQty;
+                dr["TotalQty"] = item.TotalQty;
+                dr["TotalAmount"] = item.TotalAmount;
+                dr["AvgCost"] = item.TotalQty > 0 ? Math.Round(item.TotalAmount / item.TotalQty, 2) : 0m;
+
+                table.Rows.Add(dr);
+            }
+
+            return table;
+        }
+
+        private DataTable BuildDetailsDataTable(List<DatewisePurchaseReportRow> rawRows)
+        {
+            DataTable details = new DataTable("PurchaseDetails");
+            details.Columns.Add("ItemKey", typeof(string));
+            details.Columns.Add("PurchaseDate", typeof(DateTime));
+            details.Columns.Add("PurchaseNo", typeof(long));
+            details.Columns.Add("InvoiceNo", typeof(string));
+            details.Columns.Add("VendorName", typeof(string));
+            details.Columns.Add("Unit", typeof(string));
+            details.Columns.Add("Qty", typeof(decimal));
+            details.Columns.Add("Cost", typeof(decimal));
+            details.Columns.Add("TaxAmt", typeof(decimal));
+            details.Columns.Add("NetAmount", typeof(decimal));
+
+            if (rawRows != null && rawRows.Count > 0)
+            {
+                foreach (DatewisePurchaseReportRow r in rawRows.OrderBy(x => x.PurchaseDate).ThenBy(x => x.PurchaseNo).ThenBy(x => x.SlNo))
+                {
+                    string itemKey = (r.ItemID > 0 ? r.ItemID.ToString() : (r.ItemName ?? string.Empty)) + "_" + (r.Unit ?? string.Empty);
+                    DataRow dr = details.NewRow();
+                    dr["ItemKey"] = itemKey;
+                    dr["PurchaseDate"] = r.PurchaseDate.Date;
+                    dr["PurchaseNo"] = r.PurchaseNo;
+                    dr["InvoiceNo"] = !string.IsNullOrEmpty(r.InvoiceNo) ? r.InvoiceNo : (r.PurchaseNo > 0 ? "GRN-" + r.PurchaseNo : "-");
+                    dr["VendorName"] = !string.IsNullOrEmpty(r.VendorName) ? r.VendorName : "-";
+                    dr["Unit"] = r.Unit ?? string.Empty;
+                    dr["Qty"] = r.Qty;
+                    dr["Cost"] = r.Cost;
+                    dr["TaxAmt"] = r.TaxAmt;
+                    dr["NetAmount"] = (r.NetAmount != 0m) ? r.NetAmount : r.Amount;
+                    details.Rows.Add(dr);
+                }
+            }
+
+            return details;
+        }
+
+        private DataSet BuildMatrixDataSet(List<DatewisePurchaseReportRow> rawRows, DatewisePurchaseReportFilter filter, out List<PivotDateColumnInfo> dateColumns)
+        {
+            DataTable matrixTable = BuildMatrixDataTable(rawRows, filter, out dateColumns);
+            DataTable detailsTable = BuildDetailsDataTable(rawRows);
+
+            DataSet ds = new DataSet("DatewisePurchaseDataSet");
+            ds.Tables.Add(matrixTable);
+            ds.Tables.Add(detailsTable);
+
+            DataRelation relation = new DataRelation("ItemPurchaseBreakdown", matrixTable.Columns["ItemKey"], detailsTable.Columns["ItemKey"], false);
+            ds.Relations.Add(relation);
+
+            return ds;
+        }
+
         private void LoadReport()
         {
             Cursor prev = Cursor;
@@ -1394,7 +1847,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
             try
             {
                 string periodMode = Convert.ToString(ultraComboPeriodMode.Value) ?? "DATE_RANGE";
-                string viewMode = Convert.ToString(ultraComboViewMode.Value) ?? "DETAILED";
+                string viewMode = Convert.ToString(ultraComboViewMode.Value) ?? "DATE_MATRIX";
 
                 DatewisePurchaseReportFilter filter = new DatewisePurchaseReportFilter
                 {
@@ -1408,17 +1861,36 @@ namespace PosBranch_Win.Reports.PurchaseReports
                     FinYearId = SessionContext.FinYearId,
                     VendorLedgerId = ultraComboVendor.Value != null ? Convert.ToInt32(ultraComboVendor.Value) : 0,
                     ItemSearch = txtItemSearch.Text != null ? txtItemSearch.Text.Trim() : string.Empty,
-                    ViewMode = viewMode
+                    ViewMode = "DETAILED" // Fetch transaction details so drilldown displays real invoice, vendor, and item costs
                 };
 
                 _reportRows = _repository.GetReport(filter);
 
-                gridReport.DataSource = null;
-                gridReport.DataSource = _reportRows;
+                if (string.Equals(viewMode, "DATE_MATRIX", StringComparison.OrdinalIgnoreCase))
+                {
+                    List<PivotDateColumnInfo> matrixCols;
+                    DataSet ds = BuildMatrixDataSet(_reportRows, filter, out matrixCols);
+                    _matrixDataSet = ds;
+                    _matrixTable = ds.Tables["PurchaseMatrix"];
+                    _currentMatrixDateColumns.Clear();
+                    _currentMatrixDateColumns.AddRange(matrixCols);
+
+                    gridReport.DataSource = null;
+                    gridReport.DataSource = _matrixDataSet;
+                }
+                else
+                {
+                    _currentMatrixDateColumns.Clear();
+                    _matrixTable = null;
+                    _matrixDataSet = null;
+
+                    gridReport.DataSource = null;
+                    gridReport.DataSource = _reportRows;
+                }
 
                 CreateFooterCells();
                 UpdateFooterCellPositions();
-                UpdateFooterValues(_reportRows);
+                UpdateFooterValues();
             }
             catch (Exception ex)
             {
@@ -1459,48 +1931,189 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 return;
 
             UltraGridBand band = e.Layout.Bands[0];
-            foreach (UltraGridColumn column in band.Columns)
+            bool isMatrix = string.Equals(Convert.ToString(ultraComboViewMode.Value), "DATE_MATRIX", StringComparison.OrdinalIgnoreCase);
+
+            if (isMatrix)
             {
-                column.Hidden = true;
-                column.ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
+                foreach (UltraGridColumn column in band.Columns)
+                {
+                    if (column.IsChaptered || string.Equals(column.Key, "ItemPurchaseBreakdown", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+                    column.Hidden = true;
+                    column.ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
+                }
+
+                if (band.Columns.Exists("ItemKey"))
+                {
+                    band.Columns["ItemKey"].Hidden = true;
+                    band.Columns["ItemKey"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
+                }
+
+                if (band.Columns.Exists("ItemID"))
+                {
+                    band.Columns["ItemID"].Hidden = true;
+                    band.Columns["ItemID"].ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
+                }
+
+                ConfigureGridColumn(band, "ItemName", "Item Description", 240, null, HAlign.Left, 0);
+
+                int visPos = 1;
+                foreach (var dateCol in _currentMatrixDateColumns)
+                {
+                    if (band.Columns.Exists(dateCol.ColumnKey))
+                    {
+                        ConfigureGridColumn(band, dateCol.ColumnKey, dateCol.HeaderCaption, 55, "#,##0.00", HAlign.Right, visPos++);
+                        string modeDesc = _isAmountMode ? "Net Amount" : "Qty";
+                        band.Columns[dateCol.ColumnKey].Header.ToolTipText = $"{dateCol.Tooltip} ({modeDesc})";
+                    }
+                }
+
+                ConfigureGridColumn(band, "Total", "Total", 90, "#,##0.00", HAlign.Right, visPos++);
+                if (band.Columns.Exists("Total"))
+                {
+                    band.Columns["Total"].Hidden = false;
+                    band.Columns["Total"].Header.Caption = "Total";
+                    band.Columns["Total"].Header.ToolTipText = _isAmountMode ? "Total Net Amount across dates" : "Total Quantity across dates";
+                    band.Columns["Total"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
+                    band.Columns["Total"].CellAppearance.ForeColor = _isAmountMode ? Color.FromArgb(27, 94, 32) : Color.FromArgb(13, 71, 161);
+                }
+
+                ConfigureGridColumn(band, "Unit", "Unit", 55, null, HAlign.Center, visPos++);
+                ConfigureGridColumn(band, "TotalQty", "Total Qty", 85, "#,##0.00", HAlign.Right, visPos++);
+                ConfigureGridColumn(band, "TotalAmount", "Total Amount", 105, "#,##0.00", HAlign.Right, visPos++);
+                ConfigureGridColumn(band, "AvgCost", "Avg Rate", 80, "#,##0.00", HAlign.Right, visPos++);
+                ConfigureGridColumn(band, "BarCode", "Barcode", 110, null, HAlign.Left, visPos++);
+
+                if (band.Columns.Exists("Unit") && !userHiddenColumnKeys.Contains("Unit"))
+                {
+                    band.Columns["Unit"].Hidden = true;
+                }
+                if (band.Columns.Exists("TotalQty"))
+                {
+                    band.Columns["TotalQty"].Hidden = true;
+                }
+                if (band.Columns.Exists("TotalAmount"))
+                {
+                    band.Columns["TotalAmount"].Hidden = true;
+                }
+                if (band.Columns.Exists("AvgCost"))
+                {
+                    band.Columns["AvgCost"].Hidden = true;
+                }
+                if (band.Columns.Exists("BarCode"))
+                {
+                    band.Columns["BarCode"].Hidden = true;
+                }
+
+                if (band.Columns.Exists("ItemName"))
+                {
+                    band.Columns["ItemName"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
+                }
+            }
+            else
+            {
+                foreach (UltraGridColumn column in band.Columns)
+                {
+                    column.Hidden = true;
+                    column.ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
+                }
+
+                ConfigureGridColumn(band, "PurchaseDate", "Purchase Date", 105, "dd-MMM-yyyy", HAlign.Left, 0);
+                ConfigureGridColumn(band, "PurchaseNo", "Purchase No", 95, null, HAlign.Left, 1);
+                ConfigureGridColumn(band, "InvoiceNo", "Invoice No", 110, null, HAlign.Left, 2);
+                ConfigureGridColumn(band, "InvoiceDate", "Invoice Date", 100, "dd-MMM-yyyy", HAlign.Left, 3);
+                ConfigureGridColumn(band, "VendorName", "Vendor Name", 200, null, HAlign.Left, 4);
+                ConfigureGridColumn(band, "BarCode", "Barcode", 115, null, HAlign.Left, 5);
+                ConfigureGridColumn(band, "ItemName", "Item Description", 230, null, HAlign.Left, 6);
+                ConfigureGridColumn(band, "Unit", "Unit", 65, null, HAlign.Center, 7);
+                ConfigureGridColumn(band, "Qty", "Qty", 80, "#,##0.00", HAlign.Right, 8);
+                ConfigureGridColumn(band, "Free", "Free Qty", 75, "#,##0.00", HAlign.Right, 9);
+                ConfigureGridColumn(band, "TotalQty", "Total Qty", 85, "#,##0.00", HAlign.Right, 10);
+                ConfigureGridColumn(band, "Cost", "Purchase Rate", 95, "#,##0.00", HAlign.Right, 11);
+                ConfigureGridColumn(band, "Amount", "Amount", 105, "#,##0.00", HAlign.Right, 12);
+                ConfigureGridColumn(band, "TaxAmt", "Tax Amount", 90, "#,##0.00", HAlign.Right, 13);
+                ConfigureGridColumn(band, "NetAmount", "Net Amount", 110, "#,##0.00", HAlign.Right, 14);
+                ConfigureGridColumn(band, "Paymode", "Pay Mode", 90, null, HAlign.Left, 15);
+                ConfigureGridColumn(band, "BilledBy", "Billed By", 100, null, HAlign.Left, 16);
+
+                if (band.Columns.Exists("ItemName"))
+                {
+                    band.Columns["ItemName"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
+                }
+
+                if (band.Columns.Exists("Qty"))
+                {
+                    band.Columns["Qty"].CellAppearance.ForeColor = Color.FromArgb(13, 71, 161);
+                    band.Columns["Qty"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
+                }
+
+                if (band.Columns.Exists("NetAmount"))
+                {
+                    band.Columns["NetAmount"].CellAppearance.ForeColor = Color.FromArgb(27, 94, 32);
+                    band.Columns["NetAmount"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
+                }
             }
 
-            ConfigureGridColumn(band, "PurchaseDate", "Purchase Date", 105, "dd-MMM-yyyy", HAlign.Left, 0);
-            ConfigureGridColumn(band, "PurchaseNo", "Purchase No", 95, null, HAlign.Left, 1);
-            ConfigureGridColumn(band, "InvoiceNo", "Invoice No", 110, null, HAlign.Left, 2);
-            ConfigureGridColumn(band, "InvoiceDate", "Invoice Date", 100, "dd-MMM-yyyy", HAlign.Left, 3);
-            ConfigureGridColumn(band, "VendorName", "Vendor Name", 200, null, HAlign.Left, 4);
-            ConfigureGridColumn(band, "BarCode", "Barcode", 115, null, HAlign.Left, 5);
-            ConfigureGridColumn(band, "ItemName", "Item Description", 230, null, HAlign.Left, 6);
-            ConfigureGridColumn(band, "Unit", "Unit", 65, null, HAlign.Center, 7);
-            ConfigureGridColumn(band, "Qty", "Qty", 80, "#,##0.00", HAlign.Right, 8);
-            ConfigureGridColumn(band, "Free", "Free Qty", 75, "#,##0.00", HAlign.Right, 9);
-            ConfigureGridColumn(band, "TotalQty", "Total Qty", 85, "#,##0.00", HAlign.Right, 10);
-            ConfigureGridColumn(band, "Cost", "Purchase Rate", 95, "#,##0.00", HAlign.Right, 11);
-            ConfigureGridColumn(band, "Amount", "Amount", 105, "#,##0.00", HAlign.Right, 12);
-            ConfigureGridColumn(band, "TaxAmt", "Tax Amount", 90, "#,##0.00", HAlign.Right, 13);
-            ConfigureGridColumn(band, "NetAmount", "Net Amount", 110, "#,##0.00", HAlign.Right, 14);
-            ConfigureGridColumn(band, "Paymode", "Pay Mode", 90, null, HAlign.Left, 15);
-            ConfigureGridColumn(band, "BilledBy", "Billed By", 100, null, HAlign.Left, 16);
-
-            if (band.Columns.Exists("ItemName"))
+            // Configure Child Band 1 for Purchase Details drilldown (opened via +)
+            if (e.Layout.Bands.Count > 1)
             {
-                band.Columns["ItemName"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
-            }
+                UltraGridBand childBand = e.Layout.Bands[1];
+                childBand.HeaderVisible = true;
+                childBand.Header.Caption = "Purchase Breakdown (Date, Invoice, Vendor, Qty, Cost, Net Amount)";
+                childBand.Header.Appearance.BackColor = Color.FromArgb(41, 128, 185);
+                childBand.Header.Appearance.ForeColor = Color.White;
+                childBand.Header.Appearance.FontData.Bold = DefaultableBoolean.True;
+                childBand.Override.AllowAddNew = AllowAddNew.No;
+                childBand.Override.AllowDelete = DefaultableBoolean.False;
+                childBand.Override.AllowUpdate = DefaultableBoolean.False;
+                childBand.Override.RowSelectors = DefaultableBoolean.False;
+                childBand.Override.HeaderAppearance.BackColor = Color.FromArgb(70, 130, 180);
+                childBand.Override.HeaderAppearance.ForeColor = Color.White;
+                childBand.Override.HeaderAppearance.FontData.Bold = DefaultableBoolean.True;
+                childBand.Override.RowAlternateAppearance.BackColor = Color.FromArgb(246, 250, 255);
+                childBand.Override.CellAppearance.BorderColor = GridRowLine;
 
-            if (band.Columns.Exists("Qty"))
-            {
-                band.Columns["Qty"].CellAppearance.ForeColor = Color.FromArgb(13, 71, 161);
-                band.Columns["Qty"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
-            }
+                foreach (UltraGridColumn column in childBand.Columns)
+                {
+                    column.Hidden = true;
+                    column.ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
+                }
 
-            if (band.Columns.Exists("NetAmount"))
-            {
-                band.Columns["NetAmount"].CellAppearance.ForeColor = Color.FromArgb(27, 94, 32);
-                band.Columns["NetAmount"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
+                ConfigureChildGridColumn(childBand, "PurchaseDate", "Purchase Date", 110, "dd-MMM-yyyy", HAlign.Center, 0);
+                ConfigureChildGridColumn(childBand, "InvoiceNo", "Invoice / Bill No", 125, null, HAlign.Left, 1);
+                ConfigureChildGridColumn(childBand, "VendorName", "Vendor / Supplier", 210, null, HAlign.Left, 2);
+                ConfigureChildGridColumn(childBand, "Unit", "Unit", 65, null, HAlign.Center, 3);
+                ConfigureChildGridColumn(childBand, "Qty", "Purchased Qty", 100, "#,##0.00", HAlign.Right, 4);
+                ConfigureChildGridColumn(childBand, "Cost", "Unit Cost", 100, "#,##0.00", HAlign.Right, 5);
+                ConfigureChildGridColumn(childBand, "TaxAmt", "Tax Amount", 95, "#,##0.00", HAlign.Right, 6);
+                ConfigureChildGridColumn(childBand, "NetAmount", "Net Amount", 120, "#,##0.00", HAlign.Right, 7);
+
+                if (childBand.Columns.Exists("Qty"))
+                {
+                    childBand.Columns["Qty"].CellAppearance.ForeColor = Color.FromArgb(13, 71, 161);
+                    childBand.Columns["Qty"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
+                }
+                if (childBand.Columns.Exists("Cost"))
+                {
+                    childBand.Columns["Cost"].CellAppearance.ForeColor = Color.FromArgb(20, 40, 80);
+                    childBand.Columns["Cost"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
+                }
+                if (childBand.Columns.Exists("NetAmount"))
+                {
+                    childBand.Columns["NetAmount"].CellAppearance.ForeColor = Color.FromArgb(27, 94, 32);
+                    childBand.Columns["NetAmount"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
+                }
             }
 
             ReportGridLayoutHelper.ApplySavedLayout(GetLayoutKey(), gridReport, userHiddenColumnKeys);
+            if (isMatrix && band.Columns.Exists("Total"))
+            {
+                band.Columns["Total"].Hidden = false;
+                band.Columns["Total"].Header.Caption = "Total";
+                band.Columns["Total"].Header.VisiblePosition = _currentMatrixDateColumns.Count + 1;
+            }
             if (columnChooserForm != null && columnChooserForm.Visible)
             {
                 PopulateColumnChooserListBox();
@@ -1509,13 +2122,106 @@ namespace PosBranch_Win.Reports.PurchaseReports
             e.Layout.AutoFitStyle = AutoFitStyle.None;
             CreateFooterCells();
             UpdateFooterCellPositions();
-            UpdateFooterValues(gridReport.DataSource as IList<DatewisePurchaseReportRow>);
+            UpdateFooterValues();
+        }
+
+        private void ConfigureChildGridColumn(UltraGridBand band, string key, string header, int width, string format, HAlign align, int visiblePosition)
+        {
+            if (!band.Columns.Exists(key))
+                return;
+
+            UltraGridColumn column = band.Columns[key];
+            column.ExcludeFromColumnChooser = ExcludeFromColumnChooser.True;
+            column.Hidden = false;
+            column.Header.Caption = header;
+            column.Width = width;
+            column.Header.VisiblePosition = visiblePosition;
+            column.Header.Appearance.BorderColor = GridRowLine;
+            column.CellAppearance.BorderColor = GridRowLine;
+            column.CellAppearance.TextHAlign = align;
+            column.CellAppearance.FontData.Name = "Microsoft Sans Serif";
+            column.CellAppearance.FontData.SizeInPoints = 8.25F;
+
+            if (!string.IsNullOrWhiteSpace(format))
+            {
+                column.Format = format;
+            }
         }
 
         private void gridReport_InitializeRow(object sender, InitializeRowEventArgs e)
         {
             if (e.Row.Band.Index == 0)
             {
+                e.Row.ExpansionIndicator = ShowExpansionIndicator.Always;
+                bool isMatrix = string.Equals(Convert.ToString(ultraComboViewMode.Value), "DATE_MATRIX", StringComparison.OrdinalIgnoreCase);
+
+                if (isMatrix)
+                {
+                    foreach (var dateCol in _currentMatrixDateColumns)
+                    {
+                        if (e.Row.Cells.Exists(dateCol.ColumnKey))
+                        {
+                            var cell = e.Row.Cells[dateCol.ColumnKey];
+                            if (cell.Value != null && cell.Value != DBNull.Value && decimal.TryParse(Convert.ToString(cell.Value), out decimal q))
+                            {
+                                if (q > 0)
+                                {
+                                    cell.Appearance.FontData.Bold = DefaultableBoolean.True;
+                                    cell.Appearance.ForeColor = _isAmountMode ? Color.FromArgb(27, 94, 32) : Color.FromArgb(10, 45, 120);
+                                    cell.Appearance.BackColor = Color.FromArgb(242, 248, 255);
+                                }
+                                else
+                                {
+                                    cell.Appearance.ForeColor = Color.FromArgb(170, 185, 205);
+                                }
+                            }
+                        }
+                    }
+
+                    if (e.Row.Cells.Exists("Total"))
+                    {
+                        var totalCell = e.Row.Cells["Total"];
+                        totalCell.Appearance.FontData.Bold = DefaultableBoolean.True;
+                        totalCell.Appearance.ForeColor = _isAmountMode ? Color.FromArgb(27, 94, 32) : Color.FromArgb(13, 71, 161);
+                        if (totalCell.Value != null && totalCell.Value != DBNull.Value && decimal.TryParse(Convert.ToString(totalCell.Value), out decimal tv) && tv > 0)
+                        {
+                            totalCell.Appearance.BackColor = Color.FromArgb(238, 245, 255);
+                        }
+                    }
+
+                    if (e.Row.Cells.Exists("TotalQty"))
+                    {
+                        e.Row.Cells["TotalQty"].Appearance.FontData.Bold = DefaultableBoolean.True;
+                        e.Row.Cells["TotalQty"].Appearance.ForeColor = Color.FromArgb(13, 71, 161);
+                    }
+
+                    if (e.Row.Cells.Exists("TotalAmount"))
+                    {
+                        e.Row.Cells["TotalAmount"].Appearance.FontData.Bold = DefaultableBoolean.True;
+                        e.Row.Cells["TotalAmount"].Appearance.ForeColor = Color.FromArgb(27, 94, 32);
+                    }
+                }
+                else
+                {
+                    if (e.Row.Cells.Exists("NetAmount"))
+                    {
+                        e.Row.Cells["NetAmount"].Appearance.FontData.Bold = DefaultableBoolean.True;
+                        e.Row.Cells["NetAmount"].Appearance.ForeColor = Color.FromArgb(27, 94, 32);
+                    }
+                }
+            }
+            else if (e.Row.Band.Index == 1)
+            {
+                if (e.Row.Cells.Exists("Qty"))
+                {
+                    e.Row.Cells["Qty"].Appearance.FontData.Bold = DefaultableBoolean.True;
+                    e.Row.Cells["Qty"].Appearance.ForeColor = Color.FromArgb(13, 71, 161);
+                }
+                if (e.Row.Cells.Exists("Cost"))
+                {
+                    e.Row.Cells["Cost"].Appearance.FontData.Bold = DefaultableBoolean.True;
+                    e.Row.Cells["Cost"].Appearance.ForeColor = Color.FromArgb(20, 40, 80);
+                }
                 if (e.Row.Cells.Exists("NetAmount"))
                 {
                     e.Row.Cells["NetAmount"].Appearance.FontData.Bold = DefaultableBoolean.True;
@@ -1526,6 +2232,76 @@ namespace PosBranch_Win.Reports.PurchaseReports
         #endregion
 
         #region Actions & Exports
+        private void btnToggleValueMode_Click(object sender, EventArgs e)
+        {
+            _isAmountMode = !_isAmountMode;
+            UpdateValueModeButtonText();
+
+            bool isMatrix = string.Equals(Convert.ToString(ultraComboViewMode?.Value), "DATE_MATRIX", StringComparison.OrdinalIgnoreCase);
+            if (isMatrix && _reportRows != null && _reportRows.Count > 0)
+            {
+                string periodMode = Convert.ToString(ultraComboPeriodMode.Value) ?? "DATE_RANGE";
+                DatewisePurchaseReportFilter filter = new DatewisePurchaseReportFilter
+                {
+                    PeriodMode = periodMode,
+                    FromDate = dtFrom.Value != null ? Convert.ToDateTime(dtFrom.Value).Date : DateTime.MinValue,
+                    ToDate = dtTo.Value != null ? Convert.ToDateTime(dtTo.Value).Date : DateTime.MaxValue,
+                    Month = ultraComboMonth.Value != null ? Convert.ToInt32(ultraComboMonth.Value) : 0,
+                    Year = ultraComboYear.Value != null ? Convert.ToInt32(ultraComboYear.Value) : 0,
+                    CompanyId = SessionContext.CompanyId,
+                    BranchId = SessionContext.BranchId,
+                    FinYearId = SessionContext.FinYearId,
+                    VendorLedgerId = ultraComboVendor.Value != null ? Convert.ToInt32(ultraComboVendor.Value) : 0,
+                    ItemSearch = txtItemSearch.Text != null ? txtItemSearch.Text.Trim() : string.Empty,
+                    ViewMode = "DATE_MATRIX"
+                };
+
+                List<PivotDateColumnInfo> matrixCols;
+                DataSet ds = BuildMatrixDataSet(_reportRows, filter, out matrixCols);
+                _matrixDataSet = ds;
+                _matrixTable = ds.Tables["PurchaseMatrix"];
+                _currentMatrixDateColumns.Clear();
+                _currentMatrixDateColumns.AddRange(matrixCols);
+
+                gridReport.DataSource = null;
+                gridReport.DataSource = _matrixDataSet;
+
+                CreateFooterCells();
+                UpdateFooterCellPositions();
+                UpdateFooterValues();
+            }
+            else
+            {
+                LoadReport();
+            }
+        }
+
+        private void btnExpandAll_Click(object sender, EventArgs e)
+        {
+            if (gridReport.Rows != null && gridReport.Rows.Count > 0)
+            {
+                gridReport.Rows.ExpandAll(true);
+                UpdateFooterCellPositions();
+            }
+        }
+
+        private void btnCollapseAll_Click(object sender, EventArgs e)
+        {
+            if (gridReport.Rows != null && gridReport.Rows.Count > 0)
+            {
+                gridReport.Rows.CollapseAll(true);
+                UpdateFooterCellPositions();
+            }
+        }
+
+        private void UpdateValueModeButtonText()
+        {
+            if (btnToggleValueMode != null)
+            {
+                btnToggleValueMode.Text = _isAmountMode ? "Show Qty" : "Show Amount";
+            }
+        }
+
         private void btnViewGrid_Click(object sender, EventArgs e)
         {
             LoadReport();
@@ -1550,8 +2326,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
         private void ShowReportPreview()
         {
-            List<DatewisePurchaseReportRow> rows = gridReport.DataSource as List<DatewisePurchaseReportRow>;
-            if (rows == null || rows.Count == 0)
+            if (gridReport.Rows == null || gridReport.Rows.Count == 0)
             {
                 MessageBox.Show("There is no data to preview. Click View Grid first.", "Preview",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
@@ -1588,7 +2363,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 Label subtitleLabel = new Label
                 {
                     Dock = DockStyle.Fill,
-                    Text = $"Generated On: {DateTime.Now:dd/MM/yyyy HH:mm:ss} | Mode: {ultraComboPeriodMode.Text} | Total Records: {rows.Count}",
+                    Text = $"Generated On: {DateTime.Now:dd/MM/yyyy HH:mm:ss} | Mode: {ultraComboPeriodMode.Text} | Total Records: {gridReport.Rows.Count}",
                     ForeColor = Color.FromArgb(220, 235, 255),
                     BackColor = Color.Transparent,
                     Font = new Font("Segoe UI", 9F, FontStyle.Regular),
@@ -1599,7 +2374,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
                 header.Controls.Add(titleLabel);
 
                 previewGrid.Dock = DockStyle.Fill;
-                previewGrid.DataSource = rows;
+                previewGrid.DataSource = gridReport.DataSource;
 
                 preview.Controls.Add(previewGrid);
                 preview.Controls.Add(header);
@@ -1615,8 +2390,7 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
         private void ExportCsv()
         {
-            List<DatewisePurchaseReportRow> rows = gridReport.DataSource as List<DatewisePurchaseReportRow>;
-            if (rows == null || rows.Count == 0)
+            if (gridReport.Rows == null || gridReport.Rows.Count == 0)
             {
                 MessageBox.Show("There is no data to export.", "Export", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
@@ -1632,31 +2406,27 @@ namespace PosBranch_Win.Reports.PurchaseReports
 
                 if (ReportPdfExporter.CheckAndExportPdf(dialog, gridReport, "Date-wise Purchase Report")) return;
 
-                StringBuilder builder = new StringBuilder();
-                builder.AppendLine("PurchaseDate,PurchaseNo,InvoiceNo,InvoiceDate,VendorName,Barcode,ItemName,Unit,Qty,FreeQty,TotalQty,Rate,Amount,TaxAmount,NetAmount,PayMode,BilledBy");
+                UltraGridBand band = gridReport.DisplayLayout.Bands[0];
+                var visibleCols = band.Columns.Cast<UltraGridColumn>()
+                    .Where(c => !c.Hidden && !c.IsChaptered && !string.Equals(c.Key, "ItemPurchaseBreakdown", StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(c => c.Header.VisiblePosition)
+                    .ToList();
 
-                var visibleRows = GetVisibleDataRows().Select(r => r.ListObject as DatewisePurchaseReportRow).Where(r => r != null).ToList();
+                StringBuilder builder = new StringBuilder();
+                builder.AppendLine(string.Join(",", visibleCols.Select(c => EscapeCsv(!string.IsNullOrEmpty(c.Header.Caption) ? c.Header.Caption : c.Key))));
+
+                var visibleRows = GetVisibleDataRows().ToList();
                 foreach (var row in visibleRows)
                 {
-                    builder.AppendLine(string.Join(",",
-                        row.PurchaseDate.ToString("yyyy-MM-dd"),
-                        row.PurchaseNo.ToString(),
-                        EscapeCsv(row.InvoiceNo),
-                        row.InvoiceDate.ToString("yyyy-MM-dd"),
-                        EscapeCsv(row.VendorName),
-                        EscapeCsv(row.BarCode),
-                        EscapeCsv(row.ItemName),
-                        EscapeCsv(row.Unit),
-                        row.Qty.ToString("F2"),
-                        row.Free.ToString("F2"),
-                        row.TotalQty.ToString("F2"),
-                        row.Cost.ToString("F2"),
-                        row.Amount.ToString("F2"),
-                        row.TaxAmt.ToString("F2"),
-                        row.NetAmount.ToString("F2"),
-                        EscapeCsv(row.Paymode),
-                        EscapeCsv(row.BilledBy)
-                    ));
+                    var lineValues = visibleCols.Select(c =>
+                    {
+                        object val = row.Cells.Exists(c.Key) ? row.Cells[c.Key].Value : null;
+                        if (val == null || val == DBNull.Value) return "";
+                        if (decimal.TryParse(Convert.ToString(val), out decimal decVal))
+                            return decVal.ToString("F2");
+                        return EscapeCsv(Convert.ToString(val));
+                    });
+                    builder.AppendLine(string.Join(",", lineValues));
                 }
 
                 File.WriteAllText(dialog.FileName, builder.ToString(), Encoding.UTF8);
@@ -1677,12 +2447,14 @@ namespace PosBranch_Win.Reports.PurchaseReports
             _isLoading = true;
             try
             {
+                _isAmountMode = false;
+                UpdateValueModeButtonText();
                 ultraComboPeriodMode.Value = "DATE_RANGE";
                 dtFrom.Value = new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1);
                 dtTo.Value = DateTime.Today;
                 ultraComboMonth.Value = DateTime.Today.Month;
                 ultraComboYear.Value = DateTime.Today.Year;
-                ultraComboViewMode.Value = "DETAILED";
+                ultraComboViewMode.Value = "DATE_MATRIX";
                 txtItemSearch.Text = string.Empty;
                 ultraComboVendor.Value = 0;
                 UpdatePeriodControlVisibility();
