@@ -96,6 +96,7 @@
     <Compile Include="ReportRepository\DatewiseSalesReportRepository.cs" />
     <Compile Include="ReportRepository\DatewiseStockAdjustmentReportRepository.cs" />
     <Compile Include="ReportRepository\DatewiseProfitReportRepository.cs" />
+    <Compile Include="ReportRepository\DatewiseItemStockReportRepository.cs" />
     <Compile Include="ReportRepository\PurchaseReturnReportRepositoty.cs" />
     <Compile Include="ReportRepository\SalesAnalyticsRepository.cs" />
     <Compile Include="ReportRepository\PurchaseAnalyticsRepository.cs" />
@@ -170,6 +171,7 @@
     <None Include="Scripts\POS_DatewiseSalesReport.sql" />
     <None Include="Scripts\POS_DatewiseStockAdjustmentReport.sql" />
     <None Include="Scripts\POS_DatewiseProfitReport.sql" />
+    <None Include="Scripts\POS_DatewiseItemStockReport.sql" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
