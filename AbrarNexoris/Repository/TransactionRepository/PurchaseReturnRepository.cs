@@ -3245,6 +3245,28 @@ namespace Repository.TransactionRepository
                     System.Diagnostics.Debug.WriteLine($"Updated {rowsAffected} rows in PReturnMaster");
                 }
 
+                // Restore stock in PriceSettings before deleting PReturnDetails
+                string restoreStockSql = @"
+                    UPDATE ps
+                    SET ps.Stock = ROUND(ps.Stock + (prd.Returned * ISNULL(ps_orig.Packing, 1)), 5),
+                        ps.StockValue = ROUND(ps.Cost * (ps.Stock + (prd.Returned * ISNULL(ps_orig.Packing, 1))), 5)
+                    FROM PriceSettings ps
+                    INNER JOIN PReturnDetails prd ON prd.ItemID = ps.ItemId AND prd.BranchID = ps.BranchId
+                    LEFT JOIN PriceSettings ps_orig ON ps_orig.ItemId = prd.ItemID AND ps_orig.BranchId = prd.BranchID AND ps_orig.UnitId = prd.UnitId
+                    WHERE prd.CompanyId = @CompanyId 
+                        AND prd.FinYearId = @FinYearId 
+                        AND prd.BranchID = @BranchId 
+                        AND prd.PReturnNo = @PReturnNo
+                        AND ps.IsBaseUnit = 'Y'";
+                using (SqlCommand cmd = new SqlCommand(restoreStockSql, (SqlConnection)DataConnection, transaction))
+                {
+                    cmd.Parameters.AddWithValue("@CompanyId", companyId);
+                    cmd.Parameters.AddWithValue("@FinYearId", finYearId);
+                    cmd.Parameters.AddWithValue("@BranchId", branchId);
+                    cmd.Parameters.AddWithValue("@PReturnNo", prReturnNo);
+                    cmd.ExecuteNonQuery();
+                }
+
                 // 2. Delete from PReturnDetails - using the exact SQL provided
                 string deleteDetailsSql = "DELETE FROM PReturnDetails WHERE CompanyId = @CompanyId AND FinYearId = @FinYearId AND BranchID = @BranchId AND PReturnNo = @PReturnNo";
                 using (SqlCommand cmd = new SqlCommand(deleteDetailsSql, (SqlConnection)DataConnection, transaction))
@@ -3419,14 +3441,18 @@ namespace Repository.TransactionRepository
                     return;
                 }
 
-                // Update PriceSettings to reduce stock by the returned quantity
+                // Update PriceSettings to reduce stock by the returned quantity on the base unit
                 string updateStockQuery = @"
+                    DECLARE @Packing float = 1;
+                    SELECT @Packing = ISNULL(Packing, 1) FROM PriceSettings WHERE ItemId = @ItemId AND BranchId = @BranchId AND UnitId = @UnitId;
+                    IF @Packing <= 0 SET @Packing = 1;
+
                     UPDATE PriceSettings 
-                    SET Stock = ISNULL(Stock, 0) - @ReturnQty,
-                        StockValue = (ISNULL(Stock, 0) - @ReturnQty) * ISNULL(Cost, 0)
+                    SET Stock = ISNULL(Stock, 0) - (@ReturnQty * @Packing),
+                        StockValue = (ISNULL(Stock, 0) - (@ReturnQty * @Packing)) * ISNULL(Cost, 0)
                     WHERE ItemId = @ItemId 
                     AND BranchId = @BranchId 
-                    AND UnitId = @UnitId";
+                    AND IsBaseUnit = 'Y'";
 
                 using (SqlCommand updateCmd = new SqlCommand(updateStockQuery, (SqlConnection)DataConnection, transaction))
                 {

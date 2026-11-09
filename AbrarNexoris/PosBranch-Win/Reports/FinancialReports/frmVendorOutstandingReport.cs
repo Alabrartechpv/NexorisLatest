@@ -1935,10 +1935,10 @@ namespace PosBranch_Win.Reports.FinancialReports
             bool dateRange = IsDateRangeMode();
             dtFrom.Enabled = dateRange;
             dtTo.Enabled = dateRange;
-            lblFromDate.Visible = true;
-            lblToDate.Visible = true;
-            dtFrom.Visible = true;
-            dtTo.Visible = true;
+            lblFromDate.Visible = dateRange;
+            lblToDate.Visible = dateRange;
+            dtFrom.Visible = dateRange;
+            dtTo.Visible = dateRange;
            
             ultraLabel1.Visible = false;
             ultraLabel2.Visible = false;
