@@ -183,7 +183,7 @@ namespace Repository.TransactionRepository
             p.Add("@Paid", ObjPurchaseMaster.Paid);
             p.Add("@Pid", ObjPurchaseMaster.Pid);
             p.Add("@POrderMasterId", ObjPurchaseMaster.POrderMasterId);
-            float payedAmt = 0;
+            double payedAmt = 0;
             if (string.Equals(ObjPurchaseMaster.Paymode, "Cash", StringComparison.OrdinalIgnoreCase) || ObjPurchaseMaster.PaymodeID == 2)
             {
                 payedAmt = ObjPurchaseMaster.GrandTotal;
