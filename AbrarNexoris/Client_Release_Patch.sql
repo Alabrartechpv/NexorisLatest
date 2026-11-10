@@ -301,7 +301,11 @@ BEGIN
         l.LedgerName,
         l.GroupID,
         ag.GroupName,
-        CASE gm.RootGroupType WHEN 'CAPITAL' THEN 'CAPITAL' ELSE 'CURRENT LIABILITIES' END AS ParentGroupName,
+        CASE 
+            WHEN gm.RootGroupID = 1 THEN 'CAPITAL'
+            WHEN gm.RootGroupID = 2 THEN 'NON-CURRENT LIABILITIES'
+            ELSE 'CURRENT LIABILITIES'
+        END AS ParentGroupName,
         ISNULL(v.Debit, 0) AS TotalDebit,
         ISNULL(v.Credit, 0) AS TotalCredit,
         (ISNULL(l.OpnCredit, 0) + ISNULL(v.Credit, 0)) - (ISNULL(l.OpnDebit, 0) + ISNULL(v.Debit, 0)) AS ClosingBalance
@@ -321,6 +325,10 @@ BEGIN
     WHERE (@BranchId = 0 OR l.BranchID = @BranchId)
       AND gm.RootGroupType IN ('CAPITAL', 'LIABILITIES');
 
+    -- Auto-reclassify: Exclude Creditors with net debit balance from Liabilities
+    DELETE FROM #Liabilities 
+    WHERE (GroupID = 17 OR GroupName LIKE '%CREDITOR%') AND ClosingBalance < 0;
+
     -- Inject Prior P&L into Reserves & Surplus row if non-zero
     IF @PriorPeriodProfit <> 0
     BEGIN
@@ -338,15 +346,18 @@ BEGIN
         END
     END
 
-    SELECT * FROM #Liabilities WHERE ClosingBalance <> 0 ORDER BY ParentGroupName DESC, LedgerName;
-
     -- RESULT SET 2: ASSETS
     SELECT 
         l.LedgerID,
         l.LedgerName,
         l.GroupID,
         ag.GroupName,
-        'CURRENT ASSETS' AS ParentGroupName,
+        CASE 
+            WHEN gm.RootGroupID = 4 THEN 'FIXED ASSETS'
+            WHEN gm.RootGroupID = 5 THEN 'INVESTMENTS'
+            WHEN gm.RootGroupID = 7 THEN 'MISC EXPENSES (ASSETS)'
+            ELSE 'CURRENT ASSETS'
+        END AS ParentGroupName,
         ISNULL(v.Debit, 0) AS TotalDebit,
         ISNULL(v.Credit, 0) AS TotalCredit,
         (ISNULL(l.OpnDebit, 0) + ISNULL(v.Debit, 0)) - (ISNULL(l.OpnCredit, 0) + ISNULL(v.Credit, 0)) AS ClosingBalance
@@ -367,11 +378,70 @@ BEGIN
       AND gm.RootGroupType = 'ASSETS'
       AND l.GroupID <> 18;
 
+    -- Auto-reclassify: Exclude Debtors with net credit balance from Assets
+    DELETE FROM #Assets 
+    WHERE (GroupID = 16 OR GroupName LIKE '%DEBTOR%') AND ClosingBalance < 0;
+
+    -- RECLASSIFY: Customer Advances (Debtors with net Credit balances -> CURRENT LIABILITIES)
+    INSERT INTO #Liabilities (LedgerID, LedgerName, GroupID, GroupName, ParentGroupName, TotalDebit, TotalCredit, ClosingBalance)
+    SELECT 
+        l.LedgerID,
+        l.LedgerName,
+        l.GroupID,
+        'CUSTOMER ADVANCES / DEPOSITS' AS GroupName,
+        'CURRENT LIABILITIES' AS ParentGroupName,
+        ISNULL(v.Debit, 0) AS TotalDebit,
+        ISNULL(v.Credit, 0) AS TotalCredit,
+        ABS((ISNULL(l.OpnDebit, 0) + ISNULL(v.Debit, 0)) - (ISNULL(l.OpnCredit, 0) + ISNULL(v.Credit, 0))) AS ClosingBalance
+    FROM LedgerMaster l
+    INNER JOIN #GroupMap gm ON l.GroupID = gm.GroupID
+    INNER JOIN (SELECT DISTINCT GroupID, GroupName FROM AccountGroupMaster) ag ON l.GroupID = ag.GroupID
+    LEFT JOIN (
+        SELECT LedgerID, SUM(Debit) AS Debit, SUM(Credit) AS Credit
+        FROM Vouchers
+        WHERE (@BranchId = 0 OR BranchID = @BranchId)
+          AND (@FinYearId = 0 OR FinYearId = @FinYearId)
+          AND VoucherDate <= @ToDate
+          AND ISNULL(CancelFlag,0) = 0
+        GROUP BY LedgerID
+    ) v ON l.LedgerID = v.LedgerID
+    WHERE (@BranchId = 0 OR l.BranchID = @BranchId)
+      AND (l.GroupID = 16 OR ag.GroupName LIKE '%DEBTOR%')
+      AND ((ISNULL(l.OpnDebit, 0) + ISNULL(v.Debit, 0)) - (ISNULL(l.OpnCredit, 0) + ISNULL(v.Credit, 0))) < 0;
+
+    -- RECLASSIFY: Supplier Advances (Creditors with net Debit balances -> CURRENT ASSETS)
+    INSERT INTO #Assets (LedgerID, LedgerName, GroupID, GroupName, ParentGroupName, TotalDebit, TotalCredit, ClosingBalance)
+    SELECT 
+        l.LedgerID,
+        l.LedgerName,
+        l.GroupID,
+        'SUPPLIER ADVANCES' AS GroupName,
+        'CURRENT ASSETS' AS ParentGroupName,
+        ISNULL(v.Debit, 0) AS TotalDebit,
+        ISNULL(v.Credit, 0) AS TotalCredit,
+        ABS((ISNULL(l.OpnCredit, 0) + ISNULL(v.Credit, 0)) - (ISNULL(l.OpnDebit, 0) + ISNULL(v.Debit, 0))) AS ClosingBalance
+    FROM LedgerMaster l
+    INNER JOIN #GroupMap gm ON l.GroupID = gm.GroupID
+    INNER JOIN (SELECT DISTINCT GroupID, GroupName FROM AccountGroupMaster) ag ON l.GroupID = ag.GroupID
+    LEFT JOIN (
+        SELECT LedgerID, SUM(Debit) AS Debit, SUM(Credit) AS Credit
+        FROM Vouchers
+        WHERE (@BranchId = 0 OR BranchID = @BranchId)
+          AND (@FinYearId = 0 OR FinYearId = @FinYearId)
+          AND VoucherDate <= @ToDate
+          AND ISNULL(CancelFlag,0) = 0
+        GROUP BY LedgerID
+    ) v ON l.LedgerID = v.LedgerID
+    WHERE (@BranchId = 0 OR l.BranchID = @BranchId)
+      AND (l.GroupID = 17 OR ag.GroupName LIKE '%CREDITOR%')
+      AND ((ISNULL(l.OpnCredit, 0) + ISNULL(v.Credit, 0)) - (ISNULL(l.OpnDebit, 0) + ISNULL(v.Debit, 0))) < 0;
+
     -- Add Closing Stock
     INSERT INTO #Assets (LedgerID, LedgerName, GroupID, GroupName, ParentGroupName, TotalDebit, TotalCredit, ClosingBalance)
     VALUES (0, 'Closing Stock', 18, 'STOCK IN HAND', 'CURRENT ASSETS', @ClosingStock, 0, @ClosingStock);
 
-    SELECT * FROM #Assets WHERE ClosingBalance <> 0 ORDER BY LedgerName;
+    SELECT * FROM #Liabilities WHERE ClosingBalance <> 0 ORDER BY ParentGroupName DESC, LedgerName;
+    SELECT * FROM #Assets WHERE ClosingBalance <> 0 ORDER BY ParentGroupName, LedgerName;
 
     -- RESULT SET 3: SUMMARY TOTALS & EQUATION
     DECLARE @TotalCapital DECIMAL(18,2) = 0;
