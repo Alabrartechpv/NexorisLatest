@@ -173,13 +173,20 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    -- Handle financial year start date dynamically using FinancialYear table
+    -- Handle financial year start date dynamically using FinancialYear table or CompanyInfo
     DECLARE @FinYearStartDate DATETIME;
     IF OBJECT_ID('FinancialYear', 'U') IS NOT NULL
     BEGIN
         SELECT TOP 1 @FinYearStartDate = FinYearFrom 
         FROM FinancialYear 
         WHERE FinYearID = @FinYearId;
+    END
+
+    IF @FinYearStartDate IS NULL AND OBJECT_ID('CompanyInfo', 'U') IS NOT NULL
+    BEGIN
+        SELECT TOP 1 @FinYearStartDate = FinYearFrom 
+        FROM CompanyInfo 
+        WHERE (@CompanyId = 0 OR CompanyID = @CompanyId);
     END
 
     IF @FinYearStartDate IS NULL
