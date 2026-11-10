@@ -858,6 +858,7 @@ BEGIN
         FROM PMaster
         WHERE (@BranchId = 0 OR BranchId = @BranchId)
           AND ISNULL(CancelFlag, 0) = 0
+          AND UPPER(LTRIM(RTRIM(ISNULL(Paymode, '')))) <> 'CASH'
           AND (ISNULL(GrandTotal, 0) - ISNULL(PayedAmount, 0)) > 0
           AND PurchaseDate < @NextDay;
     END
