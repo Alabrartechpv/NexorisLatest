@@ -62,8 +62,8 @@ namespace PosBranch_Win.Reports.FinancialReports
             currentReport = null;
             _isSummaryView = false;
             if (btnViewMode != null) btnViewMode.Text = "Summary View";
-            _filterManagerLiabilities?.ClearFilters();
-            _filterManagerAssets?.ClearFilters();
+            if (btnBackToSummary != null) btnBackToSummary.Visible = false;
+            ClearGridFilters();
             ultraGridLiabilities.DataSource = null;
             _filterManagerLiabilities?.UpdateHeaderFilterIcons();
             _filterManagerAssets?.UpdateHeaderFilterIcons();
@@ -261,6 +261,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             btnClearFilters.Text = "Reset Filters";
             btnToggleSelection.Text = "Hide Selection";
             btnViewMode.Text = _isSummaryView ? "Detailed View" : "Summary View";
+            btnBackToSummary.Text = "⬅ Back to Summary";
 
             StyleClassicButton(btnGenerate);
             StyleClassicButton(btnPreviewGrid);
@@ -268,6 +269,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             StyleClassicButton(btnExport);
             StyleClassicButton(btnClearFilters);
             StyleClassicButton(btnViewMode);
+            StyleClassicButton(btnBackToSummary);
             StyleClassicButton(btnToggleSelection);
         }
 
@@ -560,6 +562,27 @@ namespace PosBranch_Win.Reports.FinancialReports
             }
         }
 
+        private void ClearGridFilters()
+        {
+            try
+            {
+                if (ultraGridLiabilities?.DisplayLayout?.Bands?.Count > 0)
+                {
+                    ultraGridLiabilities.DisplayLayout.Bands[0].ColumnFilters.ClearAllFilters();
+                }
+                if (ultraGridAssets?.DisplayLayout?.Bands?.Count > 0)
+                {
+                    ultraGridAssets.DisplayLayout.Bands[0].ColumnFilters.ClearAllFilters();
+                }
+            }
+            catch { }
+
+            _filterManagerLiabilities?.ClearFilters();
+            _filterManagerAssets?.ClearFilters();
+            _filterManagerLiabilities?.UpdateHeaderFilterIcons();
+            _filterManagerAssets?.UpdateHeaderFilterIcons();
+        }
+
         private void btnViewMode_Click(object sender, EventArgs e)
         {
             _isSummaryView = !_isSummaryView;
@@ -567,9 +590,33 @@ namespace PosBranch_Win.Reports.FinancialReports
             {
                 btnViewMode.Text = _isSummaryView ? "Detailed View" : "Summary View";
             }
+            if (btnBackToSummary != null)
+            {
+                btnBackToSummary.Visible = false;
+            }
 
             if (currentReport != null)
             {
+                ClearGridFilters();
+                BindGrids();
+            }
+        }
+
+        private void btnBackToSummary_Click(object sender, EventArgs e)
+        {
+            _isSummaryView = true;
+            if (btnViewMode != null)
+            {
+                btnViewMode.Text = "Detailed View";
+            }
+            if (btnBackToSummary != null)
+            {
+                btnBackToSummary.Visible = false;
+            }
+
+            if (currentReport != null)
+            {
+                ClearGridFilters();
                 BindGrids();
             }
         }
@@ -578,8 +625,7 @@ namespace PosBranch_Win.Reports.FinancialReports
         {
             if (currentReport == null) return;
 
-            _filterManagerLiabilities?.ClearFilters();
-            _filterManagerAssets?.ClearFilters();
+            ClearGridFilters();
 
             if (_isSummaryView)
             {
@@ -656,6 +702,12 @@ namespace PosBranch_Win.Reports.FinancialReports
                 string selectedGroup = item.GroupName;
                 _isSummaryView = false;
                 if (btnViewMode != null) btnViewMode.Text = "Summary View";
+                if (btnBackToSummary != null)
+                {
+                    btnBackToSummary.Text = "⬅ Back to Summary";
+                    btnBackToSummary.Visible = true;
+                }
+
                 BindGrids();
 
                 UltraGrid targetGrid = sender as UltraGrid;
@@ -667,6 +719,15 @@ namespace PosBranch_Win.Reports.FinancialReports
                         band.ColumnFilters["GroupName"].FilterConditions.Clear();
                         band.ColumnFilters["GroupName"].FilterConditions.Add(FilterComparisionOperator.Equals, selectedGroup);
                     }
+                }
+
+                if (sender == ultraGridAssets)
+                {
+                    lblAssetsTitle.Text = $"ASSETS > {selectedGroup} (Click 'Back to Summary' to return)";
+                }
+                else
+                {
+                    lblLiabilitiesTitle.Text = $"LIABILITIES & CAPITAL > {selectedGroup} (Click 'Back to Summary' to return)";
                 }
             }
             else
@@ -925,7 +986,9 @@ namespace PosBranch_Win.Reports.FinancialReports
 
         private void btnClearFilters_Click(object sender, EventArgs e)
         {
-            RibbonClear();
+            ClearGridFilters();
+            if (btnBackToSummary != null) btnBackToSummary.Visible = false;
+            BindGrids();
         }
 
         private void btnToggleSelection_Click(object sender, EventArgs e)
@@ -968,6 +1031,12 @@ namespace PosBranch_Win.Reports.FinancialReports
                 }
                 else if (e.KeyCode == Keys.Escape)
                 {
+                    if (btnBackToSummary != null && btnBackToSummary.Visible)
+                    {
+                        btnBackToSummary_Click(sender, e);
+                        e.Handled = true;
+                        return;
+                    }
                     btnClose_Click(sender, e);
                     e.Handled = true;
                 }
