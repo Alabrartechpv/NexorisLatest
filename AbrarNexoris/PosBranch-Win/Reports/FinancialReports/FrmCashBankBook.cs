@@ -696,6 +696,24 @@ namespace PosBranch_Win.Reports.FinancialReports
 
         public void RibbonClear() => ResetFilters();
         public void Clear() => ResetFilters();
+
+        /// <summary>
+        /// External drill-down launcher from Balance Sheet or Executive Dashboard
+        /// </summary>
+        public void LoadForLedger(int ledgerId, DateTime fromDate, DateTime toDate)
+        {
+            try
+            {
+                if (dtFromDate != null) dtFromDate.DateTime = fromDate;
+                if (dtToDate != null) dtToDate.DateTime = toDate;
+                if (ultraComboLedger != null && ledgerId > 0)
+                {
+                    ultraComboLedger.Value = ledgerId;
+                }
+                LoadData();
+            }
+            catch { }
+        }
         #endregion
 
         #region Actions & Drill-Down

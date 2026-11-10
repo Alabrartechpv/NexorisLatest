@@ -729,6 +729,23 @@ namespace PosBranch_Win.Reports.FinancialReports
             }
         }
 
+        /// <summary>
+        /// External drill-down launcher from Balance Sheet or Executive Dashboard
+        /// </summary>
+        public void LoadForCustomer(int customerId, string customerName, DateTime fromDate, DateTime toDate)
+        {
+            try
+            {
+                _selectedCustomerId = customerId;
+                _selectedCustomerName = customerName ?? string.Empty;
+                if (txtCustomerName != null) txtCustomerName.Text = _selectedCustomerName;
+                if (dtFrom != null) dtFrom.Value = fromDate;
+                if (dtTo != null) dtTo.Value = toDate;
+                FetchFromDatabase();
+            }
+            catch { }
+        }
+
         private void ultraComboPreset_ValueChanged(object sender, EventArgs e)
         {
             if (_isLoading || ultraComboPreset.Value == null) return;

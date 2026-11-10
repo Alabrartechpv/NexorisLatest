@@ -44,6 +44,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             this.btnPrint = new Infragistics.Win.Misc.UltraButton();
             this.btnExport = new Infragistics.Win.Misc.UltraButton();
             this.btnClearFilters = new Infragistics.Win.Misc.UltraButton();
+            this.btnViewMode = new Infragistics.Win.Misc.UltraButton();
             this.btnToggleSelection = new Infragistics.Win.Misc.UltraButton();
 
             this.ultraPanelMaster = new Infragistics.Win.Misc.UltraPanel();
@@ -202,6 +203,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             this.ultraPanelAction.ClientArea.Controls.Add(this.btnPrint);
             this.ultraPanelAction.ClientArea.Controls.Add(this.btnExport);
             this.ultraPanelAction.ClientArea.Controls.Add(this.btnClearFilters);
+            this.ultraPanelAction.ClientArea.Controls.Add(this.btnViewMode);
             this.ultraPanelAction.ClientArea.Controls.Add(this.btnToggleSelection);
             this.ultraPanelAction.Dock = System.Windows.Forms.DockStyle.Top;
             this.ultraPanelAction.Location = new System.Drawing.Point(0, 58);
@@ -258,6 +260,15 @@ namespace PosBranch_Win.Reports.FinancialReports
             this.btnClearFilters.TabIndex = 4;
             this.btnClearFilters.Text = "Reset Filters";
             this.btnClearFilters.Click += new System.EventHandler(this.btnClearFilters_Click);
+            // 
+            // btnViewMode
+            // 
+            this.btnViewMode.Location = new System.Drawing.Point(630, 8);
+            this.btnViewMode.Name = "btnViewMode";
+            this.btnViewMode.Size = new System.Drawing.Size(130, 28);
+            this.btnViewMode.TabIndex = 5;
+            this.btnViewMode.Text = "Summary View";
+            this.btnViewMode.Click += new System.EventHandler(this.btnViewMode_Click);
 
             // 
             // btnToggleSelection
@@ -641,6 +652,7 @@ namespace PosBranch_Win.Reports.FinancialReports
         private Infragistics.Win.Misc.UltraButton btnPrint;
         private Infragistics.Win.Misc.UltraButton btnExport;
         private Infragistics.Win.Misc.UltraButton btnClearFilters;
+        private Infragistics.Win.Misc.UltraButton btnViewMode;
         private Infragistics.Win.Misc.UltraButton btnToggleSelection;
 
         private Infragistics.Win.Misc.UltraPanel ultraPanelMaster;
