@@ -643,7 +643,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                         TotalCredit = g.Sum(x => x.TotalCredit),
                         ClosingBalance = g.Sum(x => x.ClosingBalance)
                     })
-                    .OrderBy(x => x.ParentGroupName == "CAPITAL" ? 0 : (x.ParentGroupName == "NON-CURRENT LIABILITIES" ? 1 : 2))
+                    .OrderBy(x => x.ParentGroupName == "CAPITAL" ? 0 : 1)
                     .ThenByDescending(x => Math.Abs(x.ClosingBalance))
                     .ToList();
 
@@ -660,7 +660,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                         TotalCredit = g.Sum(x => x.TotalCredit),
                         ClosingBalance = g.Sum(x => x.ClosingBalance)
                     })
-                    .OrderBy(x => x.ParentGroupName == "FIXED ASSETS" ? 0 : (x.ParentGroupName == "INVESTMENTS" ? 1 : 2))
+                    .OrderBy(x => x.ParentGroupName)
                     .ThenByDescending(x => Math.Abs(x.ClosingBalance))
                     .ToList();
 
@@ -672,18 +672,9 @@ namespace PosBranch_Win.Reports.FinancialReports
             }
             else
             {
-                // Detailed View: Individual party-by-party ledger accounts ordered by Schedule III hierarchy
-                ultraGridLiabilities.DataSource = currentReport.LiabilitiesItems
-                    .OrderBy(x => x.ParentGroupName == "CAPITAL" ? 0 : (x.ParentGroupName == "NON-CURRENT LIABILITIES" ? 1 : 2))
-                    .ThenBy(x => x.GroupName)
-                    .ThenBy(x => x.LedgerName)
-                    .ToList();
-
-                ultraGridAssets.DataSource = currentReport.AssetsItems
-                    .OrderBy(x => x.ParentGroupName == "FIXED ASSETS" ? 0 : (x.ParentGroupName == "INVESTMENTS" ? 1 : 2))
-                    .ThenBy(x => x.GroupName)
-                    .ThenBy(x => x.LedgerName)
-                    .ToList();
+                // Detailed View: Individual party-by-party ledger accounts
+                ultraGridLiabilities.DataSource = currentReport.LiabilitiesItems;
+                ultraGridAssets.DataSource = currentReport.AssetsItems;
 
                 lblLiabilitiesTitle.Text = $"LIABILITIES & CAPITAL (Detailed: {currentReport.LiabilitiesItems.Count} Items)";
                 lblAssetsTitle.Text = $"ASSETS (Detailed: {currentReport.AssetsItems.Count} Items)";
@@ -768,21 +759,16 @@ namespace PosBranch_Win.Reports.FinancialReports
                     formToOpen = form;
                     tabTitle = $"Cash/Bank - {item.LedgerName}";
                 }
-                // 2. Sundry Debtors (Group 16) or Customer Advances -> Open Customer Ledger Statement in TabControl
-                else if (item.GroupID == 16 || 
-                         item.GroupName.IndexOf("Debtor", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                         item.GroupName.IndexOf("Customer", StringComparison.OrdinalIgnoreCase) >= 0)
+                // 2. Sundry Debtors (Group 16) -> Open Customer Ledger Statement in TabControl
+                else if (item.GroupID == 16 || item.GroupName.IndexOf("Debtor", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     var form = new frmCustomerLedgerReport();
                     form.LoadForCustomer(item.LedgerID, item.LedgerName, fromDate, toDate);
                     formToOpen = form;
                     tabTitle = $"Customer - {item.LedgerName}";
                 }
-                // 3. Sundry Creditors (Group 17) or Supplier Advances -> Open Vendor Outstanding Report in TabControl
-                else if (item.GroupID == 17 || 
-                         item.GroupName.IndexOf("Creditor", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                         item.GroupName.IndexOf("Supplier", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                         item.GroupName.IndexOf("Vendor", StringComparison.OrdinalIgnoreCase) >= 0)
+                // 3. Sundry Creditors (Group 17) -> Open Vendor Outstanding Report in TabControl
+                else if (item.GroupID == 17 || item.GroupName.IndexOf("Creditor", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     var form = new frmVendorOutstandingReport();
                     formToOpen = form;
