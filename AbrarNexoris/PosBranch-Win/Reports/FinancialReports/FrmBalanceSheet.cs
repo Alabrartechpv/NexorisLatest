@@ -685,42 +685,64 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             try
             {
-                // 1. Cash or Bank Accounts (Group 14 & 15) -> Open FrmCashBankBook
+                Form formToOpen = null;
+                string tabTitle = item.LedgerName;
+
+                // 1. Cash or Bank Accounts (Group 14 & 15) -> Open FrmCashBankBook in TabControl
                 if (item.GroupID == 14 || item.GroupID == 15 || 
                     item.GroupName.IndexOf("Cash", StringComparison.OrdinalIgnoreCase) >= 0 || 
                     item.GroupName.IndexOf("Bank", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     var form = new FrmCashBankBook();
-                    form.Show();
                     form.LoadForLedger(item.LedgerID, fromDate, toDate);
-                    return;
+                    formToOpen = form;
+                    tabTitle = $"Cash/Bank - {item.LedgerName}";
                 }
-
-                // 2. Sundry Debtors (Group 16) -> Open Customer Ledger Statement
-                if (item.GroupID == 16 || item.GroupName.IndexOf("Debtor", StringComparison.OrdinalIgnoreCase) >= 0)
+                // 2. Sundry Debtors (Group 16) -> Open Customer Ledger Statement in TabControl
+                else if (item.GroupID == 16 || item.GroupName.IndexOf("Debtor", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     var form = new frmCustomerLedgerReport();
-                    form.Show();
                     form.LoadForCustomer(item.LedgerID, item.LedgerName, fromDate, toDate);
-                    return;
+                    formToOpen = form;
+                    tabTitle = $"Customer - {item.LedgerName}";
                 }
-
-                // 3. Sundry Creditors (Group 17) -> Open Vendor Outstanding Report
-                if (item.GroupID == 17 || item.GroupName.IndexOf("Creditor", StringComparison.OrdinalIgnoreCase) >= 0)
+                // 3. Sundry Creditors (Group 17) -> Open Vendor Outstanding Report in TabControl
+                else if (item.GroupID == 17 || item.GroupName.IndexOf("Creditor", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     var form = new frmVendorOutstandingReport();
-                    form.Show();
-                    return;
+                    formToOpen = form;
+                    tabTitle = $"Vendor - {item.LedgerName}";
+                }
+                // 4. Default fallback: Open Cash/Bank book in TabControl
+                else
+                {
+                    var defaultForm = new FrmCashBankBook();
+                    defaultForm.LoadForLedger(item.LedgerID, fromDate, toDate);
+                    formToOpen = defaultForm;
+                    tabTitle = $"Ledger - {item.LedgerName}";
                 }
 
-                // 4. Default fallback: Open Cash/Bank book
-                var defaultForm = new FrmCashBankBook();
-                defaultForm.Show();
-                defaultForm.LoadForLedger(item.LedgerID, fromDate, toDate);
+                if (formToOpen != null)
+                {
+                    OpenInTabControl(formToOpen, tabTitle);
+                }
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Could not open statement for {item.LedgerName}: {ex.Message}", "Drill Down", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
+        private void OpenInTabControl(Form formToOpen, string tabTitle)
+        {
+            var home = Application.OpenForms.OfType<Home>().FirstOrDefault();
+            if (home != null)
+            {
+                home.OpenFormInTabSafe(formToOpen, tabTitle);
+            }
+            else
+            {
+                formToOpen.Show();
             }
         }
 
