@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Windows.Forms;
 using Infragistics.Win;
@@ -42,6 +43,7 @@ namespace PosBranch_Win.Reports.FinancialReports
         private BalanceSheetReport currentReport;
         private ReportColumnFilterManager _filterManagerLiabilities;
         private ReportColumnFilterManager _filterManagerAssets;
+        private bool _isSummaryView = false;
         private readonly System.Windows.Forms.ToolTip headerToolTip = new System.Windows.Forms.ToolTip();
         #endregion
 
@@ -58,8 +60,10 @@ namespace PosBranch_Win.Reports.FinancialReports
             ultraComboPresetDates.Value = "CURRENT_FY";
             ApplyDatePreset("CURRENT_FY");
             currentReport = null;
-            _filterManagerLiabilities?.ClearFilters();
-            _filterManagerAssets?.ClearFilters();
+            _isSummaryView = false;
+            if (btnViewMode != null) btnViewMode.Text = "Summary View";
+            if (btnBackToSummary != null) btnBackToSummary.Visible = false;
+            ClearGridFilters();
             ultraGridLiabilities.DataSource = null;
             _filterManagerLiabilities?.UpdateHeaderFilterIcons();
             _filterManagerAssets?.UpdateHeaderFilterIcons();
@@ -256,12 +260,16 @@ namespace PosBranch_Win.Reports.FinancialReports
             btnExport.Text = "Export Grid";
             btnClearFilters.Text = "Reset Filters";
             btnToggleSelection.Text = "Hide Selection";
+            btnViewMode.Text = _isSummaryView ? "Detailed View" : "Summary View";
+            btnBackToSummary.Text = "⬅ Back to Summary";
 
             StyleClassicButton(btnGenerate);
             StyleClassicButton(btnPreviewGrid);
             StyleClassicButton(btnPrint);
             StyleClassicButton(btnExport);
             StyleClassicButton(btnClearFilters);
+            StyleClassicButton(btnViewMode);
+            StyleClassicButton(btnBackToSummary);
             StyleClassicButton(btnToggleSelection);
         }
 
@@ -314,6 +322,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             ultraGridLiabilities.InitializeLayout += UltraGridLiabilities_InitializeLayout;
             ultraGridLiabilities.MouseDown += UltraGridLiabilities_MouseDown;
             ultraGridLiabilities.MouseMove += UltraGridLiabilities_MouseMove;
+            ultraGridLiabilities.DoubleClickRow += UltraGrid_DoubleClickRow;
             _filterManagerLiabilities = new ReportColumnFilterManager(ultraGridLiabilities, null);
         }
 
@@ -338,6 +347,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             ultraGridAssets.InitializeLayout += UltraGridAssets_InitializeLayout;
             ultraGridAssets.MouseDown += UltraGridAssets_MouseDown;
             ultraGridAssets.MouseMove += UltraGridAssets_MouseMove;
+            ultraGridAssets.DoubleClickRow += UltraGrid_DoubleClickRow;
             _filterManagerAssets = new ReportColumnFilterManager(ultraGridAssets, null);
         }
 
@@ -526,25 +536,15 @@ namespace PosBranch_Win.Reports.FinancialReports
 
                 if (currentReport != null)
                 {
-                    _filterManagerLiabilities?.ClearFilters();
-                    _filterManagerAssets?.ClearFilters();
-                    ultraGridLiabilities.DataSource = currentReport.LiabilitiesItems;
-                    ultraGridLiabilities.DataBind();
-
-                    ultraGridAssets.DataSource = currentReport.AssetsItems;
-                    ultraGridAssets.DataBind();
-                    _filterManagerLiabilities?.UpdateHeaderFilterIcons();
-                    _filterManagerAssets?.UpdateHeaderFilterIcons();
-
-                    UpdateSummary();
+                    BindGrids();
                 }
                 else
                 {
                     _filterManagerLiabilities?.ClearFilters();
-            _filterManagerAssets?.ClearFilters();
-            ultraGridLiabilities.DataSource = null;
-            _filterManagerLiabilities?.UpdateHeaderFilterIcons();
-            _filterManagerAssets?.UpdateHeaderFilterIcons();
+                    _filterManagerAssets?.ClearFilters();
+                    ultraGridLiabilities.DataSource = null;
+                    _filterManagerLiabilities?.UpdateHeaderFilterIcons();
+                    _filterManagerAssets?.UpdateHeaderFilterIcons();
                     ultraGridAssets.DataSource = null;
                     ClearSummary();
                     MessageBox.Show("No data found for the selected period.", "Information",
@@ -559,6 +559,251 @@ namespace PosBranch_Win.Reports.FinancialReports
             finally
             {
                 this.Cursor = Cursors.Default;
+            }
+        }
+
+        private void ClearGridFilters()
+        {
+            try
+            {
+                if (ultraGridLiabilities?.DisplayLayout?.Bands?.Count > 0)
+                {
+                    ultraGridLiabilities.DisplayLayout.Bands[0].ColumnFilters.ClearAllFilters();
+                }
+                if (ultraGridAssets?.DisplayLayout?.Bands?.Count > 0)
+                {
+                    ultraGridAssets.DisplayLayout.Bands[0].ColumnFilters.ClearAllFilters();
+                }
+            }
+            catch { }
+
+            _filterManagerLiabilities?.ClearFilters();
+            _filterManagerAssets?.ClearFilters();
+            _filterManagerLiabilities?.UpdateHeaderFilterIcons();
+            _filterManagerAssets?.UpdateHeaderFilterIcons();
+        }
+
+        private void btnViewMode_Click(object sender, EventArgs e)
+        {
+            _isSummaryView = !_isSummaryView;
+            if (btnViewMode != null)
+            {
+                btnViewMode.Text = _isSummaryView ? "Detailed View" : "Summary View";
+            }
+            if (btnBackToSummary != null)
+            {
+                btnBackToSummary.Visible = false;
+            }
+
+            if (currentReport != null)
+            {
+                ClearGridFilters();
+                BindGrids();
+            }
+        }
+
+        private void btnBackToSummary_Click(object sender, EventArgs e)
+        {
+            _isSummaryView = true;
+            if (btnViewMode != null)
+            {
+                btnViewMode.Text = "Detailed View";
+            }
+            if (btnBackToSummary != null)
+            {
+                btnBackToSummary.Visible = false;
+            }
+
+            if (currentReport != null)
+            {
+                ClearGridFilters();
+                BindGrids();
+            }
+        }
+
+        private void BindGrids()
+        {
+            if (currentReport == null) return;
+
+            ClearGridFilters();
+
+            if (_isSummaryView)
+            {
+                // Summary View: Aggregate by Account Group for high-level Supermarket Schedule III executive reporting
+                var summaryLiabilities = currentReport.LiabilitiesItems
+                    .GroupBy(x => new { x.GroupID, x.GroupName, x.ParentGroupName })
+                    .Select(g => new BalanceSheetLineItem
+                    {
+                        LedgerID = g.Key.GroupID,
+                        LedgerName = $"{g.Key.GroupName} ({g.Count()} {(g.Count() == 1 ? "Account" : "Accounts")})",
+                        GroupID = g.Key.GroupID,
+                        GroupName = g.Key.GroupName,
+                        ParentGroupName = g.Key.ParentGroupName,
+                        TotalDebit = g.Sum(x => x.TotalDebit),
+                        TotalCredit = g.Sum(x => x.TotalCredit),
+                        ClosingBalance = g.Sum(x => x.ClosingBalance)
+                    })
+                    .OrderBy(x => x.ParentGroupName == "CAPITAL" ? 0 : 1)
+                    .ThenByDescending(x => Math.Abs(x.ClosingBalance))
+                    .ToList();
+
+                var summaryAssets = currentReport.AssetsItems
+                    .GroupBy(x => new { x.GroupID, x.GroupName, x.ParentGroupName })
+                    .Select(g => new BalanceSheetLineItem
+                    {
+                        LedgerID = g.Key.GroupID,
+                        LedgerName = $"{g.Key.GroupName} ({g.Count()} {(g.Count() == 1 ? "Account" : "Accounts")})",
+                        GroupID = g.Key.GroupID,
+                        GroupName = g.Key.GroupName,
+                        ParentGroupName = g.Key.ParentGroupName,
+                        TotalDebit = g.Sum(x => x.TotalDebit),
+                        TotalCredit = g.Sum(x => x.TotalCredit),
+                        ClosingBalance = g.Sum(x => x.ClosingBalance)
+                    })
+                    .OrderBy(x => x.ParentGroupName)
+                    .ThenByDescending(x => Math.Abs(x.ClosingBalance))
+                    .ToList();
+
+                ultraGridLiabilities.DataSource = summaryLiabilities;
+                ultraGridAssets.DataSource = summaryAssets;
+
+                lblLiabilitiesTitle.Text = $"LIABILITIES & CAPITAL (Summary: {summaryLiabilities.Count} Groups)";
+                lblAssetsTitle.Text = $"ASSETS (Summary: {summaryAssets.Count} Groups)";
+            }
+            else
+            {
+                // Detailed View: Individual party-by-party ledger accounts
+                ultraGridLiabilities.DataSource = currentReport.LiabilitiesItems;
+                ultraGridAssets.DataSource = currentReport.AssetsItems;
+
+                lblLiabilitiesTitle.Text = $"LIABILITIES & CAPITAL (Detailed: {currentReport.LiabilitiesItems.Count} Items)";
+                lblAssetsTitle.Text = $"ASSETS (Detailed: {currentReport.AssetsItems.Count} Items)";
+            }
+
+            ultraGridLiabilities.DataBind();
+            ultraGridAssets.DataBind();
+
+            _filterManagerLiabilities?.UpdateHeaderFilterIcons();
+            _filterManagerAssets?.UpdateHeaderFilterIcons();
+
+            UpdateSummary();
+        }
+
+        private void UltraGrid_DoubleClickRow(object sender, DoubleClickRowEventArgs e)
+        {
+            if (e.Row == null || !e.Row.IsDataRow) return;
+
+            var item = e.Row.ListObject as BalanceSheetLineItem;
+            if (item == null) return;
+
+            if (_isSummaryView)
+            {
+                // In Summary View, double-clicking a summary group row smoothly expands directly to Detailed View filtered to that group
+                string selectedGroup = item.GroupName;
+                _isSummaryView = false;
+                if (btnViewMode != null) btnViewMode.Text = "Summary View";
+                if (btnBackToSummary != null)
+                {
+                    btnBackToSummary.Text = "⬅ Back to Summary";
+                    btnBackToSummary.Visible = true;
+                }
+
+                BindGrids();
+
+                UltraGrid targetGrid = sender as UltraGrid;
+                if (targetGrid != null && targetGrid.DisplayLayout.Bands.Count > 0)
+                {
+                    var band = targetGrid.DisplayLayout.Bands[0];
+                    if (band.Columns.Exists("GroupName"))
+                    {
+                        band.ColumnFilters["GroupName"].FilterConditions.Clear();
+                        band.ColumnFilters["GroupName"].FilterConditions.Add(FilterComparisionOperator.Equals, selectedGroup);
+                    }
+                }
+
+                if (sender == ultraGridAssets)
+                {
+                    lblAssetsTitle.Text = $"ASSETS > {selectedGroup} (Click 'Back to Summary' to return)";
+                }
+                else
+                {
+                    lblLiabilitiesTitle.Text = $"LIABILITIES & CAPITAL > {selectedGroup} (Click 'Back to Summary' to return)";
+                }
+            }
+            else
+            {
+                // In Detailed View, double-clicking any party opens the ledger transactions statement
+                DrillDownLedger(item);
+            }
+        }
+
+        private void DrillDownLedger(BalanceSheetLineItem item)
+        {
+            if (item == null || item.LedgerID <= 0) return;
+
+            DateTime fromDate = ultraDateTimeFrom.DateTime.Date;
+            DateTime toDate = ultraDateTimeTo.DateTime.Date.AddHours(23).AddMinutes(59).AddSeconds(59);
+
+            try
+            {
+                Form formToOpen = null;
+                string tabTitle = item.LedgerName;
+
+                // 1. Cash or Bank Accounts (Group 14 & 15) -> Open FrmCashBankBook in TabControl
+                if (item.GroupID == 14 || item.GroupID == 15 || 
+                    item.GroupName.IndexOf("Cash", StringComparison.OrdinalIgnoreCase) >= 0 || 
+                    item.GroupName.IndexOf("Bank", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    var form = new FrmCashBankBook();
+                    form.LoadForLedger(item.LedgerID, fromDate, toDate);
+                    formToOpen = form;
+                    tabTitle = $"Cash/Bank - {item.LedgerName}";
+                }
+                // 2. Sundry Debtors (Group 16) -> Open Customer Ledger Statement in TabControl
+                else if (item.GroupID == 16 || item.GroupName.IndexOf("Debtor", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    var form = new frmCustomerLedgerReport();
+                    form.LoadForCustomer(item.LedgerID, item.LedgerName, fromDate, toDate);
+                    formToOpen = form;
+                    tabTitle = $"Customer - {item.LedgerName}";
+                }
+                // 3. Sundry Creditors (Group 17) -> Open Vendor Outstanding Report in TabControl
+                else if (item.GroupID == 17 || item.GroupName.IndexOf("Creditor", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    var form = new frmVendorOutstandingReport();
+                    formToOpen = form;
+                    tabTitle = $"Vendor - {item.LedgerName}";
+                }
+                // 4. Default fallback: Open Cash/Bank book in TabControl
+                else
+                {
+                    var defaultForm = new FrmCashBankBook();
+                    defaultForm.LoadForLedger(item.LedgerID, fromDate, toDate);
+                    formToOpen = defaultForm;
+                    tabTitle = $"Ledger - {item.LedgerName}";
+                }
+
+                if (formToOpen != null)
+                {
+                    OpenInTabControl(formToOpen, tabTitle);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Could not open statement for {item.LedgerName}: {ex.Message}", "Drill Down", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        }
+
+        private void OpenInTabControl(Form formToOpen, string tabTitle)
+        {
+            var home = Application.OpenForms.OfType<Home>().FirstOrDefault();
+            if (home != null)
+            {
+                home.OpenFormInTabSafe(formToOpen, tabTitle);
+            }
+            else
+            {
+                formToOpen.Show();
             }
         }
 
@@ -741,7 +986,9 @@ namespace PosBranch_Win.Reports.FinancialReports
 
         private void btnClearFilters_Click(object sender, EventArgs e)
         {
-            RibbonClear();
+            ClearGridFilters();
+            if (btnBackToSummary != null) btnBackToSummary.Visible = false;
+            BindGrids();
         }
 
         private void btnToggleSelection_Click(object sender, EventArgs e)
@@ -784,6 +1031,12 @@ namespace PosBranch_Win.Reports.FinancialReports
                 }
                 else if (e.KeyCode == Keys.Escape)
                 {
+                    if (btnBackToSummary != null && btnBackToSummary.Visible)
+                    {
+                        btnBackToSummary_Click(sender, e);
+                        e.Handled = true;
+                        return;
+                    }
                     btnClose_Click(sender, e);
                     e.Handled = true;
                 }

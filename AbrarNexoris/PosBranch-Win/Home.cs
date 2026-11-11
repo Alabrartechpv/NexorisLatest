@@ -1198,7 +1198,7 @@ namespace PosBranch_Win
         }
 
         // Modified version with additional safety checks
-        private void OpenFormInTabSafe(Form formToOpen, string tabName)
+        public void OpenFormInTabSafe(Form formToOpen, string tabName)
         {
             try
             {

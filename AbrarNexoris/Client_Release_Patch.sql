@@ -70,12 +70,15 @@ GO
 IF OBJECT_ID('dbo.POS_CashBankBook', 'P') IS NOT NULL
     DROP PROCEDURE dbo.POS_CashBankBook;
 GO
-
+SET ANSI_NULLS ON;
+GO
+SET QUOTED_IDENTIFIER ON;
+GO
 CREATE PROCEDURE [dbo].[POS_CashBankBook]
-    @CompanyId INT,
-    @BranchId INT,
-    @FinYearId INT,
-    @LedgerId INT,
+    @CompanyId INT = 0,
+    @BranchId INT = 0,
+    @FinYearId INT = 0,
+    @LedgerId INT = 0,
     @FromDate DATETIME,
     @ToDate DATETIME
 AS
@@ -162,24 +165,34 @@ GO
 IF OBJECT_ID('dbo.POS_BalanceSheet', 'P') IS NOT NULL
     DROP PROCEDURE dbo.POS_BalanceSheet;
 GO
-
+SET ANSI_NULLS ON;
+GO
+SET QUOTED_IDENTIFIER ON;
+GO
 CREATE PROCEDURE [dbo].[POS_BalanceSheet]
-    @CompanyId INT,
-    @BranchId INT,
-    @FinYearId INT,
+    @CompanyId INT = 0,
+    @BranchId INT = 0,
+    @FinYearId INT = 0,
     @FromDate DATETIME,
     @ToDate DATETIME
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    -- Handle financial year start date dynamically using FinancialYear table
+    -- Handle financial year start date dynamically using FinancialYear table or CompanyInfo
     DECLARE @FinYearStartDate DATETIME;
     IF OBJECT_ID('FinancialYear', 'U') IS NOT NULL
     BEGIN
         SELECT TOP 1 @FinYearStartDate = FinYearFrom 
         FROM FinancialYear 
         WHERE FinYearID = @FinYearId;
+    END
+
+    IF @FinYearStartDate IS NULL AND OBJECT_ID('CompanyInfo', 'U') IS NOT NULL
+    BEGIN
+        SELECT TOP 1 @FinYearStartDate = FinYearFrom 
+        FROM CompanyInfo 
+        WHERE (@CompanyId = 0 OR CompanyID = @CompanyId);
     END
 
     IF @FinYearStartDate IS NULL
@@ -403,7 +416,10 @@ GO
 IF OBJECT_ID('dbo._POS_ExecutiveDashboardKPIs', 'P') IS NOT NULL
     DROP PROCEDURE dbo._POS_ExecutiveDashboardKPIs;
 GO
-
+SET ANSI_NULLS ON;
+GO
+SET QUOTED_IDENTIFIER ON;
+GO
 CREATE PROCEDURE [dbo].[_POS_ExecutiveDashboardKPIs]
     @CompanyId INT = 0,
     @BranchId INT = 0,
@@ -1313,7 +1329,10 @@ GO
 IF OBJECT_ID('dbo.POS_CounterSession', 'P') IS NULL
     EXEC('CREATE PROCEDURE dbo.POS_CounterSession AS RETURN 0;');
 GO
-
+SET ANSI_NULLS ON;
+GO
+SET QUOTED_IDENTIFIER ON;
+GO
 ALTER PROCEDURE [dbo].[POS_CounterSession]
 (
     @CompanyId INT,
