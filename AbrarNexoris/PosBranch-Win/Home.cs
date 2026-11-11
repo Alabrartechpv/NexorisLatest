@@ -94,12 +94,14 @@ namespace PosBranch_Win
             new ReportNavigatorDefinition("Purchase", "Purchase Return Audit Report", "PurchaseReturnAuditReport"),
             new ReportNavigatorDefinition("Purchase", "Vendor Purchase Report", "VendorPurchaseReport"),
             new ReportNavigatorDefinition("Purchase", "Date-wise Purchase Report", "DatewisePurchaseReport"),
+            new ReportNavigatorDefinition("Purchase", "Date-wise Vendor Payment Report", "DatewiseVendorPaymentReport"),
             new ReportNavigatorDefinition("Customer", "Customer Outstanding Listing", "CustomerOutstandingReport"),
             new ReportNavigatorDefinition("Customer", "Customer Receipt Report", "CustomerReceiptReport"),
             new ReportNavigatorDefinition("Customer", "Customer Ledger Statement", "CustomerLedgerReport"),
             new ReportNavigatorDefinition("Customer", "Customer Report Details", "CustomerReportDetails"),
             new ReportNavigatorDefinition("Vendor", "Vendor Outstanding Listing", "VendorOutstandingReport"),
             new ReportNavigatorDefinition("Vendor", "Vendor Payment Report", "VendorPaymentReport"),
+            new ReportNavigatorDefinition("Vendor", "Date-wise Vendor Payment Report", "DatewiseVendorPaymentReport"),
             new ReportNavigatorDefinition("Vendor", "Unallocated Purchase Returns", "UnallocatedPurchaseReturns"),
             new ReportNavigatorDefinition("Vendor", "Vendor Report Details", "VendorReportDetails"),
             new ReportNavigatorDefinition("Analysis", "Executive Dashboard (30 KPIs)", "ExecutiveDashboard"),
@@ -135,6 +137,7 @@ namespace PosBranch_Win
 
             // Ensure "Vendor Payment Report" button exists in Vendor ribbon
             EnsureVendorPaymentReportRibbonButton();
+            EnsureDatewiseVendorPaymentReportRibbonButton();
 
             // Ensure Purchase, Stock Adjustment, Purchase Return, Sales Return, Payment, Receipt buttons exist in Home ribbon
             EnsureHomeTransactionRibbonButtons();
@@ -1620,6 +1623,7 @@ namespace PosBranch_Win
 
             // Ensure "Vendor Payment Report" button exists in the Vendor ribbon
             EnsureVendorPaymentReportRibbonButton();
+            EnsureDatewiseVendorPaymentReportRibbonButton();
 
             // Ensure Purchase, Stock Adjustment, Purchase Return, Sales Return, Payment, Receipt buttons exist in Home ribbon
             EnsureHomeTransactionRibbonButtons();
@@ -1972,6 +1976,115 @@ namespace PosBranch_Win
         /// Places it directly in the Report group so users can easily launch it from the ribbon.
         /// Safe to call multiple times.
         /// </summary>
+        /// <summary>
+        /// Programmatically ensures the "Date-wise Vendor Payment Report" button exists in the Vendor ribbon tab.
+        /// </summary>
+        private void EnsureDatewiseVendorPaymentReportRibbonButton()
+        {
+            try
+            {
+                const string TOOL_KEY = "DatewiseVendorPaymentReport";
+
+                Infragistics.Win.UltraWinToolbars.ButtonTool btnTool;
+                if (!ultraToolbarsManager1.Tools.Exists(TOOL_KEY))
+                {
+                    btnTool = new Infragistics.Win.UltraWinToolbars.ButtonTool(TOOL_KEY);
+                    btnTool.SharedProps.Caption = "Date-wise Payment";
+                    btnTool.SharedProps.ToolTipText = "Date-wise Vendor Payment Report";
+                    btnTool.SharedProps.DisplayStyle = Infragistics.Win.UltraWinToolbars.ToolDisplayStyle.ImageAndText;
+                    btnTool.SharedProps.Enabled = true;
+                    btnTool.SharedProps.Visible = true;
+
+                    if (ultraToolbarsManager1.Tools.Exists("VendorPaymentReport"))
+                    {
+                        var vTool = ultraToolbarsManager1.Tools["VendorPaymentReport"] as Infragistics.Win.UltraWinToolbars.ButtonTool;
+                        if (vTool?.SharedProps?.AppearancesLarge?.Appearance?.Image != null)
+                        {
+                            btnTool.SharedProps.AppearancesLarge.Appearance.Image = vTool.SharedProps.AppearancesLarge.Appearance.Image;
+                        }
+                    }
+                    else if (ultraToolbarsManager1.Tools.Exists("Payment"))
+                    {
+                        var payTool = ultraToolbarsManager1.Tools["Payment"] as Infragistics.Win.UltraWinToolbars.ButtonTool;
+                        if (payTool?.SharedProps?.AppearancesLarge?.Appearance?.Image != null)
+                        {
+                            btnTool.SharedProps.AppearancesLarge.Appearance.Image = payTool.SharedProps.AppearancesLarge.Appearance.Image;
+                        }
+                    }
+
+                    ultraToolbarsManager1.Tools.Add(btnTool);
+                }
+                else
+                {
+                    btnTool = ultraToolbarsManager1.Tools[TOOL_KEY] as Infragistics.Win.UltraWinToolbars.ButtonTool;
+                    if (btnTool != null)
+                    {
+                        btnTool.SharedProps.Caption = "Date-wise Payment";
+                        btnTool.SharedProps.ToolTipText = "Date-wise Vendor Payment Report";
+                        btnTool.SharedProps.DisplayStyle = Infragistics.Win.UltraWinToolbars.ToolDisplayStyle.ImageAndText;
+                        btnTool.SharedProps.Enabled = true;
+                        btnTool.SharedProps.Visible = true;
+                    }
+                }
+
+                Infragistics.Win.UltraWinToolbars.RibbonTab vendorTab = null;
+                if (ultraToolbarsManager1.Ribbon != null && ultraToolbarsManager1.Ribbon.Tabs != null)
+                {
+                    if (ultraToolbarsManager1.Ribbon.Tabs.Exists("ribbon4"))
+                    {
+                        vendorTab = ultraToolbarsManager1.Ribbon.Tabs["ribbon4"];
+                    }
+                    else
+                    {
+                        foreach (Infragistics.Win.UltraWinToolbars.RibbonTab tab in ultraToolbarsManager1.Ribbon.Tabs)
+                        {
+                            if (tab.Caption != null && tab.Caption.Equals("Vendor", StringComparison.OrdinalIgnoreCase))
+                            {
+                                vendorTab = tab;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (vendorTab == null) return;
+
+                Infragistics.Win.UltraWinToolbars.RibbonGroup reportGroup = null;
+                if (vendorTab.Groups.Exists("ribbonGroup2"))
+                {
+                    reportGroup = vendorTab.Groups["ribbonGroup2"];
+                }
+                else
+                {
+                    foreach (Infragistics.Win.UltraWinToolbars.RibbonGroup grp in vendorTab.Groups)
+                    {
+                        if (grp.Caption != null && grp.Caption.Equals("Report", StringComparison.OrdinalIgnoreCase))
+                        {
+                            reportGroup = grp;
+                            break;
+                        }
+                    }
+                }
+
+                if (reportGroup != null)
+                {
+                    if (!reportGroup.Tools.Exists(TOOL_KEY))
+                    {
+                        var instanceTool = reportGroup.Tools.InsertTool(1, TOOL_KEY);
+                        if (instanceTool != null)
+                        {
+                            instanceTool.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
+                            instanceTool.InstanceProps.MinimumSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"EnsureDatewiseVendorPaymentReportRibbonButton error: {ex.Message}");
+            }
+        }
+
         private void EnsureVendorPaymentReportRibbonButton()
         {
             try
@@ -2978,6 +3091,7 @@ namespace PosBranch_Win
             if (tk == "CustomerLedgerReport") return "customerledger";
             if (tk == "VendorOutstandingReport") return "vendoroutstanding";
             if (tk == "VendorPaymentReport") return "vendorpaymentreport";
+            if (tk == "DatewiseVendorPaymentReport") return "datewisevendorpaymentreport";
             if (tk == "Sales Details") return "salesdetails";
             if (tk == "Purchase Details") return "purchasedetails";
             if (tk == "DatewisePurchaseReport") return "datewisepurchasereport";
@@ -3952,6 +4066,11 @@ namespace PosBranch_Win
             {
                 Reports.InventoryReport.frmdatewiseitemstockreport datewiseItemStockReport = new Reports.InventoryReport.frmdatewiseitemstockreport();
                 OpenFormInTab(datewiseItemStockReport, "Date-wise Item Stock Movement Report");
+            }
+            if (e.Tool.Key == "DatewiseVendorPaymentReport")
+            {
+                Reports.FinancialReports.frmdatewisevendorpaymentreport datewiseVendorPaymentReport = new Reports.FinancialReports.frmdatewisevendorpaymentreport();
+                OpenFormInTab(datewiseVendorPaymentReport, "Date-wise Vendor Payment Report");
             }
             if (e.Tool.Key == "PurchaseReturnAuditReport")
             {
@@ -6555,6 +6674,7 @@ namespace PosBranch_Win
                     keyToExecute == "SalesReturnAuditReport" ||
                     keyToExecute == "VendorDNPaymentReport" ||
                     keyToExecute == "VendorPaymentReport" ||
+                    keyToExecute == "DatewiseVendorPaymentReport" ||
                     keyToExecute == "VendorReportDetails" ||
                     keyToExecute == "CustomerReceiptReport" ||
                     keyToExecute == "CustomerLedgerReport" ||
