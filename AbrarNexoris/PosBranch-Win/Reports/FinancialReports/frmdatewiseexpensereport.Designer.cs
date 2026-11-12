@@ -288,12 +288,12 @@ namespace PosBranch_Win.Reports.FinancialReports
             this.ultraPanelAction.Dock = System.Windows.Forms.DockStyle.Top;
             this.ultraPanelAction.Location = new System.Drawing.Point(0, 80);
             this.ultraPanelAction.Name = "ultraPanelAction";
-            this.ultraPanelAction.Size = new System.Drawing.Size(1364, 42);
+            this.ultraPanelAction.Size = new System.Drawing.Size(1364, 45);
             this.ultraPanelAction.TabIndex = 1;
             // 
             // btnViewGrid
             // 
-            this.btnViewGrid.Location = new System.Drawing.Point(12, 6);
+            this.btnViewGrid.Location = new System.Drawing.Point(12, 7);
             this.btnViewGrid.Name = "btnViewGrid";
             this.btnViewGrid.Size = new System.Drawing.Size(110, 30);
             this.btnViewGrid.TabIndex = 0;
@@ -301,7 +301,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             // 
             // btnPreviewGrid
             // 
-            this.btnPreviewGrid.Location = new System.Drawing.Point(128, 6);
+            this.btnPreviewGrid.Location = new System.Drawing.Point(128, 7);
             this.btnPreviewGrid.Name = "btnPreviewGrid";
             this.btnPreviewGrid.Size = new System.Drawing.Size(110, 30);
             this.btnPreviewGrid.TabIndex = 1;
@@ -309,7 +309,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             // 
             // btnPreviewReport
             // 
-            this.btnPreviewReport.Location = new System.Drawing.Point(244, 6);
+            this.btnPreviewReport.Location = new System.Drawing.Point(244, 7);
             this.btnPreviewReport.Name = "btnPreviewReport";
             this.btnPreviewReport.Size = new System.Drawing.Size(110, 30);
             this.btnPreviewReport.TabIndex = 2;
@@ -317,7 +317,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             // 
             // btnExportGrid
             // 
-            this.btnExportGrid.Location = new System.Drawing.Point(360, 6);
+            this.btnExportGrid.Location = new System.Drawing.Point(360, 7);
             this.btnExportGrid.Name = "btnExportGrid";
             this.btnExportGrid.Size = new System.Drawing.Size(110, 30);
             this.btnExportGrid.TabIndex = 3;
@@ -325,7 +325,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             // 
             // btnClearFilters
             // 
-            this.btnClearFilters.Location = new System.Drawing.Point(476, 6);
+            this.btnClearFilters.Location = new System.Drawing.Point(476, 7);
             this.btnClearFilters.Name = "btnClearFilters";
             this.btnClearFilters.Size = new System.Drawing.Size(110, 30);
             this.btnClearFilters.TabIndex = 4;
@@ -333,7 +333,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             // 
             // btnColumnChooser
             // 
-            this.btnColumnChooser.Location = new System.Drawing.Point(592, 6);
+            this.btnColumnChooser.Location = new System.Drawing.Point(592, 7);
             this.btnColumnChooser.Name = "btnColumnChooser";
             this.btnColumnChooser.Size = new System.Drawing.Size(115, 30);
             this.btnColumnChooser.TabIndex = 5;
@@ -341,7 +341,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             // 
             // btnExpandAll
             // 
-            this.btnExpandAll.Location = new System.Drawing.Point(713, 6);
+            this.btnExpandAll.Location = new System.Drawing.Point(713, 7);
             this.btnExpandAll.Name = "btnExpandAll";
             this.btnExpandAll.Size = new System.Drawing.Size(95, 30);
             this.btnExpandAll.TabIndex = 6;
@@ -349,7 +349,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             // 
             // btnCollapseAll
             // 
-            this.btnCollapseAll.Location = new System.Drawing.Point(814, 6);
+            this.btnCollapseAll.Location = new System.Drawing.Point(814, 7);
             this.btnCollapseAll.Name = "btnCollapseAll";
             this.btnCollapseAll.Size = new System.Drawing.Size(95, 30);
             this.btnCollapseAll.TabIndex = 7;
@@ -357,7 +357,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             // 
             // btnToggleSelection
             // 
-            this.btnToggleSelection.Location = new System.Drawing.Point(915, 6);
+            this.btnToggleSelection.Location = new System.Drawing.Point(915, 7);
             this.btnToggleSelection.Name = "btnToggleSelection";
             this.btnToggleSelection.Size = new System.Drawing.Size(110, 30);
             this.btnToggleSelection.TabIndex = 8;
@@ -368,17 +368,17 @@ namespace PosBranch_Win.Reports.FinancialReports
             this.ultraPanelMaster.ClientArea.Controls.Add(this.gridReport);
             this.ultraPanelMaster.ClientArea.Controls.Add(this.ultraPanelGridFooter);
             this.ultraPanelMaster.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.ultraPanelMaster.Location = new System.Drawing.Point(0, 122);
+            this.ultraPanelMaster.Location = new System.Drawing.Point(0, 125);
             this.ultraPanelMaster.Name = "ultraPanelMaster";
-            this.ultraPanelMaster.Size = new System.Drawing.Size(1364, 627);
+            this.ultraPanelMaster.Size = new System.Drawing.Size(1364, 624);
             this.ultraPanelMaster.TabIndex = 2;
             // 
             // ultraPanelGridFooter
             // 
             this.ultraPanelGridFooter.Dock = System.Windows.Forms.DockStyle.Bottom;
-            this.ultraPanelGridFooter.Location = new System.Drawing.Point(0, 589);
+            this.ultraPanelGridFooter.Location = new System.Drawing.Point(0, 598);
             this.ultraPanelGridFooter.Name = "ultraPanelGridFooter";
-            this.ultraPanelGridFooter.Size = new System.Drawing.Size(1364, 38);
+            this.ultraPanelGridFooter.Size = new System.Drawing.Size(1364, 26);
             this.ultraPanelGridFooter.TabIndex = 1;
             // 
             // gridReport
@@ -386,7 +386,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             this.gridReport.Dock = System.Windows.Forms.DockStyle.Fill;
             this.gridReport.Location = new System.Drawing.Point(0, 0);
             this.gridReport.Name = "gridReport";
-            this.gridReport.Size = new System.Drawing.Size(1364, 589);
+            this.gridReport.Size = new System.Drawing.Size(1364, 598);
             this.gridReport.TabIndex = 0;
             // 
             // frmdatewiseexpensereport
