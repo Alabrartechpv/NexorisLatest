@@ -260,6 +260,7 @@ BEGIN
         ('balancesheet', 'Balance Sheet', 'Reports'),
         ('trialbalance', 'Trial Balance', 'Reports'),
         ('cashbankbook', 'Cash & Bank Book', 'Reports'),
+        ('generalledger', 'General Ledger Statement', 'Reports'),
         ('daybook', 'Day Book', 'Reports'),
         ('bankstatement', 'Bank Statement Report', 'Reports'),
         ('shiftreconciliation', 'Shift Reconciliation Report', 'Reports'),

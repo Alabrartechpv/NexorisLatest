@@ -332,6 +332,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             ultraGridTrialBalance.InitializeRow += UltraGridTrialBalance_InitializeRow;
             ultraGridTrialBalance.MouseDown += UltraGridTrialBalance_MouseDown;
             ultraGridTrialBalance.MouseMove += UltraGridTrialBalance_MouseMove;
+            ultraGridTrialBalance.DoubleClickRow += UltraGridTrialBalance_DoubleClickRow;
             _filterManager = new ReportColumnFilterManager(ultraGridTrialBalance, null);
         }
 
@@ -765,6 +766,37 @@ namespace PosBranch_Win.Reports.FinancialReports
         private void txtSearch_TextChanged(object sender, EventArgs e)
         {
             ApplySearchFilter();
+        }
+
+        private void UltraGridTrialBalance_DoubleClickRow(object sender, DoubleClickRowEventArgs e)
+        {
+            if (e.Row == null || !e.Row.IsDataRow) return;
+            if (!(e.Row.ListObject is TrialBalanceLineItem item) || item.LedgerID <= 0) return;
+
+            try
+            {
+                DateTime fromDate = ultraDateTimeFrom.DateTime.Date;
+                DateTime toDate = ultraDateTimeTo.DateTime.Date;
+
+                var ledgerForm = new FrmGeneralLedger();
+                ledgerForm.LoadForLedger(item.LedgerID, fromDate, toDate);
+
+                string tabTitle = $"Ledger - {item.LedgerName}";
+                var home = Application.OpenForms.OfType<Home>().FirstOrDefault();
+                if (home != null)
+                {
+                    home.OpenFormInTabSafe(ledgerForm, tabTitle);
+                }
+                else
+                {
+                    ledgerForm.Show(this);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Could not open General Ledger for {item.LedgerName}: {ex.Message}",
+                    "Drill Down", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
         }
         #endregion
 

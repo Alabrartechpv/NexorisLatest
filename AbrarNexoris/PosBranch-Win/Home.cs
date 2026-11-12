@@ -113,6 +113,7 @@ namespace PosBranch_Win
             new ReportNavigatorDefinition("Analysis", "Balance Sheet", "BalanceSheet"),
             new ReportNavigatorDefinition("Analysis", "Trial Balance", "TrialBalance"),
             new ReportNavigatorDefinition("Analysis", "Cash & Bank Book", "CashBankBook"),
+            new ReportNavigatorDefinition("Analysis", "General Ledger Statement", "GeneralLedger"),
             new ReportNavigatorDefinition("Analysis", "Day Book", "DayBook"),
             new ReportNavigatorDefinition("Analysis", "Counter Closing Report", "ShiftReconciliationReport"),
             new ReportNavigatorDefinition("Analysis", "Bank Statement", "BankStatementReport"),
@@ -3296,6 +3297,7 @@ namespace PosBranch_Win
             if (tk == "BalanceSheet") return "balancesheet";
             if (tk == "TrialBalance") return "trialbalance";
             if (tk == "CashBankBook") return "cashbankbook";
+            if (tk == "GeneralLedger") return "generalledger";
             if (tk == "DayBook") return "daybook";
             if (tk == "BankReconciliation") return "bankreconciliation";
             if (tk == "BankStatementReport") return "bankstatement";
@@ -4034,6 +4036,11 @@ namespace PosBranch_Win
             {
                 PosBranch_Win.Reports.FinancialReports.FrmCashBankBook cbBook = new PosBranch_Win.Reports.FinancialReports.FrmCashBankBook();
                 OpenFormInTabSafe(cbBook, "Cash & Bank Book");
+            }
+            if (e.Tool.Key == "GeneralLedger")
+            {
+                PosBranch_Win.Reports.FinancialReports.FrmGeneralLedger glReport = new PosBranch_Win.Reports.FinancialReports.FrmGeneralLedger();
+                OpenFormInTabSafe(glReport, "General Ledger Statement");
             }
             if (e.Tool.Key == "DayBook")
             {
@@ -5865,6 +5872,7 @@ namespace PosBranch_Win
                             else if (formTypeName == "FrmBalanceSheet" || tabTextClean == "Balance Sheet") matchedToolKey = "BalanceSheet";
                             else if (formTypeName == "FrmTrialBalance" || tabTextClean == "Trial Balance") matchedToolKey = "TrialBalance";
                             else if (formTypeName == "FrmCashBankBook" || tabTextClean == "Cash & Bank Book") matchedToolKey = "CashBankBook";
+                            else if (formTypeName == "FrmGeneralLedger" || tabTextClean == "General Ledger Statement" || tabTextClean == "General Ledger") matchedToolKey = "GeneralLedger";
                             else if (formTypeName == "FrmDayBook" || tabTextClean == "Day Book") matchedToolKey = "DayBook";
                             else if (formTypeName == "FrmBankReconciliation" || tabTextClean == "Bank Reconciliation") matchedToolKey = "BankReconciliation";
                             else if (formTypeName == "FrmBankStatementReport" || tabTextClean == "Bank Statement") matchedToolKey = "BankStatementReport";

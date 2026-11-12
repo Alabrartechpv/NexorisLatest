@@ -680,6 +680,7 @@ namespace Repository.MasterRepositry
             add("cashinout", "Cash In / Out Report", "Reports");
             add("daybook", "Day Book", "Reports");
             add("cashbankbook", "Cash & Bank Book", "Reports");
+            add("generalledger", "General Ledger Statement", "Reports");
             add("bankstatement", "Bank Statement Report", "Reports");
             add("shiftreconciliation", "Shift Reconciliation Report", "Reports");
             add("customeroutstanding", "Customer Outstanding Report", "Reports");

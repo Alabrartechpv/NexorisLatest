@@ -57,8 +57,8 @@ namespace PosBranch_Win.Reports.FinancialReports
 
         public void RibbonClear()
         {
-            ultraComboPresetDates.Value = "CURRENT_FY";
-            ApplyDatePreset("CURRENT_FY");
+            ultraComboPresetDates.Value = "ALL";
+            ApplyDatePreset("ALL");
             currentReport = null;
             _isSummaryView = false;
             if (btnViewMode != null) btnViewMode.Text = "Summary View";
@@ -109,30 +109,47 @@ namespace PosBranch_Win.Reports.FinancialReports
             }
         }
 
+        private static DateTime GetFinancialYearStart(DateTime asOnDate)
+        {
+            int fyStartYear = asOnDate.Month >= 4 ? asOnDate.Year : asOnDate.Year - 1;
+            return new DateTime(fyStartYear, 4, 1);
+        }
+
         private void InitializeDateControls()
         {
             ultraDateTimeFrom.FormatString = "dd-MM-yyyy";
             ultraDateTimeTo.FormatString = "dd-MM-yyyy";
 
+            lblPreset.Visible = true;
+            ultraComboPresetDates.Visible = true;
+            lblFromDate.Visible = true;
+            ultraDateTimeFrom.Visible = true;
+            lblToDate.Text = "To";
+
             ultraComboPresetDates.Items.Clear();
+            ultraComboPresetDates.Items.Add("ALL", "ALL");
             ultraComboPresetDates.Items.Add("CURRENT_FY", "Current FY");
             ultraComboPresetDates.Items.Add("TODAY", "Today");
             ultraComboPresetDates.Items.Add("THIS_MONTH", "This Month");
             ultraComboPresetDates.Items.Add("DATE_RANGE", "Date by Range");
-            ultraComboPresetDates.Items.Add("ALL", "ALL");
 
-            ultraComboPresetDates.Value = "CURRENT_FY";
-            ApplyDatePreset("CURRENT_FY");
+            ultraComboPresetDates.Value = "ALL";
+            ApplyDatePreset("ALL");
         }
 
         private void ApplyDatePreset(string presetKey)
         {
-            int currentYear = DateTime.Now.Year;
             switch (presetKey)
             {
+                case "ALL":
+                    ultraDateTimeFrom.Value = new DateTime(1990, 1, 1);
+                    ultraDateTimeTo.Value = DateTime.Today;
+                    ultraDateTimeFrom.Enabled = false;
+                    ultraDateTimeTo.Enabled = false;
+                    break;
+
                 case "CURRENT_FY":
-                    int fyStartYear = DateTime.Now.Month >= 4 ? currentYear : currentYear - 1;
-                    ultraDateTimeFrom.Value = new DateTime(fyStartYear, 4, 1);
+                    ultraDateTimeFrom.Value = GetFinancialYearStart(DateTime.Today);
                     ultraDateTimeTo.Value = DateTime.Today;
                     ultraDateTimeFrom.Enabled = false;
                     ultraDateTimeTo.Enabled = false;
@@ -152,15 +169,12 @@ namespace PosBranch_Win.Reports.FinancialReports
                     ultraDateTimeTo.Enabled = false;
                     break;
 
-                case "ALL":
-                    ultraDateTimeFrom.Value = new DateTime(1990, 1, 1);
-                    ultraDateTimeTo.Value = DateTime.Today;
-                    ultraDateTimeFrom.Enabled = false;
-                    ultraDateTimeTo.Enabled = false;
-                    break;
-
                 case "DATE_RANGE":
                 default:
+                    if (ultraDateTimeFrom.DateTime < new DateTime(2000, 1, 1))
+                    {
+                        ultraDateTimeFrom.Value = GetFinancialYearStart(DateTime.Today);
+                    }
                     ultraDateTimeFrom.Enabled = true;
                     ultraDateTimeTo.Enabled = true;
                     break;
@@ -532,6 +546,13 @@ namespace PosBranch_Win.Reports.FinancialReports
                 DateTime fromDate = ultraDateTimeFrom.DateTime.Date;
                 DateTime toDate = ultraDateTimeTo.DateTime.Date.AddHours(23).AddMinutes(59).AddSeconds(59);
 
+                if (fromDate > toDate)
+                {
+                    MessageBox.Show("From Date cannot be greater than To Date.", "Invalid Date Range",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
                 currentReport = reportRepository.GetBalanceSheetReport(fromDate, toDate);
 
                 if (currentReport != null)
@@ -774,10 +795,10 @@ namespace PosBranch_Win.Reports.FinancialReports
                     formToOpen = form;
                     tabTitle = $"Vendor - {item.LedgerName}";
                 }
-                // 4. Default fallback: Open Cash/Bank book in TabControl
+                // 4. Default fallback: Open General Ledger Statement in TabControl
                 else
                 {
-                    var defaultForm = new FrmCashBankBook();
+                    var defaultForm = new FrmGeneralLedger();
                     defaultForm.LoadForLedger(item.LedgerID, fromDate, toDate);
                     formToOpen = defaultForm;
                     tabTitle = $"Ledger - {item.LedgerName}";
@@ -915,10 +936,19 @@ namespace PosBranch_Win.Reports.FinancialReports
                     return;
                 }
 
+                DateTime fromDate = ultraDateTimeFrom.DateTime.Date;
+                DateTime toDate = ultraDateTimeTo.DateTime.Date;
+                string selectedPreset = Convert.ToString(ultraComboPresetDates.Value ?? "");
+                string periodText = selectedPreset == "ALL"
+                    ? $"ALL (Up to {toDate:dd/MM/yyyy})"
+                    : $"Period: {fromDate:dd/MM/yyyy} to {toDate:dd/MM/yyyy}";
+
                 using (SaveFileDialog sfd = new SaveFileDialog())
                 {
                     sfd.Filter = ReportPdfExporter.CsvAndPdfFilter;
-                    sfd.FileName = $"BalanceSheet_{ultraDateTimeFrom.DateTime:yyyyMMdd}_to_{ultraDateTimeTo.DateTime:yyyyMMdd}.csv";
+                    sfd.FileName = selectedPreset == "ALL"
+                        ? $"BalanceSheet_ALL_{toDate:yyyyMMdd}.csv"
+                        : $"BalanceSheet_{fromDate:yyyyMMdd}_to_{toDate:yyyyMMdd}.csv";
 
                     if (sfd.ShowDialog() == DialogResult.OK)
                     {
@@ -926,7 +956,7 @@ namespace PosBranch_Win.Reports.FinancialReports
 
                         // Header Info
                         sb.AppendLine($"Balance Sheet");
-                        sb.AppendLine($"Period: {ultraDateTimeFrom.DateTime:dd/MM/yyyy} to {ultraDateTimeTo.DateTime:dd/MM/yyyy}");
+                        sb.AppendLine(periodText);
                         sb.AppendLine();
 
                         // Liabilities 
@@ -954,7 +984,7 @@ namespace PosBranch_Win.Reports.FinancialReports
 
                         sb.AppendLine($"Difference:,{currentReport.Summary.Difference:N2}");
 
-                        if (ReportPdfExporter.CheckAndExportPdf(sfd, sb.ToString(), "Balance Sheet", $"Period: {ultraDateTimeFrom.DateTime:dd/MM/yyyy} to {ultraDateTimeTo.DateTime:dd/MM/yyyy}")) return;
+                        if (ReportPdfExporter.CheckAndExportPdf(sfd, sb.ToString(), "Balance Sheet", periodText)) return;
 
                         File.WriteAllText(sfd.FileName, sb.ToString());
                         MessageBox.Show("Report exported successfully!", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
