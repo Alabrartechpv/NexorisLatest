@@ -98,6 +98,7 @@
     <Compile Include="ReportRepository\DatewiseProfitReportRepository.cs" />
     <Compile Include="ReportRepository\DatewiseItemStockReportRepository.cs" />
     <Compile Include="ReportRepository\DatewiseVendorPaymentReportRepository.cs" />
+    <Compile Include="ReportRepository\DatewiseCustomerPaymentReportRepository.cs" />
     <Compile Include="ReportRepository\PurchaseReturnReportRepositoty.cs" />
     <Compile Include="ReportRepository\SalesAnalyticsRepository.cs" />
     <Compile Include="ReportRepository\PurchaseAnalyticsRepository.cs" />
