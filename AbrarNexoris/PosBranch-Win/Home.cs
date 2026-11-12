@@ -107,6 +107,7 @@ namespace PosBranch_Win
             new ReportNavigatorDefinition("Vendor", "Unallocated Purchase Returns", "UnallocatedPurchaseReturns"),
             new ReportNavigatorDefinition("Vendor", "Vendor Report Details", "VendorReportDetails"),
             new ReportNavigatorDefinition("Analysis", "Executive Dashboard (30 KPIs)", "ExecutiveDashboard"),
+            new ReportNavigatorDefinition("Analysis", "Date-wise Expense Report", "DatewiseExpenseReport"),
             new ReportNavigatorDefinition("Analysis", "Trading Account", "TradingAccount"),
             new ReportNavigatorDefinition("Analysis", "Profit & Loss Account", "ProfitLossAccount"),
             new ReportNavigatorDefinition("Analysis", "Balance Sheet", "BalanceSheet"),
@@ -141,6 +142,7 @@ namespace PosBranch_Win
             EnsureVendorPaymentReportRibbonButton();
             EnsureDatewiseVendorPaymentReportRibbonButton();
             EnsureDatewiseCustomerPaymentReportRibbonButton();
+            EnsureDatewiseExpenseReportRibbonButton();
 
             // Ensure Purchase, Stock Adjustment, Purchase Return, Sales Return, Payment, Receipt buttons exist in Home ribbon
             EnsureHomeTransactionRibbonButtons();
@@ -1628,6 +1630,7 @@ namespace PosBranch_Win
             EnsureVendorPaymentReportRibbonButton();
             EnsureDatewiseVendorPaymentReportRibbonButton();
             EnsureDatewiseCustomerPaymentReportRibbonButton();
+            EnsureDatewiseExpenseReportRibbonButton();
 
             // Ensure Purchase, Stock Adjustment, Purchase Return, Sales Return, Payment, Receipt buttons exist in Home ribbon
             EnsureHomeTransactionRibbonButtons();
@@ -1986,6 +1989,115 @@ namespace PosBranch_Win
         /// <summary>
         /// Programmatically ensures the "Date-wise Customer Payment Report" button exists in the Customer ribbon tab.
         /// </summary>
+        /// <summary>
+        /// Programmatically ensures the "Date-wise Expense Report" button exists in the Accounts ribbon tab.
+        /// </summary>
+        private void EnsureDatewiseExpenseReportRibbonButton()
+        {
+            try
+            {
+                const string TOOL_KEY = "DatewiseExpenseReport";
+
+                Infragistics.Win.UltraWinToolbars.ButtonTool btnTool;
+                if (!ultraToolbarsManager1.Tools.Exists(TOOL_KEY))
+                {
+                    btnTool = new Infragistics.Win.UltraWinToolbars.ButtonTool(TOOL_KEY);
+                    btnTool.SharedProps.Caption = "Date-wise Expense";
+                    btnTool.SharedProps.ToolTipText = "Date-wise Expense Report";
+                    btnTool.SharedProps.DisplayStyle = Infragistics.Win.UltraWinToolbars.ToolDisplayStyle.ImageAndText;
+                    btnTool.SharedProps.Enabled = true;
+                    btnTool.SharedProps.Visible = true;
+
+                    if (ultraToolbarsManager1.Tools.Exists("GeneralPayment"))
+                    {
+                        var gTool = ultraToolbarsManager1.Tools["GeneralPayment"] as Infragistics.Win.UltraWinToolbars.ButtonTool;
+                        if (gTool?.SharedProps?.AppearancesLarge?.Appearance?.Image != null)
+                        {
+                            btnTool.SharedProps.AppearancesLarge.Appearance.Image = gTool.SharedProps.AppearancesLarge.Appearance.Image;
+                        }
+                    }
+                    else if (ultraToolbarsManager1.Tools.Exists("Payment"))
+                    {
+                        var pTool = ultraToolbarsManager1.Tools["Payment"] as Infragistics.Win.UltraWinToolbars.ButtonTool;
+                        if (pTool?.SharedProps?.AppearancesLarge?.Appearance?.Image != null)
+                        {
+                            btnTool.SharedProps.AppearancesLarge.Appearance.Image = pTool.SharedProps.AppearancesLarge.Appearance.Image;
+                        }
+                    }
+
+                    ultraToolbarsManager1.Tools.Add(btnTool);
+                }
+                else
+                {
+                    btnTool = ultraToolbarsManager1.Tools[TOOL_KEY] as Infragistics.Win.UltraWinToolbars.ButtonTool;
+                    if (btnTool != null)
+                    {
+                        btnTool.SharedProps.Caption = "Date-wise Expense";
+                        btnTool.SharedProps.ToolTipText = "Date-wise Expense Report";
+                        btnTool.SharedProps.DisplayStyle = Infragistics.Win.UltraWinToolbars.ToolDisplayStyle.ImageAndText;
+                        btnTool.SharedProps.Enabled = true;
+                        btnTool.SharedProps.Visible = true;
+                    }
+                }
+
+                Infragistics.Win.UltraWinToolbars.RibbonTab accountsTab = null;
+                if (ultraToolbarsManager1.Ribbon != null && ultraToolbarsManager1.Ribbon.Tabs != null)
+                {
+                    if (ultraToolbarsManager1.Ribbon.Tabs.Exists("ribbon3"))
+                    {
+                        accountsTab = ultraToolbarsManager1.Ribbon.Tabs["ribbon3"];
+                    }
+                    else
+                    {
+                        foreach (Infragistics.Win.UltraWinToolbars.RibbonTab tab in ultraToolbarsManager1.Ribbon.Tabs)
+                        {
+                            if (tab.Caption != null && tab.Caption.Equals("Accounts", StringComparison.OrdinalIgnoreCase))
+                            {
+                                accountsTab = tab;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (accountsTab == null) return;
+
+                Infragistics.Win.UltraWinToolbars.RibbonGroup reportGroup = null;
+                if (accountsTab.Groups.Exists("ribbonGroup32"))
+                {
+                    reportGroup = accountsTab.Groups["ribbonGroup32"];
+                }
+                else
+                {
+                    foreach (Infragistics.Win.UltraWinToolbars.RibbonGroup grp in accountsTab.Groups)
+                    {
+                        if (grp.Caption != null && grp.Caption.IndexOf("Financial", StringComparison.OrdinalIgnoreCase) >= 0)
+                        {
+                            reportGroup = grp;
+                            break;
+                        }
+                    }
+                }
+
+                if (reportGroup != null)
+                {
+                    if (!reportGroup.Tools.Exists(TOOL_KEY))
+                    {
+                        var instanceTool = reportGroup.Tools.InsertTool(reportGroup.Tools.Count, TOOL_KEY);
+                        if (instanceTool != null)
+                        {
+                            instanceTool.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
+                            instanceTool.InstanceProps.MinimumSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"EnsureDatewiseExpenseReportRibbonButton error: {ex.Message}");
+            }
+        }
+
         private void EnsureDatewiseCustomerPaymentReportRibbonButton()
         {
             try
@@ -3218,6 +3330,7 @@ namespace PosBranch_Win
             if (tk == "VendorPaymentReport") return "vendorpaymentreport";
             if (tk == "DatewiseVendorPaymentReport") return "datewisevendorpaymentreport";
             if (tk == "DatewiseCustomerPaymentReport") return "datewisecustomerpaymentreport";
+            if (tk == "DatewiseExpenseReport") return "datewiseexpensereport";
             if (tk == "Sales Details") return "salesdetails";
             if (tk == "Purchase Details") return "purchasedetails";
             if (tk == "DatewisePurchaseReport") return "datewisepurchasereport";
@@ -4192,6 +4305,11 @@ namespace PosBranch_Win
             {
                 Reports.InventoryReport.frmdatewiseitemstockreport datewiseItemStockReport = new Reports.InventoryReport.frmdatewiseitemstockreport();
                 OpenFormInTab(datewiseItemStockReport, "Date-wise Item Stock Movement Report");
+            }
+            if (e.Tool.Key == "DatewiseExpenseReport" || e.Tool.Key == "frmdatewiseexpensereport")
+            {
+                Reports.FinancialReports.frmdatewiseexpensereport datewiseExpenseReport = new Reports.FinancialReports.frmdatewiseexpensereport();
+                OpenFormInTab(datewiseExpenseReport, "Date-wise Expense Report");
             }
             if (e.Tool.Key == "DatewiseCustomerPaymentReport" || e.Tool.Key == "frmdatewisecustomerpaymentreport")
             {
@@ -6807,6 +6925,7 @@ namespace PosBranch_Win
                     keyToExecute == "VendorPaymentReport" ||
                     keyToExecute == "DatewiseVendorPaymentReport" ||
                     keyToExecute == "DatewiseCustomerPaymentReport" ||
+                    keyToExecute == "DatewiseExpenseReport" ||
                     keyToExecute == "VendorReportDetails" ||
                     keyToExecute == "CustomerReceiptReport" ||
                     keyToExecute == "CustomerLedgerReport" ||

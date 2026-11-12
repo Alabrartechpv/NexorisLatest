@@ -1099,6 +1099,12 @@
     <Compile Include="Reports\FinancialReports\frmdatewisecustomerpaymentreport.Designer.cs">
       <DependentUpon>frmdatewisecustomerpaymentreport.cs</DependentUpon>
     </Compile>
+    <Compile Include="Reports\FinancialReports\frmdatewiseexpensereport.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Reports\FinancialReports\frmdatewiseexpensereport.Designer.cs">
+      <DependentUpon>frmdatewiseexpensereport.cs</DependentUpon>
+    </Compile>
     <Compile Include="Reports\FinancialReports\frmInputGSTReport.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -1928,6 +1934,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Reports\FinancialReports\frmdatewisecustomerpaymentreport.resx">
       <DependentUpon>frmdatewisecustomerpaymentreport.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Reports\FinancialReports\frmdatewiseexpensereport.resx">
+      <DependentUpon>frmdatewiseexpensereport.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Reports\FinancialReports\frmVendorPaymentReport.resx">
       <DependentUpon>frmVendorPaymentReport.cs</DependentUpon>

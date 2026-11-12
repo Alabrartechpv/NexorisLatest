@@ -92,6 +92,7 @@
     <Compile Include="Report\DatewiseItemStockReportModel.cs" />
     <Compile Include="Report\DatewiseVendorPaymentReportModel.cs" />
     <Compile Include="Report\DatewiseCustomerPaymentReportModel.cs" />
+    <Compile Include="Report\DatewiseExpenseReportModel.cs" />
     <Compile Include="Report\PurchaseReturnReport.cs" />
     <Compile Include="Report\Reports.cs" />
     <Compile Include="Report\CounterReportModel.cs" />
