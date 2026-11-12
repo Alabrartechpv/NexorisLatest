@@ -126,11 +126,11 @@ namespace Repository.ReportRepository
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.CommandTimeout = 120;
 
-                    cmd.Parameters.AddWithValue("@CompanyId", filter.CompanyId > 0 ? filter.CompanyId : 1);
+                    cmd.Parameters.AddWithValue("@CompanyId", filter.CompanyId);
                     cmd.Parameters.AddWithValue("@BranchId", filter.BranchId);
                     cmd.Parameters.AddWithValue("@PeriodMode", string.IsNullOrEmpty(filter.PeriodMode) ? "DATE_RANGE" : filter.PeriodMode);
-                    cmd.Parameters.AddWithValue("@FromDate", filter.FromDate != DateTime.MinValue ? (object)filter.FromDate.Date : DBNull.Value);
-                    cmd.Parameters.AddWithValue("@ToDate", filter.ToDate != DateTime.MinValue ? (object)filter.ToDate.Date : DBNull.Value);
+                    cmd.Parameters.AddWithValue("@FromDate", filter.FromDate != DateTime.MinValue ? (object)filter.FromDate : DBNull.Value);
+                    cmd.Parameters.AddWithValue("@ToDate", filter.ToDate != DateTime.MinValue ? (object)filter.ToDate : DBNull.Value);
                     cmd.Parameters.AddWithValue("@Month", filter.Month);
                     cmd.Parameters.AddWithValue("@Year", filter.Year);
                     cmd.Parameters.AddWithValue("@ExpenseCategoryId", filter.ExpenseCategoryId);
@@ -172,6 +172,7 @@ namespace Repository.ReportRepository
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error in DatewiseExpenseReportRepository.GetReportData: {ex.Message}");
+                throw;
             }
 
             return result;

@@ -37,14 +37,14 @@ BEGIN
     BEGIN
         IF (@Year IS NULL OR @Year < 2000) SET @Year = YEAR(GETDATE());
         IF (@Month IS NULL OR @Month < 1 OR @Month > 12) SET @Month = MONTH(GETDATE());
-        SET @FromDate = DATEFROMPARTS(@Year, @Month, 1);
+        SET @FromDate = CAST(CONVERT(VARCHAR(4), @Year) + '-' + RIGHT('0' + CONVERT(VARCHAR(2), @Month), 2) + '-01 00:00:00' AS DATETIME);
         SET @ToDate = DATEADD(SECOND, -1, DATEADD(MONTH, 1, @FromDate));
     END
     ELSE IF (@PeriodMode = 'YEAR_WISE')
     BEGIN
         IF (@Year IS NULL OR @Year < 2000) SET @Year = YEAR(GETDATE());
-        SET @FromDate = DATEFROMPARTS(@Year, 1, 1);
-        SET @ToDate = DATEADD(SECOND, -1, DATEADD(YEAR, 1, @FromDate));
+        SET @FromDate = CAST(CONVERT(VARCHAR(4), @Year) + '-01-01 00:00:00' AS DATETIME);
+        SET @ToDate = CAST(CONVERT(VARCHAR(4), @Year) + '-12-31 23:59:59' AS DATETIME);
     END
     ELSE IF (@PeriodMode = 'ALL')
     BEGIN
@@ -54,12 +54,14 @@ BEGIN
     ELSE -- 'DATE_RANGE' or fallback
     BEGIN
         IF (@FromDate IS NULL OR @FromDate < '1900-01-01')
-            SET @FromDate = DATEADD(DAY, 1 - DAY(GETDATE()), CAST(GETDATE() AS DATE)); -- 1st of current month
+            SET @FromDate = CAST(CONVERT(VARCHAR(7), GETDATE(), 120) + '-01 00:00:00' AS DATETIME);
+        ELSE
+            SET @FromDate = CAST(CONVERT(VARCHAR(10), @FromDate, 120) + ' 00:00:00' AS DATETIME);
+
         IF (@ToDate IS NULL OR @ToDate < '1900-01-01')
-            SET @ToDate = CAST(GETDATE() AS DATE);
-        
-        -- End of day coverage
-        SET @ToDate = DATEADD(SECOND, -1, DATEADD(DAY, 1, CAST(@ToDate AS DATE)));
+            SET @ToDate = CAST(CONVERT(VARCHAR(10), GETDATE(), 120) + ' 23:59:59' AS DATETIME);
+        ELSE
+            SET @ToDate = CAST(CONVERT(VARCHAR(10), @ToDate, 120) + ' 23:59:59' AS DATETIME);
     END
 
     SET @SearchText = LTRIM(RTRIM(ISNULL(@SearchText, '')));

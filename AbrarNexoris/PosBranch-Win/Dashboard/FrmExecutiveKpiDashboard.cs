@@ -363,11 +363,11 @@ namespace PosBranch_Win.Dashboard
 
             if (lblDashboardSubtitle != null)
             {
-                lblDashboardSubtitle.Text = "41 Key Business Metrics, EOD Reconciliation & Performance Matrix";
+                lblDashboardSubtitle.Text = "42 Key Business Metrics, EOD Reconciliation & Performance Matrix";
             }
 
             // ═══════════════════════════════════════════════════════════════════
-            // ALL 41 METRICS IN EXACT NUMERICAL ORDER (1 to 41)
+            // ALL 42 METRICS IN EXACT NUMERICAL ORDER (1 to 42)
             // ═══════════════════════════════════════════════════════════════════
             var allCards = new List<Control>
             {
@@ -509,7 +509,12 @@ namespace PosBranch_Win.Dashboard
                             ? $"Excess: {FormatCurr(_model.TotalExcessAmount)} ({_model.ExcessShiftCount} Shifts)" 
                             : (_model.TotalShiftClosingCount > 0 ? $"All {_model.TotalShiftClosingCount} Shifts Balanced" : "0 Discrepancy (Reconciled)")),
                     _model.NetCashDifference < 0 ? Color.FromArgb(220, 38, 38) : (_model.NetCashDifference > 0 ? Color.FromArgb(37, 99, 235) : Color.FromArgb(22, 163, 74)),
-                    () => DrillDown("ShiftReconciliation"))
+                    () => DrillDown("ShiftReconciliation")),
+
+                // 42. Date-wise Reports Hub
+                CreateKpiCard("42. Date-wise", "Consolidated multi-dimensional date-wise activity reports (Sales, Purchase, Stock, Profit, Expense, Payments)",
+                    "8 Reports", "Date Matrix Hub ➔", Color.FromArgb(2, 132, 199),
+                    () => DrillDown("DateWiseReports"))
             };
 
             // Display in clean full-width responsive grid:
@@ -1042,6 +1047,11 @@ namespace PosBranch_Win.Dashboard
                     case "BankReconciliation":
                         formToOpen = new Accounts.FrmBankReconciliation();
                         title = "Bank Reconciliation";
+                        break;
+                    case "DateWise":
+                    case "DateWiseReports":
+                        Home.OpenReportCategory("Date-wise");
+
                         break;
                 }
 
@@ -1805,7 +1815,7 @@ namespace PosBranch_Win.Dashboard
             sb.AppendLine("</style></head><body><div class='container'>");
 
             string filterLabel = GetFilterLabel();
-            sb.AppendLine("<h1>Executive Business KPI Cockpit — 41 Key Metrics &amp; EOD Reconciliation</h1>");
+            sb.AppendLine("<h1>Executive Business KPI Cockpit — 42 Key Metrics &amp; EOD Reconciliation</h1>");
             sb.AppendLine($"<div class='meta'>{EscapeXml(filterLabel)} | Generated: <b>{_model.GeneratedAt:dd-MMM-yyyy hh:mm tt}</b></div>");
 
             // 1. Growth Performance Matrix
@@ -1827,7 +1837,7 @@ namespace PosBranch_Win.Dashboard
             sb.AppendLine("</table></div>");
 
             // 2. Complete 41 KPI Summary Table
-            sb.AppendLine("<h2>2. Complete 41 Business KPI Summary</h2>");
+            sb.AppendLine("<h2>2. Complete 42 Business KPI Summary</h2>");
             sb.AppendLine("<table><tr><th style='width:50px;'>#</th><th>Metric Name</th><th style='text-align:right;'>Value</th><th>Business Context & Notes</th></tr>");
             sb.AppendLine($"<tr><td>1</td><td>Total Stock Value</td><td class='value'>{FormatCurr(_model.TotalStockCostValue)}</td><td>Valued at Cost Price ({_model.TotalStockItemCount:N0} Items, {_model.TotalStockQuantity:N0} Units)</td></tr>");
             sb.AppendLine($"<tr><td>2</td><td>Stock Profit Potential</td><td class='value'>{FormatCurr(_model.StockProfitPotential)}</td><td>Retail Value: {FormatCurr(_model.TotalStockRetailValue)}</td></tr>");
@@ -1868,7 +1878,8 @@ namespace PosBranch_Win.Dashboard
             sb.AppendLine($"<tr><td>37</td><td>Manual Party Balance</td><td class='value'>{FormatCurr(_model.TotalManualBalance)}</td><td>Cust: {FormatCurr(_model.ManualCustomerBalance)} | Supp: {FormatCurr(_model.ManualVendorBalance)} ({_model.ManualBalanceCount} Open Entries)</td></tr>");
             sb.AppendLine($"<tr><td>38</td><td>Cash In / Cash Out Flow</td><td class='value'>{FormatCurr(_model.NetCashFlow)}</td><td>In: {FormatCurr(_model.TotalCashIn)} | Out: {FormatCurr(_model.TotalCashOut)} (Net)</td></tr>");
             sb.AppendLine($"<tr><td>39</td><td>Daily Cash vs Bank Sales</td><td class='value'>{FormatCurr((_model.DailyCashSales + _model.DailyBankSales) > 0 ? (_model.DailyCashSales + _model.DailyBankSales) : _model.TotalSalesRevenue)}</td><td>Cash: {FormatCurr(_model.DailyCashSales)} | Bank/UPI: {FormatCurr(_model.DailyBankSales)}</td></tr>");
-            sb.AppendLine($"<tr><td>40</td><td>Counter Cash Shortage / Excess</td><td class='value' style='color:{(_model.NetCashDifference < 0 ? "#dc2626" : "#16a34a")};'>{(_model.NetCashDifference == 0 ? "₹ 0.00 (Balanced)" : (_model.NetCashDifference < 0 ? $"- {FormatCurr(Math.Abs(_model.NetCashDifference))} (Shortage)" : $"+ {FormatCurr(_model.NetCashDifference)} (Excess)"))}</td><td>Expected: {FormatCurr(_model.TotalExpectedCash)} | Counted: {FormatCurr(_model.TotalCountedCash)} ({_model.TotalShiftClosingCount} Shifts)</td></tr>");
+            sb.AppendLine($"<tr><td>41</td><td>Counter Cash Shortage / Excess</td><td class='value' style='color:{(_model.NetCashDifference < 0 ? "#dc2626" : "#16a34a")};'>{(_model.NetCashDifference == 0 ? "₹ 0.00 (Balanced)" : (_model.NetCashDifference < 0 ? $"- {FormatCurr(Math.Abs(_model.NetCashDifference))} (Shortage)" : $"+ {FormatCurr(_model.NetCashDifference)} (Excess)"))}</td><td>Expected: {FormatCurr(_model.TotalExpectedCash)} | Counted: {FormatCurr(_model.TotalCountedCash)} ({_model.TotalShiftClosingCount} Shifts)</td></tr>");
+            sb.AppendLine($"<tr><td>42</td><td>Date-wise Reports Hub</td><td class='value'>8 Reports</td><td>Date-wise Purchase, Sales, Stock Adj, Profit, Expense, Item Stock, Customer & Vendor Payments</td></tr>");
             sb.AppendLine("</table>");
 
             sb.AppendLine("</div></body></html>");
@@ -1919,7 +1930,8 @@ namespace PosBranch_Win.Dashboard
             sb.AppendLine($"37,Manual Party Balance,\"{_model.TotalManualBalance:N2}\",Cust: {_model.ManualCustomerBalance:N2} | Supp: {_model.ManualVendorBalance:N2} (Entries: {_model.ManualBalanceCount})");
             sb.AppendLine($"38,Cash In / Cash Out Flow,\"{_model.NetCashFlow:N2}\",In: {_model.TotalCashIn:N2} | Out: {_model.TotalCashOut:N2} (Net)");
             sb.AppendLine($"39,Daily Cash vs Bank Sales,\"{((_model.DailyCashSales + _model.DailyBankSales) > 0 ? (_model.DailyCashSales + _model.DailyBankSales) : _model.TotalSalesRevenue):N2}\",Cash: {_model.DailyCashSales:N2} | Bank/UPI: {_model.DailyBankSales:N2}");
-            sb.AppendLine($"40,Counter Cash Shortage / Excess,\"{(_model.NetCashDifference == 0 ? "0.00 (Balanced)" : (_model.NetCashDifference < 0 ? $"-{Math.Abs(_model.NetCashDifference):N2} (Shortage)" : $"+{_model.NetCashDifference:N2} (Excess)"))}\",Expected: {_model.TotalExpectedCash:N2} | Counted: {_model.TotalCountedCash:N2}");
+            sb.AppendLine($"41,Counter Cash Shortage / Excess,\"{(_model.NetCashDifference == 0 ? "0.00 (Balanced)" : (_model.NetCashDifference < 0 ? $"-{Math.Abs(_model.NetCashDifference):N2} (Shortage)" : $"+{_model.NetCashDifference:N2} (Excess)"))}\",Expected: {_model.TotalExpectedCash:N2} | Counted: {_model.TotalCountedCash:N2}");
+            sb.AppendLine($"42,Date-wise Reports Hub,\"8 Reports\",Date-wise Sales/Purchase/Stock/Expense/Payments");
 
             // Growth Matrix in CSV
             sb.AppendLine();
