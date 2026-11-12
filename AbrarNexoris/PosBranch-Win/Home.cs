@@ -117,6 +117,14 @@ namespace PosBranch_Win
             new ReportNavigatorDefinition("Analysis", "Day Book", "DayBook"),
             new ReportNavigatorDefinition("Analysis", "Counter Closing Report", "ShiftReconciliationReport"),
             new ReportNavigatorDefinition("Analysis", "Bank Statement", "BankStatementReport"),
+            new ReportNavigatorDefinition("Date-wise", "Date-wise Purchase Report", "DatewisePurchaseReport"),
+            new ReportNavigatorDefinition("Date-wise", "Date-wise Sales Report", "DatewiseSalesReport"),
+            new ReportNavigatorDefinition("Date-wise", "Date-wise Stock Adjustment Report", "DatewiseStockAdjustmentReport"),
+            new ReportNavigatorDefinition("Date-wise", "Date-wise Profit Report", "DatewiseProfitReport"),
+            new ReportNavigatorDefinition("Date-wise", "Date-wise Expense Report", "DatewiseExpenseReport"),
+            new ReportNavigatorDefinition("Date-wise", "Date-wise Item Stock Report", "DatewiseItemStockReport"),
+            new ReportNavigatorDefinition("Date-wise", "Date-wise Customer Payment Report", "DatewiseCustomerPaymentReport"),
+            new ReportNavigatorDefinition("Date-wise", "Date-wise Vendor Payment Report", "DatewiseVendorPaymentReport"),
             new ReportNavigatorDefinition("Others", "Manual Party Balance Report", "ManualPartyBalanceReport"),
             new ReportNavigatorDefinition("Others", "Combined Party Balance Report", "CombinedPartyBalanceReport"),
             new ReportNavigatorDefinition("GST Reports", "Input GST Report", "InputGSTReport"),
@@ -6585,6 +6593,7 @@ namespace PosBranch_Win
                         else if (group.Key == "Grp_Customer") group.Settings.AppearancesSmall.HeaderAppearance.Image = PosBranch_Win.Properties.Resources.icons8_roles_96;
                         else if (group.Key == "Grp_Vendor") group.Settings.AppearancesSmall.HeaderAppearance.Image = PosBranch_Win.Properties.Resources.transaction;
                         else if (group.Key == "Grp_Analysis") group.Settings.AppearancesSmall.HeaderAppearance.Image = PosBranch_Win.Properties.Resources.profit_and_loss;
+                        else if (group.Key == "Grp_Date-wise") group.Settings.AppearancesSmall.HeaderAppearance.Image = PosBranch_Win.Properties.Resources.yearly_report;
                         else if (group.Key == "Grp_Others") group.Settings.AppearancesSmall.HeaderAppearance.Image = PosBranch_Win.Properties.Resources.report1;
                     } catch { }
 
@@ -6815,13 +6824,37 @@ namespace PosBranch_Win
             ClearActiveReportNavigatorItem();
         }
 
-        private void ShowReportNavigator(string targetGroupKey = null)
+        public static void OpenReportCategory(string targetGroupKey)
+        {
+            try
+            {
+                var home = Application.OpenForms.OfType<Home>().FirstOrDefault();
+                if (home != null)
+                {
+                    if (home.InvokeRequired)
+                    {
+                        home.BeginInvoke(new Action(() => home.ShowReportNavigator(targetGroupKey)));
+                    }
+                    else
+                    {
+                        home.ShowReportNavigator(targetGroupKey);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to open report category: {ex.Message}");
+            }
+        }
+
+        public void ShowReportNavigator(string targetGroupKey = null)
         {
             if (ultraExplorerBarSideMenu != null)
                 ultraExplorerBarSideMenu.Visible = false;
 
             if (panelReportNavigatorWrapper != null)
                 panelReportNavigatorWrapper.Visible = true;
+                panelReportNavigatorWrapper.BringToFront();
 
             _isReportNavigatorVisible = true;
             ApplyReportNavigatorPermissions();

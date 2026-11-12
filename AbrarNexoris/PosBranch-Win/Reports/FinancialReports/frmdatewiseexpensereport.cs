@@ -155,6 +155,10 @@ namespace PosBranch_Win.Reports.FinancialReports
             btnExpenseLedgerPicker.Click += BtnExpenseLedgerPicker_Click;
 
             ultraComboPeriodMode.ValueChanged += UltraComboPeriodMode_ValueChanged;
+            dtFrom.ValueChanged += (s, e) => { if (!_isLoading) LoadReport(); };
+            dtTo.ValueChanged += (s, e) => { if (!_isLoading) LoadReport(); };
+            ultraComboMonth.ValueChanged += (s, e) => { if (!_isLoading) LoadReport(); };
+            ultraComboYear.ValueChanged += (s, e) => { if (!_isLoading) LoadReport(); };
             ultraComboViewMode.ValueChanged += (s, e) => { if (!_isLoading) LoadReport(); };
             ultraComboExpenseCategory.ValueChanged += (s, e) => { if (!_isLoading) LoadReport(); };
             ultraComboExpenseLedger.ValueChanged += (s, e) => { if (!_isLoading) LoadReport(); };
@@ -208,12 +212,13 @@ namespace PosBranch_Win.Reports.FinancialReports
                 SetupGrid();
                 InitializeGridFooter();
                 SetupHeaderDragToHideAndColumnChooser();
-                LoadReport();
             }
             finally
             {
                 _isLoading = false;
             }
+
+            LoadReport();
         }
 
         private void frmdatewiseexpensereport_FormClosing(object sender, FormClosingEventArgs e)
@@ -727,8 +732,8 @@ namespace PosBranch_Win.Reports.FinancialReports
             f.LedgerId          = ultraComboExpenseLedger.Value != null ? Convert.ToInt32(ultraComboExpenseLedger.Value) : 0;
             f.PaymentMode       = ultraComboPaymentMode.Value?.ToString() ?? "ALL";
             f.SearchText        = (txtSearch.Text ?? string.Empty).Trim();
-            f.CompanyId         = 1;
-            f.BranchId          = 0;
+            f.CompanyId         = SessionContext.CompanyId > 0 ? SessionContext.CompanyId : 0;
+            f.BranchId          = SessionContext.BranchId > 0 ? SessionContext.BranchId : 0;
 
             return f;
         }
