@@ -8065,8 +8065,9 @@ namespace PosBranch_Win.Transaction
                     }
                     else
                     {
-                        // Show error message
-                        MessageBox.Show("Error deleting purchase: " + message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        // Show validation / block warning message cleanly
+                        string displayMsg = message.StartsWith("Error: ") ? message.Substring(7).Trim() : message;
+                        MessageBox.Show(displayMsg, "Cannot Delete Purchase", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     }
                 }
             }

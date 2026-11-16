@@ -1179,6 +1179,57 @@ namespace Repository.TransactionRepository
                 }
                 trans = DataConnection.BeginTransaction();
 
+                // 1. Strict Accounting Rule: Block deleting if active Vendor Payment(s) exist for this purchase bill
+                string checkPaymentSql = @"
+                    SELECT DISTINCT VPM.VoucherId
+                    FROM VendorPaymentDetails VPD
+                    INNER JOIN VendorPaymentMaster VPM
+                        ON VPM.Id = VPD.PaymentMasterId AND VPM.BranchId = VPD.BranchId
+                    INNER JOIN PMaster PM
+                        ON PM.PurchaseNo = VPD.BillNo AND PM.BranchId = VPD.BranchId
+                       AND PM.LedgerID = VPM.VendorLedgerId
+                    WHERE VPD.BillNo = @PurchaseNo
+                      AND (@BranchId IS NULL OR @BranchId = 0 OR VPD.BranchId = @BranchId)
+                      AND (@FinYearId IS NULL OR @FinYearId = 0 OR PM.FinYearId = @FinYearId)
+                      AND ISNULL(PM.CancelFlag, 0) = 0
+                      AND ISNULL(VPD.CancelFlag, 0) = 0
+                      AND ISNULL(VPM.CancelFlag, 0) = 0";
+
+                var paymentVouchers = DataConnection.Query<int>(
+                    checkPaymentSql,
+                    new { PurchaseNo = purchaseNo, BranchId = branchId, FinYearId = finYearId },
+                    trans).ToList();
+
+                if (paymentVouchers != null && paymentVouchers.Count > 0)
+                {
+                    trans.Rollback();
+                    string vouchersList = string.Join(", ", paymentVouchers.Select(v => "#" + v));
+                    return $"Cannot delete Purchase Bill #{purchaseNo} because active Vendor Payment(s) [{vouchersList}] exist. Cancel the payment(s) first.";
+                }
+
+                // 2. Strict Accounting Rule: Block deleting if active Purchase Return(s) exist for this purchase bill
+                string checkReturnSql = @"
+                    SELECT DISTINCT PRM.PReturnNo
+                    FROM PReturnMaster PRM
+                    WHERE (PRM.InvoiceNo = CAST(@PurchaseNo AS VARCHAR(50)) 
+                        OR PRM.PInvoice = CAST(@PurchaseNo AS VARCHAR(50))
+                        OR (EXISTS (SELECT 1 FROM PMaster PM WHERE PM.PurchaseNo = @PurchaseNo AND (@BranchId IS NULL OR @BranchId = 0 OR PM.BranchId = @BranchId) AND PM.InvoiceNo = PRM.InvoiceNo AND PRM.LedgerID = PM.LedgerID)))
+                      AND (@BranchId IS NULL OR @BranchId = 0 OR PRM.BranchId = @BranchId)
+                      AND (@FinYearId IS NULL OR @FinYearId = 0 OR PRM.FinYearId = @FinYearId)
+                      AND ISNULL(PRM.CancelFlag, 0) = 0";
+
+                var returnNos = DataConnection.Query<int>(
+                    checkReturnSql,
+                    new { PurchaseNo = purchaseNo, BranchId = branchId, FinYearId = finYearId },
+                    trans).ToList();
+
+                if (returnNos != null && returnNos.Count > 0)
+                {
+                    trans.Rollback();
+                    string returnsList = string.Join(", ", returnNos.Select(r => "#" + r));
+                    return $"Cannot delete Purchase Bill #{purchaseNo} because active Purchase Return(s) [{returnsList}] exist. Cancel the purchase return first.";
+                }
+
                 // Reverse stock in PriceSettings for all items in this purchase invoice BEFORE deleting
                 List<PurchaseDetails> oldPurchaseDetails = GetOldPurchaseDetails(purchaseNo, finYearId, trans);
                 if (oldPurchaseDetails != null && oldPurchaseDetails.Count > 0)
