@@ -103,6 +103,7 @@
     <Compile Include="Report\TrialBalanceModel.cs" />
     <Compile Include="Report\CashBankBookModel.cs" />
     <Compile Include="Report\GeneralLedgerModel.cs" />
+    <Compile Include="Report\DailyFinancialMovementModel.cs" />
     <Compile Include="Report\BankStatementReportModel.cs" />
     <Compile Include="Report\CombinedPartyBalanceReportModel.cs" />
     <Compile Include="Report\CustomerOutstandingReportModel.cs" />

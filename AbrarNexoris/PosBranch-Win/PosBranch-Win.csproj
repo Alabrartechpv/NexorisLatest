@@ -392,6 +392,12 @@
     <Compile Include="Reports\FinancialReports\FrmGeneralLedger.Designer.cs">
       <DependentUpon>FrmGeneralLedger.cs</DependentUpon>
     </Compile>
+    <Compile Include="Reports\FinancialReports\FrmDailyFinancialMovement.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Reports\FinancialReports\FrmDailyFinancialMovement.Designer.cs">
+      <DependentUpon>FrmDailyFinancialMovement.cs</DependentUpon>
+    </Compile>
     <Compile Include="Reports\FinancialReports\FrmBankStatementReport.cs">
       <SubType>Form</SubType>
     </Compile>

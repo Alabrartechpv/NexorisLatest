@@ -114,6 +114,7 @@
     <Compile Include="ReportRepository\TrialBalanceRepository.cs" />
     <Compile Include="ReportRepository\CashBankBookRepository.cs" />
     <Compile Include="ReportRepository\GeneralLedgerRepository.cs" />
+    <Compile Include="ReportRepository\DailyFinancialMovementRepository.cs" />
     <Compile Include="ReportRepository\BankStatementReportRepository.cs" />
     <Compile Include="ReportRepository\CombinedPartyBalanceReportRepository.cs" />
     <Compile Include="ReportRepository\CustomerOutstandingReportRepository.cs" />
