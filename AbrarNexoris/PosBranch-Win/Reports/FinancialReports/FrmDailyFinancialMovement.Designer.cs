@@ -39,10 +39,12 @@ namespace PosBranch_Win.Reports.FinancialReports
             this.btnLast7Days = new System.Windows.Forms.Button();
             this.btnThisMonth = new System.Windows.Forms.Button();
             this.btnGenerate = new System.Windows.Forms.Button();
+            this.btnToggleView = new System.Windows.Forms.Button();
             this.btnExportCsv = new System.Windows.Forms.Button();
             this.btnPrint = new System.Windows.Forms.Button();
 
             this.ultraPanelMaster = new Infragistics.Win.Misc.UltraPanel();
+            this.ultraGridDaywise = new Infragistics.Win.UltraWinGrid.UltraGrid();
             this.splitContainerMain = new System.Windows.Forms.SplitContainer();
 
             // Left Side: Liabilities
@@ -73,6 +75,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             this.ultraPanelControls.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.dtFromDate)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.dtToDate)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.ultraGridDaywise)).BeginInit();
             this.ultraPanelMaster.ClientArea.SuspendLayout();
             this.ultraPanelMaster.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)(this.splitContainerMain)).BeginInit();
@@ -106,6 +109,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             this.ultraPanelControls.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
             this.ultraPanelControls.ClientArea.Controls.Add(this.btnPrint);
             this.ultraPanelControls.ClientArea.Controls.Add(this.btnExportCsv);
+            this.ultraPanelControls.ClientArea.Controls.Add(this.btnToggleView);
             this.ultraPanelControls.ClientArea.Controls.Add(this.btnGenerate);
             this.ultraPanelControls.ClientArea.Controls.Add(this.btnThisMonth);
             this.ultraPanelControls.ClientArea.Controls.Add(this.btnLast7Days);
@@ -249,12 +253,25 @@ namespace PosBranch_Win.Reports.FinancialReports
             this.btnGenerate.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
             this.btnGenerate.Font = new System.Drawing.Font("Segoe UI Semibold", 9F, System.Drawing.FontStyle.Bold);
             this.btnGenerate.ForeColor = System.Drawing.Color.White;
-            this.btnGenerate.Location = new System.Drawing.Point(842, 8);
+            this.btnGenerate.Location = new System.Drawing.Point(838, 8);
             this.btnGenerate.Name = "btnGenerate";
-            this.btnGenerate.Size = new System.Drawing.Size(95, 27);
+            this.btnGenerate.Size = new System.Drawing.Size(85, 27);
             this.btnGenerate.TabIndex = 10;
             this.btnGenerate.Text = "View / Load";
             this.btnGenerate.UseVisualStyleBackColor = false;
+            // 
+            // btnToggleView
+            // 
+            this.btnToggleView.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(232)))), ((int)(((byte)(241)))), ((int)(((byte)(252)))));
+            this.btnToggleView.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnToggleView.Font = new System.Drawing.Font("Segoe UI", 8.25F, System.Drawing.FontStyle.Bold);
+            this.btnToggleView.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(14)))), ((int)(((byte)(47)))), ((int)(((byte)(108)))));
+            this.btnToggleView.Location = new System.Drawing.Point(928, 8);
+            this.btnToggleView.Name = "btnToggleView";
+            this.btnToggleView.Size = new System.Drawing.Size(140, 27);
+            this.btnToggleView.TabIndex = 11;
+            this.btnToggleView.Text = "Day-wise Timeline";
+            this.btnToggleView.UseVisualStyleBackColor = false;
 
             // 
             // btnExportCsv
@@ -293,6 +310,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             appearanceMaster.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(118)))), ((int)(((byte)(154)))), ((int)(((byte)(198)))));
             this.ultraPanelMaster.Appearance = appearanceMaster;
             this.ultraPanelMaster.BorderStyle = Infragistics.Win.UIElementBorderStyle.Solid;
+            this.ultraPanelMaster.ClientArea.Controls.Add(this.ultraGridDaywise);
             this.ultraPanelMaster.ClientArea.Controls.Add(this.splitContainerMain);
             this.ultraPanelMaster.ClientArea.Controls.Add(this.ultraPanelGridFooter);
             this.ultraPanelMaster.Dock = System.Windows.Forms.DockStyle.Fill;
@@ -300,6 +318,15 @@ namespace PosBranch_Win.Reports.FinancialReports
             this.ultraPanelMaster.Name = "ultraPanelMaster";
             this.ultraPanelMaster.Size = new System.Drawing.Size(1264, 617);
             this.ultraPanelMaster.TabIndex = 1;
+            // 
+            // ultraGridDaywise
+            // 
+            this.ultraGridDaywise.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.ultraGridDaywise.Location = new System.Drawing.Point(0, 0);
+            this.ultraGridDaywise.Name = "ultraGridDaywise";
+            this.ultraGridDaywise.Size = new System.Drawing.Size(1264, 583);
+            this.ultraGridDaywise.TabIndex = 2;
+            this.ultraGridDaywise.Visible = false;
 
             // 
             // splitContainerMain
@@ -609,6 +636,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             this.pnlAssetsHeader.ClientArea.ResumeLayout(false);
             this.pnlAssetsHeader.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)(this.ultraGridAssets)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.ultraGridDaywise)).EndInit();
             this.panelAssetsTotal.ClientArea.ResumeLayout(false);
             this.panelAssetsTotal.ResumeLayout(false);
             this.ultraPanelGridFooter.ClientArea.ResumeLayout(false);
@@ -629,10 +657,12 @@ namespace PosBranch_Win.Reports.FinancialReports
         private System.Windows.Forms.Button btnLast7Days;
         private System.Windows.Forms.Button btnThisMonth;
         private System.Windows.Forms.Button btnGenerate;
+        private System.Windows.Forms.Button btnToggleView;
         private System.Windows.Forms.Button btnExportCsv;
         private System.Windows.Forms.Button btnPrint;
 
         private Infragistics.Win.Misc.UltraPanel ultraPanelMaster;
+        private Infragistics.Win.UltraWinGrid.UltraGrid ultraGridDaywise;
         private System.Windows.Forms.SplitContainer splitContainerMain;
 
         private Infragistics.Win.Misc.UltraPanel pnlLiabilitiesContainer;

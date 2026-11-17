@@ -35,6 +35,7 @@ namespace PosBranch_Win.Reports.FinancialReports
         private readonly DailyFinancialMovementRepository _repository;
         private DailyFinancialMovementReport _currentReport;
         private bool _isPopulatingCombo = false;
+        private bool _isDaywiseView = false;
 
         public FrmDailyFinancialMovement()
         {
@@ -45,12 +46,14 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             SetupGridTheme(ultraGridLiabilities);
             SetupGridTheme(ultraGridAssets);
+            SetupGridTheme(ultraGridDaywise);
 
             this.Load += FrmDailyFinancialMovement_Load;
             this.KeyPreview = true;
             this.KeyDown += FrmDailyFinancialMovement_KeyDown;
 
             btnGenerate.Click += (s, e) => LoadData();
+            btnToggleView.Click += (s, e) => ToggleViewMode();
             btnToday.Click += (s, e) => SetPreset(DateTime.Today, DateTime.Today);
             btnYesterday.Click += (s, e) => SetPreset(DateTime.Today.AddDays(-1), DateTime.Today.AddDays(-1));
             btnLast7Days.Click += (s, e) => SetPreset(DateTime.Today.AddDays(-6), DateTime.Today);
@@ -63,6 +66,8 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             ultraGridLiabilities.DoubleClickRow += UltraGrid_DoubleClickRow;
             ultraGridAssets.DoubleClickRow += UltraGrid_DoubleClickRow;
+            ultraGridDaywise.DoubleClickRow += UltraGridDaywise_DoubleClickRow;
+            ultraGridDaywise.InitializeRow += UltraGridDaywise_InitializeRow;
         }
 
         private void SetupGridTheme(UltraGrid grid)
@@ -241,18 +246,42 @@ namespace PosBranch_Win.Reports.FinancialReports
             decimal totalLoansDrawn = _currentReport.DayRows.Sum(d => d.LoansClosing - d.LoansOpening > 0 ? d.LoansClosing - d.LoansOpening : 0);
             decimal totalLoansRepaid = _currentReport.DayRows.Sum(d => d.LoansOpening - d.LoansClosing > 0 ? d.LoansOpening - d.LoansClosing : 0);
 
-            // Bind Liabilities Table
+            // Bind Liabilities Table (from full GroupRows if available, or fallback)
             DataTable dtLiab = CreateBalanceSheetTable();
-            AddBalanceSheetRow(dtLiab, "Sundry Creditors (Supplier / Vendor Udhaar)", firstDay.CreditorsOpening, totalCreditPurchases, totalCreditorsPaid, lastDay.CreditorsClosing, "CREDITORS");
-            AddBalanceSheetRow(dtLiab, "Bank Overdraft & Loans", firstDay.LoansOpening, totalLoansDrawn, totalLoansRepaid, lastDay.LoansClosing, "LOANS");
+            var liabGroups = _currentReport.GroupRows?.Where(g => g.Side == "LIABILITIES").ToList();
+            if (liabGroups != null && liabGroups.Count > 0)
+            {
+                foreach (var g in liabGroups)
+                {
+                    string categoryCode = g.GroupID == 17 ? "CREDITORS" : (g.GroupID >= 25 && g.GroupID <= 27 ? "LOANS" : "LIAB_" + g.GroupID);
+                    AddBalanceSheetRow(dtLiab, g.GroupName, g.OpeningBal, g.CreditTotal, g.DebitTotal, g.ClosingBal, categoryCode);
+                }
+            }
+            else
+            {
+                AddBalanceSheetRow(dtLiab, "Sundry Creditors (Supplier / Vendor Udhaar)", firstDay.CreditorsOpening, totalCreditPurchases, totalCreditorsPaid, lastDay.CreditorsClosing, "CREDITORS");
+                AddBalanceSheetRow(dtLiab, "Bank Overdraft & Loans", firstDay.LoansOpening, totalLoansDrawn, totalLoansRepaid, lastDay.LoansClosing, "LOANS");
+            }
             BindSideGrid(ultraGridLiabilities, dtLiab, isAsset: false);
 
-            // Bind Assets Table
+            // Bind Assets Table (from full GroupRows if available, or fallback)
             DataTable dtAssets = CreateBalanceSheetTable();
-            AddBalanceSheetRow(dtAssets, "Cash in Hand (Counter Drawers & Safe)", firstDay.CashOpening, totalCashIn, totalCashOut, lastDay.CashClosing, "CASH");
-            AddBalanceSheetRow(dtAssets, "Bank Accounts & UPI / Card Machines", firstDay.BankOpening, totalBankIn, totalBankOut, lastDay.BankClosing, "BANK");
-            AddBalanceSheetRow(dtAssets, "Stock on Hand (Shelf & Godown Valuation)", firstDay.StockOpening, totalStockIn, totalStockOut, lastDay.StockClosing, "STOCK");
-            AddBalanceSheetRow(dtAssets, "Sundry Debtors (Customer Udhaar Book)", firstDay.DebtorsOpening, totalCreditSales, totalDebtorsColl, lastDay.DebtorsClosing, "DEBTORS");
+            var assetGroups = _currentReport.GroupRows?.Where(g => g.Side == "ASSETS").ToList();
+            if (assetGroups != null && assetGroups.Count > 0)
+            {
+                foreach (var g in assetGroups)
+                {
+                    string categoryCode = g.GroupID == 14 ? "CASH" : (g.GroupID == 15 ? "BANK" : (g.GroupID == 16 ? "DEBTORS" : (g.GroupID == 18 ? "STOCK" : "ASSET_" + g.GroupID)));
+                    AddBalanceSheetRow(dtAssets, g.GroupName, g.OpeningBal, g.DebitTotal, g.CreditTotal, g.ClosingBal, categoryCode);
+                }
+            }
+            else
+            {
+                AddBalanceSheetRow(dtAssets, "Cash in Hand (Counter Drawers & Safe)", firstDay.CashOpening, totalCashIn, totalCashOut, lastDay.CashClosing, "CASH");
+                AddBalanceSheetRow(dtAssets, "Bank Accounts & UPI / Card Machines", firstDay.BankOpening, totalBankIn, totalBankOut, lastDay.BankClosing, "BANK");
+                AddBalanceSheetRow(dtAssets, "Stock on Hand (Shelf & Godown Valuation)", firstDay.StockOpening, totalStockIn, totalStockOut, lastDay.StockClosing, "STOCK");
+                AddBalanceSheetRow(dtAssets, "Sundry Debtors (Customer Udhaar Book)", firstDay.DebtorsOpening, totalCreditSales, totalDebtorsColl, lastDay.DebtorsClosing, "DEBTORS");
+            }
             BindSideGrid(ultraGridAssets, dtAssets, isAsset: true);
 
             // Sub-Totals inside containers
@@ -264,7 +293,11 @@ namespace PosBranch_Win.Reports.FinancialReports
             lblTotalAssets.Text = "Total Assets: ₹ " + lastDay.TotalAssets.ToString("N2");
 
             string sign = _currentReport.Summary.PeriodNetWorthGrowth >= 0 ? "+" : "";
-            lblNetPositionBadge.Text = $"NET STORE WORTH: ₹ {lastDay.NetStorePosition:N2}  (PERIOD GAIN: {sign}₹ {_currentReport.Summary.PeriodNetWorthGrowth:N2})";
+            string assetSign = _currentReport.Summary.PeriodAssetGrowth >= 0 ? "+" : "";
+            lblNetPositionBadge.Text = $"NET STORE WORTH: ₹ {lastDay.NetStorePosition:N2} (GAIN: {sign}₹ {_currentReport.Summary.PeriodNetWorthGrowth:N2}) | ASSET GROWTH: {assetSign}₹ {_currentReport.Summary.PeriodAssetGrowth:N2} ({assetSign}{_currentReport.Summary.PeriodAssetGrowthPct:N2}%)";
+
+            // Update Day-wise Grid data
+            BindDaywiseGrid();
         }
 
         private void DisplaySingleDay(DailyFinancialMovementDayRow day)
@@ -294,7 +327,172 @@ namespace PosBranch_Win.Reports.FinancialReports
             lblTotalAssets.Text = "Total Assets: ₹ " + day.TotalAssets.ToString("N2");
 
             string sign = day.DailyNetChange >= 0 ? "+" : "";
-            lblNetPositionBadge.Text = $"NET STORE WORTH: ₹ {day.NetStorePosition:N2}  (DAY GAIN: {sign}₹ {day.DailyNetChange:N2})";
+            string assetSign = day.DailyAssetChange >= 0 ? "+" : "";
+            lblNetPositionBadge.Text = $"NET STORE WORTH: ₹ {day.NetStorePosition:N2} (DAY GAIN: {sign}₹ {day.DailyNetChange:N2}) | ASSET PROGRESSION: {assetSign}₹ {day.DailyAssetChange:N2} ({assetSign}{day.DailyAssetChangePct:N2}%)";
+        }
+
+        private void ToggleViewMode()
+        {
+            _isDaywiseView = !_isDaywiseView;
+
+            if (_isDaywiseView)
+            {
+                ultraGridDaywise.Visible = true;
+                ultraGridDaywise.BringToFront();
+                splitContainerMain.Visible = false;
+                btnToggleView.Text = "Balance Sheet View";
+                lblDaySelect.Visible = false;
+                cmbDaySelect.Visible = false;
+                BindDaywiseGrid();
+            }
+            else
+            {
+                ultraGridDaywise.Visible = false;
+                splitContainerMain.Visible = true;
+                splitContainerMain.BringToFront();
+                btnToggleView.Text = "Day-wise Timeline";
+                lblDaySelect.Visible = true;
+                cmbDaySelect.Visible = true;
+                DisplayCurrentSelection();
+            }
+        }
+
+        private void BindDaywiseGrid()
+        {
+            if (_currentReport == null || _currentReport.DayRows == null || _currentReport.DayRows.Count == 0)
+            {
+                ultraGridDaywise.DataSource = null;
+                return;
+            }
+
+            DataTable dt = new DataTable();
+            dt.Columns.Add("TxDate", typeof(DateTime));
+            dt.Columns.Add("DayName", typeof(string));
+            dt.Columns.Add("AssetOpening", typeof(decimal));
+            dt.Columns.Add("AssetAdditions", typeof(decimal));
+            dt.Columns.Add("AssetReductions", typeof(decimal));
+            dt.Columns.Add("TotalAssets", typeof(decimal));
+            dt.Columns.Add("DailyAssetChange", typeof(decimal));
+            dt.Columns.Add("DailyAssetChangePct", typeof(decimal));
+            dt.Columns.Add("LiabOpening", typeof(decimal));
+            dt.Columns.Add("TotalLiabilities", typeof(decimal));
+            dt.Columns.Add("DailyLiabChange", typeof(decimal));
+            dt.Columns.Add("NetStorePosition", typeof(decimal));
+            dt.Columns.Add("DailyNetChange", typeof(decimal));
+
+            foreach (var r in _currentReport.DayRows)
+            {
+                dt.Rows.Add(
+                    r.TxDate,
+                    r.DayName,
+                    r.AssetOpening,
+                    r.AssetAdditions,
+                    r.AssetReductions,
+                    r.TotalAssets,
+                    r.DailyAssetChange,
+                    r.DailyAssetChangePct,
+                    r.LiabOpening,
+                    r.TotalLiabilities,
+                    r.DailyLiabChange,
+                    r.NetStorePosition,
+                    r.DailyNetChange
+                );
+            }
+
+            ultraGridDaywise.DataSource = dt;
+            if (ultraGridDaywise.DisplayLayout.Bands.Count > 0)
+            {
+                var b = ultraGridDaywise.DisplayLayout.Bands[0];
+                b.ColHeadersVisible = true;
+                ultraGridDaywise.DisplayLayout.Override.HeaderPlacement = HeaderPlacement.OncePerRowIsland;
+
+                FormatDaywiseCol(b, "TxDate", "Date", 90, isDate: true);
+                FormatDaywiseCol(b, "DayName", "Day", 70);
+                FormatDaywiseCol(b, "AssetOpening", "Asset Opn (12 AM)", 125);
+                FormatDaywiseCol(b, "AssetAdditions", "Asset In (+)", 105);
+                FormatDaywiseCol(b, "AssetReductions", "Asset Out (-)", 105);
+                FormatDaywiseCol(b, "TotalAssets", "Asset Close (12 AM)", 135, isBold: true, foreColor: DebitGreen);
+                FormatDaywiseCol(b, "DailyAssetChange", "Asset Growth (₹)", 115, isBold: true, format: "+#,##0.00;-#,##0.00;0.00");
+                FormatDaywiseCol(b, "DailyAssetChangePct", "Asset Growth %", 95, isBold: true, format: "+0.00%;-0.00%;0.00%");
+                FormatDaywiseCol(b, "LiabOpening", "Liab Opn (12 AM)", 125);
+                FormatDaywiseCol(b, "TotalLiabilities", "Liab Close (12 AM)", 135, isBold: true, foreColor: CreditRed);
+                FormatDaywiseCol(b, "DailyLiabChange", "Liab Change", 105, isBold: true, format: "+#,##0.00;-#,##0.00;0.00");
+                FormatDaywiseCol(b, "NetStorePosition", "Net Store Worth", 125, isBold: true);
+                FormatDaywiseCol(b, "DailyNetChange", "Day Net Gain", 110, isBold: true, format: "+#,##0.00;-#,##0.00;0.00");
+            }
+        }
+
+        private void FormatDaywiseCol(UltraGridBand band, string colKey, string caption, int width, bool isBold = false, Color? foreColor = null, bool isDate = false, string format = "#,##0.00")
+        {
+            if (band.Columns.Exists(colKey))
+            {
+                var col = band.Columns[colKey];
+                col.Header.Caption = caption;
+                col.Width = width;
+                col.Header.Appearance.BackColor = GridHeaderBlue;
+                col.Header.Appearance.BackColor2 = GridHeaderBlueDark;
+                col.Header.Appearance.BackGradientStyle = GradientStyle.Vertical;
+                col.Header.Appearance.ForeColor = Color.White;
+                col.Header.Appearance.FontData.Bold = DefaultableBoolean.True;
+                col.Header.Appearance.TextHAlign = HAlign.Center;
+
+                if (isDate)
+                {
+                    col.Format = "dd-MM-yyyy";
+                    col.CellAppearance.TextHAlign = HAlign.Center;
+                }
+                else if (col.DataType == typeof(decimal))
+                {
+                    col.Format = format;
+                    col.CellAppearance.TextHAlign = HAlign.Right;
+                }
+
+                if (isBold) col.CellAppearance.FontData.Bold = DefaultableBoolean.True;
+                if (foreColor.HasValue) col.CellAppearance.ForeColor = foreColor.Value;
+            }
+        }
+
+        private void UltraGridDaywise_InitializeRow(object sender, InitializeRowEventArgs e)
+        {
+            if (e.Row == null || !e.Row.IsDataRow) return;
+
+            if (e.Row.Cells.Exists("DailyAssetChange"))
+            {
+                decimal change = Convert.ToDecimal(e.Row.Cells["DailyAssetChange"].Value ?? 0);
+                if (change > 0)
+                {
+                    e.Row.Cells["DailyAssetChange"].Appearance.ForeColor = DebitGreen;
+                    if (e.Row.Cells.Exists("DailyAssetChangePct")) e.Row.Cells["DailyAssetChangePct"].Appearance.ForeColor = DebitGreen;
+                }
+                else if (change < 0)
+                {
+                    e.Row.Cells["DailyAssetChange"].Appearance.ForeColor = CreditRed;
+                    if (e.Row.Cells.Exists("DailyAssetChangePct")) e.Row.Cells["DailyAssetChangePct"].Appearance.ForeColor = CreditRed;
+                }
+            }
+
+            if (e.Row.Cells.Exists("DailyNetChange"))
+            {
+                decimal netChange = Convert.ToDecimal(e.Row.Cells["DailyNetChange"].Value ?? 0);
+                e.Row.Cells["DailyNetChange"].Appearance.ForeColor = netChange >= 0 ? DebitGreen : CreditRed;
+            }
+        }
+
+        private void UltraGridDaywise_DoubleClickRow(object sender, DoubleClickRowEventArgs e)
+        {
+            if (e.Row == null || !e.Row.IsDataRow) return;
+            DateTime targetDate = Convert.ToDateTime(e.Row.Cells["TxDate"].Value);
+
+            // Switch to single-day Balance Sheet view
+            for (int i = 1; i < cmbDaySelect.Items.Count; i++)
+            {
+                if (cmbDaySelect.Items[i].ToString().StartsWith(targetDate.ToString("dd-MM-yyyy")))
+                {
+                    ToggleViewMode();
+                    cmbDaySelect.SelectedIndex = i;
+                    return;
+                }
+            }
         }
 
         private DataTable CreateBalanceSheetTable()
@@ -531,17 +729,25 @@ namespace PosBranch_Win.Reports.FinancialReports
             using (SaveFileDialog sfd = new SaveFileDialog())
             {
                 sfd.Filter = "CSV Files (*.csv)|*.csv|All Files (*.*)|*.*";
-                sfd.FileName = $"BalanceSheetMovement_{dtFromDate.DateTime:yyyyMMdd}_{dtToDate.DateTime:yyyyMMdd}.csv";
+                sfd.FileName = $"AssetProgression_BalanceSheet_{dtFromDate.DateTime:yyyyMMdd}_{dtToDate.DateTime:yyyyMMdd}.csv";
                 if (sfd.ShowDialog() == DialogResult.OK)
                 {
                     StringBuilder sb = new StringBuilder();
-                    sb.AppendLine("Date,Cash Opn,Cash Close,Bank Close,Stock Close,Debtors Close,Total Assets,Creditors Close,Total Liabilities,Net Worth,Gain");
+                    sb.AppendLine("=== ASSET PROGRESSION & BALANCE SHEET MOVEMENT REPORT ===");
+                    sb.AppendLine($"Reporting Period: {dtFromDate.DateTime:dd-MM-yyyy} to {dtToDate.DateTime:dd-MM-yyyy}");
+                    sb.AppendLine($"Starting Assets (12 AM): ₹ {_currentReport.Summary.PeriodAssetOpening:F2}");
+                    sb.AppendLine($"Ending Assets (12 AM): ₹ {_currentReport.Summary.PeriodAssetClosing:F2}");
+                    sb.AppendLine($"Period Asset Growth: ₹ {_currentReport.Summary.PeriodAssetGrowth:F2} ({_currentReport.Summary.PeriodAssetGrowthPct:F2}%)");
+                    sb.AppendLine($"Ending Net Store Worth: ₹ {_currentReport.Summary.LatestNetStorePosition:F2} (Net Worth Gain: ₹ {_currentReport.Summary.PeriodNetWorthGrowth:F2})");
+                    sb.AppendLine();
+                    sb.AppendLine("Date,Day,Asset Opening (12 AM),Asset Inflow (+),Asset Outflow (-),Asset Closing (12 AM),Asset Growth (₹),Asset Growth %,Liab Opening (12 AM),Liab Closing (12 AM),Liab Growth (₹),Net Store Worth,Day Net Gain,Cash Close,Bank Close,Stock Close,Debtors Close,Creditors Close");
 
                     foreach (var r in _currentReport.DayRows)
                     {
-                        sb.AppendLine(string.Format("{0:dd-MM-yyyy},{1:F2},{2:F2},{3:F2},{4:F2},{5:F2},{6:F2},{7:F2},{8:F2},{9:F2},{10:F2}",
-                            r.TxDate, r.CashOpening, r.CashClosing, r.BankClosing, r.StockClosing, r.DebtorsClosing,
-                            r.TotalAssets, r.CreditorsClosing, r.TotalLiabilities, r.NetStorePosition, r.DailyNetChange));
+                        sb.AppendLine(string.Format("{0:dd-MM-yyyy},{1},{2:F2},{3:F2},{4:F2},{5:F2},{6:F2},{7:F2}%,{8:F2},{9:F2},{10:F2},{11:F2},{12:F2},{13:F2},{14:F2},{15:F2},{16:F2},{17:F2}",
+                            r.TxDate, r.DayName, r.AssetOpening, r.AssetAdditions, r.AssetReductions, r.TotalAssets, r.DailyAssetChange, r.DailyAssetChangePct,
+                            r.LiabOpening, r.TotalLiabilities, r.DailyLiabChange, r.NetStorePosition, r.DailyNetChange,
+                            r.CashClosing, r.BankClosing, r.StockClosing, r.DebtorsClosing, r.CreditorsClosing));
                     }
 
                     File.WriteAllText(sfd.FileName, sb.ToString(), Encoding.UTF8);
@@ -554,7 +760,14 @@ namespace PosBranch_Win.Reports.FinancialReports
         {
             try
             {
-                ultraGridAssets.PrintPreview();
+                if (_isDaywiseView && ultraGridDaywise != null)
+                {
+                    ultraGridDaywise.PrintPreview();
+                }
+                else
+                {
+                    ultraGridAssets.PrintPreview();
+                }
             }
             catch (Exception ex)
             {

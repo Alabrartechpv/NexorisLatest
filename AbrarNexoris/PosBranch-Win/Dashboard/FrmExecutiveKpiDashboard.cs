@@ -99,6 +99,7 @@ namespace PosBranch_Win.Dashboard
             InitGroupAndCategoryCombos();
             InitPeriodCombo();
             SetDefaultDates();
+            btnDailyMovement.Click += (s, ev) => DrillDown("DailyMovement");
             LoadDashboardData();
         }
 
@@ -553,7 +554,91 @@ namespace PosBranch_Win.Dashboard
             pnlScrollableContent.Controls.Add(dgvGrowth);
             currentY += dgvGrowth.Height + 8;
 
+            // ═══════════════════════════════════════════════════════════════════
+            // DAILY FINANCIAL MOVEMENT & ASSET PROGRESSION BANNER
+            // ═══════════════════════════════════════════════════════════════════
+            var pnlDailyMovement = CreateDailyMovementSection(containerWidth);
+            pnlDailyMovement.Location = new Point(leftMargin, currentY);
+            pnlScrollableContent.Controls.Add(pnlDailyMovement);
+            currentY += pnlDailyMovement.Height + 8;
+
             pnlScrollableContent.ResumeLayout(true);
+        }
+
+        private Panel CreateDailyMovementSection(int width)
+        {
+            var pnl = new Panel
+            {
+                Size = new Size(width, 42),
+                BackColor = Color.White,
+                Margin = new Padding(0)
+            };
+
+            pnl.Paint += (s, e) =>
+            {
+                using (var pen = new Pen(CardBorderColor, 1))
+                {
+                    e.Graphics.DrawRectangle(pen, 0, 0, width - 1, 41);
+                }
+            };
+
+            var lblIconTitle = new Label
+            {
+                Text = "📅 Daily Financial Movement & Asset Progression (12:00 AM Automatic Cutoff)",
+                Font = new Font("Segoe UI Semibold", 8.5F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(14, 47, 108),
+                Location = new Point(10, 4),
+                AutoSize = true
+            };
+            pnl.Controls.Add(lblIconTitle);
+
+            var lblDesc = new Label
+            {
+                Text = "Tracks daily 12 AM closing valuations for Cash, Bank, Debtors, Stock, Creditors & Net Store Worth.",
+                Font = new Font("Segoe UI", 7.5F),
+                ForeColor = SectionSubColor,
+                Location = new Point(12, 22),
+                AutoSize = true
+            };
+            pnl.Controls.Add(lblDesc);
+
+            int statsX = Math.Max(480, width - 460);
+            var lblAssets = new Label
+            {
+                Text = $"Assets (12 AM): {FormatCurr(_model.TotalAssets)}",
+                Font = new Font("Segoe UI Semibold", 8F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(27, 94, 32),
+                Location = new Point(statsX, 12),
+                AutoSize = true
+            };
+            pnl.Controls.Add(lblAssets);
+
+            var lblLiab = new Label
+            {
+                Text = $"Liabilities: {FormatCurr(_model.TotalLiabilities)}",
+                Font = new Font("Segoe UI Semibold", 8F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(198, 40, 40),
+                Location = new Point(statsX + 135, 12),
+                AutoSize = true
+            };
+            pnl.Controls.Add(lblLiab);
+
+            var btnOpen = new Button
+            {
+                Text = "View Daily Movement ➔",
+                Font = new Font("Segoe UI Semibold", 8F, FontStyle.Bold),
+                ForeColor = Color.FromArgb(14, 47, 108),
+                BackColor = Color.FromArgb(232, 246, 255),
+                FlatStyle = FlatStyle.Flat,
+                Cursor = Cursors.Hand,
+                Size = new Size(155, 26),
+                Location = new Point(width - 165, 8)
+            };
+            btnOpen.FlatAppearance.BorderColor = Color.FromArgb(118, 154, 198);
+            btnOpen.Click += (s, e) => DrillDown("DailyMovement");
+            pnl.Controls.Add(btnOpen);
+
+            return pnl;
         }
 
         private Panel CreateSectionHeader(string title, int kpiCount, int width)
@@ -955,6 +1040,12 @@ namespace PosBranch_Win.Dashboard
                     case "BalanceSheet":
                         formToOpen = new Reports.FinancialReports.FrmBalanceSheet();
                         title = "Balance Sheet";
+                        break;
+                    case "DailyMovement":
+                    case "DailyFinancialMovement":
+                    case "AssetProgression":
+                        formToOpen = new Reports.FinancialReports.FrmDailyFinancialMovement();
+                        title = "Daily Financial Movement & Asset Progression";
                         break;
                     case "VendorPaymentReport":
                         formToOpen = new Reports.FinancialReports.frmVendorPaymentReport();

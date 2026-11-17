@@ -20,6 +20,7 @@ namespace PosBranch_Win.Dashboard
             this.pnlTopHeader = new System.Windows.Forms.Panel();
             this.pnlFilters = new System.Windows.Forms.Panel();
             this.btnPrint = new System.Windows.Forms.Button();
+            this.btnDailyMovement = new System.Windows.Forms.Button();
             this.btnRefresh = new System.Windows.Forms.Button();
             this.btnApply = new System.Windows.Forms.Button();
             this.dtTo = new Infragistics.Win.UltraWinEditors.UltraDateTimeEditor();
@@ -60,6 +61,7 @@ namespace PosBranch_Win.Dashboard
             // pnlFilters
             // 
             this.pnlFilters.Anchor = ((System.Windows.Forms.AnchorStyles)((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right)));
+            this.pnlFilters.Controls.Add(this.btnDailyMovement);
             this.pnlFilters.Controls.Add(this.btnPrint);
             this.pnlFilters.Controls.Add(this.btnRefresh);
             this.pnlFilters.Controls.Add(this.btnApply);
@@ -73,10 +75,25 @@ namespace PosBranch_Win.Dashboard
             this.pnlFilters.Controls.Add(this.lblCategory);
             this.pnlFilters.Controls.Add(this.comboGroup);
             this.pnlFilters.Controls.Add(this.lblGroup);
-            this.pnlFilters.Location = new System.Drawing.Point(296, 4);
+            this.pnlFilters.Location = new System.Drawing.Point(170, 4);
             this.pnlFilters.Name = "pnlFilters";
-            this.pnlFilters.Size = new System.Drawing.Size(958, 38);
+            this.pnlFilters.Size = new System.Drawing.Size(1084, 38);
             this.pnlFilters.TabIndex = 2;
+            // 
+            // btnDailyMovement
+            // 
+            this.btnDailyMovement.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(232)))), ((int)(((byte)(246)))), ((int)(((byte)(255)))));
+            this.btnDailyMovement.Cursor = System.Windows.Forms.Cursors.Hand;
+            this.btnDailyMovement.FlatAppearance.BorderColor = System.Drawing.Color.FromArgb(((int)(((byte)(118)))), ((int)(((byte)(154)))), ((int)(((byte)(198)))));
+            this.btnDailyMovement.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnDailyMovement.Font = new System.Drawing.Font("Segoe UI Semibold", 8F, System.Drawing.FontStyle.Bold);
+            this.btnDailyMovement.ForeColor = System.Drawing.Color.FromArgb(((int)(((byte)(14)))), ((int)(((byte)(47)))), ((int)(((byte)(108)))));
+            this.btnDailyMovement.Location = new System.Drawing.Point(956, 6);
+            this.btnDailyMovement.Name = "btnDailyMovement";
+            this.btnDailyMovement.Size = new System.Drawing.Size(122, 26);
+            this.btnDailyMovement.TabIndex = 13;
+            this.btnDailyMovement.Text = "📊 Daily Movement";
+            this.btnDailyMovement.UseVisualStyleBackColor = false;
             // 
             // btnPrint
             // 
@@ -300,6 +317,7 @@ namespace PosBranch_Win.Dashboard
         private Infragistics.Win.UltraWinEditors.UltraDateTimeEditor dtTo;
         private System.Windows.Forms.Button btnApply;
         private System.Windows.Forms.Button btnRefresh;
+        private System.Windows.Forms.Button btnDailyMovement;
         private System.Windows.Forms.Button btnPrint;
         private System.Windows.Forms.Panel pnlScrollableContent;
     }

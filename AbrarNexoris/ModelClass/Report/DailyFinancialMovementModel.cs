@@ -43,8 +43,13 @@ namespace ModelClass.Report
         public decimal StockOutflow { get; set; }
         public decimal StockClosing { get; set; }
 
-        // Total Assets Tonight
+        // Asset 12:00 AM Daily Totals & Progression
+        public decimal AssetOpening { get; set; }
+        public decimal AssetAdditions { get; set; }
+        public decimal AssetReductions { get; set; }
         public decimal TotalAssets { get; set; }
+        public decimal DailyAssetChange { get; set; }
+        public decimal DailyAssetChangePct { get; set; }
 
         // Creditors (Supplier Udhaar)
         public decimal CreditorsOpening { get; set; }
@@ -56,8 +61,12 @@ namespace ModelClass.Report
         public decimal LoansOpening { get; set; }
         public decimal LoansClosing { get; set; }
 
-        // Total Liabilities Tonight
+        // Liability 12:00 AM Daily Totals
+        public decimal LiabOpening { get; set; }
+        public decimal LiabAdditions { get; set; }
+        public decimal LiabReductions { get; set; }
         public decimal TotalLiabilities { get; set; }
+        public decimal DailyLiabChange { get; set; }
 
         // Net Store Position (Worth) Tonight
         public decimal NetStorePosition { get; set; }
@@ -83,6 +92,30 @@ namespace ModelClass.Report
         public decimal PeriodStockInwardCost { get; set; }
         public decimal PeriodStockOutwardCost { get; set; }
         public decimal PeriodNetWorthGrowth { get; set; }
+
+        // Period Asset & Liability Progression
+        public decimal PeriodAssetOpening { get; set; }
+        public decimal PeriodAssetClosing { get; set; }
+        public decimal PeriodAssetGrowth { get; set; }
+        public decimal PeriodAssetGrowthPct { get; set; }
+        public decimal PeriodLiabOpening { get; set; }
+        public decimal PeriodLiabClosing { get; set; }
+        public decimal PeriodLiabGrowth { get; set; }
+        public decimal PeriodNetWorthOpening { get; set; }
+        public decimal PeriodNetWorthClosing { get; set; }
+    }
+
+    public class BalanceSheetGroupMovementRow
+    {
+        public string Side { get; set; }
+        public int GroupID { get; set; }
+        public string GroupName { get; set; }
+        public string ParentGroupName { get; set; }
+        public decimal OpeningBal { get; set; }
+        public decimal DebitTotal { get; set; }
+        public decimal CreditTotal { get; set; }
+        public decimal ClosingBal { get; set; }
+        public decimal NetChange { get; set; }
     }
 
     public class DailyFinancialMovementDrilldownRow
@@ -106,6 +139,7 @@ namespace ModelClass.Report
         public DateTime ToDate { get; set; }
         public List<DailyFinancialMovementDayRow> DayRows { get; set; } = new List<DailyFinancialMovementDayRow>();
         public DailyFinancialMovementSummary Summary { get; set; } = new DailyFinancialMovementSummary();
+        public List<BalanceSheetGroupMovementRow> GroupRows { get; set; } = new List<BalanceSheetGroupMovementRow>();
         public List<DailyFinancialMovementDrilldownRow> DrilldownRows { get; set; } = new List<DailyFinancialMovementDrilldownRow>();
     }
 }
