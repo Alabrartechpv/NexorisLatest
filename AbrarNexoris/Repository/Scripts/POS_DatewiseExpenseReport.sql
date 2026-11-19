@@ -123,7 +123,7 @@ BEGIN
     FROM Vouchers v
     LEFT JOIN LedgerMaster lm ON v.LedgerID = lm.LedgerID
     LEFT JOIN AccountGroupMaster ag ON lm.GroupID = ag.GroupID
-    LEFT JOIN dbo.Branch bm ON v.BranchID = bm.Id
+    LEFT JOIN dbo.Branches bm WITH (NOLOCK) ON v.BranchID = bm.Id
     OUTER APPLY (
         SELECT TOP 1 
             c.LedgerID AS CreditLedgerID,

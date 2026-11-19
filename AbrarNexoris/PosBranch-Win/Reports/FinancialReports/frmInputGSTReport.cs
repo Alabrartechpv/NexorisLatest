@@ -38,6 +38,28 @@ namespace PosBranch_Win.Reports.FinancialReports
         private readonly Dictionary<string, Label> _footerLabels;
         private readonly Dictionary<string, string> _columnAggregations;
         private readonly HashSet<string> userHiddenColumnKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> summaryDefaultNumericColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "Qty",
+            "TotalQty",
+            "TaxableValue",
+            "CGSTAmt",
+            "SGSTAmt",
+            "IGSTAmt",
+            "CessAmt",
+            "TotalInputGST",
+            "TotalInvoiceAmount",
+            "TotalItems",
+            "TotalGST",
+            "PurchaseGST",
+            "EligibleITC",
+            "IneligibleITC",
+            "ERPTaxable",
+            "ERPGST",
+            "GSTR2BTaxable",
+            "GSTR2BGST",
+            "TaxDiff"
+        };
         private Form columnChooserForm;
         private ListBox columnChooserListBox;
         private TextBox txtColumnSearch;
@@ -80,6 +102,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             btnPreviewReport.Click += btnPreviewReport_Click;
             btnExportGrid.Click += btnExportGrid_Click;
             btnToggleSelection.Click += btnToggleSelection_Click;
+            btnToggleBillWise.Click += btnToggleBillWise_Click;
 
             ultraComboReportView.ValueChanged += filter_ValueChanged;
             txtSearch.TextChanged += filter_ValueChanged;
@@ -187,7 +210,8 @@ namespace PosBranch_Win.Reports.FinancialReports
             }
 
             ultraComboReportView.Items.Clear();
-            ultraComboReportView.Items.Add("REGISTER", "Purchase GST Register");
+            ultraComboReportView.Items.Add("REGISTER", "Purchase GST Register (Item-wise)");
+            ultraComboReportView.Items.Add("BILL_WISE", "Purchase GST Bill-wise (GRN)");
             ultraComboReportView.Items.Add("SUMMARY", "Input GST Summary");
             ultraComboReportView.Items.Add("RATE_WISE", "Input GST Rate-wise");
             ultraComboReportView.Items.Add("ITC", "ITC Eligible / Ineligible");
@@ -314,6 +338,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             StyleClassicButton(btnPreviewReport);
             StyleClassicButton(btnExportGrid);
             StyleClassicButton(btnToggleSelection);
+            StyleClassicButton(btnToggleBillWise);
         }
 
         private static void StyleClassicButton(Infragistics.Win.Misc.UltraButton button)
@@ -501,6 +526,8 @@ namespace PosBranch_Win.Reports.FinancialReports
                 string rawVal = Convert.ToString(ultraComboReportView.Value ?? "");
                 string rawText = Convert.ToString(ultraComboReportView.Text ?? "");
 
+                UpdateButtonToggleState();
+
                 if (rawVal == "SUMMARY" || rawText.Contains("Summary"))
                 {
                     gridReport.DataSource = _repository.GetInputSummary(filter);
@@ -516,6 +543,10 @@ namespace PosBranch_Win.Reports.FinancialReports
                 else if (rawVal == "RECON" || rawText.Contains("Reconciliation") || rawText.Contains("2B"))
                 {
                     gridReport.DataSource = _repository.GetGSTR2BReconciliation(filter);
+                }
+                else if (rawVal == "BILL_WISE" || rawText.IndexOf("Bill-wise", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    gridReport.DataSource = _repository.GetPurchaseBillWise(filter);
                 }
                 else
                 {
@@ -555,6 +586,33 @@ namespace PosBranch_Win.Reports.FinancialReports
                 col.Header.Appearance.FontData.Bold = DefaultableBoolean.False;
                 col.Header.Appearance.FontData.Name = "Microsoft Sans Serif";
                 col.Header.Appearance.FontData.SizeInPoints = 8.25F;
+
+                switch (col.Key)
+                {
+                    case "InvoiceNo": col.Header.Caption = "Invoice No"; break;
+                    case "GRNNo": col.Header.Caption = "GRN No"; break;
+                    case "DocDate": col.Header.Caption = "Doc Date"; col.Format = "dd-MM-yyyy"; break;
+                    case "SupplierName": col.Header.Caption = "Supplier Name"; break;
+                    case "SupplierGSTIN": col.Header.Caption = "Supplier GSTIN"; break;
+                    case "ItemName": col.Header.Caption = "Item Name"; break;
+                    case "HSNCode": col.Header.Caption = "HSN Code"; break;
+                    case "Qty": col.Header.Caption = "Qty"; break;
+                    case "Unit": col.Header.Caption = "Unit"; break;
+                    case "TotalItems": col.Header.Caption = "Total Items"; break;
+                    case "TotalQty": col.Header.Caption = "Total Qty"; break;
+                    case "TaxableValue": col.Header.Caption = "Taxable Value"; break;
+                    case "CGSTPer": col.Header.Caption = "CGST %"; break;
+                    case "CGSTAmt": col.Header.Caption = "CGST Amt"; break;
+                    case "SGSTPer": col.Header.Caption = "SGST %"; break;
+                    case "SGSTAmt": col.Header.Caption = "SGST Amt"; break;
+                    case "IGSTPer": col.Header.Caption = "IGST %"; break;
+                    case "IGSTAmt": col.Header.Caption = "IGST Amt"; break;
+                    case "CessPer": col.Header.Caption = "Cess %"; break;
+                    case "CessAmt": col.Header.Caption = "Cess Amt"; break;
+                    case "TotalInputGST": col.Header.Caption = "Total Input GST"; break;
+                    case "TotalInvoiceAmount": col.Header.Caption = "Total Invoice Amt"; break;
+                    case "TaxType": col.Header.Caption = "Tax Type"; break;
+                }
 
                 if (col.DataType == typeof(decimal) || col.DataType == typeof(double) || col.DataType == typeof(float) || col.DataType == typeof(int) || col.DataType == typeof(long))
                 {
@@ -619,7 +677,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                 _footerLabels[column.Key] = footerLabel;
 
                 if (!_columnAggregations.ContainsKey(column.Key))
-                    _columnAggregations[column.Key] = "None"; // Defaults to None on page load!
+                    _columnAggregations[column.Key] = summaryDefaultNumericColumns.Contains(column.Key) ? "Sum" : "None";
 
                 xOffset += column.Width;
             }
@@ -642,7 +700,7 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             menu.Opening += (sender, e) =>
             {
-                string current = _columnAggregations.ContainsKey(columnKey) ? _columnAggregations[columnKey] : "None";
+                string current = _columnAggregations.ContainsKey(columnKey) ? _columnAggregations[columnKey] : (summaryDefaultNumericColumns.Contains(columnKey) ? "Sum" : "None");
                 foreach (ToolStripItem item in menu.Items)
                 {
                     ToolStripMenuItem menuItem = item as ToolStripMenuItem;
@@ -868,6 +926,35 @@ namespace PosBranch_Win.Reports.FinancialReports
         {
             ultraPanelControls.Visible = !ultraPanelControls.Visible;
             btnToggleSelection.Text = ultraPanelControls.Visible ? "Hide Selection" : "Show Selection";
+        }
+
+        private void btnToggleBillWise_Click(object sender, EventArgs e)
+        {
+            string currentVal = Convert.ToString(ultraComboReportView?.Value ?? "");
+            string currentText = Convert.ToString(ultraComboReportView?.Text ?? "");
+            bool isBillWise = string.Equals(currentVal, "BILL_WISE", StringComparison.OrdinalIgnoreCase) ||
+                              currentText.IndexOf("Bill-wise", StringComparison.OrdinalIgnoreCase) >= 0;
+
+            if (isBillWise)
+            {
+                ultraComboReportView.Value = "REGISTER";
+            }
+            else
+            {
+                ultraComboReportView.Value = "BILL_WISE";
+            }
+            UpdateButtonToggleState();
+        }
+
+        private void UpdateButtonToggleState()
+        {
+            if (btnToggleBillWise == null) return;
+            string currentVal = Convert.ToString(ultraComboReportView?.Value ?? "");
+            string currentText = Convert.ToString(ultraComboReportView?.Text ?? "");
+            bool isBillWise = string.Equals(currentVal, "BILL_WISE", StringComparison.OrdinalIgnoreCase) ||
+                              currentText.IndexOf("Bill-wise", StringComparison.OrdinalIgnoreCase) >= 0;
+
+            btnToggleBillWise.Text = isBillWise ? "Item-wise View" : "Bill-wise (GRN)";
         }
 
         private void frmInputGSTReport_KeyDown(object sender, KeyEventArgs e)

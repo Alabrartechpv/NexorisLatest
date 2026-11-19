@@ -18,6 +18,7 @@ namespace ModelClass.Report
     public class PurchaseGSTRegisterRow
     {
         public string InvoiceNo { get; set; } = string.Empty;
+        public string GRNNo { get; set; } = string.Empty;
         public DateTime DocDate { get; set; }
         public string SupplierName { get; set; } = string.Empty;
         public string SupplierGSTIN { get; set; } = string.Empty;
@@ -33,6 +34,25 @@ namespace ModelClass.Report
         public double IGSTPer { get; set; }
         public decimal IGSTAmt { get; set; }
         public double CessPer { get; set; }
+        public decimal CessAmt { get; set; }
+        public decimal TotalInputGST { get; set; }
+        public decimal TotalInvoiceAmount { get; set; }
+        public string TaxType { get; set; } = string.Empty;
+    }
+
+    public class PurchaseGSTBillWiseRow
+    {
+        public string GRNNo { get; set; } = string.Empty;
+        public string InvoiceNo { get; set; } = string.Empty;
+        public DateTime DocDate { get; set; }
+        public string SupplierName { get; set; } = string.Empty;
+        public string SupplierGSTIN { get; set; } = string.Empty;
+        public int TotalItems { get; set; }
+        public double TotalQty { get; set; }
+        public decimal TaxableValue { get; set; }
+        public decimal CGSTAmt { get; set; }
+        public decimal SGSTAmt { get; set; }
+        public decimal IGSTAmt { get; set; }
         public decimal CessAmt { get; set; }
         public decimal TotalInputGST { get; set; }
         public decimal TotalInvoiceAmount { get; set; }
@@ -65,6 +85,7 @@ namespace ModelClass.Report
     {
         public string SupplierName { get; set; } = string.Empty;
         public string InvoiceNo { get; set; } = string.Empty;
+        public string GRNNo { get; set; } = string.Empty;
         public DateTime InvoiceDate { get; set; }
         public decimal PurchaseGST { get; set; }
         public decimal EligibleITC { get; set; }
@@ -77,6 +98,7 @@ namespace ModelClass.Report
     {
         public string SupplierName { get; set; } = string.Empty;
         public string InvoiceNo { get; set; } = string.Empty;
+        public string GRNNo { get; set; } = string.Empty;
         public decimal ERPTaxable { get; set; }
         public decimal ERPGST { get; set; }
         public decimal GSTR2BTaxable { get; set; }

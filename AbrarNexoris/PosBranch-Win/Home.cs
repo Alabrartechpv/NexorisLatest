@@ -86,7 +86,8 @@ namespace PosBranch_Win
             new ReportNavigatorDefinition("Sales", "Sales Hold Report", "SalesHoldReport"),
             new ReportNavigatorDefinition("Sales", "Daily Sales", "DSales"),
             new ReportNavigatorDefinition("Sales", "Counter Report", "CounterReport"),
-            new ReportNavigatorDefinition("Sales", "Date-wise Sales Report", "DatewiseSalesReport"),
+            new ReportNavigatorDefinition("Sales", "Date-wise Sales Report", "DatewiseSalesReport"),
+            new ReportNavigatorDefinition("Sales", "Date-wise Sales Return Report", "DatewiseSalesReturnReport"),
             new ReportNavigatorDefinition("Sales", "Date-wise Profit Report", "DatewiseProfitReport"),
             new ReportNavigatorDefinition("Sales", "Date-wise Customer Payment Report", "DatewiseCustomerPaymentReport"),
             new ReportNavigatorDefinition("Purchase", "Purchase Details", "Purchase Details"),
@@ -95,6 +96,7 @@ namespace PosBranch_Win
             new ReportNavigatorDefinition("Purchase", "Purchase Return Audit Report", "PurchaseReturnAuditReport"),
             new ReportNavigatorDefinition("Purchase", "Vendor Purchase Report", "VendorPurchaseReport"),
             new ReportNavigatorDefinition("Purchase", "Date-wise Purchase Report", "DatewisePurchaseReport"),
+            new ReportNavigatorDefinition("Purchase", "Date-wise Purchase Return Report", "DatewisePurchaseReturnReport"),
             new ReportNavigatorDefinition("Purchase", "Date-wise Vendor Payment Report", "DatewiseVendorPaymentReport"),
             new ReportNavigatorDefinition("Customer", "Customer Outstanding Listing", "CustomerOutstandingReport"),
             new ReportNavigatorDefinition("Customer", "Customer Receipt Report", "CustomerReceiptReport"),
@@ -119,7 +121,9 @@ namespace PosBranch_Win
             new ReportNavigatorDefinition("Analysis", "Counter Closing Report", "ShiftReconciliationReport"),
             new ReportNavigatorDefinition("Analysis", "Bank Statement", "BankStatementReport"),
             new ReportNavigatorDefinition("Date-wise", "Date-wise Purchase Report", "DatewisePurchaseReport"),
-            new ReportNavigatorDefinition("Date-wise", "Date-wise Sales Report", "DatewiseSalesReport"),
+            new ReportNavigatorDefinition("Date-wise", "Date-wise Purchase Return Report", "DatewisePurchaseReturnReport"),
+            new ReportNavigatorDefinition("Date-wise", "Date-wise Sales Report", "DatewiseSalesReport"),
+            new ReportNavigatorDefinition("Date-wise", "Date-wise Sales Return Report", "DatewiseSalesReturnReport"),
             new ReportNavigatorDefinition("Date-wise", "Date-wise Stock Adjustment Report", "DatewiseStockAdjustmentReport"),
             new ReportNavigatorDefinition("Date-wise", "Date-wise Profit Report", "DatewiseProfitReport"),
             new ReportNavigatorDefinition("Date-wise", "Date-wise Expense Report", "DatewiseExpenseReport"),
@@ -3275,6 +3279,8 @@ namespace PosBranch_Win
             if (tk == "Roles") return "RolePermissions";
             if (tk == "SalesReturn") return "salesreturnreport";
             if (tk == "PurchaseReturn") return "purchasereturnreport";
+            if (tk == "DatewiseSalesReturnReport" || tk == "frmdatewisesalesreturnreport") return "datewisesalesreturnreport";
+            if (tk == "DatewisePurchaseReturnReport" || tk == "frmdatewisepurchasereturnreport") return "datewisepurchasereturnreport";
             if (tk == "Ledger" || tk == "Account Ledgers" || tk == "FrmLedgers" || tk == "AccountLedgers") return "ledgers";
             if (tk == "ChartOfAccount" || tk == "Chart Of Account" || tk == "Chart Of Acc" || tk == "ChartofAccounts" || tk == "FrmChartOfAcc" || tk == "FrmChartOfAccount" || tk == "chartofacc") return "chartofaccount";
             if (tk == "frmvendor") return "vendor";
@@ -3346,7 +3352,9 @@ namespace PosBranch_Win
             if (tk == "Sales Details") return "salesdetails";
             if (tk == "Purchase Details") return "purchasedetails";
             if (tk == "DatewisePurchaseReport") return "datewisepurchasereport";
+            if (tk == "DatewisePurchaseReturnReport") return "datewisepurchasereturnreport";
             if (tk == "DatewiseSalesReport") return "datewisesalesreport";
+            if (tk == "DatewiseSalesReturnReport") return "datewisesalesreturnreport";
             if (tk == "DatewiseStockAdjustmentReport") return "datewisestockadjustmentreport";
             if (tk == "DatewiseItemStockReport") return "datewiseitemstockreport";
             if (tk == "DatewiseProfitReport") return "datewiseprofitreport";
@@ -4342,6 +4350,16 @@ namespace PosBranch_Win
             {
                 Reports.FinancialReports.frmdatewisevendorpaymentreport datewiseVendorPaymentReport = new Reports.FinancialReports.frmdatewisevendorpaymentreport();
                 OpenFormInTab(datewiseVendorPaymentReport, "Date-wise Vendor Payment Report");
+            }
+            if (e.Tool.Key == "DatewisePurchaseReturnReport" || e.Tool.Key == "frmdatewisepurchasereturnreport")
+            {
+                Reports.PurchaseReports.frmdatewisepurchasereturnreport datewisePReturnReport = new Reports.PurchaseReports.frmdatewisepurchasereturnreport();
+                OpenFormInTab(datewisePReturnReport, "Date-wise Purchase Return Report");
+            }
+            if (e.Tool.Key == "DatewiseSalesReturnReport" || e.Tool.Key == "frmdatewisesalesreturnreport")
+            {
+                Reports.SalesReports.frmdatewisesalesreturnreport datewiseSReturnReport = new Reports.SalesReports.frmdatewisesalesreturnreport();
+                OpenFormInTab(datewiseSReturnReport, "Date-wise Sales Return Report");
             }
             if (e.Tool.Key == "PurchaseReturnAuditReport")
             {
@@ -6963,6 +6981,8 @@ namespace PosBranch_Win
                     keyToExecute == "VendorPurchaseReport" ||
                     keyToExecute == "PurchaseAuditReport" ||
                     keyToExecute == "DatewisePurchaseReport" ||
+                    keyToExecute == "DatewisePurchaseReturnReport" ||
+                    keyToExecute == "DatewiseSalesReturnReport" ||
                     keyToExecute == "DatewiseStockAdjustmentReport" ||
                     keyToExecute == "DatewiseSalesReport" ||
                     keyToExecute == "DatewiseProfitReport" ||

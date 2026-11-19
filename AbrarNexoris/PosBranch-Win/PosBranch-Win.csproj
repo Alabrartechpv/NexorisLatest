@@ -1266,6 +1266,12 @@
     <Compile Include="Reports\PurchaseReports\frmdatewisepurchasereport.Designer.cs">
       <DependentUpon>frmdatewisepurchasereport.cs</DependentUpon>
     </Compile>
+    <Compile Include="Reports\PurchaseReports\frmdatewisepurchasereturnreport.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Reports\PurchaseReports\frmdatewisepurchasereturnreport.Designer.cs">
+      <DependentUpon>frmdatewisepurchasereturnreport.cs</DependentUpon>
+    </Compile>
     <Compile Include="Reports\PurchaseReports\purchasereturnauditreport.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -1283,6 +1289,12 @@
     </Compile>
     <Compile Include="Reports\SalesReports\frmdatewisesalesreport.Designer.cs">
       <DependentUpon>frmdatewisesalesreport.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Reports\SalesReports\frmdatewisesalesreturnreport.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Reports\SalesReports\frmdatewisesalesreturnreport.Designer.cs">
+      <DependentUpon>frmdatewisesalesreturnreport.cs</DependentUpon>
     </Compile>
     <Compile Include="Reports\SalesReports\frmdatewiseprofitreport.cs">
       <SubType>Form</SubType>
@@ -1998,6 +2010,9 @@
     <EmbeddedResource Include="Reports\SalesReports\frmdatewisesalesreport.resx">
       <DependentUpon>frmdatewisesalesreport.cs</DependentUpon>
     </EmbeddedResource>
+    <EmbeddedResource Include="Reports\SalesReports\frmdatewisesalesreturnreport.resx">
+      <DependentUpon>frmdatewisesalesreturnreport.cs</DependentUpon>
+    </EmbeddedResource>
     <EmbeddedResource Include="Reports\SalesReports\frmdatewiseprofitreport.resx">
       <DependentUpon>frmdatewiseprofitreport.cs</DependentUpon>
     </EmbeddedResource>
@@ -2033,6 +2048,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Reports\PurchaseReports\frmdatewisepurchasereport.resx">
       <DependentUpon>frmdatewisepurchasereport.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Reports\PurchaseReports\frmdatewisepurchasereturnreport.resx">
+      <DependentUpon>frmdatewisepurchasereturnreport.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Reports\FinancialReports\frmcustomerreportdetails.resx">
       <DependentUpon>frmcustomerreportdetails.cs</DependentUpon>

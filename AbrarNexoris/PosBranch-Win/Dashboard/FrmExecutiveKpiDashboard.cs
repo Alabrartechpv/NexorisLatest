@@ -411,7 +411,7 @@ namespace PosBranch_Win.Dashboard
                 CreateKpiCard("13. Cost of Goods (COGS)", "Total purchase cost of merchandise sold during the period", FormatCurr(_model.CostOfGoodsSold), "Cost of Sold Items", Color.FromArgb(100, 116, 139), () => DrillDown("SalesProfit")),
 
                 // 14. Sales Return (Customer Returns)
-                CreateKpiCard("14. Sales Return (Cust)", "Goods returned and credit notes issued to customers", FormatCurr(_model.TotalSalesReturn), $"{_model.TotalSalesReturnCount} Return Vouchers", Color.FromArgb(231, 76, 60), () => DrillDown("SalesReturnReport")),
+                CreateKpiCard("14. Sales Return (Cust)", "Goods returned and credit notes issued to customers", FormatCurr(_model.TotalSalesReturn), $"{_model.TotalSalesReturnCount} Return Vouchers", Color.FromArgb(231, 76, 60), () => DrillDown("DatewiseSalesReturnReport")),
 
                 // 15. Total Purchases (Inward Stock)
                 CreateKpiCard("15. Total Purchases", "Total inward purchases billed from vendors and suppliers", FormatCurr(_model.TotalPurchases), $"{_model.TotalPurchasesBillCount:N0} Purchase Bills", Color.FromArgb(41, 128, 185), () => DrillDown("PurchaseDetailsReport")),
@@ -974,6 +974,10 @@ namespace PosBranch_Win.Dashboard
                         formToOpen = new FrmSalesAnalytics();
                         title = "Sales Analytics";
                         break;
+                    case "DatewiseSalesReturnReport":
+                        formToOpen = new Reports.SalesReports.frmdatewisesalesreturnreport();
+                        title = "Date-wise Sales Return Report";
+                        break;
                     case "SalesReturnReport":
                         formToOpen = new Reports.SalesReports.SalesReturnReport();
                         title = "Sales Return Report";
@@ -1006,6 +1010,10 @@ namespace PosBranch_Win.Dashboard
                     case "PurchaseDetailsReport":
                         formToOpen = new Reports.PurchaseReports.frmPurchaseReportDetails();
                         title = "Purchase Details Report";
+                        break;
+                    case "DatewisePurchaseReturnReport":
+                        formToOpen = new Reports.PurchaseReports.frmdatewisepurchasereturnreport();
+                        title = "Date-wise Purchase Return Report";
                         break;
                     case "PurchaseReturnReport":
                     case "PurchaseReturn":
