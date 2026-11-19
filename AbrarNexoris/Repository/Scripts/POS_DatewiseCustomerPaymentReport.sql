@@ -164,7 +164,7 @@ BEGIN
     ) SR
     LEFT JOIN dbo.LedgerMaster LM 
         ON LM.LedgerID = CRM.CustomerLedgerId
-    LEFT JOIN dbo.Branch B 
+    LEFT JOIN dbo.Branches B WITH (NOLOCK)
         ON B.Id = CRM.BranchId
     LEFT JOIN dbo.PayMode PayMode 
         ON PayMode.PayModeID = CRM.PaymentMethodLedgerId
@@ -232,7 +232,7 @@ BEGIN
     FROM dbo.CustomerReceiptMaster CRM
     LEFT JOIN dbo.LedgerMaster LM 
         ON LM.LedgerID = CRM.CustomerLedgerId
-    LEFT JOIN dbo.Branch B 
+    LEFT JOIN dbo.Branches B WITH (NOLOCK)
         ON B.Id = CRM.BranchId
     LEFT JOIN dbo.PayMode PayMode 
         ON PayMode.PayModeID = CRM.PaymentMethodLedgerId
@@ -318,7 +318,7 @@ BEGIN
         ) SR
         LEFT JOIN dbo.LedgerMaster LM 
             ON LM.LedgerID = CNM.CustomerLedgerId
-        LEFT JOIN dbo.Branch B 
+        LEFT JOIN dbo.Branches B WITH (NOLOCK)
             ON B.Id = CNM.BranchId
         LEFT JOIN #CustomerBalances CB 
             ON CB.LedgerID = CNM.CustomerLedgerId
@@ -449,7 +449,7 @@ BEGIN
             ISNULL(B.BranchName, '') AS BranchName
         FROM dbo.SMaster SM
         LEFT JOIN dbo.LedgerMaster LM ON LM.LedgerID = SM.LedgerID
-        LEFT JOIN dbo.Branch B ON B.Id = SM.BranchId
+        LEFT JOIN dbo.Branches B WITH (NOLOCK) ON B.Id = SM.BranchId
         OUTER APPLY (
             SELECT SUM(SRM.GrandTotal) AS ReturnedAmount
             FROM dbo.SReturnMaster SRM
@@ -511,7 +511,7 @@ BEGIN
         FROM dbo.CustomerReceiptDetails CRD
         INNER JOIN dbo.CustomerReceiptMaster CRM ON CRM.Id = CRD.ReceiptMasterId
         LEFT JOIN dbo.PayMode PayMode ON PayMode.PayModeID = CRM.PaymentMethodLedgerId
-        LEFT JOIN dbo.Branch B ON B.Id = CRM.BranchId
+        LEFT JOIN dbo.Branches B WITH (NOLOCK) ON B.Id = CRM.BranchId
         WHERE CRM.CustomerLedgerId IN (SELECT DISTINCT CustomerLedgerId FROM #FilteredReceipts)
           AND (@BranchId = 0 OR CRD.BranchId = @BranchId)
           AND CRD.CancelFlag = 0

@@ -1,4 +1,4 @@
-USE [RambaiTest]
+-- Stored Procedure: dbo.POS_DatewiseVendorPaymentReport
 GO
 
 IF OBJECT_ID('dbo.POS_DatewiseVendorPaymentReport', 'P') IS NOT NULL
@@ -153,7 +153,7 @@ BEGIN
     ) PR
     LEFT JOIN dbo.LedgerMaster LM 
         ON LM.LedgerID = VPM.VendorLedgerId
-    LEFT JOIN dbo.Branch B 
+    LEFT JOIN dbo.Branches B WITH (NOLOCK)
         ON B.Id = VPM.BranchId
     LEFT JOIN dbo.PayMode PayMode 
         ON PayMode.PayModeID = VPM.PaymentMethodLedgerId
@@ -284,7 +284,7 @@ BEGIN
             ISNULL(B.BranchName, '') AS BranchName
         FROM dbo.PMaster PM
         LEFT JOIN dbo.LedgerMaster LM ON LM.LedgerID = PM.LedgerID
-        LEFT JOIN dbo.Branch B ON B.Id = PM.BranchId
+        LEFT JOIN dbo.Branches B WITH (NOLOCK) ON B.Id = PM.BranchId
         OUTER APPLY (
             SELECT SUM(PRM.GrandTotal) AS ReturnedAmount
             FROM dbo.PReturnMaster PRM
@@ -346,7 +346,7 @@ BEGIN
         FROM dbo.VendorPaymentDetails VPD
         INNER JOIN dbo.VendorPaymentMaster VPM ON VPM.Id = VPD.PaymentMasterId
         LEFT JOIN dbo.PayMode PayMode ON PayMode.PayModeID = VPM.PaymentMethodLedgerId
-        LEFT JOIN dbo.Branch B ON B.Id = VPM.BranchId
+        LEFT JOIN dbo.Branches B WITH (NOLOCK) ON B.Id = VPM.BranchId
         WHERE VPM.VendorLedgerId IN (SELECT DISTINCT VendorLedgerId FROM #FilteredPayments)
           AND (@BranchId = 0 OR VPD.BranchId = @BranchId)
           AND VPD.CancelFlag = 0

@@ -39,6 +39,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             this.btnPreviewReport = new Infragistics.Win.Misc.UltraButton();
             this.btnExportGrid = new Infragistics.Win.Misc.UltraButton();
             this.btnToggleSelection = new Infragistics.Win.Misc.UltraButton();
+            this.btnToggleBillWise = new Infragistics.Win.Misc.UltraButton();
 
             this.ultraPanelControls.ClientArea.SuspendLayout();
             this.ultraPanelControls.SuspendLayout();
@@ -126,6 +127,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             this.ultraPanelAction.ClientArea.Controls.Add(this.btnPreviewReport);
             this.ultraPanelAction.ClientArea.Controls.Add(this.btnExportGrid);
             this.ultraPanelAction.ClientArea.Controls.Add(this.btnToggleSelection);
+            this.ultraPanelAction.ClientArea.Controls.Add(this.btnToggleBillWise);
 
             this.btnViewGrid.Location = new System.Drawing.Point(12, 6);
             this.btnViewGrid.Name = "btnViewGrid";
@@ -151,6 +153,11 @@ namespace PosBranch_Win.Reports.FinancialReports
             this.btnToggleSelection.Name = "btnToggleSelection";
             this.btnToggleSelection.Size = new System.Drawing.Size(120, 28);
             this.btnToggleSelection.Text = "Hide Selection";
+
+            this.btnToggleBillWise.Location = new System.Drawing.Point(632, 6);
+            this.btnToggleBillWise.Name = "btnToggleBillWise";
+            this.btnToggleBillWise.Size = new System.Drawing.Size(140, 28);
+            this.btnToggleBillWise.Text = "Bill-wise (GRN)";
 
             // ultraPanelMaster
             this.ultraPanelMaster.Dock = System.Windows.Forms.DockStyle.Fill;
@@ -223,5 +230,6 @@ namespace PosBranch_Win.Reports.FinancialReports
         private Infragistics.Win.Misc.UltraButton btnPreviewReport;
         private Infragistics.Win.Misc.UltraButton btnExportGrid;
         private Infragistics.Win.Misc.UltraButton btnToggleSelection;
+        private Infragistics.Win.Misc.UltraButton btnToggleBillWise;
     }
 }

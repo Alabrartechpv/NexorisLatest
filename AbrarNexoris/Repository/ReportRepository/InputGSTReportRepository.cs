@@ -163,6 +163,7 @@ namespace Repository.ReportRepository
                     string sql = $@"
                         SELECT 
                             ISNULL({invNoMaster}, CAST({purNoMaster} AS NVARCHAR(50))) AS InvoiceNo,
+                            CAST({purNoMaster} AS NVARCHAR(50)) AS GRNNo,
                             {dateColMaster} AS DocDate,
                             ISNULL(NULLIF({vendorNameCol}, ''), 'General Supplier') AS SupplierName,
                             {gstinSelect} AS SupplierGSTIN,
@@ -277,6 +278,55 @@ namespace Repository.ReportRepository
             return list;
         }
 
+        public List<PurchaseGSTBillWiseRow> GetPurchaseBillWise(InputGSTReportFilter filter)
+        {
+            var register = GetPurchaseRegister(filter);
+            if (register == null || register.Count == 0)
+                return new List<PurchaseGSTBillWiseRow>();
+
+            var list = register
+                .GroupBy(r => !string.IsNullOrEmpty(r.GRNNo) ? r.GRNNo : r.InvoiceNo)
+                .Select(g =>
+                {
+                    var first = g.First();
+                    int itemsCount = g.Select(x => x.ItemName).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().Count();
+                    return new PurchaseGSTBillWiseRow
+                    {
+                        GRNNo = !string.IsNullOrEmpty(first.GRNNo) ? first.GRNNo : first.InvoiceNo,
+                        InvoiceNo = first.InvoiceNo,
+                        DocDate = first.DocDate,
+                        SupplierName = first.SupplierName,
+                        SupplierGSTIN = first.SupplierGSTIN,
+                        TaxType = first.TaxType,
+                        TotalItems = itemsCount > 0 ? itemsCount : g.Count(),
+                        TotalQty = g.Sum(x => x.Qty),
+                        TaxableValue = g.Sum(x => x.TaxableValue),
+                        CGSTAmt = g.Sum(x => x.CGSTAmt),
+                        SGSTAmt = g.Sum(x => x.SGSTAmt),
+                        IGSTAmt = g.Sum(x => x.IGSTAmt),
+                        CessAmt = g.Sum(x => x.CessAmt),
+                        TotalInputGST = g.Sum(x => x.TotalInputGST),
+                        TotalInvoiceAmount = g.Sum(x => x.TotalInvoiceAmount)
+                    };
+                })
+                .OrderByDescending(x => x.DocDate)
+                .ThenBy(x => x.GRNNo)
+                .ToList();
+
+            if (filter != null && !string.IsNullOrWhiteSpace(filter.SearchText))
+            {
+                string search = filter.SearchText.Trim();
+                list = list.Where(x =>
+                    (x.GRNNo != null && x.GRNNo.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                    (x.InvoiceNo != null && x.InvoiceNo.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                    (x.SupplierName != null && x.SupplierName.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0) ||
+                    (x.SupplierGSTIN != null && x.SupplierGSTIN.IndexOf(search, StringComparison.OrdinalIgnoreCase) >= 0)
+                ).ToList();
+            }
+
+            return list;
+        }
+
         public List<InputGSTSummaryRow> GetInputSummary(InputGSTReportFilter filter)
         {
             List<PurchaseGSTRegisterRow> register = GetPurchaseRegister(filter);
@@ -377,6 +427,7 @@ namespace Repository.ReportRepository
             PurchaseGSTRegisterRow r = new PurchaseGSTRegisterRow
             {
                 InvoiceNo = ToString(row, "InvoiceNo"),
+                GRNNo = !string.IsNullOrEmpty(ToString(row, "GRNNo")) ? ToString(row, "GRNNo") : ToString(row, "InvoiceNo"),
                 DocDate = ToDateTime(row, "DocDate"),
                 SupplierName = ToString(row, "SupplierName"),
                 SupplierGSTIN = ToString(row, "SupplierGSTIN"),
