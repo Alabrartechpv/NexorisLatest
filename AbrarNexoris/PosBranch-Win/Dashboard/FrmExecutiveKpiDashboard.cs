@@ -364,11 +364,11 @@ namespace PosBranch_Win.Dashboard
 
             if (lblDashboardSubtitle != null)
             {
-                lblDashboardSubtitle.Text = "42 Key Business Metrics, EOD Reconciliation & Performance Matrix";
+                lblDashboardSubtitle.Text = "43 Key Business Metrics, EOD Reconciliation & Performance Matrix";
             }
 
             // ═══════════════════════════════════════════════════════════════════
-            // ALL 42 METRICS IN EXACT NUMERICAL ORDER (1 to 42)
+            // ALL 43 METRICS IN EXACT NUMERICAL ORDER (1 to 43)
             // ═══════════════════════════════════════════════════════════════════
             var allCards = new List<Control>
             {
@@ -515,7 +515,14 @@ namespace PosBranch_Win.Dashboard
                 // 42. Date-wise Reports Hub
                 CreateKpiCard("42. Date-wise", "Consolidated multi-dimensional date-wise activity reports (Sales, Purchase, Stock, Profit, Expense, Payments)",
                     "8 Reports", "Date Matrix Hub ➔", Color.FromArgb(2, 132, 199),
-                    () => DrillDown("DateWiseReports"))
+                    () => DrillDown("DateWiseReports")),
+
+                // 43. Daily Financial Movement & Asset Progression
+                CreateKpiCard("43. Daily Fin Movement", "Daily 12 AM closing valuations for Cash, Bank, Debtors, Stock, Creditors & Net Store Worth",
+                    FormatCurr(_model.TotalAssets),
+                    $"Liab: {FormatCurr(_model.TotalLiabilities)}",
+                    Color.FromArgb(14, 47, 108),
+                    () => DrillDown("DailyMovement"))
             };
 
             // Display in clean full-width responsive grid:
@@ -554,91 +561,7 @@ namespace PosBranch_Win.Dashboard
             pnlScrollableContent.Controls.Add(dgvGrowth);
             currentY += dgvGrowth.Height + 8;
 
-            // ═══════════════════════════════════════════════════════════════════
-            // DAILY FINANCIAL MOVEMENT & ASSET PROGRESSION BANNER
-            // ═══════════════════════════════════════════════════════════════════
-            var pnlDailyMovement = CreateDailyMovementSection(containerWidth);
-            pnlDailyMovement.Location = new Point(leftMargin, currentY);
-            pnlScrollableContent.Controls.Add(pnlDailyMovement);
-            currentY += pnlDailyMovement.Height + 8;
-
             pnlScrollableContent.ResumeLayout(true);
-        }
-
-        private Panel CreateDailyMovementSection(int width)
-        {
-            var pnl = new Panel
-            {
-                Size = new Size(width, 42),
-                BackColor = Color.White,
-                Margin = new Padding(0)
-            };
-
-            pnl.Paint += (s, e) =>
-            {
-                using (var pen = new Pen(CardBorderColor, 1))
-                {
-                    e.Graphics.DrawRectangle(pen, 0, 0, width - 1, 41);
-                }
-            };
-
-            var lblIconTitle = new Label
-            {
-                Text = "📅 Daily Financial Movement & Asset Progression (12:00 AM Automatic Cutoff)",
-                Font = new Font("Segoe UI Semibold", 8.5F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(14, 47, 108),
-                Location = new Point(10, 4),
-                AutoSize = true
-            };
-            pnl.Controls.Add(lblIconTitle);
-
-            var lblDesc = new Label
-            {
-                Text = "Tracks daily 12 AM closing valuations for Cash, Bank, Debtors, Stock, Creditors & Net Store Worth.",
-                Font = new Font("Segoe UI", 7.5F),
-                ForeColor = SectionSubColor,
-                Location = new Point(12, 22),
-                AutoSize = true
-            };
-            pnl.Controls.Add(lblDesc);
-
-            int statsX = Math.Max(480, width - 460);
-            var lblAssets = new Label
-            {
-                Text = $"Assets (12 AM): {FormatCurr(_model.TotalAssets)}",
-                Font = new Font("Segoe UI Semibold", 8F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(27, 94, 32),
-                Location = new Point(statsX, 12),
-                AutoSize = true
-            };
-            pnl.Controls.Add(lblAssets);
-
-            var lblLiab = new Label
-            {
-                Text = $"Liabilities: {FormatCurr(_model.TotalLiabilities)}",
-                Font = new Font("Segoe UI Semibold", 8F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(198, 40, 40),
-                Location = new Point(statsX + 135, 12),
-                AutoSize = true
-            };
-            pnl.Controls.Add(lblLiab);
-
-            var btnOpen = new Button
-            {
-                Text = "View Daily Movement ➔",
-                Font = new Font("Segoe UI Semibold", 8F, FontStyle.Bold),
-                ForeColor = Color.FromArgb(14, 47, 108),
-                BackColor = Color.FromArgb(232, 246, 255),
-                FlatStyle = FlatStyle.Flat,
-                Cursor = Cursors.Hand,
-                Size = new Size(155, 26),
-                Location = new Point(width - 165, 8)
-            };
-            btnOpen.FlatAppearance.BorderColor = Color.FromArgb(118, 154, 198);
-            btnOpen.Click += (s, e) => DrillDown("DailyMovement");
-            pnl.Controls.Add(btnOpen);
-
-            return pnl;
         }
 
         private Panel CreateSectionHeader(string title, int kpiCount, int width)
@@ -1906,7 +1829,7 @@ namespace PosBranch_Win.Dashboard
             sb.AppendLine("</style></head><body><div class='container'>");
 
             string filterLabel = GetFilterLabel();
-            sb.AppendLine("<h1>Executive Business KPI Cockpit — 42 Key Metrics &amp; EOD Reconciliation</h1>");
+            sb.AppendLine("<h1>Executive Business KPI Cockpit — 43 Key Metrics &amp; EOD Reconciliation</h1>");
             sb.AppendLine($"<div class='meta'>{EscapeXml(filterLabel)} | Generated: <b>{_model.GeneratedAt:dd-MMM-yyyy hh:mm tt}</b></div>");
 
             // 1. Growth Performance Matrix
@@ -1927,8 +1850,8 @@ namespace PosBranch_Win.Dashboard
             }
             sb.AppendLine("</table></div>");
 
-            // 2. Complete 41 KPI Summary Table
-            sb.AppendLine("<h2>2. Complete 42 Business KPI Summary</h2>");
+            // 2. Complete 43 Business KPI Summary
+            sb.AppendLine("<h2>2. Complete 43 Business KPI Summary</h2>");
             sb.AppendLine("<table><tr><th style='width:50px;'>#</th><th>Metric Name</th><th style='text-align:right;'>Value</th><th>Business Context & Notes</th></tr>");
             sb.AppendLine($"<tr><td>1</td><td>Total Stock Value</td><td class='value'>{FormatCurr(_model.TotalStockCostValue)}</td><td>Valued at Cost Price ({_model.TotalStockItemCount:N0} Items, {_model.TotalStockQuantity:N0} Units)</td></tr>");
             sb.AppendLine($"<tr><td>2</td><td>Stock Profit Potential</td><td class='value'>{FormatCurr(_model.StockProfitPotential)}</td><td>Retail Value: {FormatCurr(_model.TotalStockRetailValue)}</td></tr>");
@@ -1942,35 +1865,37 @@ namespace PosBranch_Win.Dashboard
             sb.AppendLine($"<tr><td>10</td><td>Low Stock Alert</td><td class='value'>{_model.LowStockAlertCount} Items</td><td>Items below minimum safety stock</td></tr>");
             sb.AppendLine($"<tr><td>11</td><td>Reorder Alert</td><td class='value'>{_model.ReorderAlertCount} Items</td><td>Items at or below reorder level</td></tr>");
             sb.AppendLine($"<tr><td>12</td><td>Total Sales Revenue</td><td class='value'>{FormatCurr(_model.TotalSalesRevenue)}</td><td>{_model.TotalSalesBillCount:N0} Bills Billed</td></tr>");
-            sb.AppendLine($"<tr><td>13</td><td>Sales Return (Customer Returns)</td><td class='value'>{FormatCurr(_model.TotalSalesReturn)}</td><td>{_model.TotalSalesReturnCount} Customer Return / Credit Vouchers</td></tr>");
-            sb.AppendLine($"<tr><td>14</td><td>Total Purchases (Inward Stock)</td><td class='value'>{FormatCurr(_model.TotalPurchases)}</td><td>{_model.TotalPurchasesBillCount:N0} Purchase Bills</td></tr>");
-            sb.AppendLine($"<tr><td>15</td><td>Purchase Return (Vendor Returns)</td><td class='value'>{FormatCurr(_model.TotalPurchaseReturn)}</td><td>{_model.TotalPurchaseReturnCount} Vendor Return / Debit Vouchers</td></tr>");
-            sb.AppendLine($"<tr><td>16</td><td>Holded Items / Hold Bills</td><td class='value'>{FormatCurr(_model.HoldBillsValue)}</td><td>{_model.HoldBillsCount} Suspended sales bills ({_model.HoldItemsCount:N0} items on hold)</td></tr>");
-            sb.AppendLine($"<tr><td>17</td><td>Gross Profit & Margin %</td><td class='value'>{FormatCurr(_model.GrossProfit)}</td><td>Gross Profit Margin: {_model.GrossProfitMarginPercent:N1}%</td></tr>");
-            sb.AppendLine($"<tr><td>18</td><td>Total Business Expenses</td><td class='value'>{FormatCurr(_model.TotalBusinessExpenses)}</td><td>Direct: {FormatCurr(_model.DirectExpenses)} | Indirect: {FormatCurr(_model.IndirectExpenses)}</td></tr>");
-            sb.AppendLine($"<tr><td>19</td><td>Actual Net Profit</td><td class='value'>{FormatCurr(_model.ActualNetProfit)}</td><td>Operating Margin: {_model.OperatingProfitMarginPercent:N2}%</td></tr>");
-            sb.AppendLine($"<tr><td>20</td><td>Operating Profit Margin %</td><td class='value'>{_model.OperatingProfitMarginPercent:N2}%</td><td>Net Profit / Sales Turnover</td></tr>");
-            sb.AppendLine($"<tr><td>21</td><td>GST / Net Tax Liability</td><td class='value'>{FormatCurr(_model.NetTaxLiability)}</td><td>Output GST: {FormatCurr(_model.OutputGstAmount)} | Input GST: {FormatCurr(_model.InputGstAmount)}</td></tr>");
-            sb.AppendLine($"<tr><td>22</td><td>Cash in Hand</td><td class='value'>{FormatCurr(_model.CashInHand)}</td><td>Liquid cash available in tills and safe</td></tr>");
-            sb.AppendLine($"<tr><td>23</td><td>Bank Balance</td><td class='value'>{FormatCurr(_model.BankBalance)}</td><td>Active commercial bank accounts balance</td></tr>");
-            sb.AppendLine($"<tr><td>24</td><td>Vendor Outstanding</td><td class='value'>{FormatCurr(_model.SupplierPayables)}</td><td>Owed to vendors across {_model.SupplierPayablesCount} bills</td></tr>");
-            sb.AppendLine($"<tr><td>25</td><td>Customer Outstanding</td><td class='value'>{FormatCurr(_model.CustomerReceivables)}</td><td>Outstanding dues from {_model.CustomerReceivablesCount} customer invoices</td></tr>");
-            sb.AppendLine($"<tr><td>26</td><td>Delayed Customer Receivables (>30 Days)</td><td class='value'>{FormatCurr(_model.DelayedCustomerReceivables30Days)}</td><td>{_model.DelayedCustomerCount30Days} High-Risk Invoices overdue</td></tr>");
-            sb.AppendLine($"<tr><td>27</td><td>Delayed Supplier Payables (>30 Days)</td><td class='value'>{FormatCurr(_model.DelayedSupplierPayables30Days)}</td><td>{_model.DelayedSupplierCount30Days} Vendor Invoices overdue</td></tr>");
-            sb.AppendLine($"<tr><td>28</td><td>Net Business Asset (NBA)</td><td class='value'>{FormatCurr(_model.NetBusinessAsset)}</td><td>Total Assets: {FormatCurr(_model.TotalAssets)} | Liabilities: {FormatCurr(_model.TotalLiabilities)}</td></tr>");
-            sb.AppendLine($"<tr><td>29</td><td>Owner Drawings</td><td class='value'>{FormatCurr(_model.OwnerDrawings)}</td><td>Proprietor capital withdrawals</td></tr>");
-            sb.AppendLine($"<tr><td>30</td><td>Customer Bad Debts</td><td class='value'>{FormatCurr(_model.CustomerBadDebts)}</td><td>Uncollectible receivables written off</td></tr>");
-            sb.AppendLine($"<tr><td>31</td><td>Supplier Write-Offs</td><td class='value'>{FormatCurr(_model.SupplierWriteOffs)}</td><td>Vendor settlement discounts / write-offs</td></tr>");
-            sb.AppendLine($"<tr><td>32</td><td>Supplier Advance / Overpayment</td><td class='value'>{FormatCurr(_model.SupplierAdvanceBalance)}</td><td>Advance payments & vendor debit balances</td></tr>");
-            sb.AppendLine($"<tr><td>33</td><td>Customer Advance / Deposits</td><td class='value'>{FormatCurr(_model.CustomerAdvanceBalance)}</td><td>Advance deposits & customer credit balances</td></tr>");
-            sb.AppendLine($"<tr><td>34</td><td>Deletion & Cancellation Logs</td><td class='value'>{_model.DeletionCount} Events</td><td>Cancelled bills, deleted receipts & vouchers</td></tr>");
-            sb.AppendLine($"<tr><td>35</td><td>Price Change Modifications</td><td class='value'>{_model.PriceChangeCount} Events</td><td>Item Master price updates</td></tr>");
-            sb.AppendLine($"<tr><td>36</td><td>Physical Stock Discrepancy Logs</td><td class='value'>{_model.StockAdjustmentCount} Adjustments</td><td>Stock reconciliation entries</td></tr>");
-            sb.AppendLine($"<tr><td>37</td><td>Manual Party Balance</td><td class='value'>{FormatCurr(_model.TotalManualBalance)}</td><td>Cust: {FormatCurr(_model.ManualCustomerBalance)} | Supp: {FormatCurr(_model.ManualVendorBalance)} ({_model.ManualBalanceCount} Open Entries)</td></tr>");
-            sb.AppendLine($"<tr><td>38</td><td>Cash In / Cash Out Flow</td><td class='value'>{FormatCurr(_model.NetCashFlow)}</td><td>In: {FormatCurr(_model.TotalCashIn)} | Out: {FormatCurr(_model.TotalCashOut)} (Net)</td></tr>");
-            sb.AppendLine($"<tr><td>39</td><td>Daily Cash vs Bank Sales</td><td class='value'>{FormatCurr((_model.DailyCashSales + _model.DailyBankSales) > 0 ? (_model.DailyCashSales + _model.DailyBankSales) : _model.TotalSalesRevenue)}</td><td>Cash: {FormatCurr(_model.DailyCashSales)} | Bank/UPI: {FormatCurr(_model.DailyBankSales)}</td></tr>");
+            sb.AppendLine($"<tr><td>13</td><td>Cost of Goods Sold (COGS)</td><td class='value'>{FormatCurr(_model.CostOfGoodsSold)}</td><td>Cost of sold merchandise</td></tr>");
+            sb.AppendLine($"<tr><td>14</td><td>Sales Return (Customer Returns)</td><td class='value'>{FormatCurr(_model.TotalSalesReturn)}</td><td>{_model.TotalSalesReturnCount} Customer Return / Credit Vouchers</td></tr>");
+            sb.AppendLine($"<tr><td>15</td><td>Total Purchases (Inward Stock)</td><td class='value'>{FormatCurr(_model.TotalPurchases)}</td><td>{_model.TotalPurchasesBillCount:N0} Purchase Bills</td></tr>");
+            sb.AppendLine($"<tr><td>16</td><td>Purchase Return (Vendor Returns)</td><td class='value'>{FormatCurr(_model.TotalPurchaseReturn)}</td><td>{_model.TotalPurchaseReturnCount} Vendor Return / Debit Vouchers</td></tr>");
+            sb.AppendLine($"<tr><td>17</td><td>Holded Items / Hold Bills</td><td class='value'>{FormatCurr(_model.HoldBillsValue)}</td><td>{_model.HoldBillsCount} Suspended sales bills ({_model.HoldItemsCount:N0} items on hold)</td></tr>");
+            sb.AppendLine($"<tr><td>18</td><td>Gross Profit & Margin %</td><td class='value'>{FormatCurr(_model.GrossProfit)}</td><td>Gross Profit Margin: {_model.GrossProfitMarginPercent:N1}%</td></tr>");
+            sb.AppendLine($"<tr><td>19</td><td>Total Business Expenses</td><td class='value'>{FormatCurr(_model.TotalBusinessExpenses)}</td><td>Direct: {FormatCurr(_model.DirectExpenses)} | Indirect: {FormatCurr(_model.IndirectExpenses)}</td></tr>");
+            sb.AppendLine($"<tr><td>20</td><td>Actual Net Profit</td><td class='value'>{FormatCurr(_model.ActualNetProfit)}</td><td>Operating Margin: {_model.OperatingProfitMarginPercent:N2}%</td></tr>");
+            sb.AppendLine($"<tr><td>21</td><td>Operating Profit Margin %</td><td class='value'>{_model.OperatingProfitMarginPercent:N2}%</td><td>Net Profit / Sales Turnover</td></tr>");
+            sb.AppendLine($"<tr><td>22</td><td>GST / Net Tax Liability</td><td class='value'>{FormatCurr(_model.NetTaxLiability)}</td><td>Output GST: {FormatCurr(_model.OutputGstAmount)} | Input GST: {FormatCurr(_model.InputGstAmount)}</td></tr>");
+            sb.AppendLine($"<tr><td>23</td><td>Cash in Hand</td><td class='value'>{FormatCurr(_model.CashInHand)}</td><td>Liquid cash available in tills and safe</td></tr>");
+            sb.AppendLine($"<tr><td>24</td><td>Bank Balance</td><td class='value'>{FormatCurr(_model.BankBalance)}</td><td>Active commercial bank accounts balance</td></tr>");
+            sb.AppendLine($"<tr><td>25</td><td>Vendor Outstanding</td><td class='value'>{FormatCurr(_model.SupplierPayables)}</td><td>Owed to vendors across {_model.SupplierPayablesCount} bills</td></tr>");
+            sb.AppendLine($"<tr><td>26</td><td>Customer Outstanding</td><td class='value'>{FormatCurr(_model.CustomerReceivables)}</td><td>Outstanding dues from {_model.CustomerReceivablesCount} customer invoices</td></tr>");
+            sb.AppendLine($"<tr><td>27</td><td>Delayed Customer Receivables (>30 Days)</td><td class='value'>{FormatCurr(_model.DelayedCustomerReceivables30Days)}</td><td>{_model.DelayedCustomerCount30Days} High-Risk Invoices overdue</td></tr>");
+            sb.AppendLine($"<tr><td>28</td><td>Delayed Supplier Payables (>30 Days)</td><td class='value'>{FormatCurr(_model.DelayedSupplierPayables30Days)}</td><td>{_model.DelayedSupplierCount30Days} Vendor Invoices overdue</td></tr>");
+            sb.AppendLine($"<tr><td>29</td><td>Net Business Asset (NBA)</td><td class='value'>{FormatCurr(_model.NetBusinessAsset)}</td><td>Total Assets: {FormatCurr(_model.TotalAssets)} | Liabilities: {FormatCurr(_model.TotalLiabilities)}</td></tr>");
+            sb.AppendLine($"<tr><td>30</td><td>Owner Drawings</td><td class='value'>{FormatCurr(_model.OwnerDrawings)}</td><td>Proprietor capital withdrawals</td></tr>");
+            sb.AppendLine($"<tr><td>31</td><td>Customer Bad Debts</td><td class='value'>{FormatCurr(_model.CustomerBadDebts)}</td><td>Uncollectible receivables written off</td></tr>");
+            sb.AppendLine($"<tr><td>32</td><td>Supplier Write-Offs</td><td class='value'>{FormatCurr(_model.SupplierWriteOffs)}</td><td>Vendor settlement discounts / write-offs</td></tr>");
+            sb.AppendLine($"<tr><td>33</td><td>Supplier Advance / Overpayment</td><td class='value'>{FormatCurr(_model.SupplierAdvanceBalance)}</td><td>Advance payments & vendor debit balances</td></tr>");
+            sb.AppendLine($"<tr><td>34</td><td>Customer Advance / Deposits</td><td class='value'>{FormatCurr(_model.CustomerAdvanceBalance)}</td><td>Advance deposits & customer credit balances</td></tr>");
+            sb.AppendLine($"<tr><td>35</td><td>Deletion & Cancellation Logs</td><td class='value'>{_model.DeletionCount} Events</td><td>Cancelled bills, deleted receipts & vouchers</td></tr>");
+            sb.AppendLine($"<tr><td>36</td><td>Price Change Modifications</td><td class='value'>{_model.PriceChangeCount} Events</td><td>Item Master price updates</td></tr>");
+            sb.AppendLine($"<tr><td>37</td><td>Physical Stock Discrepancy Logs</td><td class='value'>{_model.StockAdjustmentCount} Adjustments</td><td>Stock reconciliation entries</td></tr>");
+            sb.AppendLine($"<tr><td>38</td><td>Manual Party Balance</td><td class='value'>{FormatCurr(_model.TotalManualBalance)}</td><td>Cust: {FormatCurr(_model.ManualCustomerBalance)} | Supp: {FormatCurr(_model.ManualVendorBalance)} ({_model.ManualBalanceCount} Open Entries)</td></tr>");
+            sb.AppendLine($"<tr><td>39</td><td>Cash In / Cash Out Flow</td><td class='value'>{FormatCurr(_model.NetCashFlow)}</td><td>In: {FormatCurr(_model.TotalCashIn)} | Out: {FormatCurr(_model.TotalCashOut)} (Net)</td></tr>");
+            sb.AppendLine($"<tr><td>40</td><td>Daily Cash vs Bank Sales</td><td class='value'>{FormatCurr((_model.DailyCashSales + _model.DailyBankSales + _model.DailyCreditSales) > 0 ? (_model.DailyCashSales + _model.DailyBankSales + _model.DailyCreditSales) : _model.TotalSalesRevenue)}</td><td>Cash: {FormatCurr(_model.DailyCashSales)} | Bank/UPI: {FormatCurr(_model.DailyBankSales)}</td></tr>");
             sb.AppendLine($"<tr><td>41</td><td>Counter Cash Shortage / Excess</td><td class='value' style='color:{(_model.NetCashDifference < 0 ? "#dc2626" : "#16a34a")};'>{(_model.NetCashDifference == 0 ? "₹ 0.00 (Balanced)" : (_model.NetCashDifference < 0 ? $"- {FormatCurr(Math.Abs(_model.NetCashDifference))} (Shortage)" : $"+ {FormatCurr(_model.NetCashDifference)} (Excess)"))}</td><td>Expected: {FormatCurr(_model.TotalExpectedCash)} | Counted: {FormatCurr(_model.TotalCountedCash)} ({_model.TotalShiftClosingCount} Shifts)</td></tr>");
             sb.AppendLine($"<tr><td>42</td><td>Date-wise Reports Hub</td><td class='value'>8 Reports</td><td>Date-wise Purchase, Sales, Stock Adj, Profit, Expense, Item Stock, Customer & Vendor Payments</td></tr>");
+            sb.AppendLine($"<tr><td>43</td><td>Daily Financial Movement</td><td class='value'>{FormatCurr(_model.TotalAssets)}</td><td>Daily 12 AM closing valuations (Assets: {FormatCurr(_model.TotalAssets)} | Liab: {FormatCurr(_model.TotalLiabilities)})</td></tr>");
             sb.AppendLine("</table>");
 
             sb.AppendLine("</div></body></html>");
@@ -1994,35 +1919,37 @@ namespace PosBranch_Win.Dashboard
             sb.AppendLine($"10,Low Stock Alert,\"{_model.LowStockAlertCount}\",Below Min Limit");
             sb.AppendLine($"11,Reorder Alert,\"{_model.ReorderAlertCount}\",Reorder Needed");
             sb.AppendLine($"12,Total Sales Revenue,\"{_model.TotalSalesRevenue:N2}\",Bills: {_model.TotalSalesBillCount}");
-            sb.AppendLine($"13,Sales Return (Customer Returns),\"{_model.TotalSalesReturn:N2}\",Return Count: {_model.TotalSalesReturnCount}");
-            sb.AppendLine($"14,Total Purchases (Inward Stock),\"{_model.TotalPurchases:N2}\",Purchase Bills: {_model.TotalPurchasesBillCount}");
-            sb.AppendLine($"15,Purchase Return (Vendor Returns),\"{_model.TotalPurchaseReturn:N2}\",Return Count: {_model.TotalPurchaseReturnCount}");
-            sb.AppendLine($"16,Holded Items / Hold Bills,\"{_model.HoldBillsValue:N2}\",Bills: {_model.HoldBillsCount} | Items: {_model.HoldItemsCount:N0}");
-            sb.AppendLine($"17,Gross Profit & Margin %,\"{_model.GrossProfit:N2}\",Gross Margin: {_model.GrossProfitMarginPercent:N1}%");
-            sb.AppendLine($"18,Total Business Expenses,\"{_model.TotalBusinessExpenses:N2}\",Direct: {_model.DirectExpenses:N2}, Indir: {_model.IndirectExpenses:N2}");
-            sb.AppendLine($"19,Actual Net Profit,\"{_model.ActualNetProfit:N2}\",Margin: {_model.OperatingProfitMarginPercent:N2}%");
-            sb.AppendLine($"20,Operating Profit Margin %,\"{_model.OperatingProfitMarginPercent:N2}%\",Net Margin");
-            sb.AppendLine($"21,GST / Net Tax Liability,\"{_model.NetTaxLiability:N2}\",Out: {_model.OutputGstAmount:N2}, In: {_model.InputGstAmount:N2}");
-            sb.AppendLine($"22,Cash in Hand,\"{_model.CashInHand:N2}\",Counter & Safe Cash");
-            sb.AppendLine($"23,Bank Balance,\"{_model.BankBalance:N2}\",Active Bank Accounts");
-            sb.AppendLine($"24,Vendor Outstanding,\"{_model.SupplierPayables:N2}\",Bills Count: {_model.SupplierPayablesCount}");
-            sb.AppendLine($"25,Customer Outstanding,\"{_model.CustomerReceivables:N2}\",Invoices Count: {_model.CustomerReceivablesCount}");
-            sb.AppendLine($"26,Delayed Customer Receivables (>30 Days),\"{_model.DelayedCustomerReceivables30Days:N2}\",Count: {_model.DelayedCustomerCount30Days}");
-            sb.AppendLine($"27,Delayed Supplier Payables (>30 Days),\"{_model.DelayedSupplierPayables30Days:N2}\",Count: {_model.DelayedSupplierCount30Days}");
-            sb.AppendLine($"28,Net Business Asset (NBA),\"{_model.NetBusinessAsset:N2}\",Assets: {_model.TotalAssets:N2} | Liab: {_model.TotalLiabilities:N2}");
-            sb.AppendLine($"29,Owner Drawings,\"{_model.OwnerDrawings:N2}\",Capital Withdrawals");
-            sb.AppendLine($"30,Customer Bad Debts,\"{_model.CustomerBadDebts:N2}\",Written Off");
-            sb.AppendLine($"31,Supplier Write-Offs,\"{_model.SupplierWriteOffs:N2}\",Discounts Settled");
-            sb.AppendLine($"32,Supplier Advance / Overpayment,\"{_model.SupplierAdvanceBalance:N2}\",Debit Balances");
-            sb.AppendLine($"33,Customer Advance / Deposits,\"{_model.CustomerAdvanceBalance:N2}\",Credit Balances");
-            sb.AppendLine($"34,Deletion & Cancellation Logs,\"{_model.DeletionCount}\",Deleted Bills/Vouchers");
-            sb.AppendLine($"35,Price Change Modifications,\"{_model.PriceChangeCount}\",Item Master Edits");
-            sb.AppendLine($"36,Physical Stock Discrepancy Logs,\"{_model.StockAdjustmentCount}\",Stock Adjustments");
-            sb.AppendLine($"37,Manual Party Balance,\"{_model.TotalManualBalance:N2}\",Cust: {_model.ManualCustomerBalance:N2} | Supp: {_model.ManualVendorBalance:N2} (Entries: {_model.ManualBalanceCount})");
-            sb.AppendLine($"38,Cash In / Cash Out Flow,\"{_model.NetCashFlow:N2}\",In: {_model.TotalCashIn:N2} | Out: {_model.TotalCashOut:N2} (Net)");
-            sb.AppendLine($"39,Daily Cash vs Bank Sales,\"{((_model.DailyCashSales + _model.DailyBankSales) > 0 ? (_model.DailyCashSales + _model.DailyBankSales) : _model.TotalSalesRevenue):N2}\",Cash: {_model.DailyCashSales:N2} | Bank/UPI: {_model.DailyBankSales:N2}");
+            sb.AppendLine($"13,Cost of Goods Sold (COGS),\"{_model.CostOfGoodsSold:N2}\",Cost of sold merchandise");
+            sb.AppendLine($"14,Sales Return (Customer Returns),\"{_model.TotalSalesReturn:N2}\",Return Count: {_model.TotalSalesReturnCount}");
+            sb.AppendLine($"15,Total Purchases (Inward Stock),\"{_model.TotalPurchases:N2}\",Purchase Bills: {_model.TotalPurchasesBillCount}");
+            sb.AppendLine($"16,Purchase Return (Vendor Returns),\"{_model.TotalPurchaseReturn:N2}\",Return Count: {_model.TotalPurchaseReturnCount}");
+            sb.AppendLine($"17,Holded Items / Hold Bills,\"{_model.HoldBillsValue:N2}\",Bills: {_model.HoldBillsCount} | Items: {_model.HoldItemsCount:N0}");
+            sb.AppendLine($"18,Gross Profit & Margin %,\"{_model.GrossProfit:N2}\",Gross Margin: {_model.GrossProfitMarginPercent:N1}%");
+            sb.AppendLine($"19,Total Business Expenses,\"{_model.TotalBusinessExpenses:N2}\",Direct: {_model.DirectExpenses:N2}, Indir: {_model.IndirectExpenses:N2}");
+            sb.AppendLine($"20,Actual Net Profit,\"{_model.ActualNetProfit:N2}\",Margin: {_model.OperatingProfitMarginPercent:N2}%");
+            sb.AppendLine($"21,Operating Profit Margin %,\"{_model.OperatingProfitMarginPercent:N2}%\",Net Margin");
+            sb.AppendLine($"22,GST / Net Tax Liability,\"{_model.NetTaxLiability:N2}\",Out: {_model.OutputGstAmount:N2}, In: {_model.InputGstAmount:N2}");
+            sb.AppendLine($"23,Cash in Hand,\"{_model.CashInHand:N2}\",Counter & Safe Cash");
+            sb.AppendLine($"24,Bank Balance,\"{_model.BankBalance:N2}\",Active Bank Accounts");
+            sb.AppendLine($"25,Vendor Outstanding,\"{_model.SupplierPayables:N2}\",Bills Count: {_model.SupplierPayablesCount}");
+            sb.AppendLine($"26,Customer Outstanding,\"{_model.CustomerReceivables:N2}\",Invoices Count: {_model.CustomerReceivablesCount}");
+            sb.AppendLine($"27,Delayed Customer Receivables (>30 Days),\"{_model.DelayedCustomerReceivables30Days:N2}\",Count: {_model.DelayedCustomerCount30Days}");
+            sb.AppendLine($"28,Delayed Supplier Payables (>30 Days),\"{_model.DelayedSupplierPayables30Days:N2}\",Count: {_model.DelayedSupplierCount30Days}");
+            sb.AppendLine($"29,Net Business Asset (NBA),\"{_model.NetBusinessAsset:N2}\",Assets: {_model.TotalAssets:N2} | Liab: {_model.TotalLiabilities:N2}");
+            sb.AppendLine($"30,Owner Drawings,\"{_model.OwnerDrawings:N2}\",Capital Withdrawals");
+            sb.AppendLine($"31,Customer Bad Debts,\"{_model.CustomerBadDebts:N2}\",Written Off");
+            sb.AppendLine($"32,Supplier Write-Offs,\"{_model.SupplierWriteOffs:N2}\",Discounts Settled");
+            sb.AppendLine($"33,Supplier Advance / Overpayment,\"{_model.SupplierAdvanceBalance:N2}\",Debit Balances");
+            sb.AppendLine($"34,Customer Advance / Deposits,\"{_model.CustomerAdvanceBalance:N2}\",Credit Balances");
+            sb.AppendLine($"35,Deletion & Cancellation Logs,\"{_model.DeletionCount}\",Deleted Bills/Vouchers");
+            sb.AppendLine($"36,Price Change Modifications,\"{_model.PriceChangeCount}\",Item Master Edits");
+            sb.AppendLine($"37,Physical Stock Discrepancy Logs,\"{_model.StockAdjustmentCount}\",Stock Adjustments");
+            sb.AppendLine($"38,Manual Party Balance,\"{_model.TotalManualBalance:N2}\",Cust: {_model.ManualCustomerBalance:N2} | Supp: {_model.ManualVendorBalance:N2} (Entries: {_model.ManualBalanceCount})");
+            sb.AppendLine($"39,Cash In / Cash Out Flow,\"{_model.NetCashFlow:N2}\",In: {_model.TotalCashIn:N2} | Out: {_model.TotalCashOut:N2} (Net)");
+            sb.AppendLine($"40,Daily Cash vs Bank Sales,\"{((_model.DailyCashSales + _model.DailyBankSales + _model.DailyCreditSales) > 0 ? (_model.DailyCashSales + _model.DailyBankSales + _model.DailyCreditSales) : _model.TotalSalesRevenue):N2}\",Cash: {_model.DailyCashSales:N2} | Bank/UPI: {_model.DailyBankSales:N2}");
             sb.AppendLine($"41,Counter Cash Shortage / Excess,\"{(_model.NetCashDifference == 0 ? "0.00 (Balanced)" : (_model.NetCashDifference < 0 ? $"-{Math.Abs(_model.NetCashDifference):N2} (Shortage)" : $"+{_model.NetCashDifference:N2} (Excess)"))}\",Expected: {_model.TotalExpectedCash:N2} | Counted: {_model.TotalCountedCash:N2}");
             sb.AppendLine($"42,Date-wise Reports Hub,\"8 Reports\",Date-wise Sales/Purchase/Stock/Expense/Payments");
+            sb.AppendLine($"43,Daily Financial Movement,\"{_model.TotalAssets:N2}\",Daily 12 AM closing valuations (Assets: {_model.TotalAssets:N2} | Liab: {_model.TotalLiabilities:N2})");
 
             // Growth Matrix in CSV
             sb.AppendLine();

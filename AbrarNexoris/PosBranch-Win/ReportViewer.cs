@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
 using System.IO;
+using System.Linq;
 using System.Windows.Forms;
 
 namespace PosBranch_Win
@@ -177,8 +178,9 @@ namespace PosBranch_Win
             }
         }
 
-        public bool PreviewPurchase(long purchaseNo)
+        public bool PreviewPurchase(long purchaseNo, int finYearId = 0, int branchId = 0)
         {
+            int reportBranchId = branchId > 0 ? branchId : SessionContext.BranchId;
             string reportPath = ResolveReportPath("CrystalReportPurcase.rpt");
             if (reportPath == null)
             {
@@ -194,8 +196,9 @@ namespace PosBranch_Win
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@PurchaseNo", purchaseNo);
-                    cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
+                    cmd.Parameters.AddWithValue("@BranchId", reportBranchId);
                     cmd.Parameters.AddWithValue("@_Operations", "GETPURCHASE");
+                    cmd.Parameters.AddWithValue("@FinYearId", finYearId > 0 ? finYearId : SessionContext.FinYearId);
 
                     using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
                     {
@@ -210,9 +213,10 @@ namespace PosBranch_Win
                     }
                 }
 
+                SetPurchaseReportDetails(rpt, dt);
                 setReportConnection(rpt);
                 SetMainReportParameter(rpt, "@PurchaseNo", purchaseNo);
-                SetMainReportParameter(rpt, "@BranchId", SessionContext.BranchId);
+                SetMainReportParameter(rpt, "@BranchId", reportBranchId);
                 SetMainReportParameter(rpt, "@_Operations", "GETPURCHASE");
                 PreviewReport(rpt, $"Purchase Invoice - {purchaseNo}");
                 return true;
@@ -231,7 +235,7 @@ namespace PosBranch_Win
             }
         }
 
-        public void PrintPurchase(long purchaseNo)
+        public void PrintPurchase(long purchaseNo, int finYearId = 0)
         {
             DataTable dt = new DataTable();
             string reportPath = ResolveReportPath("CrystalReportPurcase.rpt");
@@ -250,14 +254,21 @@ namespace PosBranch_Win
                     cmd.Parameters.AddWithValue("@PurchaseNo", purchaseNo);
                     cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
                     cmd.Parameters.AddWithValue("@_Operations", "GETPURCHASE");
+                    cmd.Parameters.AddWithValue("@FinYearId", finYearId > 0 ? finYearId : SessionContext.FinYearId);
 
                     using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
                     {
                         adapt.Fill(dt);
+                        if (dt.Rows.Count == 0)
+                        {
+                            MessageBox.Show($"No data found for Purchase No: {purchaseNo}", "Purchase Report", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            return;
+                        }
                         rpt.SetDataSource(dt);
                     }
                 }
 
+                SetPurchaseReportDetails(rpt, dt);
                 setReportConnection(rpt);
                 SetMainReportParameter(rpt, "@PurchaseNo", purchaseNo);
                 SetMainReportParameter(rpt, "@BranchId", SessionContext.BranchId);
@@ -568,8 +579,65 @@ namespace PosBranch_Win
             }
         }
 
+        private static void SetPurchaseReportDetails(ReportDocument report, DataTable data)
+        {
+            var header = data.Rows[0];
+            string mode = Convert.ToString(header["Paymode"]).Trim();
+            string order = data.Columns.Contains("PurchaseOrderNo")
+                ? Convert.ToString(header["PurchaseOrderNo"]).Trim()
+                : string.Empty;
+            var rows = data.Rows.Cast<DataRow>().ToList();
+            var unitQuantities = rows
+                .GroupBy(row => Convert.ToString(row["Unit"]).Trim(), StringComparer.OrdinalIgnoreCase)
+                .Select(group => $"{group.Sum(row => Convert.ToDecimal(row["Qty"])):#,0.##} " +
+                    (string.IsNullOrWhiteSpace(group.Key) ? "unspecified unit" : group.Key));
+            var summary = new List<string>
+            {
+                $"Item lines  {rows.Count:N0}",
+                $"Total quantity  {string.Join("  |  ", unitQuantities)}"
+            };
+
+            var taxes = rows.Where(row => Convert.ToDecimal(row["ItemTaxAmt"]) != 0m)
+                .GroupBy(row => Convert.ToDecimal(row["ItemTaxPer"]))
+                .OrderBy(group => group.Key)
+                .ToList();
+            if (taxes.Count > 0)
+            {
+                summary.Add(string.Empty);
+                summary.Add("Tax breakdown");
+                foreach (var group in taxes)
+                {
+                    decimal taxableBase = group.Sum(row => Convert.ToDecimal(row["Amount"]) - Convert.ToDecimal(row["ItemTaxAmt"]));
+                    decimal tax = group.Sum(row => Convert.ToDecimal(row["ItemTaxAmt"]));
+                    summary.Add($"{group.Key:0.##}%  |  Taxable {taxableBase:N2}  |  Tax {tax:N2}");
+                }
+            }
+
+            string generatedOn = $"Generated on  {DateTime.Now:dd-MM-yyyy hh:mm tt}";
+            if (!string.IsNullOrWhiteSpace(SessionContext.UserName))
+                generatedOn += $"  by {SessionContext.UserName.Trim()}";
+
+            var text = new Dictionary<string, string>
+            {
+                ["PurchasePaymentLabel"] = string.IsNullOrWhiteSpace(mode) ? "" : "Payment Mode",
+                ["PurchasePaymentMode"] = mode,
+                ["PurchaseOrderLabel"] = string.IsNullOrWhiteSpace(order) ? "" : "PO No.",
+                ["PurchaseOrderReference"] = order,
+                ["PurchaseReceivingSummary"] = string.Join(Environment.NewLine, summary),
+                ["PurchaseGeneratedOn"] = generatedOn
+            };
+            foreach (Section section in report.ReportDefinition.Sections)
+            {
+                foreach (ReportObject reportObject in section.ReportObjects)
+                {
+                    if (reportObject is TextObject field && text.TryGetValue(field.Name, out string value))
+                        field.Text = value;
+                }
+            }
+        }
+
         /// <summary>
-        /// Helper method to safely set main report parameters
+        /// Sets a main report parameter when it exists in the template.
         /// </summary>
         private void SetMainReportParameter(ReportDocument reportDoc, string parameterName, object value)
         {

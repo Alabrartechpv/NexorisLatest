@@ -187,6 +187,8 @@ namespace Repository.Accounts
                 {
                     try
                     {
+                        EnsureInvoiceReturnsArePosted(conn, transaction, master, details);
+
                         // Convert master.CreatedBy from string to int for the UserID parameter
                         int userId = 1; // Default value
                         if (!string.IsNullOrEmpty(master.CreatedBy))
@@ -511,6 +513,59 @@ namespace Repository.Accounts
             {
                 if (conn.State == ConnectionState.Open)
                     conn.Close();
+            }
+        }
+
+        private static void EnsureInvoiceReturnsArePosted(SqlConnection connection, SqlTransaction transaction,
+            CustomerReceiptMaster master, List<CustomerReceiptDetails> details)
+        {
+            const string sql = @"
+SELECT TOP (1) sr.SReturnNo
+FROM dbo.SReturnMaster sr WITH (HOLDLOCK)
+WHERE sr.BranchId = @BranchId
+  AND sr.LedgerID = @CustomerLedgerId
+  AND TRY_CONVERT(bigint, sr.InvoiceNo) = @BillNo
+  AND (sr.InvoiceDate IS NULL OR (sr.InvoiceDate >= @BillDate AND sr.InvoiceDate < DATEADD(day, 1, @BillDate)))
+  AND ISNULL(sr.CancelFlag, 0) = 0
+  AND ISNULL(sr.GrandTotal, 0) > 0
+  AND NOT EXISTS (
+      SELECT 1
+      FROM dbo.CreditNoteMaster cn WITH (HOLDLOCK)
+      INNER JOIN dbo.Vouchers v WITH (HOLDLOCK)
+        ON v.BranchID = cn.BranchId
+       AND v.FinYearID = cn.FinYearId
+       AND v.VoucherID = cn.VoucherId
+       AND v.LedgerID = cn.CustomerLedgerId
+       AND v.VoucherType = 'Credit Note'
+       AND ISNULL(v.CancelFlag, 0) = 0
+       AND v.Credit > 0
+      WHERE cn.SReturnNo = sr.SReturnNo
+        AND cn.BranchId = sr.BranchId
+        AND cn.FinYearId = sr.FinYearId
+        AND cn.CustomerLedgerId = sr.LedgerID
+        AND ISNULL(cn.CancelFlag, 0) = 0
+  )
+ORDER BY sr.SReturnNo;";
+
+            using (var command = new SqlCommand(sql, connection, transaction))
+            {
+                command.Parameters.Add("@BranchId", SqlDbType.Int).Value = master.BranchId;
+                command.Parameters.Add("@CustomerLedgerId", SqlDbType.Int).Value = master.CustomerLedgerId;
+                var billParameter = command.Parameters.Add("@BillNo", SqlDbType.BigInt);
+                var dateParameter = command.Parameters.Add("@BillDate", SqlDbType.Date);
+
+                foreach (var detail in details)
+                {
+                    billParameter.Value = long.Parse(detail.BillNo);
+                    dateParameter.Value = detail.BillDate.Date;
+                    var pendingReturn = command.ExecuteScalar();
+                    if (pendingReturn != null)
+                    {
+                        throw new InvalidOperationException(
+                            $"Invoice #{detail.BillNo} has Sales Return #{pendingReturn} awaiting a posted Credit Note. " +
+                            "Post the Credit Note, refresh the invoice balance, then save the receipt.");
+                    }
+                }
             }
         }
 
