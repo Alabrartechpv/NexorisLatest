@@ -3,12 +3,14 @@ using CrystalDecisions.CrystalReports.Engine;
 using CrystalDecisions.Shared;
 using ModelClass;
 using Repository;
+using Repository.SettingsRepo;
 using Repository.TransactionRepository;
 using PosBranch_Win.Transaction;
 using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
@@ -209,7 +211,7 @@ namespace PosBranch_Win
                             return false;
                         }
 
-                        rpt.SetDataSource(dt);
+                        BindPurchaseReport(rpt, dt);
                     }
                 }
 
@@ -264,7 +266,7 @@ namespace PosBranch_Win
                             MessageBox.Show($"No data found for Purchase No: {purchaseNo}", "Purchase Report", MessageBoxButtons.OK, MessageBoxIcon.Information);
                             return;
                         }
-                        rpt.SetDataSource(dt);
+                        BindPurchaseReport(rpt, dt);
                     }
                 }
 
@@ -576,6 +578,92 @@ namespace PosBranch_Win
             catch (Exception)
             {
                 // Ignore subreport setup errors
+            }
+        }
+
+        private static void BindPurchaseReport(ReportDocument report, DataTable data)
+        {
+            int branchId = Convert.ToInt32(data.Rows[0]["BranchId"]);
+            PurchasePrintBranding branding;
+            using (var repository = new PurchasePrintBrandingRepository())
+                branding = repository.Get(SessionContext.CompanyId, branchId);
+
+            ApplyPurchaseBranding(report, data, branding);
+        }
+
+        private static void ApplyPurchaseBranding(ReportDocument report, DataTable data, PurchasePrintBranding branding)
+        {
+            if (branding != null)
+            {
+                var overrides = new Dictionary<string, string>
+                {
+                    ["CompanyName"] = branding.ShopName,
+                    ["CompanyAddress1"] = branding.Address1,
+                    ["CompanyAddress2"] = branding.Address2,
+                    ["CompanyPhone"] = branding.Phone,
+                    ["CompanyEmail"] = branding.Email
+                };
+                foreach (DataRow row in data.Rows)
+                    foreach (var field in overrides)
+                        if (!string.IsNullOrWhiteSpace(field.Value))
+                            row[field.Key] = field.Value;
+            }
+
+            report.SetDataSource(data);
+            if (branding != null && !branding.HideLogo)
+                AddPurchaseLogo(report, branding.Logo ?? branding.CompanyLogo);
+        }
+
+        private static void AddPurchaseLogo(ReportDocument report, byte[] bytes)
+        {
+            if (bytes == null || bytes.Length == 0)
+                return;
+
+            string imagePath = Path.Combine(Path.GetTempPath(), $"nexoris-purchase-{Guid.NewGuid():N}.png");
+            try
+            {
+                using (var stream = new MemoryStream(bytes))
+                using (var source = Image.FromStream(stream, true, true))
+                {
+                    const int maximumWidth = 2700;
+                    const int maximumHeight = 900;
+                    const string pageFrameName = "PurchaseInvoiceFrame";
+                    double scale = Math.Min((double)maximumWidth / source.Width, (double)maximumHeight / source.Height);
+                    int width = Math.Max(1, (int)Math.Round(source.Width * scale));
+                    int height = Math.Max(1, (int)Math.Round(source.Height * scale));
+
+                    source.Save(imagePath, System.Drawing.Imaging.ImageFormat.Png);
+                    var reportHeader = report.ReportDefinition.Sections["Section1"];
+                    int originalHeaderHeight = reportHeader.Height;
+                    var definition = report.ReportClientDocument.ReportDefController;
+                    var title = definition.ReportDefinition.FindObjectByName("Text1");
+                    int logoLeft = title.Left + (title.Width - width) / 2;
+                    int logoTop = definition.ReportDefinition.FindObjectByName(pageFrameName) != null ? 145 : 0;
+                    var controller = definition.ReportObjectController;
+                    var section = definition.ReportDefinition.FindSectionByName("Section1");
+                    var picture = controller.ImportPicture(imagePath, section, logoLeft, logoTop);
+                    var resized = (CrystalDecisions.ReportAppServer.ReportDefModel.ISCRPictureObject)picture.Clone(true);
+                    resized.Width = width;
+                    resized.Height = height;
+                    controller.Modify(picture, resized);
+
+                    int offset = height + 125;
+                    reportHeader = report.ReportDefinition.Sections["Section1"];
+                    reportHeader.Height = Math.Max(reportHeader.Height, originalHeaderHeight + offset);
+                    foreach (ReportObject entry in reportHeader.ReportObjects)
+                        if (entry.Name != resized.Name && entry.Name != pageFrameName)
+                            entry.Top += offset;
+                    reportHeader.Height = originalHeaderHeight + offset;
+                }
+            }
+            catch (ArgumentException ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Purchase print logo could not be decoded: {ex.Message}");
+            }
+            finally
+            {
+                try { File.Delete(imagePath); }
+                catch (IOException ex) { System.Diagnostics.Debug.WriteLine(ex.Message); }
             }
         }
 

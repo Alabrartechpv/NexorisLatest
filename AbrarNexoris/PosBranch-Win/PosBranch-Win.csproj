@@ -740,6 +740,9 @@
     <Compile Include="DialogBox\frmItemTypeDialog.Designer.cs">
       <DependentUpon>frmItemTypeDialog.cs</DependentUpon>
     </Compile>
+    <Compile Include="Settings\FrmPurchasePrintSettings.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="DialogBox\FrmPurchaseDisplayDialog.cs">
       <SubType>Form</SubType>
     </Compile>

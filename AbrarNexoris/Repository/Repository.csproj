@@ -151,6 +151,7 @@
     <Compile Include="TransactionRepository\StockAdjustmentRepository.cs" />
     <Compile Include="TransactionRepository\StockTransferRepository.cs" />
     <Compile Include="SettingsRepo\POSSettingsRepository.cs" />
+    <Compile Include="SettingsRepo\PurchasePrintBrandingRepository.cs" />
     <Compile Include="SettingsRepo\FinancialYearRepository.cs" />
     <Compile Include="SettingsRepo\ItemActivityLogRepository.cs" />
     <Compile Include="SettingsRepo\TransactionActivityLogRepository.cs" />

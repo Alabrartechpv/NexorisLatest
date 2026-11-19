@@ -144,6 +144,7 @@ namespace PosBranch_Win
         public Home()
         {
             InitializeComponent();
+            AddPrintReportsGroup();
 
             // Ensure "SEARCH" button exists in Home ribbon
             EnsureSearchRibbonButton();
@@ -3320,7 +3321,7 @@ namespace PosBranch_Win
             if (tk == "Customer") return "customer";
             if (tk == "Vendor") return "vendor";
             if (tk == "Users") return "users";
-            if (tk == "Company") return "company";
+            if (tk == "Company" || tk == "PurchasePrintSetup" || tk == "FrmPurchasePrintSettings") return "company";
             if (tk == "Branch") return "branch";
             if (tk == "Category") return "category";
             if (tk == "Group") return "group";
@@ -3395,6 +3396,16 @@ namespace PosBranch_Win
                 System.Diagnostics.Debug.WriteLine($"Error getting active tab form: {ex.Message}");
             }
             return null;
+        }
+
+        private void AddPrintReportsGroup()
+        {
+            var tool = new Infragistics.Win.UltraWinToolbars.ButtonTool("PurchasePrintSetup");
+            tool.SharedProps.Caption = "Purchase Print";
+            ultraToolbarsManager1.Tools.Add(tool);
+            var group = new Infragistics.Win.UltraWinToolbars.RibbonGroup("PrintReports", "Print Reports");
+            ultraToolbarsManager1.Ribbon.Tabs["ribbonGeneralSetup"].Groups.Add(group);
+            group.Tools.AddTool(tool.Key);
         }
 
         private void ultraToolbarsManager1_ToolClick_1(object sender, Infragistics.Win.UltraWinToolbars.ToolClickEventArgs e)
@@ -3966,6 +3977,19 @@ namespace PosBranch_Win
             {
                 frmCompany compa = new frmCompany();
                 OpenFormInTabSafe(compa, "Company");
+            }
+
+            if (toolKey == "PurchasePrintSetup")
+            {
+                try
+                {
+                    OpenFormInTabSafe(new Settings.FrmPurchasePrintSettings(), "Purchase Print");
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(this, ex.Message, "Purchase Print", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                return;
             }
             if (e.Tool.Key == "Rack")
             {
