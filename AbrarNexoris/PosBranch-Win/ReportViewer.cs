@@ -2,6 +2,7 @@
 using CrystalDecisions.CrystalReports.Engine;
 using CrystalDecisions.Shared;
 using ModelClass;
+using ModelClass.Report;
 using Repository;
 using Repository.SettingsRepo;
 using Repository.TransactionRepository;
@@ -235,6 +236,67 @@ namespace PosBranch_Win
                     cn.DataConnection.Close();
                 }
             }
+        }
+
+        public void OpenStockListing(IReadOnlyList<StockReportItem> rows, string branchCaption, string filterCaption,
+            bool print, IWin32Window owner)
+        {
+            string reportPath = ResolveReportPath("StockListing.rpt");
+            if (reportPath == null)
+                return;
+
+            rpt.Load(reportPath);
+            BindStockListing(rpt, rows, branchCaption, filterCaption);
+            if (print)
+            {
+                using (var dialog = new PrintDialog { AllowSomePages = true, UseEXDialog = true })
+                {
+                    dialog.PrinterSettings.MaximumPage = 9999;
+                    if (dialog.ShowDialog(owner) != DialogResult.OK)
+                        return;
+
+                    var printer = dialog.PrinterSettings;
+                    rpt.PrintOptions.PrinterName = printer.PrinterName;
+                    rpt.PrintOptions.PaperOrientation = PaperOrientation.Landscape;
+                    bool selectedPages = printer.PrintRange == System.Drawing.Printing.PrintRange.SomePages;
+                    rpt.PrintToPrinter(printer.Copies, printer.Collate, selectedPages ? printer.FromPage : 0,
+                        selectedPages ? printer.ToPage : 0);
+                }
+                return;
+            }
+
+            Text = "Stock Listing - Print Preview";
+            WindowState = FormWindowState.Maximized;
+            crystalReportViewer1.ReportSource = rpt;
+            ShowDialog(owner);
+        }
+
+        private static void BindStockListing(ReportDocument report, IReadOnlyList<StockReportItem> rows,
+            string branchCaption, string filterCaption)
+        {
+            var data = new DataTable("StockListing");
+            foreach (string column in new[] { "Barcode", "ItemName", "Unit" })
+                data.Columns.Add(column, typeof(string));
+            foreach (string column in new[] { "Stock", "Hold", "Available", "UnitCost", "StockValue" })
+                data.Columns.Add(column, typeof(decimal));
+            foreach (var row in rows)
+                data.Rows.Add(row.Barcode ?? "", row.ItemName ?? "", row.BaseUnitName ?? "", row.ClosingStock,
+                    row.HoldQty, row.AvailableStock, row.Cost, row.StockValue);
+
+            report.SetDataSource(data);
+            var quantities = rows.GroupBy(row => (row.BaseUnitName ?? "").Trim(), StringComparer.OrdinalIgnoreCase)
+                .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(group => FormattableString.Invariant(
+                    $"{(group.Key.Length == 0 ? "Unspecified UOM" : group.Key)}   Stock {group.Sum(row => row.ClosingStock):#,0.##}  |  Hold {group.Sum(row => row.HoldQty):#,0.##}  |  Available {group.Sum(row => row.AvailableStock):#,0.##}"));
+
+            ((TextObject)report.ReportDefinition.ReportObjects["StockReportBranch"]).Text = branchCaption;
+            ((TextObject)report.ReportDefinition.ReportObjects["StockReportFilters"]).Text = filterCaption;
+            ((TextObject)report.ReportDefinition.ReportObjects["StockReportTotals"]).Text =
+                FormattableString.Invariant($"Items  {rows.Count:N0}     |     Total stock value  {rows.Sum(row => row.StockValue):N2}");
+            ((TextObject)report.ReportDefinition.ReportObjects["StockReportUnitTotals"]).Text =
+                string.Join(Environment.NewLine, quantities);
+            ((TextObject)report.ReportDefinition.ReportObjects["StockGenerated"]).Text =
+                $"Generated on  {DateTime.Now:dd-MM-yyyy hh:mm tt}";
         }
 
         public void PrintPurchase(long purchaseNo, int finYearId = 0)
