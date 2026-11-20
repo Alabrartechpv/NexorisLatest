@@ -299,6 +299,9 @@ namespace Repository.Accounts
                             master.BranchId = branchId;
                             master.FinYearId = finYearId;
 
+                            if (master.SReturnNo > 0)
+                                details = GetLinkedReturnAllocation(conn, transaction, master);
+
                             // 1. Resolve Voucher ID — reuse SalesReturn's VoucherID if available, else generate new
                             if (master.VoucherId <= 0)
                             {
@@ -362,52 +365,7 @@ namespace Repository.Accounts
                                 }
                             }
 
-                             // 2. Insert or Update into CreditNoteMaster
-                             bool exists = false;
-                             int existingId = 0;
-                             if (master.SReturnNo > 0)
-                             {
-                                 using (SqlCommand checkCmd = new SqlCommand(STOREDPROCEDURE._CreditNoteMaster, conn, transaction))
-                                 {
-                                     checkCmd.CommandType = CommandType.StoredProcedure;
-                                     checkCmd.Parameters.AddWithValue("@SReturnNo", master.SReturnNo);
-                                     checkCmd.Parameters.AddWithValue("@BranchId", master.BranchId);
-                                     checkCmd.Parameters.AddWithValue("@FinYearId", finYearId);
-                                     checkCmd.Parameters.AddWithValue("@_Operation", "GETMASTERBYSR");
-                                     using (var checkReader = checkCmd.ExecuteReader())
-                                     {
-                                         if (checkReader.Read())
-                                         {
-                                             exists = true;
-                                             existingId = Convert.ToInt32(checkReader["Id"]);
-                                             master.VoucherId = Convert.ToInt32(checkReader["VoucherId"]);
-                                         }
-                                     }
-                                 }
-                             }
-
-                            if (exists)
-                            {
-                                master.Id = existingId;
-                                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._CreditNoteMaster, conn, transaction))
-                                {
-                                    cmd.CommandType = CommandType.StoredProcedure;
-                                    cmd.Parameters.AddWithValue("@Id", master.Id);
-                                    cmd.Parameters.AddWithValue("@CompanyId", master.CompanyId);
-                                    cmd.Parameters.AddWithValue("@BranchId", master.BranchId);
-                                    cmd.Parameters.AddWithValue("@FinYearId", finYearId);
-                                    cmd.Parameters.AddWithValue("@VoucherId", master.VoucherId);
-                                    cmd.Parameters.AddWithValue("@CustomerLedgerId", master.CustomerLedgerId);
-                                    cmd.Parameters.AddWithValue("@CreditAmount", master.CreditAmount);
-                                    cmd.Parameters.AddWithValue("@PaymentMethodLedgerId", master.PaymentMethodLedgerId);
-                                    cmd.Parameters.AddWithValue("@Narration", master.Narration ?? "");
-                                    cmd.Parameters.AddWithValue("@_Operation", "UPDATE");
-
-                                    cmd.ExecuteNonQuery();
-                                }
-                            }
-                            else
-                            {
+                            // 2. Insert into CreditNoteMaster
                                 using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._CreditNoteMaster, conn, transaction))
                                 {
                                     cmd.CommandType = CommandType.StoredProcedure;
@@ -447,7 +405,6 @@ namespace Repository.Accounts
                                         }
                                     }
                                 }
-                            }
 
                             // 3. Insert detail rows for each invoice that had credit applied.
                             // Rows with CreditAmount = 0 (fully-paid invoice audit rows)
@@ -461,7 +418,7 @@ namespace Repository.Accounts
                                 {
                                     cmd.CommandType = CommandType.StoredProcedure;
                                     cmd.Parameters.AddWithValue("@BranchId", master.BranchId);
-                                    cmd.Parameters.AddWithValue("@FinYearId", finYearId);
+                                    cmd.Parameters.AddWithValue("@FinYearId", detail.FinYearId > 0 ? detail.FinYearId : finYearId);
                                     cmd.Parameters.AddWithValue("@CustomerLedgerId", master.CustomerLedgerId);
                                     cmd.Parameters.AddWithValue("@CreditNoteMasterId", master.Id);
                                     cmd.Parameters.AddWithValue("@BillNo", detail.BillNo);
@@ -742,6 +699,92 @@ namespace Repository.Accounts
                 catch (Exception ex)
                 {
                     throw new Exception($"Connection error: {ex.Message}", ex);
+                }
+            }
+        }
+
+        private static List<CreditNoteDetails> GetLinkedReturnAllocation(SqlConnection connection,
+            SqlTransaction transaction, CreditNoteMaster master)
+        {
+            const string sql = @"
+SELECT sr.InvoiceNo, sr.GrandTotal, invoice.BillNo, invoice.BillDate, invoice.FinYearId,
+       invoice.NetAmount, invoice.ReceivedAmount, existing.VoucherId AS ExistingVoucherId
+FROM dbo.SReturnMaster sr WITH (UPDLOCK, HOLDLOCK)
+OUTER APPLY (
+    SELECT TOP (1) cn.VoucherId
+    FROM dbo.CreditNoteMaster cn WITH (HOLDLOCK)
+    WHERE cn.BranchId = sr.BranchId
+      AND cn.FinYearId = sr.FinYearId
+      AND cn.SReturnNo = sr.SReturnNo
+      AND ISNULL(cn.CancelFlag, 0) = 0
+    ORDER BY cn.Id
+) existing
+LEFT JOIN dbo.SMaster invoice WITH (UPDLOCK, HOLDLOCK)
+    ON invoice.BranchId = sr.BranchId
+   AND invoice.LedgerID = sr.LedgerID
+   AND invoice.BillNo = TRY_CONVERT(bigint, sr.InvoiceNo)
+   AND (sr.InvoiceDate IS NULL OR CAST(invoice.BillDate AS date) = CAST(sr.InvoiceDate AS date))
+   AND ISNULL(invoice.CancelFlag, 0) = 0
+WHERE sr.SReturnNo = @ReturnNo
+  AND sr.BranchId = @BranchId
+  AND sr.FinYearId = @FinYearId
+  AND sr.LedgerID = @CustomerLedgerId
+  AND ISNULL(sr.CancelFlag, 0) = 0;";
+            using (var command = new SqlCommand(sql, connection, transaction))
+            {
+                command.Parameters.Add("@ReturnNo", SqlDbType.Int).Value = master.SReturnNo;
+                command.Parameters.Add("@BranchId", SqlDbType.Int).Value = master.BranchId;
+                command.Parameters.Add("@FinYearId", SqlDbType.Int).Value = master.FinYearId;
+                command.Parameters.Add("@CustomerLedgerId", SqlDbType.Int).Value = master.CustomerLedgerId;
+
+                using (var reader = command.ExecuteReader())
+                {
+                    if (!reader.Read())
+                        throw new InvalidOperationException($"Sales Return #{master.SReturnNo} is no longer available for this customer.");
+
+                    if (reader["ExistingVoucherId"] != DBNull.Value)
+                        throw new InvalidOperationException(
+                            $"Sales Return #{master.SReturnNo} already has Credit Note #{reader["ExistingVoucherId"]}. Open the existing note from Credit Note History.");
+
+                    master.InvoiceNo = Convert.ToString(reader["InvoiceNo"]).Trim();
+                    decimal credit = Math.Round(Convert.ToDecimal(reader["GrandTotal"]), 2);
+                    if (credit <= 0)
+                        throw new InvalidOperationException("The sales return has no credit amount to post.");
+
+                    master.CreditAmount = (double)credit;
+                    var allocation = new List<CreditNoteDetails>();
+                    if (string.IsNullOrEmpty(master.InvoiceNo) ||
+                        master.InvoiceNo.Equals("without bill", StringComparison.OrdinalIgnoreCase) ||
+                        master.InvoiceNo.Equals("without sales bill", StringComparison.OrdinalIgnoreCase) ||
+                        master.InvoiceNo.Equals("without GR", StringComparison.OrdinalIgnoreCase))
+                        return allocation;
+
+                    if (reader["BillNo"] == DBNull.Value)
+                        throw new InvalidOperationException($"Original invoice #{master.InvoiceNo} could not be matched to the sales return.");
+
+                    decimal invoiceAmount = Convert.ToDecimal(reader["NetAmount"]);
+                    decimal received = reader["ReceivedAmount"] == DBNull.Value ? 0m : Convert.ToDecimal(reader["ReceivedAmount"]);
+                    decimal outstanding = Math.Max(0m, Math.Round(invoiceAmount - received, 2));
+                    decimal applied = Math.Min(credit, outstanding);
+                    if (applied > 0)
+                    {
+                        allocation.Add(new CreditNoteDetails
+                        {
+                            BranchId = master.BranchId,
+                            FinYearId = Convert.ToInt32(reader["FinYearId"]),
+                            BillNo = Convert.ToInt32(reader["BillNo"]),
+                            BillDate = Convert.ToDateTime(reader["BillDate"]),
+                            BillAmount = (double)invoiceAmount,
+                            OldBillAmount = (double)invoiceAmount,
+                            CreditAmount = (double)applied,
+                            BalanceAmount = (double)(outstanding - applied)
+                        });
+                    }
+
+                    if (reader.Read())
+                        throw new InvalidOperationException($"More than one invoice matched #{master.InvoiceNo}. Verify the return's original invoice date.");
+
+                    return allocation;
                 }
             }
         }

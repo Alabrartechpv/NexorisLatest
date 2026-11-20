@@ -3,13 +3,16 @@ using CrystalDecisions.CrystalReports.Engine;
 using CrystalDecisions.Shared;
 using ModelClass;
 using Repository;
+using Repository.SettingsRepo;
 using Repository.TransactionRepository;
 using PosBranch_Win.Transaction;
 using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Windows.Forms;
 
 namespace PosBranch_Win
@@ -177,8 +180,9 @@ namespace PosBranch_Win
             }
         }
 
-        public bool PreviewPurchase(long purchaseNo)
+        public bool PreviewPurchase(long purchaseNo, int finYearId = 0, int branchId = 0)
         {
+            int reportBranchId = branchId > 0 ? branchId : SessionContext.BranchId;
             string reportPath = ResolveReportPath("CrystalReportPurcase.rpt");
             if (reportPath == null)
             {
@@ -194,8 +198,9 @@ namespace PosBranch_Win
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@PurchaseNo", purchaseNo);
-                    cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
+                    cmd.Parameters.AddWithValue("@BranchId", reportBranchId);
                     cmd.Parameters.AddWithValue("@_Operations", "GETPURCHASE");
+                    cmd.Parameters.AddWithValue("@FinYearId", finYearId > 0 ? finYearId : SessionContext.FinYearId);
 
                     using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
                     {
@@ -206,13 +211,14 @@ namespace PosBranch_Win
                             return false;
                         }
 
-                        rpt.SetDataSource(dt);
+                        BindPurchaseReport(rpt, dt);
                     }
                 }
 
+                SetPurchaseReportDetails(rpt, dt);
                 setReportConnection(rpt);
                 SetMainReportParameter(rpt, "@PurchaseNo", purchaseNo);
-                SetMainReportParameter(rpt, "@BranchId", SessionContext.BranchId);
+                SetMainReportParameter(rpt, "@BranchId", reportBranchId);
                 SetMainReportParameter(rpt, "@_Operations", "GETPURCHASE");
                 PreviewReport(rpt, $"Purchase Invoice - {purchaseNo}");
                 return true;
@@ -231,7 +237,7 @@ namespace PosBranch_Win
             }
         }
 
-        public void PrintPurchase(long purchaseNo)
+        public void PrintPurchase(long purchaseNo, int finYearId = 0)
         {
             DataTable dt = new DataTable();
             string reportPath = ResolveReportPath("CrystalReportPurcase.rpt");
@@ -250,14 +256,21 @@ namespace PosBranch_Win
                     cmd.Parameters.AddWithValue("@PurchaseNo", purchaseNo);
                     cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
                     cmd.Parameters.AddWithValue("@_Operations", "GETPURCHASE");
+                    cmd.Parameters.AddWithValue("@FinYearId", finYearId > 0 ? finYearId : SessionContext.FinYearId);
 
                     using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
                     {
                         adapt.Fill(dt);
-                        rpt.SetDataSource(dt);
+                        if (dt.Rows.Count == 0)
+                        {
+                            MessageBox.Show($"No data found for Purchase No: {purchaseNo}", "Purchase Report", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            return;
+                        }
+                        BindPurchaseReport(rpt, dt);
                     }
                 }
 
+                SetPurchaseReportDetails(rpt, dt);
                 setReportConnection(rpt);
                 SetMainReportParameter(rpt, "@PurchaseNo", purchaseNo);
                 SetMainReportParameter(rpt, "@BranchId", SessionContext.BranchId);
@@ -568,8 +581,151 @@ namespace PosBranch_Win
             }
         }
 
+        private static void BindPurchaseReport(ReportDocument report, DataTable data)
+        {
+            int branchId = Convert.ToInt32(data.Rows[0]["BranchId"]);
+            PurchasePrintBranding branding;
+            using (var repository = new PurchasePrintBrandingRepository())
+                branding = repository.Get(SessionContext.CompanyId, branchId);
+
+            ApplyPurchaseBranding(report, data, branding);
+        }
+
+        private static void ApplyPurchaseBranding(ReportDocument report, DataTable data, PurchasePrintBranding branding)
+        {
+            if (branding != null)
+            {
+                var overrides = new Dictionary<string, string>
+                {
+                    ["CompanyName"] = branding.ShopName,
+                    ["CompanyAddress1"] = branding.Address1,
+                    ["CompanyAddress2"] = branding.Address2,
+                    ["CompanyPhone"] = branding.Phone,
+                    ["CompanyEmail"] = branding.Email
+                };
+                foreach (DataRow row in data.Rows)
+                    foreach (var field in overrides)
+                        if (!string.IsNullOrWhiteSpace(field.Value))
+                            row[field.Key] = field.Value;
+            }
+
+            report.SetDataSource(data);
+            if (branding != null && !branding.HideLogo)
+                AddPurchaseLogo(report, branding.Logo ?? branding.CompanyLogo);
+        }
+
+        private static void AddPurchaseLogo(ReportDocument report, byte[] bytes)
+        {
+            if (bytes == null || bytes.Length == 0)
+                return;
+
+            string imagePath = Path.Combine(Path.GetTempPath(), $"nexoris-purchase-{Guid.NewGuid():N}.png");
+            try
+            {
+                using (var stream = new MemoryStream(bytes))
+                using (var source = Image.FromStream(stream, true, true))
+                {
+                    const int maximumWidth = 2700;
+                    const int maximumHeight = 900;
+                    const string pageFrameName = "PurchaseInvoiceFrame";
+                    double scale = Math.Min((double)maximumWidth / source.Width, (double)maximumHeight / source.Height);
+                    int width = Math.Max(1, (int)Math.Round(source.Width * scale));
+                    int height = Math.Max(1, (int)Math.Round(source.Height * scale));
+
+                    source.Save(imagePath, System.Drawing.Imaging.ImageFormat.Png);
+                    var reportHeader = report.ReportDefinition.Sections["Section1"];
+                    int originalHeaderHeight = reportHeader.Height;
+                    var definition = report.ReportClientDocument.ReportDefController;
+                    var title = definition.ReportDefinition.FindObjectByName("Text1");
+                    int logoLeft = title.Left + (title.Width - width) / 2;
+                    int logoTop = definition.ReportDefinition.FindObjectByName(pageFrameName) != null ? 145 : 0;
+                    var controller = definition.ReportObjectController;
+                    var section = definition.ReportDefinition.FindSectionByName("Section1");
+                    var picture = controller.ImportPicture(imagePath, section, logoLeft, logoTop);
+                    var resized = (CrystalDecisions.ReportAppServer.ReportDefModel.ISCRPictureObject)picture.Clone(true);
+                    resized.Width = width;
+                    resized.Height = height;
+                    controller.Modify(picture, resized);
+
+                    int offset = height + 125;
+                    reportHeader = report.ReportDefinition.Sections["Section1"];
+                    reportHeader.Height = Math.Max(reportHeader.Height, originalHeaderHeight + offset);
+                    foreach (ReportObject entry in reportHeader.ReportObjects)
+                        if (entry.Name != resized.Name && entry.Name != pageFrameName)
+                            entry.Top += offset;
+                    reportHeader.Height = originalHeaderHeight + offset;
+                }
+            }
+            catch (ArgumentException ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Purchase print logo could not be decoded: {ex.Message}");
+            }
+            finally
+            {
+                try { File.Delete(imagePath); }
+                catch (IOException ex) { System.Diagnostics.Debug.WriteLine(ex.Message); }
+            }
+        }
+
+        private static void SetPurchaseReportDetails(ReportDocument report, DataTable data)
+        {
+            var header = data.Rows[0];
+            string mode = Convert.ToString(header["Paymode"]).Trim();
+            string order = data.Columns.Contains("PurchaseOrderNo")
+                ? Convert.ToString(header["PurchaseOrderNo"]).Trim()
+                : string.Empty;
+            var rows = data.Rows.Cast<DataRow>().ToList();
+            var unitQuantities = rows
+                .GroupBy(row => Convert.ToString(row["Unit"]).Trim(), StringComparer.OrdinalIgnoreCase)
+                .Select(group => $"{group.Sum(row => Convert.ToDecimal(row["Qty"])):#,0.##} " +
+                    (string.IsNullOrWhiteSpace(group.Key) ? "unspecified unit" : group.Key));
+            var summary = new List<string>
+            {
+                $"Item lines  {rows.Count:N0}",
+                $"Total quantity  {string.Join("  |  ", unitQuantities)}"
+            };
+
+            var taxes = rows.Where(row => Convert.ToDecimal(row["ItemTaxAmt"]) != 0m)
+                .GroupBy(row => Convert.ToDecimal(row["ItemTaxPer"]))
+                .OrderBy(group => group.Key)
+                .ToList();
+            if (taxes.Count > 0)
+            {
+                summary.Add(string.Empty);
+                summary.Add("Tax breakdown");
+                foreach (var group in taxes)
+                {
+                    decimal taxableBase = group.Sum(row => Convert.ToDecimal(row["Amount"]) - Convert.ToDecimal(row["ItemTaxAmt"]));
+                    decimal tax = group.Sum(row => Convert.ToDecimal(row["ItemTaxAmt"]));
+                    summary.Add($"{group.Key:0.##}%  |  Taxable {taxableBase:N2}  |  Tax {tax:N2}");
+                }
+            }
+
+            string generatedOn = $"Generated on  {DateTime.Now:dd-MM-yyyy hh:mm tt}";
+            if (!string.IsNullOrWhiteSpace(SessionContext.UserName))
+                generatedOn += $"  by {SessionContext.UserName.Trim()}";
+
+            var text = new Dictionary<string, string>
+            {
+                ["PurchasePaymentLabel"] = string.IsNullOrWhiteSpace(mode) ? "" : "Payment Mode",
+                ["PurchasePaymentMode"] = mode,
+                ["PurchaseOrderLabel"] = string.IsNullOrWhiteSpace(order) ? "" : "PO No.",
+                ["PurchaseOrderReference"] = order,
+                ["PurchaseReceivingSummary"] = string.Join(Environment.NewLine, summary),
+                ["PurchaseGeneratedOn"] = generatedOn
+            };
+            foreach (Section section in report.ReportDefinition.Sections)
+            {
+                foreach (ReportObject reportObject in section.ReportObjects)
+                {
+                    if (reportObject is TextObject field && text.TryGetValue(field.Name, out string value))
+                        field.Text = value;
+                }
+            }
+        }
+
         /// <summary>
-        /// Helper method to safely set main report parameters
+        /// Sets a main report parameter when it exists in the template.
         /// </summary>
         private void SetMainReportParameter(ReportDocument reportDoc, string parameterName, object value)
         {

@@ -413,7 +413,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                 FormatDaywiseCol(b, "AssetReductions", "Asset Out (-)", 105);
                 FormatDaywiseCol(b, "TotalAssets", "Asset Close (12 AM)", 135, isBold: true, foreColor: DebitGreen);
                 FormatDaywiseCol(b, "DailyAssetChange", "Asset Growth (₹)", 115, isBold: true, format: "+#,##0.00;-#,##0.00;0.00");
-                FormatDaywiseCol(b, "DailyAssetChangePct", "Asset Growth %", 95, isBold: true, format: "+0.00%;-0.00%;0.00%");
+                FormatDaywiseCol(b, "DailyAssetChangePct", "Asset Growth %", 95, isBold: true, format: "+0.00'%';-0.00'%';0.00'%'");
                 FormatDaywiseCol(b, "LiabOpening", "Liab Opn (12 AM)", 125);
                 FormatDaywiseCol(b, "TotalLiabilities", "Liab Close (12 AM)", 135, isBold: true, foreColor: CreditRed);
                 FormatDaywiseCol(b, "DailyLiabChange", "Liab Change", 105, isBold: true, format: "+#,##0.00;-#,##0.00;0.00");

@@ -252,7 +252,7 @@ namespace PosBranch_Win.Dashboard
             this.lblDashboardSubtitle.Name = "lblDashboardSubtitle";
             this.lblDashboardSubtitle.Size = new System.Drawing.Size(275, 12);
             this.lblDashboardSubtitle.TabIndex = 1;
-            this.lblDashboardSubtitle.Text = "42 Key Business Metrics, EOD Reconciliation & Performance Matrix";
+            this.lblDashboardSubtitle.Text = "43 Key Business Metrics, EOD Reconciliation & Performance Matrix";
             // 
             // lblDashboardTitle
             // 

@@ -63,6 +63,17 @@ namespace PosBranch_Win.DialogBox
             // Set up UltraPanel styling
             SetupUltraPanelStyle();
 
+            var reprintButton = new Button
+            {
+                Name = "btnReprintInvoice",
+                Text = "&Reprint Invoice",
+                Location = new Point(ultraPanel6.Right + 14, ultraPanel6.Top),
+                Size = new Size(146, ultraPanel6.Height),
+                TabIndex = ultraPanel6.TabIndex + 1
+            };
+            reprintButton.Click += ReprintInvoice_Click;
+            ultPanelPurchaseDisplay.ClientArea.Controls.Add(reprintButton);
+
             // Register key event handlers
             ultraGrid1.KeyPress += ultraGrid1_KeyPress;
             ultraGrid1.KeyDown += ultraGrid1_KeyDown;
@@ -1109,6 +1120,42 @@ namespace PosBranch_Win.DialogBox
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"Error wiring OK/Close click handlers: {ex.Message}");
+            }
+        }
+
+        private void ReprintInvoice_Click(object sender, EventArgs e)
+        {
+            var row = ultraGrid1.ActiveRow;
+            if (row == null || !row.IsDataRow || !row.Cells.Exists("Pid") ||
+                !int.TryParse(Convert.ToString(row.Cells["Pid"].Value), out int purchaseId) || purchaseId <= 0)
+            {
+                MessageBox.Show(this, "Select a saved purchase to reprint.", "Reprint Invoice",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            try
+            {
+                // Purchase History identifies the saved record by Pid even when its GRN is reused.
+                var purchase = ObjPurchaseInvRepo.getPurchaseNumber(purchaseId).Listpmaster?.SingleOrDefault();
+                if (purchase == null || purchase.PurchaseNo <= 0 || purchase.FinYearId <= 0 ||
+                    purchase.BranchId != SessionContext.BranchId || purchase.CompanyId != SessionContext.CompanyId)
+                {
+                    MessageBox.Show(this, "The selected purchase is no longer available for this branch.",
+                        "Reprint Invoice", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+
+                using (var viewer = new ReportViewer())
+                {
+                    if (viewer.PreviewPurchase(purchase.PurchaseNo, purchase.FinYearId, purchase.BranchId))
+                        viewer.ShowDialog(this);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, $"Error opening the purchase invoice: {ex.Message}", "Reprint Invoice",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 

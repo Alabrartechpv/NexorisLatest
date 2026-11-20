@@ -6680,7 +6680,8 @@ namespace PosBranch_Win.Transaction
                 }
 
                 ReportViewer rv = new ReportViewer();
-                bool previewSuccess = rv.PreviewPurchase(purchaseNo);
+                int finYearId = ObjPurchaseMaster?.PurchaseNo == purchaseNo ? ObjPurchaseMaster.FinYearId : GetFinYearId();
+                bool previewSuccess = rv.PreviewPurchase(purchaseNo, finYearId);
                 if (previewSuccess)
                 {
                     rv.Show();
@@ -6715,7 +6716,8 @@ namespace PosBranch_Win.Transaction
                 }
 
                 ReportViewer rv = new ReportViewer();
-                rv.PrintPurchase(purchaseNo);
+                int finYearId = ObjPurchaseMaster?.PurchaseNo == purchaseNo ? ObjPurchaseMaster.FinYearId : GetFinYearId();
+                rv.PrintPurchase(purchaseNo, finYearId);
             }
             catch (Exception ex)
             {

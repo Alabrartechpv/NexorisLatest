@@ -5424,11 +5424,11 @@ namespace PosBranch_Win.Transaction
 
         private void DisplayCreditNote(CreditNote creditNote)
         {
-            bool applyCreditNoteOpened = false;
+            bool hasCustomerLedger = SReturn != null && SReturn.LedgerID > 0;
 
             // Create a form to display the credit note
             Form creditNoteForm = new Form();
-            creditNoteForm.Text = "Credit Note";
+            creditNoteForm.Text = hasCustomerLedger ? "Sales Return Summary" : "Credit Note";
             creditNoteForm.Size = new Size(500, 600);
             creditNoteForm.StartPosition = FormStartPosition.CenterScreen;
             creditNoteForm.MaximizeBox = false;
@@ -5443,14 +5443,16 @@ namespace PosBranch_Win.Transaction
 
             // Add credit note details
             Label titleLabel = new Label();
-            titleLabel.Text = "CREDIT NOTE";
+            titleLabel.Text = hasCustomerLedger ? "SALES RETURN SUMMARY" : "CREDIT NOTE";
             titleLabel.Font = new Font("Arial", 16, FontStyle.Bold);
             titleLabel.TextAlign = ContentAlignment.MiddleCenter;
             titleLabel.Size = new Size(460, 40);
             titleLabel.Location = new Point(20, 20);
 
             Label creditNoteNoLabel = new Label();
-            creditNoteNoLabel.Text = $"Credit Note #: {creditNote.CreditNoteNo}";
+            creditNoteNoLabel.Text = hasCustomerLedger
+                ? $"Sales Return #: {creditNote.CreditNoteNo}"
+                : $"Credit Note #: {creditNote.CreditNoteNo}";
             creditNoteNoLabel.Font = new Font("Arial", 10);
             creditNoteNoLabel.Size = new Size(300, 20);
             creditNoteNoLabel.Location = new Point(20, 70);
@@ -5583,7 +5585,9 @@ namespace PosBranch_Win.Transaction
 
             // Add note text
             Label noteLabel = new Label();
-            noteLabel.Text = "This credit note is issued for the returned items. This is not a tax invoice.";
+            noteLabel.Text = hasCustomerLedger
+                ? "Post the linked Credit Note before collecting a receipt for this invoice."
+                : "This credit note is issued for the returned items. This is not a tax invoice.";
             noteLabel.Font = new Font("Arial", 9, FontStyle.Italic);
             noteLabel.Size = new Size(400, 40);
             noteLabel.Location = new Point(20, 460);
@@ -5593,15 +5597,16 @@ namespace PosBranch_Win.Transaction
             printButton.Text = "Print";
             printButton.Size = new Size(100, 30);
             printButton.Location = new Point(50, 510);
+            printButton.Visible = !hasCustomerLedger;
             printButton.Click += (sender, e) => PrintCreditNote(creditNote);
 
             Button viewReceiptButton = new Button();
             viewReceiptButton.Text = "Apply Credit Note";
             viewReceiptButton.Size = new Size(120, 30);
             viewReceiptButton.Location = new Point(170, 510);
+            viewReceiptButton.Visible = hasCustomerLedger;
             viewReceiptButton.Click += (sender, e) =>
             {
-                applyCreditNoteOpened = true;
                 OpenReceiptForm(creditNote, creditNoteForm);
             };
 
@@ -5631,19 +5636,6 @@ namespace PosBranch_Win.Transaction
 
             // Show the form
             creditNoteForm.ShowDialog();
-
-            if (!applyCreditNoteOpened)
-            {
-                EnsureCreditNoteMasterExists(creditNote);
-            }
-        }
-
-        private void EnsureCreditNoteMasterExists(CreditNote creditNote)
-        {
-            // Do not auto-create CreditNoteMaster during Sales Return saving.
-            // Credit Note master and GL voucher creation are handled when the user opens FrmCreditNote
-            // and applies the pending Sales Return, matching Purchase Return & FrmDebitNote behavior.
-            return;
         }
 
         private void PrintCreditNote(CreditNote creditNote)
