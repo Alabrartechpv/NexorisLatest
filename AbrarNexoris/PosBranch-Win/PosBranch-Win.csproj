@@ -2329,6 +2329,10 @@
       <Link>Reports\CrystalReportPurcase.rpt</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Content Include="..\CrsReports\StockListing.rpt">
+      <Link>Reports\StockListing.rpt</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

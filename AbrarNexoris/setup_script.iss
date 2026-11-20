@@ -31,6 +31,7 @@ Source: "PosBranch-Win\bin\Release\*"; DestDir: "{app}"; Flags: ignoreversion re
 ; Copy Crystal Report (.rpt) files — NOT output to bin\Release by the build, must be explicitly included
 Source: "CrsReports\SalesInvoicePrint.rpt"; DestDir: "{app}\Reports"; Flags: ignoreversion
 Source: "CrsReports\CrystalReportPurcase.rpt"; DestDir: "{app}\Reports"; Flags: ignoreversion
+Source: "CrsReports\StockListing.rpt"; DestDir: "{app}\Reports"; Flags: ignoreversion
 Source: "PosBranch-Win\Reportrpt\Sales_Daily.rpt"; DestDir: "{app}\Reports"; Flags: ignoreversion
 ; Copy application icon to install folder (used for shortcuts)
 Source: "PosBranch-Win\Resources\app_icon.ico"; DestDir: "{app}"; Flags: ignoreversion

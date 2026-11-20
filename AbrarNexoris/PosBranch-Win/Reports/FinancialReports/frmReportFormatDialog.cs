@@ -41,6 +41,14 @@ namespace PosBranch_Win.Reports.FinancialReports
 
         public string SelectedAction { get; private set; }
 
+        public void HideDesignActions()
+        {
+            ultraPanel1.Visible = false;
+            ultraPanel2.Visible = false;
+            ultraPanel3.Visible = false;
+            ultraPanel7.Visible = false;
+        }
+
         public frmReportFormatDialog(string reportCaption, IEnumerable<string> formatDescriptions)
         {
             InitializeComponent();
