@@ -2347,8 +2347,8 @@
       <Link>Reports\CrystalReportPurcase.rpt</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="..\CrsReports\StockListing.rpt">
-      <Link>Reports\StockListing.rpt</Link>
+    <Content Include="..\CrsReports\StockListingPortrait.rpt">
+      <Link>Reports\StockListingPortrait.rpt</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

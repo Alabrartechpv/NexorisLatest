@@ -1255,7 +1255,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                     filtered.Add(row);
                 }
 
-                _stockListingBranchCaption = string.Format("Branch  {0}    |    Stock as of  {1:dd-MM-yyyy}",
+                _stockListingBranchCaption = string.Format("Branch: {0}   ·   Stock as of: {1:dd-MMM-yyyy}",
                     string.IsNullOrWhiteSpace(SessionContext.BranchName) ? filter.BranchId.ToString() : SessionContext.BranchName,
                     filter.ToDate);
                 var stockFilters = new[]
@@ -2942,7 +2942,7 @@ namespace PosBranch_Win.Reports.InventoryReport
                     }
                     using (var viewer = new ReportViewer())
                         viewer.OpenStockListing(rows, _stockListingBranchCaption ?? SessionContext.BranchName ?? "",
-                            filters.Count == 0 ? "Filters  All items" : "Filters  " + string.Join("  |  ", filters),
+                            filters.Count == 0 ? "Filters: All items" : "Filters: " + string.Join("   ·   ", filters),
                             dialog.SelectedAction != "preview", this);
                 }
                 catch (Exception ex)

@@ -12,6 +12,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
 using System.Drawing;
+using System.Drawing.Printing;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
@@ -241,34 +242,70 @@ namespace PosBranch_Win
         public void OpenStockListing(IReadOnlyList<StockReportItem> rows, string branchCaption, string filterCaption,
             bool print, IWin32Window owner)
         {
-            string reportPath = ResolveReportPath("StockListing.rpt");
+            string reportPath = ResolveReportPath("StockListingPortrait.rpt");
             if (reportPath == null)
                 return;
 
-            rpt.Load(reportPath);
-            BindStockListing(rpt, rows, branchCaption, filterCaption);
             if (print)
             {
-                using (var dialog = new PrintDialog { AllowSomePages = true, UseEXDialog = true })
-                {
-                    dialog.PrinterSettings.MaximumPage = 9999;
-                    if (dialog.ShowDialog(owner) != DialogResult.OK)
-                        return;
-
-                    var printer = dialog.PrinterSettings;
-                    rpt.PrintOptions.PrinterName = printer.PrinterName;
-                    rpt.PrintOptions.PaperOrientation = PaperOrientation.Landscape;
-                    bool selectedPages = printer.PrintRange == System.Drawing.Printing.PrintRange.SomePages;
-                    rpt.PrintToPrinter(printer.Copies, printer.Collate, selectedPages ? printer.FromPage : 0,
-                        selectedPages ? printer.ToPage : 0);
-                }
+                PrintStockListing(reportPath, rows, branchCaption, filterCaption, owner);
                 return;
             }
 
+            rpt.Load(reportPath);
+            BindStockListing(rpt, rows, branchCaption, filterCaption);
+
             Text = "Stock Listing - Print Preview";
             WindowState = FormWindowState.Maximized;
+            crystalReportViewer1.ShowPrintButton = false;
+            var printBar = new ToolStrip { Dock = DockStyle.Top, GripStyle = ToolStripGripStyle.Hidden };
+            var printButton = new ToolStripButton("Print Stock Listing...");
+            printButton.Click += (sender, e) => PrintStockListing(reportPath, rows, branchCaption, filterCaption, this);
+            printBar.Items.Add(printButton);
+            Controls.Add(printBar);
             crystalReportViewer1.ReportSource = rpt;
             ShowDialog(owner);
+        }
+
+        private void PrintStockListing(string reportPath, IReadOnlyList<StockReportItem> rows, string branchCaption,
+            string filterCaption, IWin32Window owner)
+        {
+            try
+            {
+                using (var document = new PrintDocument())
+                using (var dialog = new PrintDialog { Document = document, AllowSomePages = true, UseEXDialog = true })
+                {
+                    document.DefaultPageSettings.Landscape = false;
+                    document.PrinterSettings.MinimumPage = 1;
+                    document.PrinterSettings.MaximumPage = 9999;
+                    // The Windows dialog validates this range even when All Pages is selected.
+                    document.PrinterSettings.FromPage = 1;
+                    document.PrinterSettings.ToPage = 1;
+                    if (dialog.ShowDialog(owner) != DialogResult.OK)
+                        return;
+
+                    using (var report = new ReportDocument())
+                    {
+                        report.Load(reportPath);
+                        BindStockListing(report, rows, branchCaption, filterCaption);
+                        SendStockListingToPrinter(report, document.PrinterSettings, document.DefaultPageSettings);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(owner, "Unable to print the stock listing.\n" + ex.Message, "Stock Listing",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private static void SendStockListingToPrinter(ReportDocument report, PrinterSettings printer, PageSettings page)
+        {
+            report.PrintOptions.PrinterDuplex = printer.Duplex == Duplex.Default
+                ? PrinterDuplex.Default
+                : (PrinterDuplex)printer.Duplex;
+            var layout = new PrintLayoutSettings { Scaling = PrintLayoutSettings.PrintScaling.ShrinkOnly, Centered = true };
+            report.PrintToPrinter(printer, page, false, layout);
         }
 
         private static void BindStockListing(ReportDocument report, IReadOnlyList<StockReportItem> rows,
@@ -284,19 +321,30 @@ namespace PosBranch_Win
                     row.HoldQty, row.AvailableStock, row.Cost, row.StockValue);
 
             report.SetDataSource(data);
-            var quantities = rows.GroupBy(row => (row.BaseUnitName ?? "").Trim(), StringComparer.OrdinalIgnoreCase)
+            var unitTotals = rows.GroupBy(row => (row.BaseUnitName ?? "").Trim(), StringComparer.OrdinalIgnoreCase)
                 .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
-                .Select(group => FormattableString.Invariant(
-                    $"{(group.Key.Length == 0 ? "Unspecified UOM" : group.Key)}   Stock {group.Sum(row => row.ClosingStock):#,0.##}  |  Hold {group.Sum(row => row.HoldQty):#,0.##}  |  Available {group.Sum(row => row.AvailableStock):#,0.##}"));
+                .Select(group => new
+                {
+                    Unit = group.Key.Length == 0 ? "Unspecified UOM" : group.Key,
+                    Stock = FormattableString.Invariant($"{group.Sum(row => row.ClosingStock):#,0.00########}"),
+                    Hold = FormattableString.Invariant($"{group.Sum(row => row.HoldQty):#,0.00########}"),
+                    Available = FormattableString.Invariant($"{group.Sum(row => row.AvailableStock):#,0.00########}")
+                }).ToList();
 
-            ((TextObject)report.ReportDefinition.ReportObjects["StockReportBranch"]).Text = branchCaption;
-            ((TextObject)report.ReportDefinition.ReportObjects["StockReportFilters"]).Text = filterCaption;
-            ((TextObject)report.ReportDefinition.ReportObjects["StockReportTotals"]).Text =
-                FormattableString.Invariant($"Items  {rows.Count:N0}     |     Total stock value  {rows.Sum(row => row.StockValue):N2}");
-            ((TextObject)report.ReportDefinition.ReportObjects["StockReportUnitTotals"]).Text =
-                string.Join(Environment.NewLine, quantities);
-            ((TextObject)report.ReportDefinition.ReportObjects["StockGenerated"]).Text =
-                $"Generated on  {DateTime.Now:dd-MM-yyyy hh:mm tt}";
+            // On mixed-unit reports, show the overall value on its own line above the unit quantities.
+            string unitTotalsOffset = unitTotals.Count > 1 ? Environment.NewLine : "";
+            var objects = report.ReportDefinition.ReportObjects;
+            ((TextObject)objects["StockReportBranch"]).Text = branchCaption;
+            ((TextObject)objects["StockReportFilters"]).Text = filterCaption;
+            ((TextObject)objects["StockReportTotals"]).Text = FormattableString.Invariant($"Total ({rows.Count:N0} items)");
+            ((TextObject)objects["StockTotalUnit"]).Text = unitTotalsOffset + string.Join(Environment.NewLine, unitTotals.Select(total => total.Unit));
+            ((TextObject)objects["StockTotalClosing"]).Text = unitTotalsOffset + string.Join(Environment.NewLine, unitTotals.Select(total => total.Stock));
+            ((TextObject)objects["StockTotalHold"]).Text = unitTotalsOffset + string.Join(Environment.NewLine, unitTotals.Select(total => total.Hold));
+            ((TextObject)objects["StockTotalAvailable"]).Text = unitTotalsOffset + string.Join(Environment.NewLine, unitTotals.Select(total => total.Available));
+            ((TextObject)objects["StockTotalValue"]).Text = FormattableString.Invariant($"{rows.Sum(row => row.StockValue):N2}");
+            ((TextObject)objects["StockGenerated"]).Text = $"Printed on: {DateTime.Now:dd-MMM-yyyy hh:mm tt}";
+            ((TextObject)objects["StockPrintedBy"]).Text =
+                $"Printed by: {(string.IsNullOrWhiteSpace(SessionContext.UserName) ? "Unavailable" : SessionContext.UserName.Trim())}";
         }
 
         public void PrintPurchase(long purchaseNo, int finYearId = 0)
