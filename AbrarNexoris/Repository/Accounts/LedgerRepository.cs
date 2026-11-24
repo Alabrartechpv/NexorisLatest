@@ -307,7 +307,7 @@ namespace Repository.Accounts
         }
 
         // Method to delete a ledger
-        public bool DeleteLedger(int ledgerId)
+        public bool DeleteLedger(int ledgerId, int companyId, int branchId, int? groupId = null)
         {
             bool result = false;
 
@@ -320,19 +320,19 @@ namespace Repository.Accounts
 
             try
             {
-                using (SqlCommand cmd = new SqlCommand("POS_Ledger", (SqlConnection)DataConnection))
+                using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE.POS_Ledger, (SqlConnection)DataConnection))
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@_Operation", "DELETE");
                     cmd.Parameters.AddWithValue("@LedgerID", ledgerId);
+                    cmd.Parameters.AddWithValue("@CompanyID", companyId);
+                    cmd.Parameters.AddWithValue("@BranchID", branchId);
+                    if (groupId.HasValue)
+                        cmd.Parameters.AddWithValue("@GroupID", groupId.Value);
 
                     object scalar = cmd.ExecuteScalar();
                     result = scalar != null && Convert.ToInt32(scalar) > 0;
                 }
-            }
-            catch (Exception ex)
-            {
-                throw ex;
             }
             finally
             {

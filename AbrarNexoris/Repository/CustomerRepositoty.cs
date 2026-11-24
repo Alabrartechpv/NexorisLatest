@@ -349,7 +349,7 @@ namespace Repository
                            ISNULL(cd.CompanyEmail, '') as CompanyEmail
                     FROM LedgerMaster l 
                     LEFT JOIN ContactDetails cd ON l.LedgerID = cd.LedgerID
-                    WHERE l.LedgerID = @CustomerId AND l.GroupID = 16";
+                    WHERE l.LedgerID = @CustomerId AND l.GroupID = 16 AND ISNULL(l.IsDelete, 0) = 0";
 
                 var customer = DataConnection.Query<ClsCustomers>(query, new { CustomerId = customerId }).FirstOrDefault();
                 return customer;

@@ -571,24 +571,32 @@ namespace PosBranch_Win.Accounts
         {
             try
             {
-                if (Ledgerid == 0)
+                if (Ledgerid <= 0)
                 {
                     MessageBox.Show("Please select a customer to delete.", "Warning",
                         MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     return;
                 }
 
-                var result = MessageBox.Show("Are you sure you want to delete this customer?",
+                var result = MessageBox.Show("Mark this unused customer inactive and keep their details in the database?",
                     "Confirm Delete", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
 
                 if (result == DialogResult.Yes)
                 {
-                    // Implement delete functionality
-                    MessageBox.Show("Delete functionality to be implemented.", "Info",
-                        MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    using (var ledgerRepo = new Repository.Accounts.LedgerRepository())
+                    {
+                        if (!ledgerRepo.DeleteLedger(Ledgerid, GetCompanyId(), GetBranchId(), (int)AccountGroup.SUNDRY_DEBTORS))
+                        {
+                            MessageBox.Show("The customer is already inactive or was not found in this company and branch.",
+                                "Customer", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                            return;
+                        }
+                    }
 
                     ClearForm();
                     RefreshCustomerGrid();
+                    MessageBox.Show("Customer marked inactive.", "Customer",
+                        MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
             }
             catch (Exception ex)

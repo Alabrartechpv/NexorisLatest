@@ -1223,7 +1223,7 @@ namespace Repository.TransactionRepository
 
                 try
                 {
-                    using (SqlCommand cmd = new SqlCommand("SELECT TOP 1 LedgerID, LedgerName FROM LedgerMaster WHERE BranchID = @BranchId AND GroupID = 18 ORDER BY LedgerID ASC", (SqlConnection)DataConnection, trans))
+                    using (SqlCommand cmd = new SqlCommand("SELECT TOP 1 LedgerID, LedgerName FROM LedgerMaster WHERE BranchID = @BranchId AND GroupID = 18 AND ISNULL(IsDelete, 0) = 0 ORDER BY LedgerID ASC", (SqlConnection)DataConnection, trans))
                     {
                         cmd.Parameters.AddWithValue("@BranchId", branchId);
                         using (SqlDataReader reader = cmd.ExecuteReader())
@@ -1238,7 +1238,7 @@ namespace Repository.TransactionRepository
                     }
 
                     // 3. Fallback: Query LedgerMaster for ANY ledger under GroupID = 18 across any branch
-                    using (SqlCommand cmd = new SqlCommand("SELECT TOP 1 LedgerID, LedgerName FROM LedgerMaster WHERE GroupID = 18 ORDER BY LedgerID ASC", (SqlConnection)DataConnection, trans))
+                    using (SqlCommand cmd = new SqlCommand("SELECT TOP 1 LedgerID, LedgerName FROM LedgerMaster WHERE GroupID = 18 AND ISNULL(IsDelete, 0) = 0 ORDER BY LedgerID ASC", (SqlConnection)DataConnection, trans))
                     {
                         using (SqlDataReader reader = cmd.ExecuteReader())
                         {
