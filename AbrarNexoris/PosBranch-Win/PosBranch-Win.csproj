@@ -380,6 +380,10 @@
     <Compile Include="Reports\AuditReport\frmAuditReport.Designer.cs">
       <DependentUpon>frmAuditReport.cs</DependentUpon>
     </Compile>
+    <Compile Include="Reports\FinancialReports\FinancialReportGrid.cs" />
+    <Compile Include="Reports\FinancialReports\datewisecashinhandreport.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="Reports\FinancialReports\FrmCashBankBook.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -1122,6 +1126,12 @@
     </Compile>
     <Compile Include="Reports\FinancialReports\frmInputGSTReport.Designer.cs">
       <DependentUpon>frmInputGSTReport.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Reports\FinancialReports\frmDeletionAuditReport.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Reports\FinancialReports\frmDeletionAuditReport.Designer.cs">
+      <DependentUpon>frmDeletionAuditReport.cs</DependentUpon>
     </Compile>
     <Compile Include="Reports\FinancialReports\frmOutputGSTReport.cs">
       <SubType>Form</SubType>
@@ -1967,6 +1977,9 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Reports\FinancialReports\frmInputGSTReport.resx">
       <DependentUpon>frmInputGSTReport.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Reports\FinancialReports\frmDeletionAuditReport.resx">
+      <DependentUpon>frmDeletionAuditReport.cs</DependentUpon>
     </EmbeddedResource>
     <EmbeddedResource Include="Reports\FinancialReports\frmOutputGSTReport.resx">
       <DependentUpon>frmOutputGSTReport.cs</DependentUpon>

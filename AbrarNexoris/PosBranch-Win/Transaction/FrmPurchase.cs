@@ -8039,6 +8039,13 @@ namespace PosBranch_Win.Transaction
                     // Get the original FinYearId to ensure data consistency
                     int finYearId = GetOriginalFinYearId(Convert.ToInt32(LblPid.Text));
 
+                    // Capture header and total amount BEFORE calling delete/clear
+                    decimal deleteAmount = ParseDecimal(label6.Text);
+                    if (deleteAmount <= 0) deleteAmount = ParseDecimal(lblSubTotalAmt.Text);
+                    if (deleteAmount <= 0) deleteAmount = ParseDecimal(textBox3.Text);
+                    string deleteInvoiceNo = txtInvoiceNo.Text ?? string.Empty;
+                    string deleteVendor = CmboVendor.Text ?? string.Empty;
+                    string deletePayment = CmboPayment.Text ?? string.Empty;
                     // Call repository method to delete the purchase
                     string message = ObjPurchaseInviceRepo.DeletePurchaseInvoice(
                         purchaseNo,
@@ -8051,10 +8058,10 @@ namespace PosBranch_Win.Transaction
                         SavePurchaseActivityLog(
                             "DELETE",
                             purchaseNo,
-                            txtInvoiceNo.Text,
-                            CmboVendor.Text,
-                            CmboPayment.Text,
-                            ParseDecimal(label6.Text),
+                            deleteInvoiceNo,
+                            deleteVendor,
+                            deletePayment,
+                            deleteAmount,
                             $"Purchase invoice GRN-{purchaseNo} deleted.");
 
                         // Show success message

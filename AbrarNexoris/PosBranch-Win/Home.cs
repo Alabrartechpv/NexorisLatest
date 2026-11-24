@@ -86,7 +86,8 @@ namespace PosBranch_Win
             new ReportNavigatorDefinition("Sales", "Sales Hold Report", "SalesHoldReport"),
             new ReportNavigatorDefinition("Sales", "Daily Sales", "DSales"),
             new ReportNavigatorDefinition("Sales", "Counter Report", "CounterReport"),
-            new ReportNavigatorDefinition("Sales", "Date-wise Sales Report", "DatewiseSalesReport"),
+            new ReportNavigatorDefinition("Sales", "Date-wise Sales Report", "DatewiseSalesReport"),
+
             new ReportNavigatorDefinition("Sales", "Date-wise Sales Return Report", "DatewiseSalesReturnReport"),
             new ReportNavigatorDefinition("Sales", "Date-wise Profit Report", "DatewiseProfitReport"),
             new ReportNavigatorDefinition("Sales", "Date-wise Customer Payment Report", "DatewiseCustomerPaymentReport"),
@@ -122,11 +123,13 @@ namespace PosBranch_Win
             new ReportNavigatorDefinition("Analysis", "Bank Statement", "BankStatementReport"),
             new ReportNavigatorDefinition("Date-wise", "Date-wise Purchase Report", "DatewisePurchaseReport"),
             new ReportNavigatorDefinition("Date-wise", "Date-wise Purchase Return Report", "DatewisePurchaseReturnReport"),
-            new ReportNavigatorDefinition("Date-wise", "Date-wise Sales Report", "DatewiseSalesReport"),
+            new ReportNavigatorDefinition("Date-wise", "Date-wise Sales Report", "DatewiseSalesReport"),
+
             new ReportNavigatorDefinition("Date-wise", "Date-wise Sales Return Report", "DatewiseSalesReturnReport"),
             new ReportNavigatorDefinition("Date-wise", "Date-wise Stock Adjustment Report", "DatewiseStockAdjustmentReport"),
             new ReportNavigatorDefinition("Date-wise", "Date-wise Profit Report", "DatewiseProfitReport"),
             new ReportNavigatorDefinition("Date-wise", "Date-wise Expense Report", "DatewiseExpenseReport"),
+            new ReportNavigatorDefinition("Date-wise", Reports.FinancialReports.datewisecashinhandreport.Title, "DatewiseCashInHandReport"),
             new ReportNavigatorDefinition("Date-wise", "Date-wise Item Stock Report", "DatewiseItemStockReport"),
             new ReportNavigatorDefinition("Date-wise", "Date-wise Customer Payment Report", "DatewiseCustomerPaymentReport"),
             new ReportNavigatorDefinition("Date-wise", "Date-wise Vendor Payment Report", "DatewiseVendorPaymentReport"),
@@ -134,7 +137,8 @@ namespace PosBranch_Win
             new ReportNavigatorDefinition("Others", "Combined Party Balance Report", "CombinedPartyBalanceReport"),
             new ReportNavigatorDefinition("GST Reports", "Input GST Report", "InputGSTReport"),
             new ReportNavigatorDefinition("GST Reports", "Output GST Report", "OutputGSTReport"),
-            new ReportNavigatorDefinition("GST Reports", "Government GST Return Report", "GovtGSTReturnReport")
+            new ReportNavigatorDefinition("GST Reports", "Government GST Return Report", "GovtGSTReturnReport"),
+            new ReportNavigatorDefinition("Audit", "Deletion & Cancellation Audit Report", "DeletionAuditReport")
         };
 
         private static readonly Dictionary<string, string> ReportNavigatorActionAliases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -3312,6 +3316,8 @@ namespace PosBranch_Win
             if (tk == "BalanceSheet") return "balancesheet";
             if (tk == "TrialBalance") return "trialbalance";
             if (tk == "CashBankBook") return "cashbankbook";
+            if (string.Equals(tk, "DatewiseCashInHandReport", StringComparison.OrdinalIgnoreCase) ||
+                tk == Reports.FinancialReports.datewisecashinhandreport.Title) return "cashbankbook";
             if (tk == "GeneralLedger") return "generalledger";
             if (tk == "DailyFinancialMovement") return "dailyfinancialmovement";
             if (tk == "DayBook") return "daybook";
@@ -4055,6 +4061,11 @@ namespace PosBranch_Win
                 PosBranch_Win.Reports.FinancialReports.FrmCashBankBook cbBook = new PosBranch_Win.Reports.FinancialReports.FrmCashBankBook();
                 OpenFormInTabSafe(cbBook, "Cash & Bank Book");
             }
+            if (e.Tool.Key == "DatewiseCashInHandReport")
+            {
+                OpenFormInTabSafe(new Reports.FinancialReports.datewisecashinhandreport(),
+                    Reports.FinancialReports.datewisecashinhandreport.Title);
+            }
             if (e.Tool.Key == "GeneralLedger")
             {
                 PosBranch_Win.Reports.FinancialReports.FrmGeneralLedger glReport = new PosBranch_Win.Reports.FinancialReports.FrmGeneralLedger();
@@ -4508,6 +4519,16 @@ namespace PosBranch_Win
             {
                 PosBranch_Win.Reports.FinancialReports.frmvendorreportdetails vendorDetailsReport = new PosBranch_Win.Reports.FinancialReports.frmvendorreportdetails();
                 OpenFormInTab(vendorDetailsReport, "Vendor Report Details");
+            }
+            if (e.Tool.Key == "DeletionAuditReport" || e.Tool.Key == "frmDeletionAuditReport" || e.Tool.Key == "DeletedTransactionsReport")
+            {
+                if (!SessionContext.IsAdmin && !string.Equals(SessionContext.UserName, "admin", StringComparison.OrdinalIgnoreCase) && SessionContext.RoleId != 1)
+                {
+                    MessageBox.Show("Access Denied.\n\nThis Deletion & Cancellation Audit Report contains sensitive security records and is strictly restricted to Administrators only.", "Admin Only", MessageBoxButtons.OK, MessageBoxIcon.Stop);
+                    return;
+                }
+                PosBranch_Win.Reports.FinancialReports.frmDeletionAuditReport deletionReport = new PosBranch_Win.Reports.FinancialReports.frmDeletionAuditReport();
+                OpenFormInTab(deletionReport, "Deletion & Cancellation Audit Report");
             }
             if (e.Tool.Key == "InputGSTReport" || e.Tool.Key == "frmInputGSTReport")
             {
@@ -5905,6 +5926,7 @@ namespace PosBranch_Win
                             else if (formTypeName == "FrmBalanceSheet" || tabTextClean == "Balance Sheet") matchedToolKey = "BalanceSheet";
                             else if (formTypeName == "FrmTrialBalance" || tabTextClean == "Trial Balance") matchedToolKey = "TrialBalance";
                             else if (formTypeName == "FrmCashBankBook" || tabTextClean == "Cash & Bank Book") matchedToolKey = "CashBankBook";
+                            else if (formTypeName == nameof(Reports.FinancialReports.datewisecashinhandreport)) matchedToolKey = "DatewiseCashInHandReport";
                             else if (formTypeName == "FrmGeneralLedger" || tabTextClean == "General Ledger Statement" || tabTextClean == "General Ledger") matchedToolKey = "GeneralLedger";
                             else if (formTypeName == "FrmDailyFinancialMovement" || tabTextClean == "Daily Financial Movement") matchedToolKey = "DailyFinancialMovement";
                             else if (formTypeName == "FrmDayBook" || tabTextClean == "Day Book") matchedToolKey = "DayBook";
@@ -7015,6 +7037,7 @@ namespace PosBranch_Win
                     keyToExecute == "UnallocatedPurchaseReturns" ||
                     keyToExecute == "ProfitLossAccount" ||
                     keyToExecute == "StockListingReport" ||
+                    keyToExecute == "DeletionAuditReport" ||
                     keyToExecute == "InputGSTReport" ||
                     keyToExecute == "OutputGSTReport" ||
                     keyToExecute == "GovtGSTReturnReport")

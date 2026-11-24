@@ -1120,8 +1120,8 @@ namespace PosBranch_Win.Dashboard
                         title = "Day Book";
                         break;
                     case "AuditDeletions":
-                        formToOpen = new Settings.UserActivityLog();
-                        title = "User Activity Log";
+                        formToOpen = new Reports.FinancialReports.frmDeletionAuditReport();
+                        title = "Deletion & Cancellation Audit Report";
                         break;
                     case "AuditPriceChanges":
                         formToOpen = new Settings.ItemHistoryLog();

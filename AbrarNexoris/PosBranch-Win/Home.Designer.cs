@@ -140,6 +140,7 @@ namespace PosBranch_Win
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolBalanceSheet_Instance = new Infragistics.Win.UltraWinToolbars.ButtonTool("BalanceSheet");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolTrialBalance_Instance = new Infragistics.Win.UltraWinToolbars.ButtonTool("TrialBalance");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolCashBank_Instance = new Infragistics.Win.UltraWinToolbars.ButtonTool("CashBankBook");
+            Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolDatewiseCashInHand_Instance = new Infragistics.Win.UltraWinToolbars.ButtonTool("DatewiseCashInHandReport");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolGeneralLedger_Instance = new Infragistics.Win.UltraWinToolbars.ButtonTool("GeneralLedger");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolDailyMovement_Instance = new Infragistics.Win.UltraWinToolbars.ButtonTool("DailyFinancialMovement");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolDayBook_Instance = new Infragistics.Win.UltraWinToolbars.ButtonTool("DayBook");
@@ -343,6 +344,7 @@ namespace PosBranch_Win
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolTrialBalance_Tool = new Infragistics.Win.UltraWinToolbars.ButtonTool("TrialBalance");
             Infragistics.Win.Appearance appearance80 = new Infragistics.Win.Appearance();
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolCashBank_Tool = new Infragistics.Win.UltraWinToolbars.ButtonTool("CashBankBook");
+            Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolDatewiseCashInHand_Tool = new Infragistics.Win.UltraWinToolbars.ButtonTool("DatewiseCashInHandReport");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolGeneralLedger_Tool = new Infragistics.Win.UltraWinToolbars.ButtonTool("GeneralLedger");
             Infragistics.Win.UltraWinToolbars.ButtonTool buttonToolDailyMovement_Tool = new Infragistics.Win.UltraWinToolbars.ButtonTool("DailyFinancialMovement");
             Infragistics.Win.Appearance appearance81 = new Infragistics.Win.Appearance();
@@ -806,6 +808,8 @@ namespace PosBranch_Win
             buttonToolTrialBalance_Instance.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
             buttonToolCashBank_Instance.InstanceProps.MinimumSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
             buttonToolCashBank_Instance.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
+            buttonToolDatewiseCashInHand_Instance.InstanceProps.MinimumSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
+            buttonToolDatewiseCashInHand_Instance.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
             buttonToolGeneralLedger_Instance.InstanceProps.MinimumSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
             buttonToolGeneralLedger_Instance.InstanceProps.PreferredSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
             buttonToolDailyMovement_Instance.InstanceProps.MinimumSizeOnRibbon = Infragistics.Win.UltraWinToolbars.RibbonToolSize.Large;
@@ -822,6 +826,7 @@ namespace PosBranch_Win
             buttonToolBalanceSheet_Instance,
             buttonToolTrialBalance_Instance,
             buttonToolCashBank_Instance,
+            buttonToolDatewiseCashInHand_Instance,
             buttonToolGeneralLedger_Instance,
             buttonToolDailyMovement_Instance,
             buttonToolDayBook_Instance,
@@ -1257,6 +1262,11 @@ namespace PosBranch_Win
             buttonToolCashBank_Tool.SharedPropsInternal.Caption = "Cash & Bank Book";
             buttonToolCashBank_Tool.SharedPropsInternal.DisplayStyle = Infragistics.Win.UltraWinToolbars.ToolDisplayStyle.ImageAndText;
             buttonToolCashBank_Tool.SharedPropsInternal.ToolTipTitle = "Cash & Bank Book";
+            buttonToolDatewiseCashInHand_Tool.SharedPropsInternal.AppearancesLarge.Appearance = appearance81;
+            buttonToolDatewiseCashInHand_Tool.SharedPropsInternal.AppearancesSmall.Appearance = appearance13;
+            buttonToolDatewiseCashInHand_Tool.SharedPropsInternal.Caption = Reports.FinancialReports.datewisecashinhandreport.Title;
+            buttonToolDatewiseCashInHand_Tool.SharedPropsInternal.DisplayStyle = Infragistics.Win.UltraWinToolbars.ToolDisplayStyle.ImageAndText;
+            buttonToolDatewiseCashInHand_Tool.SharedPropsInternal.ToolTipTitle = Reports.FinancialReports.datewisecashinhandreport.Title;
             buttonToolGeneralLedger_Tool.SharedPropsInternal.AppearancesLarge.Appearance = appearance81;
             buttonToolGeneralLedger_Tool.SharedPropsInternal.AppearancesSmall.Appearance = appearance13;
             buttonToolGeneralLedger_Tool.SharedPropsInternal.Caption = "General Ledger";
@@ -1463,6 +1473,7 @@ namespace PosBranch_Win
             buttonToolBalanceSheet_Tool,
             buttonToolTrialBalance_Tool,
             buttonToolCashBank_Tool,
+            buttonToolDatewiseCashInHand_Tool,
             buttonToolGeneralLedger_Tool,
             buttonToolDailyMovement_Tool,
             buttonToolDayBook_Tool,

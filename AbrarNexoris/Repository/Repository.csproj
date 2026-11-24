@@ -137,6 +137,7 @@
     <Compile Include="ReportRepository\VendorPaymentReportRepository.cs" />
     <Compile Include="ReportRepository\VendorOutstandingReportRepository.cs" />
     <Compile Include="ReportRepository\InputGSTReportRepository.cs" />
+    <Compile Include="ReportRepository\DeletionAuditReportRepository.cs" />
     <Compile Include="ReportRepository\OutputGSTReportRepository.cs" />
     <Compile Include="ReportRepository\GovtGSTReturnReportRepository.cs" />
     <Compile Include="ReportRepository\VendorPurchaseReportRepository.cs" />

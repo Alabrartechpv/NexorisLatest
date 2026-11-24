@@ -9,6 +9,15 @@ namespace Repository.ReportRepository
 {
     public class CashBankBookRepository : BaseRepostitory
     {
+        public DataTable GetBranchLedgers()
+        {
+            int branchId = GetContextValue(SessionContext.BranchId, DataBase.BranchId);
+            using (var repository = new Accounts.LedgerRepository())
+            {
+                return repository.GetAllLedgers(branchId);
+            }
+        }
+
         public CashBankBookModel GetCashBankBook(int ledgerId, DateTime fromDate, DateTime toDate)
         {
             var report = new CashBankBookModel();

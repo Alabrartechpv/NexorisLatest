@@ -1205,6 +1205,8 @@ namespace ModelClass
                         RegisterAlias("cash & bank book", p);
                         RegisterAlias("cash and bank book", p);
                         RegisterAlias("frmcashbankbook", p);
+                        RegisterAlias("datewisecashinhandreport", p);
+                        RegisterAlias("date-wise cash in hand report", p);
                     }
                     if (normKey.Contains("daybook") || normName.Contains("day book"))
                     {
@@ -1324,6 +1326,14 @@ namespace ModelClass
                         RegisterAlias("govtgstreturnreport", p);
                         RegisterAlias("government gst return report", p);
                         RegisterAlias("frmgovtgstreturnreport", p);
+                    }
+                    if (normKey.Contains("deletionaudit") || normName.Contains("deletion audit") || normKey.Contains("deletedtransactions"))
+                    {
+                        RegisterAlias("deletionaudit", p);
+                        RegisterAlias("deletionauditreport", p);
+                        RegisterAlias("deletion audit report", p);
+                        RegisterAlias("deletedtransactionsreport", p);
+                        RegisterAlias("frmdeletionauditreport", p);
                     }
 
                     // 24b. Accounts Entry Forms & Vouchers
