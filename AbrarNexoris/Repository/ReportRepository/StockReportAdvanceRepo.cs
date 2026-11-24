@@ -153,7 +153,9 @@ FROM
         CAST(PM.PurchaseNo AS nvarchar(50)) AS DocNumber,
         COALESCE(PAL.CreatedOn, CAST(CAST(PD.PurchaseDate AS date) AS datetime)) AS TransactionDate,
         ISNULL(NULLIF(IM.[Description], ''), 'Unknown Item') AS ItemName,
-        CAST(((ISNULL(PD.Packing, 0) * ISNULL(PD.Qty, 0)) + ISNULL(PD.Free, 0)) AS decimal(18, 2)) AS Qty,
+        CAST((ISNULL(PD.Qty, 0) +
+              CASE WHEN PD.Cost = 0 AND PD.Free > 0 AND PD.Free = PD.Qty THEN 0 ELSE ISNULL(PD.Free, 0) END)
+             * ISNULL(NULLIF(PD.Packing, 0), 1) AS decimal(18, 2)) AS Qty,
         CAST(ISNULL(PD.Cost, 0) AS decimal(18, 2)) AS Cost,
         CAST(ISNULL(PS.RetailPrice, 0) AS decimal(18, 2)) AS SellingPrice,
         CAST(CASE WHEN PD.TaxType = 'I'

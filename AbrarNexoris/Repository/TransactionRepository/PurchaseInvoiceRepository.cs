@@ -333,23 +333,10 @@ namespace Repository.TransactionRepository
                             objPricesettingsStock.ItemID = Convert.ToInt32(dgvItem.Rows[i].Cells["ItemId"].Value.ToString());
                             objPricesettingsStock.UnitId = Convert.ToInt32(dgvItem.Rows[i].Cells["UnitId"].Value.ToString());
 
-                            int gridQty = 0;
-                            int.TryParse(dgvItem.Rows[i].Cells["Qty"].Value?.ToString(), out gridQty);
-                            objPricesettingsStock.Qty = gridQty;
-
-                            // When Free = Qty (free items case), only Qty counts for stock, not Free
-                            // So if Free = Qty, set Free to 0 for stock calculation to avoid double counting
-                            if (free >= 1 && Math.Abs(free - gridQty) < 0.01f)
-                            {
-                                objPricesettingsStock.Free = 0; // Don't add Free separately since it's already in Qty
-                            }
-                            else
-                            {
-                                objPricesettingsStock.Free = free;
-                            }
-
-                            int packingValue = 0;
-                            int.TryParse(dgvItem.Rows[i].Cells["Packing"].Value?.ToString(), out packingValue);
+                            float stockFree = GetAdditionalFreeQuantity(qty, free, cost);
+                            objPricesettingsStock.Qty = qty;
+                            objPricesettingsStock.Free = stockFree;
+                            float packingValue = packing > 0 ? packing : 1;
                             objPricesettingsStock.Packing = packingValue;
 
                             objPricesettingsStock.OldQty = 10;
@@ -386,10 +373,10 @@ namespace Repository.TransactionRepository
                             objPricesettingsStock.MDMinPrice = existingPrices.MDMinPrice;
 
                             // Calculate weighted average cost based on existing stock and new purchase (on base unit level)
-                            int packingVal = packingValue > 0 ? packingValue : 1;
+                            float packingVal = packingValue;
                             float purchasePricePerUnit = baseCost > 0 ? baseCost : cost;
                             float baseUnitPurchaseCost = purchasePricePerUnit / packingVal;
-                            float totalBaseUnitPurchaseQty = (gridQty + free) * packingVal;
+                            float totalBaseUnitPurchaseQty = (qty + stockFree) * packingVal;
 
                             var baseUnitPrices = GetExistingBaseUnitPrices(objPricesettingsStock.ItemID, trans);
                             float existingBaseCost = (float)baseUnitPrices.Cost;
@@ -724,9 +711,6 @@ namespace Repository.TransactionRepository
                             objPricesettingsStock.ItemID = Convert.ToInt32(dgvPurchase.Rows[i].Cells["ItemId"].Value.ToString());
                             objPricesettingsStock.UnitId = Convert.ToInt32(dgvPurchase.Rows[i].Cells["UnitId"].Value.ToString());
 
-                            int gridQty = 0;
-                            int.TryParse(dgvPurchase.Rows[i].Cells["Qty"].Value?.ToString(), out gridQty);
-
                             // Find the old purchase detail for this item/unit combination BEFORE setting Qty
                             // so we can compute the delta for stock update
                             float oldPurchaseCost = 0;
@@ -737,16 +721,17 @@ namespace Repository.TransactionRepository
 
                             if (oldDetail != null)
                             {
+                                // Consume each old line once, including separate paid and free lines for the same item.
+                                oldPurchaseDetails.Remove(oldDetail);
                                 oldPurchaseCost = (float)oldDetail.Cost;
                                 oldPurchaseQty = (float)oldDetail.Qty;
-                                oldPurchaseFree = (float)oldDetail.Free;
+                                oldPurchaseFree = GetAdditionalFreeQuantity(oldDetail.Qty, oldDetail.Free, oldDetail.Cost);
                             }
 
-                            objPricesettingsStock.Qty = gridQty;
-                            objPricesettingsStock.Free = (int)free;
-
-                            int packingValue = 0;
-                            int.TryParse(dgvPurchase.Rows[i].Cells["Packing"].Value?.ToString(), out packingValue);
+                            float stockFree = GetAdditionalFreeQuantity(qty, free, cost);
+                            objPricesettingsStock.Qty = qty;
+                            objPricesettingsStock.Free = stockFree;
+                            float packingValue = packing > 0 ? packing : 1;
                             objPricesettingsStock.Packing = packingValue;
 
                             // Get existing item prices, markdown values, stock, and cost from database
@@ -808,18 +793,18 @@ namespace Repository.TransactionRepository
                             }
 
                             // Calculate weighted average cost for UPDATE operation (on base unit level)
-                            int packingVal = packingValue > 0 ? packingValue : 1;
+                            float packingVal = packingValue;
                             float newPurchasePricePerUnit = baseCost > 0 ? baseCost : cost;
                             float newBaseUnitPurchaseCost = newPurchasePricePerUnit / packingVal;
-                            float newBaseUnitPurchaseQty = (gridQty + free) * packingVal;
+                            float newBaseUnitPurchaseQty = (qty + stockFree) * packingVal;
 
                             float oldBaseUnitPurchaseCost = 0;
                             float oldBaseUnitPurchaseQty = 0;
                             if (oldDetail != null)
                             {
-                                int oldPackingVal = oldDetail.Packing > 0 ? (int)oldDetail.Packing : packingVal;
+                                float oldPackingVal = oldDetail.Packing > 0 ? (float)oldDetail.Packing : packingVal;
                                 oldBaseUnitPurchaseCost = (float)oldDetail.Cost / oldPackingVal;
-                                oldBaseUnitPurchaseQty = ((float)oldDetail.Qty + (float)oldDetail.Free) * oldPackingVal;
+                                oldBaseUnitPurchaseQty = (oldPurchaseQty + oldPurchaseFree) * oldPackingVal;
                             }
 
                             var baseUnitPrices = GetExistingBaseUnitPrices(objPricesettingsStock.ItemID, trans);
@@ -857,63 +842,30 @@ namespace Repository.TransactionRepository
                     }
                 }
 
-                // Step 3: Handle items that were removed from the purchase bill
-                if (oldPurchaseDetails != null && oldPurchaseDetails.Count > 0)
+                // Reverse any old purchase lines that the edited bill did not replace.
+                foreach (var oldDetail in oldPurchaseDetails)
                 {
-                    foreach (var oldDetail in oldPurchaseDetails)
+                    var existingPrices = GetExistingItemPrices(oldDetail.ItemID, oldDetail.UnitId, trans);
+                    var deleteObj = new PurchaseStockUpdateOnPricesettings
                     {
-                        bool stillPresent = false;
-                        if (dgvPurchase != null)
-                        {
-                            for (int i = 0; i < dgvPurchase.Rows.Count; i++)
-                            {
-                                if (dgvPurchase.Rows[i].Cells["ItemId"] != null &&
-                                    dgvPurchase.Rows[i].Cells["ItemId"].Value != null &&
-                                    int.TryParse(dgvPurchase.Rows[i].Cells["ItemId"].Value.ToString(), out int gridItemId) &&
-                                    gridItemId == oldDetail.ItemID)
-                                {
-                                    if (dgvPurchase.Rows[i].Cells["UnitId"] != null &&
-                                        dgvPurchase.Rows[i].Cells["UnitId"].Value != null &&
-                                        int.TryParse(dgvPurchase.Rows[i].Cells["UnitId"].Value.ToString(), out int gridUnitId) &&
-                                        gridUnitId == oldDetail.UnitId)
-                                    {
-                                        stillPresent = true;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
+                        _Operation = "DELETE",
+                        CompanyId = SessionContext.CompanyId,
+                        BranchID = SessionContext.BranchId,
+                        FinYearId = originalFinYearId,
+                        ItemID = oldDetail.ItemID,
+                        UnitId = oldDetail.UnitId,
+                        Qty = oldDetail.Qty,
+                        Free = GetAdditionalFreeQuantity(oldDetail.Qty, oldDetail.Free, oldDetail.Cost),
+                        SingleItemCost = oldDetail.Cost,
+                        Packing = oldDetail.Packing > 0 ? oldDetail.Packing : 1,
+                        RetailPrice = existingPrices.RetailPrice,
+                        WholeSalePrice = existingPrices.WholeSalePrice,
+                        CreditPrice = existingPrices.CreditPrice
+                    };
 
-                        if (!stillPresent)
-                        {
-                            // Item was removed from purchase bill: call SP with DELETE to reverse its stock
-                            var existingPrices = GetExistingItemPrices(oldDetail.ItemID, oldDetail.UnitId, trans);
-                            int packingValue = (int)oldDetail.Packing;
-                            if (packingValue <= 0) packingValue = 1;
-
-                            var deleteObj = new PurchaseStockUpdateOnPricesettings();
-                            deleteObj._Operation = "DELETE";
-                            deleteObj.CompanyId = SessionContext.CompanyId;
-                            deleteObj.BranchID = SessionContext.BranchId;
-                            deleteObj.FinYearId = originalFinYearId;
-                            deleteObj.ItemID = oldDetail.ItemID;
-                            deleteObj.UnitId = oldDetail.UnitId;
-                            deleteObj.Qty = (float)oldDetail.Qty;
-                            deleteObj.Free = (float)oldDetail.Free;
-                            deleteObj.OldQty = 0;
-                            deleteObj.SingleItemCost = (float)oldDetail.Cost;
-                            deleteObj.Packing = packingValue;
-                            deleteObj.RetailPrice = existingPrices.RetailPrice;
-                            deleteObj.WholeSalePrice = existingPrices.WholeSalePrice;
-                            deleteObj.CreditPrice = existingPrices.CreditPrice;
-
-                            DataConnection.Query<PurchaseStockUpdateOnPricesettings>(
-                                STOREDPROCEDURE.POS_PurchaseInvoice_PriceSettings,
-                                deleteObj, trans, commandType: CommandType.StoredProcedure).ToList();
-
-                            System.Diagnostics.Debug.WriteLine($"UPDATE Purchase REMOVED ITEM - ItemId={oldDetail.ItemID}, UnitId={oldDetail.UnitId}, OldQty={oldDetail.Qty}, OldFree={oldDetail.Free} reversed from PriceSettings.");
-                        }
-                    }
+                    DataConnection.Query<PurchaseStockUpdateOnPricesettings>(
+                        STOREDPROCEDURE.POS_PurchaseInvoice_PriceSettings,
+                        deleteObj, trans, commandType: CommandType.StoredProcedure).ToList();
                 }
 
                 // Calculate subtotal (GrandTotal - TaxAmount) - reuse totalTaxAmount calculated above
@@ -1237,8 +1189,7 @@ namespace Repository.TransactionRepository
                     foreach (var oldDetail in oldPurchaseDetails)
                     {
                         var existingPrices = GetExistingItemPrices(oldDetail.ItemID, oldDetail.UnitId, trans);
-                        int packingValue = (int)oldDetail.Packing;
-                        if (packingValue <= 0) packingValue = 1;
+                        double packingValue = oldDetail.Packing > 0 ? oldDetail.Packing : 1;
 
                         var deleteObj = new PurchaseStockUpdateOnPricesettings();
                         deleteObj._Operation = "DELETE";
@@ -1247,8 +1198,8 @@ namespace Repository.TransactionRepository
                         deleteObj.FinYearId = finYearId;
                         deleteObj.ItemID = oldDetail.ItemID;
                         deleteObj.UnitId = oldDetail.UnitId;
-                        deleteObj.Qty = (float)oldDetail.Qty;
-                        deleteObj.Free = (float)oldDetail.Free;
+                        deleteObj.Qty = oldDetail.Qty;
+                        deleteObj.Free = GetAdditionalFreeQuantity(oldDetail.Qty, oldDetail.Free, oldDetail.Cost);
                         deleteObj.OldQty = 0;
                         deleteObj.SingleItemCost = (float)oldDetail.Cost;
                         deleteObj.Packing = packingValue;
@@ -1414,6 +1365,12 @@ namespace Repository.TransactionRepository
                     MDMinPrice = 0.0
                 };
             }
+        }
+
+        private static float GetAdditionalFreeQuantity(double quantity, double free, double unitCost)
+        {
+            // A zero-priced free line already stores the received quantity in Qty.
+            return unitCost == 0 && free > 0 && quantity == free ? 0 : (float)free;
         }
 
         /// <summary>
