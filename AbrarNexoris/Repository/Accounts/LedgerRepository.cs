@@ -307,7 +307,7 @@ namespace Repository.Accounts
         }
 
         // Method to delete a ledger
-        public bool DeleteLedger(int ledgerId)
+        public bool DeleteLedger(int ledgerId, int companyId, int branchId)
         {
             bool result = false;
 
@@ -325,14 +325,12 @@ namespace Repository.Accounts
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@_Operation", "DELETE");
                     cmd.Parameters.AddWithValue("@LedgerID", ledgerId);
+                    cmd.Parameters.AddWithValue("@CompanyID", companyId);
+                    cmd.Parameters.AddWithValue("@BranchID", branchId);
 
                     object scalar = cmd.ExecuteScalar();
                     result = scalar != null && Convert.ToInt32(scalar) > 0;
                 }
-            }
-            catch (Exception ex)
-            {
-                throw ex;
             }
             finally
             {

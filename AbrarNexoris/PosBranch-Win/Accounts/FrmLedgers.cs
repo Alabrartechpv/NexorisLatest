@@ -367,27 +367,37 @@ namespace PosBranch_Win.Accounts
                 }
 
                 int ledgerId = Convert.ToInt32(ultraTxtLedgerId.Text);
+                int branchId = int.TryParse(ultraDropDownBranch.Value?.ToString(), out int selectedBranchId)
+                    ? selectedBranchId
+                    : SessionContext.BranchId;
+                int companyId = SessionContext.CompanyId > 0 ? SessionContext.CompanyId : Convert.ToInt32(DataBase.CompanyId);
+                if (companyId <= 0 || branchId <= 0)
+                {
+                    MessageBox.Show("Select the ledger's company and branch before deleting it.", "Ledger",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
 
                 // Confirm deletion
-                DialogResult result = MessageBox.Show("Are you sure you want to delete this ledger?",
+                DialogResult result = MessageBox.Show("Mark this unused ledger inactive and keep its record in the database?",
                                                     "Confirm Delete", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
                 if (result == DialogResult.No)
                     return;
 
                 // Delete the ledger
-                bool success = ledgerRepo.DeleteLedger(ledgerId);
+                bool success = ledgerRepo.DeleteLedger(ledgerId, companyId, branchId);
 
                 if (success)
                 {
                     LedgerSaved?.Invoke(this, EventArgs.Empty);
-                    MessageBox.Show("Ledger deleted successfully.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show("Ledger marked inactive.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
                     // Clear the form
                     ClearForm();
                 }
                 else
                 {
-                    MessageBox.Show("Failed to delete ledger. It may be in use by other records.",
+                    MessageBox.Show("The ledger is already inactive or was not found in the selected company and branch.",
                                   "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 }
             }

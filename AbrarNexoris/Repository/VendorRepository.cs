@@ -259,7 +259,7 @@ namespace Repository
                            ISNULL(cd.CompanyEmail, '') as CompanyEmail
                     FROM LedgerMaster l 
                     LEFT JOIN ContactDetails cd ON l.LedgerID = cd.LedgerID
-                    WHERE l.LedgerID = @VendorId AND l.GroupID = 17";
+                    WHERE l.LedgerID = @VendorId AND l.GroupID = 17 AND ISNULL(l.IsDelete, 0) = 0";
 
                 var vendor = DataConnection.Query<ClsVendors>(query, new { VendorId = vendorId }).FirstOrDefault();
                 return vendor;

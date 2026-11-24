@@ -328,7 +328,7 @@ namespace PosBranch_Win.ChartOfAccount
                     if (row != null)
                     {
                         // Check if it's a group or ledger
-                        if (row.Table.Columns.Contains("GroupName"))
+                        if (!row.Table.Columns.Contains("LedgerID") && row.Table.Columns.Contains("GroupName"))
                         {
                             // This is an account group - confirm and delete
                             int groupId = Convert.ToInt32(row["GroupID"]);
@@ -365,31 +365,50 @@ namespace PosBranch_Win.ChartOfAccount
                                 }
                             }
                         }
-                        else if (row.Table.Columns.Contains("LedgerName"))
+                        else if (row.Table.Columns.Contains("LedgerID") && row.Table.Columns.Contains("LedgerName"))
                         {
                             // This is a ledger - confirm and delete
                             int ledgerId = Convert.ToInt32(row["LedgerID"]);
                             string ledgerName = row["LedgerName"].ToString();
 
-                            DialogResult result = MessageBox.Show($"Are you sure you want to delete the ledger '{ledgerName}'?",
+                            int companyId = GetContextValue(SessionContext.CompanyId, DataBase.CompanyId);
+                            int branchId = row.Table.Columns.Contains("BranchID") && int.TryParse(row["BranchID"].ToString(), out int ledgerBranchId)
+                                ? ledgerBranchId
+                                : GetContextValue(SessionContext.BranchId, DataBase.BranchId);
+                            if (companyId <= 0 || branchId <= 0)
+                            {
+                                MessageBox.Show("The ledger's company or branch could not be determined.",
+                                    "Delete Failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                return;
+                            }
+
+                            DialogResult result = MessageBox.Show($"Mark the unused ledger '{ledgerName}' inactive and keep its record in the database?",
                                 "Confirm Delete", MessageBoxButtons.YesNo, MessageBoxIcon.Warning);
 
                             if (result == DialogResult.Yes)
                             {
-                                // Delete the ledger
-                                bool success = ledgerRepo.DeleteLedger(ledgerId);
+                                bool success;
+                                try
+                                {
+                                    success = ledgerRepo.DeleteLedger(ledgerId, companyId, branchId);
+                                }
+                                catch (System.Data.SqlClient.SqlException ex)
+                                {
+                                    MessageBox.Show(ex.Message, "Delete Failed", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                                    return;
+                                }
 
                                 if (success)
                                 {
-                                    MessageBox.Show($"Ledger '{ledgerName}' deleted successfully.",
-                                        "Delete Successful", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                                    MessageBox.Show($"Ledger '{ledgerName}' marked inactive.",
+                                        "Ledger Inactive", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
                                     // Refresh the tree after deleting
                                     LoadChartOfAccountsTreeSimple();
                                 }
                                 else
                                 {
-                                    MessageBox.Show("Failed to delete ledger. It may be in use by other records.",
+                                    MessageBox.Show("The ledger is already inactive or was not found in the selected company and branch.",
                                         "Delete Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
                                 }
                             }
