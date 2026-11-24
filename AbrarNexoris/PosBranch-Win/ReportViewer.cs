@@ -2,14 +2,19 @@
 using CrystalDecisions.CrystalReports.Engine;
 using CrystalDecisions.Shared;
 using ModelClass;
+using ModelClass.Report;
 using Repository;
+using Repository.SettingsRepo;
 using Repository.TransactionRepository;
 using PosBranch_Win.Transaction;
 using System;
 using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
+using System.Drawing;
+using System.Drawing.Printing;
 using System.IO;
+using System.Linq;
 using System.Windows.Forms;
 
 namespace PosBranch_Win
@@ -177,8 +182,9 @@ namespace PosBranch_Win
             }
         }
 
-        public bool PreviewPurchase(long purchaseNo)
+        public bool PreviewPurchase(long purchaseNo, int finYearId = 0, int branchId = 0)
         {
+            int reportBranchId = branchId > 0 ? branchId : SessionContext.BranchId;
             string reportPath = ResolveReportPath("CrystalReportPurcase.rpt");
             if (reportPath == null)
             {
@@ -194,8 +200,9 @@ namespace PosBranch_Win
                 {
                     cmd.CommandType = CommandType.StoredProcedure;
                     cmd.Parameters.AddWithValue("@PurchaseNo", purchaseNo);
-                    cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
+                    cmd.Parameters.AddWithValue("@BranchId", reportBranchId);
                     cmd.Parameters.AddWithValue("@_Operations", "GETPURCHASE");
+                    cmd.Parameters.AddWithValue("@FinYearId", finYearId > 0 ? finYearId : SessionContext.FinYearId);
 
                     using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
                     {
@@ -206,13 +213,14 @@ namespace PosBranch_Win
                             return false;
                         }
 
-                        rpt.SetDataSource(dt);
+                        BindPurchaseReport(rpt, dt);
                     }
                 }
 
+                SetPurchaseReportDetails(rpt, dt);
                 setReportConnection(rpt);
                 SetMainReportParameter(rpt, "@PurchaseNo", purchaseNo);
-                SetMainReportParameter(rpt, "@BranchId", SessionContext.BranchId);
+                SetMainReportParameter(rpt, "@BranchId", reportBranchId);
                 SetMainReportParameter(rpt, "@_Operations", "GETPURCHASE");
                 PreviewReport(rpt, $"Purchase Invoice - {purchaseNo}");
                 return true;
@@ -231,7 +239,115 @@ namespace PosBranch_Win
             }
         }
 
-        public void PrintPurchase(long purchaseNo)
+        public void OpenStockListing(IReadOnlyList<StockReportItem> rows, string branchCaption, string filterCaption,
+            bool print, IWin32Window owner)
+        {
+            string reportPath = ResolveReportPath("StockListingPortrait.rpt");
+            if (reportPath == null)
+                return;
+
+            if (print)
+            {
+                PrintStockListing(reportPath, rows, branchCaption, filterCaption, owner);
+                return;
+            }
+
+            rpt.Load(reportPath);
+            BindStockListing(rpt, rows, branchCaption, filterCaption);
+
+            Text = "Stock Listing - Print Preview";
+            WindowState = FormWindowState.Maximized;
+            crystalReportViewer1.ShowPrintButton = false;
+            var printBar = new ToolStrip { Dock = DockStyle.Top, GripStyle = ToolStripGripStyle.Hidden };
+            var printButton = new ToolStripButton("Print Stock Listing...");
+            printButton.Click += (sender, e) => PrintStockListing(reportPath, rows, branchCaption, filterCaption, this);
+            printBar.Items.Add(printButton);
+            Controls.Add(printBar);
+            crystalReportViewer1.ReportSource = rpt;
+            ShowDialog(owner);
+        }
+
+        private void PrintStockListing(string reportPath, IReadOnlyList<StockReportItem> rows, string branchCaption,
+            string filterCaption, IWin32Window owner)
+        {
+            try
+            {
+                using (var document = new PrintDocument())
+                using (var dialog = new PrintDialog { Document = document, AllowSomePages = true, UseEXDialog = true })
+                {
+                    document.DefaultPageSettings.Landscape = false;
+                    document.PrinterSettings.MinimumPage = 1;
+                    document.PrinterSettings.MaximumPage = 9999;
+                    // The Windows dialog validates this range even when All Pages is selected.
+                    document.PrinterSettings.FromPage = 1;
+                    document.PrinterSettings.ToPage = 1;
+                    if (dialog.ShowDialog(owner) != DialogResult.OK)
+                        return;
+
+                    using (var report = new ReportDocument())
+                    {
+                        report.Load(reportPath);
+                        BindStockListing(report, rows, branchCaption, filterCaption);
+                        SendStockListingToPrinter(report, document.PrinterSettings, document.DefaultPageSettings);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(owner, "Unable to print the stock listing.\n" + ex.Message, "Stock Listing",
+                    MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+        }
+
+        private static void SendStockListingToPrinter(ReportDocument report, PrinterSettings printer, PageSettings page)
+        {
+            report.PrintOptions.PrinterDuplex = printer.Duplex == Duplex.Default
+                ? PrinterDuplex.Default
+                : (PrinterDuplex)printer.Duplex;
+            var layout = new PrintLayoutSettings { Scaling = PrintLayoutSettings.PrintScaling.ShrinkOnly, Centered = true };
+            report.PrintToPrinter(printer, page, false, layout);
+        }
+
+        private static void BindStockListing(ReportDocument report, IReadOnlyList<StockReportItem> rows,
+            string branchCaption, string filterCaption)
+        {
+            var data = new DataTable("StockListing");
+            foreach (string column in new[] { "Barcode", "ItemName", "Unit" })
+                data.Columns.Add(column, typeof(string));
+            foreach (string column in new[] { "Stock", "Hold", "Available", "UnitCost", "StockValue" })
+                data.Columns.Add(column, typeof(decimal));
+            foreach (var row in rows)
+                data.Rows.Add(row.Barcode ?? "", row.ItemName ?? "", row.BaseUnitName ?? "", row.ClosingStock,
+                    row.HoldQty, row.AvailableStock, row.Cost, row.StockValue);
+
+            report.SetDataSource(data);
+            var unitTotals = rows.GroupBy(row => (row.BaseUnitName ?? "").Trim(), StringComparer.OrdinalIgnoreCase)
+                .OrderBy(group => group.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(group => new
+                {
+                    Unit = group.Key.Length == 0 ? "Unspecified UOM" : group.Key,
+                    Stock = FormattableString.Invariant($"{group.Sum(row => row.ClosingStock):#,0.00########}"),
+                    Hold = FormattableString.Invariant($"{group.Sum(row => row.HoldQty):#,0.00########}"),
+                    Available = FormattableString.Invariant($"{group.Sum(row => row.AvailableStock):#,0.00########}")
+                }).ToList();
+
+            // On mixed-unit reports, show the overall value on its own line above the unit quantities.
+            string unitTotalsOffset = unitTotals.Count > 1 ? Environment.NewLine : "";
+            var objects = report.ReportDefinition.ReportObjects;
+            ((TextObject)objects["StockReportBranch"]).Text = branchCaption;
+            ((TextObject)objects["StockReportFilters"]).Text = filterCaption;
+            ((TextObject)objects["StockReportTotals"]).Text = FormattableString.Invariant($"Total ({rows.Count:N0} items)");
+            ((TextObject)objects["StockTotalUnit"]).Text = unitTotalsOffset + string.Join(Environment.NewLine, unitTotals.Select(total => total.Unit));
+            ((TextObject)objects["StockTotalClosing"]).Text = unitTotalsOffset + string.Join(Environment.NewLine, unitTotals.Select(total => total.Stock));
+            ((TextObject)objects["StockTotalHold"]).Text = unitTotalsOffset + string.Join(Environment.NewLine, unitTotals.Select(total => total.Hold));
+            ((TextObject)objects["StockTotalAvailable"]).Text = unitTotalsOffset + string.Join(Environment.NewLine, unitTotals.Select(total => total.Available));
+            ((TextObject)objects["StockTotalValue"]).Text = FormattableString.Invariant($"{rows.Sum(row => row.StockValue):N2}");
+            ((TextObject)objects["StockGenerated"]).Text = $"Printed on: {DateTime.Now:dd-MMM-yyyy hh:mm tt}";
+            ((TextObject)objects["StockPrintedBy"]).Text =
+                $"Printed by: {(string.IsNullOrWhiteSpace(SessionContext.UserName) ? "Unavailable" : SessionContext.UserName.Trim())}";
+        }
+
+        public void PrintPurchase(long purchaseNo, int finYearId = 0)
         {
             DataTable dt = new DataTable();
             string reportPath = ResolveReportPath("CrystalReportPurcase.rpt");
@@ -250,14 +366,21 @@ namespace PosBranch_Win
                     cmd.Parameters.AddWithValue("@PurchaseNo", purchaseNo);
                     cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
                     cmd.Parameters.AddWithValue("@_Operations", "GETPURCHASE");
+                    cmd.Parameters.AddWithValue("@FinYearId", finYearId > 0 ? finYearId : SessionContext.FinYearId);
 
                     using (SqlDataAdapter adapt = new SqlDataAdapter(cmd))
                     {
                         adapt.Fill(dt);
-                        rpt.SetDataSource(dt);
+                        if (dt.Rows.Count == 0)
+                        {
+                            MessageBox.Show($"No data found for Purchase No: {purchaseNo}", "Purchase Report", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            return;
+                        }
+                        BindPurchaseReport(rpt, dt);
                     }
                 }
 
+                SetPurchaseReportDetails(rpt, dt);
                 setReportConnection(rpt);
                 SetMainReportParameter(rpt, "@PurchaseNo", purchaseNo);
                 SetMainReportParameter(rpt, "@BranchId", SessionContext.BranchId);
@@ -568,8 +691,151 @@ namespace PosBranch_Win
             }
         }
 
+        private static void BindPurchaseReport(ReportDocument report, DataTable data)
+        {
+            int branchId = Convert.ToInt32(data.Rows[0]["BranchId"]);
+            PurchasePrintBranding branding;
+            using (var repository = new PurchasePrintBrandingRepository())
+                branding = repository.Get(SessionContext.CompanyId, branchId);
+
+            ApplyPurchaseBranding(report, data, branding);
+        }
+
+        private static void ApplyPurchaseBranding(ReportDocument report, DataTable data, PurchasePrintBranding branding)
+        {
+            if (branding != null)
+            {
+                var overrides = new Dictionary<string, string>
+                {
+                    ["CompanyName"] = branding.ShopName,
+                    ["CompanyAddress1"] = branding.Address1,
+                    ["CompanyAddress2"] = branding.Address2,
+                    ["CompanyPhone"] = branding.Phone,
+                    ["CompanyEmail"] = branding.Email
+                };
+                foreach (DataRow row in data.Rows)
+                    foreach (var field in overrides)
+                        if (!string.IsNullOrWhiteSpace(field.Value))
+                            row[field.Key] = field.Value;
+            }
+
+            report.SetDataSource(data);
+            if (branding != null && !branding.HideLogo)
+                AddPurchaseLogo(report, branding.Logo ?? branding.CompanyLogo);
+        }
+
+        private static void AddPurchaseLogo(ReportDocument report, byte[] bytes)
+        {
+            if (bytes == null || bytes.Length == 0)
+                return;
+
+            string imagePath = Path.Combine(Path.GetTempPath(), $"nexoris-purchase-{Guid.NewGuid():N}.png");
+            try
+            {
+                using (var stream = new MemoryStream(bytes))
+                using (var source = Image.FromStream(stream, true, true))
+                {
+                    const int maximumWidth = 2700;
+                    const int maximumHeight = 900;
+                    const string pageFrameName = "PurchaseInvoiceFrame";
+                    double scale = Math.Min((double)maximumWidth / source.Width, (double)maximumHeight / source.Height);
+                    int width = Math.Max(1, (int)Math.Round(source.Width * scale));
+                    int height = Math.Max(1, (int)Math.Round(source.Height * scale));
+
+                    source.Save(imagePath, System.Drawing.Imaging.ImageFormat.Png);
+                    var reportHeader = report.ReportDefinition.Sections["Section1"];
+                    int originalHeaderHeight = reportHeader.Height;
+                    var definition = report.ReportClientDocument.ReportDefController;
+                    var title = definition.ReportDefinition.FindObjectByName("Text1");
+                    int logoLeft = title.Left + (title.Width - width) / 2;
+                    int logoTop = definition.ReportDefinition.FindObjectByName(pageFrameName) != null ? 145 : 0;
+                    var controller = definition.ReportObjectController;
+                    var section = definition.ReportDefinition.FindSectionByName("Section1");
+                    var picture = controller.ImportPicture(imagePath, section, logoLeft, logoTop);
+                    var resized = (CrystalDecisions.ReportAppServer.ReportDefModel.ISCRPictureObject)picture.Clone(true);
+                    resized.Width = width;
+                    resized.Height = height;
+                    controller.Modify(picture, resized);
+
+                    int offset = height + 125;
+                    reportHeader = report.ReportDefinition.Sections["Section1"];
+                    reportHeader.Height = Math.Max(reportHeader.Height, originalHeaderHeight + offset);
+                    foreach (ReportObject entry in reportHeader.ReportObjects)
+                        if (entry.Name != resized.Name && entry.Name != pageFrameName)
+                            entry.Top += offset;
+                    reportHeader.Height = originalHeaderHeight + offset;
+                }
+            }
+            catch (ArgumentException ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Purchase print logo could not be decoded: {ex.Message}");
+            }
+            finally
+            {
+                try { File.Delete(imagePath); }
+                catch (IOException ex) { System.Diagnostics.Debug.WriteLine(ex.Message); }
+            }
+        }
+
+        private static void SetPurchaseReportDetails(ReportDocument report, DataTable data)
+        {
+            var header = data.Rows[0];
+            string mode = Convert.ToString(header["Paymode"]).Trim();
+            string order = data.Columns.Contains("PurchaseOrderNo")
+                ? Convert.ToString(header["PurchaseOrderNo"]).Trim()
+                : string.Empty;
+            var rows = data.Rows.Cast<DataRow>().ToList();
+            var unitQuantities = rows
+                .GroupBy(row => Convert.ToString(row["Unit"]).Trim(), StringComparer.OrdinalIgnoreCase)
+                .Select(group => $"{group.Sum(row => Convert.ToDecimal(row["Qty"])):#,0.##} " +
+                    (string.IsNullOrWhiteSpace(group.Key) ? "unspecified unit" : group.Key));
+            var summary = new List<string>
+            {
+                $"Item lines  {rows.Count:N0}",
+                $"Total quantity  {string.Join("  |  ", unitQuantities)}"
+            };
+
+            var taxes = rows.Where(row => Convert.ToDecimal(row["ItemTaxAmt"]) != 0m)
+                .GroupBy(row => Convert.ToDecimal(row["ItemTaxPer"]))
+                .OrderBy(group => group.Key)
+                .ToList();
+            if (taxes.Count > 0)
+            {
+                summary.Add(string.Empty);
+                summary.Add("Tax breakdown");
+                foreach (var group in taxes)
+                {
+                    decimal taxableBase = group.Sum(row => Convert.ToDecimal(row["Amount"]) - Convert.ToDecimal(row["ItemTaxAmt"]));
+                    decimal tax = group.Sum(row => Convert.ToDecimal(row["ItemTaxAmt"]));
+                    summary.Add($"{group.Key:0.##}%  |  Taxable {taxableBase:N2}  |  Tax {tax:N2}");
+                }
+            }
+
+            string generatedOn = $"Generated on  {DateTime.Now:dd-MM-yyyy hh:mm tt}";
+            if (!string.IsNullOrWhiteSpace(SessionContext.UserName))
+                generatedOn += $"  by {SessionContext.UserName.Trim()}";
+
+            var text = new Dictionary<string, string>
+            {
+                ["PurchasePaymentLabel"] = string.IsNullOrWhiteSpace(mode) ? "" : "Payment Mode",
+                ["PurchasePaymentMode"] = mode,
+                ["PurchaseOrderLabel"] = string.IsNullOrWhiteSpace(order) ? "" : "PO No.",
+                ["PurchaseOrderReference"] = order,
+                ["PurchaseReceivingSummary"] = string.Join(Environment.NewLine, summary),
+                ["PurchaseGeneratedOn"] = generatedOn
+            };
+            foreach (Section section in report.ReportDefinition.Sections)
+            {
+                foreach (ReportObject reportObject in section.ReportObjects)
+                {
+                    if (reportObject is TextObject field && text.TryGetValue(field.Name, out string value))
+                        field.Text = value;
+                }
+            }
+        }
+
         /// <summary>
-        /// Helper method to safely set main report parameters
+        /// Sets a main report parameter when it exists in the template.
         /// </summary>
         private void SetMainReportParameter(ReportDocument reportDoc, string parameterName, object value)
         {

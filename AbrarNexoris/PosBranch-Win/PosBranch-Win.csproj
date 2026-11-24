@@ -744,6 +744,9 @@
     <Compile Include="DialogBox\frmItemTypeDialog.Designer.cs">
       <DependentUpon>frmItemTypeDialog.cs</DependentUpon>
     </Compile>
+    <Compile Include="Settings\FrmPurchasePrintSettings.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="DialogBox\FrmPurchaseDisplayDialog.cs">
       <SubType>Form</SubType>
     </Compile>
@@ -2353,6 +2356,14 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="PosBranch_Win\Utilities\" />
+    <Content Include="..\CrsReports\CrystalReportPurcase.rpt">
+      <Link>Reports\CrystalReportPurcase.rpt</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\CrsReports\StockListingPortrait.rpt">
+      <Link>Reports\StockListingPortrait.rpt</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

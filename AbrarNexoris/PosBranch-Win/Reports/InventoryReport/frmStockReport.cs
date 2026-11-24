@@ -74,6 +74,8 @@ namespace PosBranch_Win.Reports.InventoryReport
 
         // ─── Column Header Filtering State ──────────────────────────────────────────
         private readonly Dictionary<string, HashSet<string>> _activeColumnFilters = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
+        private string _stockListingBranchCaption;
+        private string _stockListingFilterCaption;
         private static readonly Bitmap _filterIconNormal = CreateFilterIcon(false);
         private static readonly Bitmap _filterIconActive = CreateFilterIcon(true);
         private bool _suppressSorting = false;
@@ -1253,6 +1255,19 @@ namespace PosBranch_Win.Reports.InventoryReport
                     filtered.Add(row);
                 }
 
+                _stockListingBranchCaption = string.Format("Branch: {0}   ·   Stock as of: {1:dd-MMM-yyyy}",
+                    string.IsNullOrWhiteSpace(SessionContext.BranchName) ? filter.BranchId.ToString() : SessionContext.BranchName,
+                    filter.ToDate);
+                var stockFilters = new[]
+                {
+                    DescribeStockFilter("Group", groupMode, ultraComboEditor13.Text, startGroup, endGroup),
+                    DescribeStockFilter("Category", categoryMode, ultraComboEditor14.Text, startCategory, endCategory),
+                    DescribeStockFilter("Brand", brandMode, ultraComboEditor15.Text, startBrand, endBrand),
+                    selectedItemTypeId > 0 ? "Item type " + ultraComboEditor7.Text : null,
+                    filter.BarcodeContains != null ? "Barcode contains " + filter.BarcodeContains : null
+                };
+                _stockListingFilterCaption = string.Join("  |  ", stockFilters.Where(value => !string.IsNullOrWhiteSpace(value)));
+
                 _allReportRows = filtered;
                 if (chkActiveGroupCategory != null && chkActiveGroupCategory.Checked && (!string.IsNullOrEmpty(_selectedGroup) || !string.IsNullOrEmpty(_selectedCategory)))
                 {
@@ -1273,6 +1288,16 @@ namespace PosBranch_Win.Reports.InventoryReport
             {
                 Cursor = previousCursor;
             }
+        }
+
+        private static string DescribeStockFilter(string label, string mode, string selected, string from, string to)
+        {
+            if (mode == "Filter by Selection" && !string.IsNullOrWhiteSpace(selected))
+                return label + " " + selected;
+            if (mode == "By Range")
+                return label + " " + (string.IsNullOrWhiteSpace(from) ? "start" : from) + " to " +
+                    (string.IsNullOrWhiteSpace(to) ? "end" : to);
+            return null;
         }
 
         private bool MatchRange(string value, string start, string end)
@@ -2234,12 +2259,21 @@ namespace PosBranch_Win.Reports.InventoryReport
             UpdateFooterValues();
         }
 
-        private IEnumerable<UltraGridRow> GetVisibleDataRows()
+        private IEnumerable<UltraGridRow> GetVisibleDataRows() => GetVisibleDataRows(gridReport.Rows);
+
+        private static IEnumerable<UltraGridRow> GetVisibleDataRows(RowsCollection rows)
         {
-            if (gridReport.Rows == null) yield break;
-            foreach (UltraGridRow row in gridReport.Rows)
+            if (rows == null) yield break;
+            foreach (UltraGridRow row in rows)
             {
-                if (row != null && row.IsDataRow && !row.IsFilteredOut && !row.Hidden)
+                if (row == null || row.IsFilteredOut || row.Hidden)
+                    continue;
+                if (row is UltraGridGroupByRow group)
+                {
+                    foreach (var child in GetVisibleDataRows(group.Rows))
+                        yield return child;
+                }
+                else if (row.IsDataRow)
                     yield return row;
             }
         }
@@ -2869,21 +2903,53 @@ namespace PosBranch_Win.Reports.InventoryReport
 
         private void ShowStockReportFormatDialog()
         {
-            ShowReportFormatDialog(
-                "STOCK LISTING",
-                new[]
-                {
-                    "STOCK LISTING",
-                    "STOCK LISTING - GROUP BY CATEGORY",
-                    "STOCK LISTING - SUMMARY"
-                });
-        }
-
-        private void ShowReportFormatDialog(string reportCaption, IEnumerable<string> formatDescriptions)
-        {
-            using (frmReportFormatDialog dialog = new frmReportFormatDialog(reportCaption, formatDescriptions))
+            var rows = GetVisibleDataRows()
+                .Select(row => row.ListObject as StockReportItem)
+                .Where(row => row != null)
+                .ToList();
+            if (rows.Count == 0)
             {
-                dialog.ShowDialog(this);
+                MessageBox.Show(this, "No matching items. Load or adjust the stock filters and try again.",
+                    "Stock Listing", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            using (var dialog = new frmReportFormatDialog("STOCK LISTING", new[] { "STOCK LISTING" }))
+            {
+                dialog.HideDesignActions();
+                if (dialog.ShowDialog(this) != DialogResult.OK)
+                    return;
+                try
+                {
+                    var filters = new List<string>();
+                    if (!string.IsNullOrWhiteSpace(_stockListingFilterCaption))
+                        filters.Add(_stockListingFilterCaption);
+                    if (chkActiveGroupCategory != null && chkActiveGroupCategory.Checked)
+                    {
+                        if (!string.IsNullOrWhiteSpace(_selectedGroup))
+                            filters.Add("Group " + _selectedGroup);
+                        if (!string.IsNullOrWhiteSpace(_selectedCategory))
+                            filters.Add("Category " + _selectedCategory);
+                    }
+                    foreach (var filter in _activeColumnFilters)
+                    {
+                        var columns = gridReport.DisplayLayout.Bands[0].Columns;
+                        string label = columns.Exists(filter.Key) ? columns[filter.Key].Header.Caption : filter.Key;
+                        string values = string.Join(", ", filter.Value.Take(3));
+                        if (filter.Value.Count > 3)
+                            values += $" (+{filter.Value.Count - 3})";
+                        filters.Add(label + " " + values);
+                    }
+                    using (var viewer = new ReportViewer())
+                        viewer.OpenStockListing(rows, _stockListingBranchCaption ?? SessionContext.BranchName ?? "",
+                            filters.Count == 0 ? "Filters: All items" : "Filters: " + string.Join("   ·   ", filters),
+                            dialog.SelectedAction != "preview", this);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(this, "Unable to open the stock report.\n" + ex.Message, "Stock Listing",
+                        MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
             }
         }
 

@@ -490,6 +490,7 @@ namespace PosBranch_Win.Accounts
                 // no detail row is created — the credit is held at master level as store credit.
                 var details = new List<CreditNoteDetails>();
                 var selectedRows = ultraGrid1.Rows
+                    .Where(row => _sReturnNo <= 0)
                     .Where(row => row.Cells["Select"].Value != null && Convert.ToBoolean(row.Cells["Select"].Value))
                     .Where(row => GetSafeDecimal(row.Cells["Credit Amount"].Value) > 0)
                     .ToList();
@@ -595,6 +596,10 @@ namespace PosBranch_Win.Accounts
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return false;
             }
+
+            // Linked returns are allocated against the original invoice at save time.
+            if (_sReturnNo > 0)
+                return true;
 
             // Rule 3: Applied credit cannot exceed the issued credit amount.
             decimal totalApplied = GetTotalCreditAmount();
@@ -835,6 +840,13 @@ namespace PosBranch_Win.Accounts
 
                 ultraGrid1.DataSource = invoices;
                 ConfigureGridColumns();
+                if (_sReturnNo > 0 && ultraGrid1.DisplayLayout.Bands.Count > 0)
+                {
+                    var columns = ultraGrid1.DisplayLayout.Bands[0].Columns;
+                    if (columns.Exists("Select")) columns["Select"].Hidden = true;
+                    if (columns.Exists("Credit Amount")) columns["Credit Amount"].Hidden = true;
+                    ultraTextEditor1.Text = "Calculated on save";
+                }
 
                 // Set all checkboxes to false and credit amounts to 0
                 foreach (UltraGridRow row in ultraGrid1.Rows)
