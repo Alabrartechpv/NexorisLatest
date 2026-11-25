@@ -5272,168 +5272,60 @@ namespace PosBranch_Win.Master
             }
         }
 
-        private void OpenStockAdjustmentInTab()
+        private void OpenStockAdjustmentInTab(bool afterSave = false)
         {
+            int itemId = afterSave ? ItemMaster.ItemId : CurrentItemId;
+            if (itemId <= 0)
+            {
+                MessageBox.Show(this, "Please load an item before opening Stock Adjustment.", "Stock Adjustment",
+                    MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            string barcode = GetMainBarcodeEditor()?.Text?.Trim();
+            string description = txt_description.Text.Trim();
+            string unit = txt_BaseUnit.Text.Trim();
+            int baseUnitId = ItemMaster.BaseUnitId;
+
             try
             {
-                // Check if an item is loaded
-                if (CurrentItemId <= 0)
+                var home = FindParentHome() as Home;
+                if (afterSave)
                 {
-                    MessageBox.Show("Please load an item first before opening the stock adjustment form.", "Information",
+                    clear();
+                    TryRefreshItemDialog();
+                }
+
+                if (home == null)
+                {
+                    MessageBox.Show(this, "Open Stock Adjustment from the main POS window.", "Stock Adjustment",
                         MessageBoxButtons.OK, MessageBoxIcon.Information);
                     return;
                 }
 
-                // Get current item data
-                string itemId = CurrentItemId.ToString();
-                string barcode = "";
-                string description = "";
-                string unit = "";
-                string stockQty = "0";
+                var prices = ItemRepository.GetItemPriceSettings(itemId);
+                var basePrice = prices.FirstOrDefault(price => baseUnitId > 0 && price.UnitId == baseUnitId)
+                    ?? prices.FirstOrDefault(price => string.Equals(price.Unit, unit, StringComparison.OrdinalIgnoreCase))
+                    ?? prices.FirstOrDefault(price => string.Equals(price.IsBaseUnit, "Y", StringComparison.OrdinalIgnoreCase));
 
-                // Get barcode from txt_barcode field
-                var txtBarcodeCtrl = GetMainBarcodeEditor();
-                if (txtBarcodeCtrl != null)
+                if (basePrice == null)
                 {
-                    barcode = txtBarcodeCtrl.Text?.Trim() ?? "";
+                    MessageBox.Show(this, "Current stock for the item's base unit could not be loaded.", "Stock Adjustment",
+                        MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
                 }
 
-                // Get description from txt_description field
-                if (txt_description != null)
-                {
-                    description = txt_description.Text?.Trim() ?? "";
-                }
-
-                // Get unit from txt_BaseUnit field
-                if (txt_BaseUnit != null)
-                {
-                    unit = txt_BaseUnit.Text?.Trim() ?? "";
-                }
-
-                // Get stock quantity from txt_qty or txt_available field
-                var txtQtyCtrl = this.Controls.Find("txt_qty", true).FirstOrDefault() as Infragistics.Win.UltraWinEditors.UltraTextEditor;
-                if (txtQtyCtrl != null && !string.IsNullOrEmpty(txtQtyCtrl.Text))
-                {
-                    stockQty = txtQtyCtrl.Text.Trim();
-                }
-                else
-                {
-                    var txtAvailableCtrl = this.Controls.Find("txt_available", true).FirstOrDefault() as Infragistics.Win.UltraWinEditors.UltraTextEditor;
-                    if (txtAvailableCtrl != null && !string.IsNullOrEmpty(txtAvailableCtrl.Text))
-                    {
-                        stockQty = txtAvailableCtrl.Text.Trim();
-                    }
-                }
-
-                // Find the parent Home form
-                Form parentHome = FindParentHome();
-
-                if (parentHome != null)
-                {
-                    // Check if FrmStockAdjustment is already open in a tab
-                    var openFormInTabSafeMethod = parentHome.GetType().GetMethod("OpenFormInTabSafe",
-                        System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-
-                    if (openFormInTabSafeMethod != null)
-                    {
-                        // Check if stock adjustment form already exists in a tab
-                        var tabControlMainField = parentHome.GetType().GetField("tabControlMain",
-                            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-
-                        PosBranch_Win.Transaction.FrmStockAdjustment stockAdjustmentForm = null;
-
-                        if (tabControlMainField != null)
-                        {
-                            var tabControl = tabControlMainField.GetValue(parentHome) as Infragistics.Win.UltraWinTabControl.UltraTabControl;
-
-                            if (tabControl != null)
-                            {
-                                // Check for existing Stock Adjustment tab
-                                foreach (Infragistics.Win.UltraWinTabControl.UltraTab tab in tabControl.Tabs)
-                                {
-                                    if (tab.Text == "Stock Adjustment" && tab.TabPage.Controls.Count > 0 &&
-                                        tab.TabPage.Controls[0] is PosBranch_Win.Transaction.FrmStockAdjustment existingForm &&
-                                        !existingForm.IsDisposed)
-                                    {
-                                        // Activate existing tab
-                                        stockAdjustmentForm = existingForm;
-                                        tabControl.SelectedTab = tab;
-                                        existingForm.BringToFront();
-                                        existingForm.Focus();
-
-                                        // Load the current item into the stock adjustment form
-                                        stockAdjustmentForm.AddItemToGrid(itemId, barcode, description, unit, stockQty);
-                                        return;
-                                    }
-                                }
-                            }
-                        }
-
-                        // Create new stock adjustment form and open in tab
-                        stockAdjustmentForm = new PosBranch_Win.Transaction.FrmStockAdjustment();
-
-                        // Open in tab - the form's Load event will handle initialization
-                        openFormInTabSafeMethod.Invoke(parentHome, new object[] { stockAdjustmentForm, "Stock Adjustment" });
-
-                        // Wait for form to load, then add the item
-                        // Use BeginInvoke to ensure form is fully loaded
-                        stockAdjustmentForm.BeginInvoke(new Action(() =>
-                        {
-                            try
-                            {
-                                stockAdjustmentForm.AddItemToGrid(itemId, barcode, description, unit, stockQty);
-                            }
-                            catch (Exception ex)
-                            {
-                                System.Diagnostics.Debug.WriteLine($"Error adding item to stock adjustment: {ex.Message}");
-                            }
-                        }));
-                        return;
-                    }
-                }
-
-                // Fallback: Open as standalone window if Home form or method not found
-                var existingStockAdjustmentForm = Application.OpenForms
-                    .OfType<PosBranch_Win.Transaction.FrmStockAdjustment>()
-                    .FirstOrDefault(f => !f.IsDisposed);
-
-                if (existingStockAdjustmentForm == null)
-                {
-                    var stockAdjustmentForm = new PosBranch_Win.Transaction.FrmStockAdjustment();
-                    stockAdjustmentForm.StartPosition = FormStartPosition.CenterScreen;
-                    stockAdjustmentForm.Show();
-
-                    // Wait for form to load, then add the item
-                    stockAdjustmentForm.Shown += (s, e) =>
-                    {
-                        try
-                        {
-                            stockAdjustmentForm.AddItemToGrid(itemId, barcode, description, unit, stockQty);
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"Error adding item to stock adjustment: {ex.Message}");
-                        }
-                    };
-                }
-                else
-                {
-                    if (existingStockAdjustmentForm.WindowState == FormWindowState.Minimized)
-                    {
-                        existingStockAdjustmentForm.WindowState = FormWindowState.Normal;
-                    }
-                    existingStockAdjustmentForm.BringToFront();
-                    existingStockAdjustmentForm.Focus();
-
-                    // Load the current item into the stock adjustment form
-                    existingStockAdjustmentForm.AddItemToGrid(itemId, barcode, description, unit, stockQty);
-                }
+                string stockUnit = string.IsNullOrWhiteSpace(basePrice.Unit) ? unit : basePrice.Unit;
+                home.OpenStockAdjustmentForItem(itemId, barcode, description, stockUnit,
+                    Convert.ToDecimal(basePrice.Stock));
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error opening stock adjustment: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
-                MessageBox.Show("Unable to open the stock adjustment form. Please try again.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                System.Diagnostics.Debug.WriteLine($"Error opening Stock Adjustment for item {itemId}: {ex}");
+                string message = afterSave
+                    ? "The item was saved. Stock Adjustment could not be loaded."
+                    : "Stock Adjustment could not be loaded for this item.";
+                MessageBox.Show(this, message, "Stock Adjustment", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 
@@ -8381,7 +8273,7 @@ namespace PosBranch_Win.Master
                 if (saveSuccess)
                 {
                     // Open stock adjustment with the saved item
-                    OpenStockAdjustmentAfterSave();
+                    OpenStockAdjustmentInTab(afterSave: true);
                 }
             }
             else
@@ -8754,170 +8646,6 @@ namespace PosBranch_Win.Master
             }
         }
 
-        /// <summary>
-        /// Opens the stock adjustment form and loads the currently saved item into it.
-        /// Called after a successful save when user chose to go to stock adjustment.
-        /// </summary>
-        private void OpenStockAdjustmentAfterSave()
-        {
-            try
-            {
-                // Get item data from the form (before clearing)
-                string itemId = ItemMaster.ItemId > 0 ? ItemMaster.ItemId.ToString() : CurrentItemId.ToString();
-                string barcode = "";
-                string description = "";
-                string unit = "";
-                string stockQty = "0";
-
-                // Get barcode from txt_barcode field
-                var txtBarcodeCtrl = GetMainBarcodeEditor();
-                if (txtBarcodeCtrl != null)
-                {
-                    barcode = txtBarcodeCtrl.Text?.Trim() ?? "";
-                }
-
-                // Get description from txt_description field
-                if (txt_description != null)
-                {
-                    description = txt_description.Text?.Trim() ?? "";
-                }
-
-                // Get unit from txt_BaseUnit field
-                if (txt_BaseUnit != null)
-                {
-                    unit = txt_BaseUnit.Text?.Trim() ?? "";
-                }
-
-                // Get stock quantity from txt_qty or txt_available field
-                var txtQtyCtrl = this.Controls.Find("txt_qty", true).FirstOrDefault() as Infragistics.Win.UltraWinEditors.UltraTextEditor;
-                if (txtQtyCtrl != null && !string.IsNullOrEmpty(txtQtyCtrl.Text))
-                {
-                    stockQty = txtQtyCtrl.Text.Trim();
-                }
-                else
-                {
-                    var txtAvailableCtrl = this.Controls.Find("txt_available", true).FirstOrDefault() as Infragistics.Win.UltraWinEditors.UltraTextEditor;
-                    if (txtAvailableCtrl != null && !string.IsNullOrEmpty(txtAvailableCtrl.Text))
-                    {
-                        stockQty = txtAvailableCtrl.Text.Trim();
-                    }
-                }
-
-                // Clear the form after saving (same as normal save)
-                this.clear();
-                TryRefreshItemDialog();
-
-                // Find the parent Home form
-                Form parentHome = FindParentHome();
-
-                if (parentHome != null)
-                {
-                    // Check if FrmStockAdjustment is already open in a tab
-                    var openFormInTabSafeMethod = parentHome.GetType().GetMethod("OpenFormInTabSafe",
-                        System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-
-                    if (openFormInTabSafeMethod != null)
-                    {
-                        // Check if stock adjustment form already exists in a tab
-                        var tabControlMainField = parentHome.GetType().GetField("tabControlMain",
-                            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-
-                        PosBranch_Win.Transaction.FrmStockAdjustment stockAdjustmentForm = null;
-
-                        if (tabControlMainField != null)
-                        {
-                            var tabControl = tabControlMainField.GetValue(parentHome) as Infragistics.Win.UltraWinTabControl.UltraTabControl;
-
-                            if (tabControl != null)
-                            {
-                                // Check for existing Stock Adjustment tab
-                                foreach (Infragistics.Win.UltraWinTabControl.UltraTab tab in tabControl.Tabs)
-                                {
-                                    if (tab.Text == "Stock Adjustment" && tab.TabPage.Controls.Count > 0 &&
-                                        tab.TabPage.Controls[0] is PosBranch_Win.Transaction.FrmStockAdjustment existingForm &&
-                                        !existingForm.IsDisposed)
-                                    {
-                                        // Activate existing tab
-                                        stockAdjustmentForm = existingForm;
-                                        tabControl.SelectedTab = tab;
-                                        existingForm.BringToFront();
-                                        existingForm.Focus();
-
-                                        // Load the current item into the stock adjustment form
-                                        stockAdjustmentForm.AddItemToGrid(itemId, barcode, description, unit, stockQty);
-                                        return;
-                                    }
-                                }
-                            }
-                        }
-
-                        // Create new stock adjustment form and open in tab
-                        stockAdjustmentForm = new PosBranch_Win.Transaction.FrmStockAdjustment();
-
-                        // Open in tab - the form's Load event will handle initialization
-                        openFormInTabSafeMethod.Invoke(parentHome, new object[] { stockAdjustmentForm, "Stock Adjustment" });
-
-                        // Wait for form to load, then add the item
-                        // Use BeginInvoke to ensure form is fully loaded
-                        stockAdjustmentForm.BeginInvoke(new Action(() =>
-                        {
-                            try
-                            {
-                                stockAdjustmentForm.AddItemToGrid(itemId, barcode, description, unit, stockQty);
-                            }
-                            catch (Exception ex)
-                            {
-                                System.Diagnostics.Debug.WriteLine($"Error adding item to stock adjustment: {ex.Message}");
-                            }
-                        }));
-                        return;
-                    }
-                }
-
-                // Fallback: Open as standalone window if Home form or method not found
-                var existingStockAdjustmentForm = Application.OpenForms
-                    .OfType<PosBranch_Win.Transaction.FrmStockAdjustment>()
-                    .FirstOrDefault(f => !f.IsDisposed);
-
-                if (existingStockAdjustmentForm == null)
-                {
-                    var stockAdjustmentForm = new PosBranch_Win.Transaction.FrmStockAdjustment();
-                    stockAdjustmentForm.StartPosition = FormStartPosition.CenterScreen;
-                    stockAdjustmentForm.Show();
-
-                    // Wait for form to load, then add the item
-                    stockAdjustmentForm.Shown += (s, evt) =>
-                    {
-                        try
-                        {
-                            stockAdjustmentForm.AddItemToGrid(itemId, barcode, description, unit, stockQty);
-                        }
-                        catch (Exception ex)
-                        {
-                            System.Diagnostics.Debug.WriteLine($"Error adding item to stock adjustment: {ex.Message}");
-                        }
-                    };
-                }
-                else
-                {
-                    if (existingStockAdjustmentForm.WindowState == FormWindowState.Minimized)
-                    {
-                        existingStockAdjustmentForm.WindowState = FormWindowState.Normal;
-                    }
-                    existingStockAdjustmentForm.BringToFront();
-                    existingStockAdjustmentForm.Focus();
-
-                    // Load the current item into the stock adjustment form
-                    existingStockAdjustmentForm.AddItemToGrid(itemId, barcode, description, unit, stockQty);
-                }
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error opening stock adjustment: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
-                MessageBox.Show("Item saved successfully, but unable to open the stock adjustment form. Please open it manually.", "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-            }
-        }
         public void SaveMaster()
         {
             try

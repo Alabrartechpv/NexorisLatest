@@ -1220,7 +1220,17 @@ namespace PosBranch_Win
         }
 
         // Modified version with additional safety checks
-        public void OpenFormInTabSafe(Form formToOpen, string tabName)
+        public void OpenFormInTabSafe(Form formToOpen, string tabName) =>
+            OpenOrActivateFormTab(formToOpen, tabName);
+
+        internal void OpenStockAdjustmentForItem(int itemId, string barcode, string description, string unit, decimal stock)
+        {
+            var stockAdjustment = OpenOrActivateFormTab(new FrmStockAdjustment(), "Stock Adjustment", "stockadjustment") as FrmStockAdjustment;
+            if (stockAdjustment != null && !stockAdjustment.IsDisposed)
+                stockAdjustment.AddItemToGrid(itemId, barcode, description, unit, stock);
+        }
+
+        private Form OpenOrActivateFormTab(Form formToOpen, string tabName, string toolKey = null)
         {
             try
             {
@@ -1245,7 +1255,7 @@ namespace PosBranch_Win
                         MessageBox.Show($"Access Denied: You do not have permission to access '{tabName}'. Please contact your administrator.",
                             "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                         try { formToOpen.Dispose(); } catch { }
-                        return;
+                        return null;
                     }
                 }
 
@@ -1288,13 +1298,13 @@ namespace PosBranch_Win
                                         }
                                     }
                                     try { formToOpen.Dispose(); } catch { }
-                                    return;
+                                    return existingForm;
                                 }
                             }
                             else
                             {
                                 tabControlMain.SelectedTab = tab;
-                                return;
+                                return null;
                             }
                         }
                     }
@@ -1337,7 +1347,7 @@ namespace PosBranch_Win
                 // Create new tab
                 string uniqueKey = $"Tab_{DateTime.Now.Ticks}_{tabName}";
                 var newTab = tabControlMain.Tabs.Add(uniqueKey, tabName);
-                newTab.Tag = _lastActivatedToolKey; // Store toolbar key for favorites
+                newTab.Tag = toolKey ?? _lastActivatedToolKey; // Store toolbar key for favorites
 
                 // Add form to tab page
                 newTab.TabPage.Controls.Add(formToOpen);
@@ -1401,7 +1411,7 @@ namespace PosBranch_Win
                 };
 
                 System.Diagnostics.Debug.WriteLine($"Successfully opened '{tabName}' in new tab");
-
+                return formToOpen;
             }
             catch (Exception ex)
             {
@@ -1412,6 +1422,7 @@ namespace PosBranch_Win
                 {
                     formToOpen.Dispose();
                 }
+                return null;
             }
         }
 

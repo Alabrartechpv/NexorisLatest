@@ -1539,6 +1539,26 @@ namespace PosBranch_Win.Transaction
         // Public method to add items to the UltraGrid from dialog classes
         public int AddItemToGrid(string itemId, string barcode, string description, string uom, string qtyOnHand, int adjQty = 0)
         {
+            if (!int.TryParse(itemId, out int numericItemId) || numericItemId <= 0)
+            {
+                MessageBox.Show(this, "The selected item has an invalid item ID.", "Stock Adjustment",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return -1;
+            }
+
+            decimal stock = 0m;
+            if (!string.IsNullOrWhiteSpace(qtyOnHand) && !decimal.TryParse(qtyOnHand, out stock))
+            {
+                MessageBox.Show(this, "The current stock quantity is not a valid number.", "Stock Adjustment",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return -1;
+            }
+
+            return AddItemToGrid(numericItemId, barcode, description, uom, stock, adjQty);
+        }
+
+        internal int AddItemToGrid(int itemId, string barcode, string description, string uom, decimal qtyOnHand, int adjQty = 0)
+        {
             try
             {
                 // Check if this item already exists in the grid
@@ -1555,12 +1575,11 @@ namespace PosBranch_Win.Transaction
                         }
                     }
                 }
-                else if (!string.IsNullOrWhiteSpace(itemId))
+                else
                 {
                     foreach (UltraGridRow existingRow in ultraGrid1.Rows)
                     {
-                        if (existingRow.Cells["ItemNo"].Value != null &&
-                            string.Equals(existingRow.Cells["ItemNo"].Value.ToString().Trim(), itemId.Trim(), StringComparison.OrdinalIgnoreCase))
+                        if (Equals(existingRow.Cells["ItemNo"].Value, itemId))
                         {
                             MessageBox.Show("Item already selected");
                             this.barcodeFocus();
