@@ -53,6 +53,7 @@ namespace Repository
         public static string _POS_GetBill = "_POS_GetBill";
         public static string _POS_GetPurchasePrint = "_POS_GetPurchasePrint";
         public static string POS_Purchase = "POS_Purchase";
+        public const string POS_PurchaseInvoiceSupport = "dbo.POS_PurchaseInvoiceSupport";
         public static string POS_Purchase_Details = "POS_Purchase_Details";
         public static string POS_PurchaseOrder = "_PurchaseOrder";
         public static string POS_PurchaseOrder_Details = "_PurchaseOrder_PurchaseOrderDetails";
