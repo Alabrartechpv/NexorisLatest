@@ -6,11 +6,33 @@
 --                            Stock Adjustment, Hold Bills, Item Deletions, and Ledger/Account Deletions.
 --                    RESTRICTED: Administrator only.
 -- =========================================================================================================
-IF OBJECT_ID('dbo.POS_DeletionAuditReport', 'P') IS NOT NULL
-    DROP PROCEDURE dbo.POS_DeletionAuditReport;
+IF OBJECT_ID(N'dbo.VoucherDeletionAudit', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.VoucherDeletionAudit
+    (
+        AuditId bigint IDENTITY(1, 1) NOT NULL PRIMARY KEY,
+        CompanyId int NOT NULL,
+        BranchId int NOT NULL,
+        FinYearId int NOT NULL,
+        VoucherType nvarchar(100) NOT NULL,
+        VoucherId bigint NOT NULL,
+        DocDate datetime NULL,
+        RefNo nvarchar(100) NULL,
+        PartyName nvarchar(200) NULL,
+        Amount decimal(28, 2) NOT NULL,
+        Narration nvarchar(max) NULL,
+        DeletedBy nvarchar(100) NOT NULL,
+        Counter nvarchar(100) NULL,
+        DeletedDate datetime NOT NULL DEFAULT GETDATE()
+    );
+END;
 GO
 
-CREATE PROCEDURE dbo.POS_DeletionAuditReport
+IF OBJECT_ID(N'dbo.POS_DeletionAuditReport', N'P') IS NULL
+    EXEC(N'CREATE PROCEDURE dbo.POS_DeletionAuditReport AS RETURN 0;');
+GO
+
+ALTER PROCEDURE dbo.POS_DeletionAuditReport
 (
     @CompanyId          INT             = 0,
     @BranchId           INT             = 0,
@@ -37,7 +59,21 @@ BEGIN
     SET @UserFilter = LTRIM(RTRIM(ISNULL(@UserFilter, 'ALL')));
     SET @SearchText = LTRIM(RTRIM(ISNULL(@SearchText, '')));
 
-    WITH AllDeletions AS (
+    ;WITH CancelledPaymentPostings AS (
+        SELECT v.*,
+               CASE
+                   WHEN type.Code IN ('GENPAY', 'GERPAY', 'GENERAL PAYMENT') THEN 'GENERAL_PAYMENT'
+                   WHEN type.Code IN ('GENREC', 'GENRECEIPT', 'GENRECIEPT', 'GENERAL RECEIPT') THEN 'GENERAL_RECEIPT'
+                   ELSE 'VENDOR_PAYMENT'
+               END AS ModuleKey
+        FROM dbo.Vouchers v
+        CROSS APPLY (VALUES (UPPER(LTRIM(RTRIM(v.VoucherType))))) type(Code)
+        WHERE v.CancelFlag = 1
+          AND type.Code IN ('GENPAY', 'GERPAY', 'GENERAL PAYMENT',
+                            'GENREC', 'GENRECEIPT', 'GENRECIEPT', 'GENERAL RECEIPT',
+                            'VENDPAY', 'VENDOR PAYMENT')
+    ),
+    AllDeletions AS (
         -- 1. Sales Master (CancelFlag = 1) - Differentiates Sales Invoices vs Hold Bills
         SELECT 
             CAST(CASE 
@@ -395,13 +431,14 @@ BEGIN
         SELECT 
             CAST('VENDOR_PAYMENT' AS NVARCHAR(50)) AS ModuleKey,
             CAST('Vendor Payment' AS NVARCHAR(100)) AS TransactionType,
-            CAST('VP-' + CAST(p.Id AS NVARCHAR(50)) AS NVARCHAR(100)) AS DocNo,
-            CAST(ISNULL(p.BillNoUntil, '') AS NVARCHAR(100)) AS RefNo,
+            CAST(COALESCE(NULLIF(voucher.VoucherNumber, ''), 'VP-' + CONVERT(nvarchar(50), COALESCE(NULLIF(p.VoucherId, 0), p.Id))) AS NVARCHAR(100)) AS DocNo,
+            ISNULL(CONVERT(nvarchar(100), p.BillNoUntil), '') AS RefNo,
             CAST(p.VoucherDate AS DATETIME) AS DocDate,
             CAST(ISNULL(
                 (SELECT TOP 1 DATEADD(minute, DATEDIFF(minute, GETUTCDATE(), GETDATE()), sq.CreatedUtc) 
                  FROM dbo.SyncQueue sq 
-                 WHERE sq.EntityType = 'VENDOR_PAYMENT' AND sq.EntityId = CAST(p.Id AS VARCHAR(50)) AND sq.Operation = 'CANCEL' 
+                 WHERE sq.EntityType = 'VENDOR_PAYMENT' AND sq.EntityId = CAST(p.Id AS VARCHAR(50))
+                   AND sq.BranchId = p.BranchId AND sq.Operation = 'CANCEL'
                  ORDER BY sq.SyncId DESC),
                 p.VoucherDate
             ) AS DATETIME) AS DeletedDate,
@@ -412,10 +449,25 @@ BEGIN
             CAST('' AS NVARCHAR(100)) AS Counter,
             CAST(ISNULL(p.Narration, 'Vendor Payment Cancelled') AS NVARCHAR(500)) AS DeletionReason,
             CAST(ISNULL(p.Narration, '') AS NVARCHAR(MAX)) AS SourceDetails,
-            p.CompanyId, p.BranchId, 1 AS FinYearId
+            p.CompanyId, p.BranchId, COALESCE(voucher.FinYearID, fiscal.FinYearID, 0) AS FinYearId
         FROM dbo.VendorPaymentMaster p
-        LEFT JOIN dbo.LedgerMaster l ON p.VendorLedgerId = l.LedgerID
+        LEFT JOIN dbo.LedgerMaster l ON p.VendorLedgerId = l.LedgerID AND p.CompanyId = l.CompanyId AND p.BranchId = l.BranchId
         LEFT JOIN dbo.Users u ON p.UserId = u.UserId
+        OUTER APPLY (
+            SELECT TOP (1) v.FinYearID, v.VoucherNumber
+            FROM dbo.Vouchers v
+            WHERE v.VoucherID = p.VoucherId AND v.VoucherType IN ('VENDPAY', 'Vendor Payment')
+              AND v.CompanyID = p.CompanyId AND v.BranchID = p.BranchId AND v.LedgerID = p.VendorLedgerId
+              AND CONVERT(date, v.VoucherDate) = CONVERT(date, p.VoucherDate)
+            ORDER BY v.CancelFlag DESC, v.FinYearID DESC
+        ) voucher
+        OUTER APPLY (
+            SELECT TOP (1) fy.FinYearID
+            FROM dbo.FinancialYear fy
+            WHERE fy.CompanyID = p.CompanyId
+              AND CONVERT(date, p.VoucherDate) BETWEEN CONVERT(date, fy.FinYearFrom) AND CONVERT(date, fy.FinYearTo)
+            ORDER BY fy.FinYearFrom DESC, fy.FinYearID DESC
+        ) fiscal
         WHERE p.CancelFlag = 1
 
         UNION ALL
@@ -568,7 +620,51 @@ BEGIN
 
         UNION ALL
 
-        -- 16. General Vouchers (Payment, Receipt, Journal, Contra)
+        -- General payment and receipt vouchers are physically deleted after recording this snapshot.
+        SELECT
+            CAST(CASE WHEN a.VoucherType = 'GENPAY' THEN 'GENERAL_PAYMENT' ELSE 'GENERAL_RECEIPT' END AS NVARCHAR(50)),
+            CAST(CASE WHEN a.VoucherType = 'GENPAY' THEN 'General Payment' ELSE 'General Receipt' END AS NVARCHAR(100)),
+            CAST(COALESCE(a.RefNo, a.VoucherType + ' #' + CONVERT(nvarchar(50), a.VoucherId)) AS NVARCHAR(100)),
+            ISNULL(a.RefNo, ''), a.DocDate, a.DeletedDate, ISNULL(a.PartyName, ''), a.Amount,
+            CAST(0 AS DECIMAL(18,2)), a.DeletedBy, ISNULL(a.Counter, ''),
+            CAST(N'Voucher deleted' AS NVARCHAR(500)), ISNULL(a.Narration, ''),
+            a.CompanyId, a.BranchId, a.FinYearId
+        FROM dbo.VoucherDeletionAudit a
+        WHERE a.VoucherType IN ('GENPAY', 'GENREC')
+
+        UNION ALL
+
+        -- Older cancellations may exist only as voucher postings. Count each voucher once.
+        SELECT
+            CAST(v.ModuleKey AS NVARCHAR(50)),
+            CAST(CASE v.ModuleKey WHEN 'GENERAL_PAYMENT' THEN 'General Payment'
+                                  WHEN 'GENERAL_RECEIPT' THEN 'General Receipt'
+                                  ELSE 'Vendor Payment' END AS NVARCHAR(100)),
+            CAST(COALESCE(MAX(NULLIF(v.VoucherNumber, '')), MAX(v.VoucherType) + ' #' + CONVERT(nvarchar(50), v.VoucherID)) AS NVARCHAR(100)),
+            CAST(ISNULL(MAX(v.VoucherNumber), '') AS NVARCHAR(100)),
+            v.VoucherDate, MAX(ISNULL(v.UserDate, v.VoucherDate)),
+            CAST(ISNULL(MIN(CASE WHEN v.ModuleKey = 'GENERAL_RECEIPT' AND v.Credit > 0
+                                   OR v.ModuleKey <> 'GENERAL_RECEIPT' AND v.Debit > 0
+                                 THEN NULLIF(v.LedgerName, '') END), '') AS NVARCHAR(200)),
+            CAST(SUM(CASE WHEN v.ModuleKey = 'GENERAL_RECEIPT' THEN ISNULL(v.Credit, 0)
+                          ELSE ISNULL(v.Debit, 0) END) AS DECIMAL(18,2)),
+            CAST(0 AS DECIMAL(18,2)),
+            CAST(ISNULL(MAX(NULLIF(v.UserName, '')), 'Unknown') AS NVARCHAR(100)),
+            CAST(ISNULL(CONVERT(nvarchar(50), MAX(v.CounterID)), '') AS NVARCHAR(100)),
+            CAST(N'Voucher cancelled' AS NVARCHAR(500)),
+            CAST(ISNULL(MAX(CONVERT(nvarchar(max), v.Narration)), '') AS NVARCHAR(MAX)),
+            v.CompanyID, v.BranchID, v.FinYearID
+        FROM CancelledPaymentPostings v
+        WHERE v.ModuleKey <> 'VENDOR_PAYMENT' OR NOT EXISTS (
+            SELECT 1 FROM dbo.VendorPaymentMaster p
+            WHERE p.VoucherId = v.VoucherID AND p.CompanyId = v.CompanyID AND p.BranchId = v.BranchID
+              AND CONVERT(date, p.VoucherDate) = CONVERT(date, v.VoucherDate) AND p.CancelFlag = 1
+        )
+        GROUP BY v.ModuleKey, v.CompanyID, v.BranchID, v.FinYearID, v.VoucherID, v.VoucherDate
+
+        UNION ALL
+
+        -- Other account vouchers (Journal, Contra, and uncategorized types).
         SELECT 
             CAST(CASE 
                 WHEN v.VoucherType LIKE '%Payment%' THEN 'GENERAL_PAYMENT'
@@ -592,7 +688,9 @@ BEGIN
             v.CompanyID AS CompanyId, v.BranchID AS BranchId, v.FinYearID AS FinYearId
         FROM dbo.Vouchers v
         WHERE v.CancelFlag = 1
-          AND v.VoucherType NOT IN ('Sales', 'Purchase', 'Customer Receipt', 'Vendor Payment')
+          AND UPPER(LTRIM(RTRIM(v.VoucherType))) NOT IN
+              ('SALES', 'PURCHASE', 'CUSTOMER RECEIPT', 'VENDPAY', 'VENDOR PAYMENT',
+               'GENPAY', 'GERPAY', 'GENERAL PAYMENT', 'GENREC', 'GENRECEIPT', 'GENRECIEPT', 'GENERAL RECEIPT')
 
         UNION ALL
 

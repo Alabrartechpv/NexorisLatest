@@ -2151,7 +2151,7 @@ namespace PosBranch_Win.Reports.FinancialReports
         {
             if (e.Row == null) return;
 
-            // Double clicking Band 1 (Child Voucher): open FrmGeneralPayment
+            // Double clicking a voucher opens its transaction form.
             if (e.Row.Band.Index == 1)
             {
                 string vNo = e.Row.Cells["VoucherNumber"].Value?.ToString() ?? string.Empty;
@@ -2159,8 +2159,11 @@ namespace PosBranch_Win.Reports.FinancialReports
                 {
                     try
                     {
-                        FrmGeneralPayment paymentForm = new FrmGeneralPayment(vNo);
-                        paymentForm.ShowDialog(this);
+                        string voucherType = e.Row.Cells["VoucherType"].Value?.ToString();
+                        bool isReceipt = string.Equals(voucherType, "GENREC", StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(voucherType, "General Receipt", StringComparison.OrdinalIgnoreCase);
+                        using (Form voucherForm = isReceipt ? (Form)new FrmGeneralReceipt(vNo) : new FrmGeneralPayment(vNo))
+                            voucherForm.ShowDialog(this);
                     }
                     catch (Exception ex)
                     {

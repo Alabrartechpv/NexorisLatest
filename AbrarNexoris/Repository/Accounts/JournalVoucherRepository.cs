@@ -13,6 +13,7 @@ namespace Repository.Accounts
     {
         protected virtual string VoucherType => "Journal";
         protected virtual string VoucherNumberPrefix => "JV";
+        private bool IsGeneralVoucher => VoucherType == "GENPAY" || VoucherType == "GENREC";
 
         public JournalVoucher Save(JournalVoucher journal)
         {
@@ -93,8 +94,11 @@ FROM Vouchers v
 LEFT JOIN LedgerMaster l
     ON l.LedgerID = v.LedgerID
    AND l.BranchID = v.BranchID
+   AND l.CompanyID = v.CompanyID
 WHERE v.VoucherType = @VoucherType
   AND ISNULL(v.CancelFlag, 0) = 0
+  AND (@UseSessionScope = 0 OR
+       (v.CompanyID = @CompanyID AND v.BranchID = @BranchID AND v.FinYearID = @FinYearID))
   AND ((@VoucherID > 0 AND v.VoucherID = @VoucherID)
        OR (@VoucherNumber <> '' AND v.VoucherNumber = @VoucherNumber))
 ORDER BY v.SlNo;";
@@ -105,6 +109,10 @@ ORDER BY v.SlNo;";
                     command.Parameters.AddWithValue("@VoucherType", VoucherType);
                     command.Parameters.AddWithValue("@VoucherID", voucherId);
                     command.Parameters.AddWithValue("@VoucherNumber", voucherText ?? string.Empty);
+                    command.Parameters.AddWithValue("@UseSessionScope", IsGeneralVoucher);
+                    command.Parameters.AddWithValue("@CompanyID", GetContextValue(SessionContext.CompanyId, DataBase.CompanyId));
+                    command.Parameters.AddWithValue("@BranchID", GetContextValue(SessionContext.BranchId, DataBase.BranchId));
+                    command.Parameters.AddWithValue("@FinYearID", GetContextValue(SessionContext.FinYearId, DataBase.FinyearId));
                     using (var adapter = new SqlDataAdapter(command))
                     {
                         adapter.Fill(table);
@@ -230,7 +238,10 @@ ORDER BY MAX(v.VoucherDate) DESC, v.VoucherID DESC;";
 
             try
             {
-                DeleteVoucherLines(journal, transaction);
+                if (IsGeneralVoucher)
+                    DeleteGeneralVoucherWithAudit(journal, transaction);
+                else
+                    DeleteVoucherLines(journal, transaction);
                 transaction.Commit();
             }
             catch
@@ -245,6 +256,53 @@ ORDER BY MAX(v.VoucherDate) DESC, v.VoucherID DESC;";
                     DataConnection.Close();
                 }
             }
+        }
+
+        private void DeleteGeneralVoucherWithAudit(JournalVoucher journal, IDbTransaction transaction)
+        {
+            const string sql = @"
+                DECLARE @DeletedLines TABLE (
+                    DocDate datetime, RefNo nvarchar(100), LedgerId int, PartyName nvarchar(200),
+                    Narration nvarchar(max), Debit decimal(28, 4), Credit decimal(28, 4));
+
+                DELETE dbo.Vouchers
+                OUTPUT deleted.VoucherDate, deleted.VoucherNumber, deleted.LedgerID, deleted.LedgerName,
+                       deleted.Narration, ISNULL(deleted.Debit, 0), ISNULL(deleted.Credit, 0)
+                INTO @DeletedLines (DocDate, RefNo, LedgerId, PartyName, Narration, Debit, Credit)
+                WHERE CompanyID = @CompanyID AND BranchID = @BranchID AND FinYearID = @FinYearID
+                  AND VoucherType = @VoucherType AND VoucherID = @VoucherID AND ISNULL(CancelFlag, 0) = 0;
+
+                IF NOT EXISTS (SELECT 1 FROM @DeletedLines)
+                    THROW 50001, 'The voucher could not be found or was already deleted.', 1;
+
+                INSERT dbo.VoucherDeletionAudit
+                    (CompanyId, BranchId, FinYearId, VoucherType, VoucherId, DocDate, RefNo,
+                     PartyName, Amount, Narration, DeletedBy, Counter)
+                SELECT @CompanyID, @BranchID, @FinYearID, @VoucherType, @VoucherID,
+                       MIN(DocDate), MAX(NULLIF(RefNo, N'')),
+                       CASE WHEN COUNT(DISTINCT d.LedgerId) > 1 THEN N'Multiple ledgers'
+                            ELSE MIN(COALESCE(NULLIF(d.PartyName, N''), l.LedgerName)) END,
+                       SUM(CASE WHEN @VoucherType = 'GENPAY' THEN Debit ELSE Credit END),
+                       MAX(NULLIF(d.Narration, N'')), @DeletedBy, @Counter
+                FROM @DeletedLines d
+                LEFT JOIN dbo.LedgerMaster l
+                  ON l.LedgerId = d.LedgerId AND l.CompanyId = @CompanyID AND l.BranchId = @BranchID
+                WHERE (@VoucherType = 'GENPAY' AND Debit > 0) OR (@VoucherType = 'GENREC' AND Credit > 0)
+                HAVING COUNT(*) > 0;
+
+                IF @@ROWCOUNT = 0
+                    THROW 50002, 'The voucher has no payment or receipt entries to audit.', 1;";
+
+            DataConnection.Execute(sql, new
+            {
+                journal.CompanyID,
+                journal.BranchID,
+                journal.FinYearID,
+                journal.VoucherID,
+                VoucherType,
+                DeletedBy = string.IsNullOrWhiteSpace(journal.UserName) ? "Unknown" : journal.UserName,
+                Counter = SessionContext.CounterName
+            }, transaction);
         }
 
         private void ValidateJournal(JournalVoucher journal)

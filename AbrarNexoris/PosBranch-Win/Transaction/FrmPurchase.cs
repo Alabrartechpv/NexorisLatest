@@ -99,7 +99,13 @@ namespace PosBranch_Win.Transaction
         private DateTime? _activityPurchaseDate;
 
         // Flag to track if the user manually changed label4 (Net Total) via ".." shortcut in txtBarcode
-        private bool _isNetTotalManuallySet = false;
+        private bool _isNetTotalManuallySet;
+        private bool _updatingPurchaseTotals;
+        private decimal _purchaseGridTotal;
+        private decimal _billDiscountAmount;
+        private decimal _billDiscountPercent;
+        private decimal _purchaseRoundOff;
+        private decimal _purchasePayable;
 
         // Read-only state for paid/half-paid purchases
         private bool _isReadOnly = false;
@@ -613,6 +619,8 @@ namespace PosBranch_Win.Transaction
 
             // Add KeyDown event for txtRoundOff to handle round-off calculations
             txtRoundOff.KeyDown += txtRoundOff_KeyDown;
+            textBox2.TextChanged += PurchaseDiscount_TextChanged;
+            ultraCheckEditor1.CheckedChanged += PurchaseRounding_CheckedChanged;
 
             // Add KeyDown event for textBox1 to load vendor by ID
             textBox1.KeyDown += textBox1_KeyDown;
@@ -1927,6 +1935,8 @@ namespace PosBranch_Win.Transaction
             txtInvoiceNo.Enabled = !readOnly;
             txtBilledBy.Enabled = !readOnly;
             txtRoundOff.Enabled = !readOnly;
+            textBox2.Enabled = !readOnly;
+            ultraCheckEditor1.Enabled = !readOnly;
             txtRemark.Enabled = !readOnly;
             textBox1.Enabled = !readOnly;
 
@@ -5279,37 +5289,15 @@ namespace PosBranch_Win.Transaction
                         return;
                     }
 
-                    // Handle ".." to update total and show balance
-                    // When user types ..{amount}, hide label4 panel, show label6 panel with new amount
-                    // label6 = NetTotal (overridden). textBox2 = remaining balance.
-                    if (input.StartsWith("..") && input.Length > 2)
+                    // The total shortcut sets the equivalent bill discount.
+                    if (input.StartsWith("..") && input.Length > 2 &&
+                        decimal.TryParse(input.Substring(2), out decimal requestedTotal) && requestedTotal >= 0m)
                     {
-                        string amountStr = input.Substring(2);
-                        if (float.TryParse(amountStr, out float newTotal))
-                        {
-                            // Hide label4 panel, show label6 panel
-                            ultraPanel11.Visible = false;
-                            ultraPanel12.Visible = true;
-
-                            // Set label6 with the overridden NetTotal amount
-                            label6.Text = newTotal.ToString("N2");
-                            txtInvoiceAmt.Text = newTotal.ToString("N2");
-
-                            // Calculate remaining balance
-                            float remaining = OriginalNetTotal - newTotal;
-
-                            // Display remaining balance in textBox2
-                            if (textBox2 != null)
-                            {
-                                textBox2.Text = remaining.ToString("N2");
-                            }
-
-                            // Mark that the user manually overrode the total
-                            _isNetTotalManuallySet = true;
-
-                            this.barcodeFocus();
-                            return;
-                        }
+                        SetBillAdjustmentControls(_purchaseGridTotal - requestedTotal, 0m,
+                            ultraCheckEditor1.Checked, true);
+                        UpdatePurchasePayable();
+                        this.barcodeFocus();
+                        return;
                     }
 
                     // Handle "." to delete the highlighted item
@@ -5887,6 +5875,9 @@ namespace PosBranch_Win.Transaction
                     textBox1.Text = CmboVendor.Value.ToString();
                 }
 
+                if (!ValidatePurchasePayable())
+                    return;
+
                 // Setup purchase master data
                 ObjPurchaseMaster.BranchId = GetBranchId();
                 ObjPurchaseMaster.CompanyId = GetCompanyId();
@@ -5905,23 +5896,16 @@ namespace PosBranch_Win.Transaction
                 ObjPurchaseMaster.SubTotal = SubTotal;
                 ObjPurchaseMaster.SpDisPer = 0;
                 ObjPurchaseMaster.SpDsiAmt = 0;
-                ObjPurchaseMaster.BillDiscountPer = 0;
-                ObjPurchaseMaster.BillDiscountAmt = _isNetTotalManuallySet
-                    ? (double.TryParse(textBox2.Text, out double saveBd) ? saveBd : 0)
-                    : 0;
                 ObjPurchaseMaster.TaxPer = 0;
                 ObjPurchaseMaster.TaxAmt = 0;
                 ObjPurchaseMaster.Frieght = 0;
                 ObjPurchaseMaster.ExpenseAmt = 0;
                 ObjPurchaseMaster.OtherExpAmt = 0;
-                ObjPurchaseMaster.GrandTotal = NetTotal;
                 ObjPurchaseMaster.CancelFlag = false;
                 ObjPurchaseMaster.UserID = GetUserId();
                 ObjPurchaseMaster.UserName = GetUserName();
                 ObjPurchaseMaster.TaxType = "I";
                 ObjPurchaseMaster.Remarks = txtRemark != null ? txtRemark.Text : "";
-                ObjPurchaseMaster.RoundOff = string.IsNullOrWhiteSpace(txtRoundOff.Text) ?
-                    0 : (float.TryParse(txtRoundOff.Text, out float roundOff) ? roundOff : 0);
                 ObjPurchaseMaster.CessPer = 0;
                 ObjPurchaseMaster.CessAmt = 0;
                 ObjPurchaseMaster.CalAfterTax = 0;
@@ -5938,10 +5922,7 @@ namespace PosBranch_Win.Transaction
                 ObjPurchaseMaster.BilledBy = txtBilledBy.Text;
                 ObjPurchaseMaster.TrnsType = "Purchase";
 
-                // NetTotal: if user overrode via ".." shortcut, save label6 value; otherwise same as GrandTotal
-                ObjPurchaseMaster.NetTotal = _isNetTotalManuallySet
-                    ? (double.TryParse(label6.Text, out double saveNt) ? saveNt : NetTotal)
-                    : NetTotal;
+                ApplyPurchaseBillTotals(ObjPurchaseMaster);
 
                 // Get data from ultraGrid1
                 DataTable dt = ultraGrid1.DataSource as DataTable;
@@ -6200,7 +6181,7 @@ namespace PosBranch_Win.Transaction
                     CmboVendor.Text = string.Empty;
                 }
 
-                txtRoundOff.Clear();
+                SetBillAdjustmentControls(0m, 0m, false, false);
 
                 // Reset dates to current date
                 dtpPurchaseDate.Value = DateTime.Today;
@@ -6220,8 +6201,6 @@ namespace PosBranch_Win.Transaction
 
                 label4.Text = "0.00";
                 label6.Text = "0.00";
-                textBox2.Text = "";
-                _isNetTotalManuallySet = false;
 
                 // Reset panel visibility: show label4 panel, hide label6 panel
                 ultraPanel11.Visible = true;
@@ -6317,136 +6296,184 @@ namespace PosBranch_Win.Transaction
         }
 
 
+        private void PurchaseDiscount_TextChanged(object sender, EventArgs e)
+        {
+            if (_updatingPurchaseTotals)
+                return;
+
+            _isNetTotalManuallySet = false;
+            UpdatePurchasePayable();
+        }
+
+        private void PurchaseRounding_CheckedChanged(object sender, EventArgs e)
+        {
+            if (_updatingPurchaseTotals)
+                return;
+
+            _updatingPurchaseTotals = true;
+            try
+            {
+                txtRoundOff.ReadOnly = ultraCheckEditor1.Checked;
+                txtRoundOff.Text = "0.00";
+            }
+            finally
+            {
+                _updatingPurchaseTotals = false;
+            }
+            UpdatePurchasePayable();
+        }
+
         private void txtRoundOff_TextChanged(object sender, EventArgs e)
         {
-            // We'll process round off only when Enter key is pressed
-            // Implementation is in txtRoundOff_KeyDown event
+            if (!_updatingPurchaseTotals && !ultraCheckEditor1.Checked)
+                UpdatePurchasePayable();
         }
 
         private void txtRoundOff_KeyDown(object sender, KeyEventArgs e)
         {
-            if (e.KeyCode == Keys.Enter)
+            if (e.KeyCode != Keys.Enter)
+                return;
+
+            e.SuppressKeyPress = true;
+            e.Handled = true;
+            string error = UpdatePurchasePayable();
+            if (error != null)
+                MessageBox.Show(this, error, "Purchase Total", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            txtRoundOff.SelectAll();
+        }
+
+        private void SetBillAdjustmentControls(decimal discount, decimal roundOff, bool autoRound,
+            bool manualTotal, decimal discountPercent = 0m)
+        {
+            _updatingPurchaseTotals = true;
+            try
             {
-                e.SuppressKeyPress = true; // Prevent "ding" sound
-                e.Handled = true;
-
-                // Apply rounding based on entered value
-                ApplyRoundOff();
-
-                // Keep focus in the txtRoundOff field
-                txtRoundOff.Focus();
-                txtRoundOff.SelectAll();
+                _isNetTotalManuallySet = manualTotal;
+                textBox2.Text = discountPercent > 0m ? discountPercent.ToString() + "%" :
+                    discount == 0m ? string.Empty : discount.ToString("0.00");
+                ultraCheckEditor1.Checked = autoRound;
+                txtRoundOff.ReadOnly = autoRound;
+                txtRoundOff.Text = roundOff.ToString("0.00");
+            }
+            finally
+            {
+                _updatingPurchaseTotals = false;
             }
         }
 
-        private void ApplyRoundOff()
+        private string UpdatePurchasePayable()
         {
-            try
+            string discountText = textBox2.Text.Trim();
+            bool percentage = discountText.EndsWith("%", StringComparison.Ordinal);
+            string discountNumber = percentage ? discountText.Substring(0, discountText.Length - 1).Trim() : discountText;
+            decimal discount = 0m;
+            if ((discountText.Length != 0 && !decimal.TryParse(discountNumber, out discount)) ||
+                (discount < 0m && !_isNetTotalManuallySet))
+                return "Enter a valid discount amount or percentage.";
+
+            decimal discountPercent = percentage ? Math.Min(discount, 100m) : 0m;
+            if (percentage)
+                discount = _purchaseGridTotal * (discountPercent / 100m);
+            discount = Math.Round(Math.Min(discount, Math.Max(0m, _purchaseGridTotal)), 2, MidpointRounding.AwayFromZero);
+            decimal unrounded = Math.Round(_purchaseGridTotal - discount, 2, MidpointRounding.AwayFromZero);
+
+            decimal adjustment = 0m;
+            if (ultraCheckEditor1.Checked)
             {
-                string input = txtRoundOff.Text.Trim();
-
-                // Check if the input starts with a plus sign (for adding values)
-                if (input.StartsWith("+") && input.Length > 1)
-                {
-                    // Extract the value after the + sign
-                    string valueStr = input.Substring(1);
-                    if (float.TryParse(valueStr, out float addValue))
-                    {
-                        // Add the value to the original total
-                        NetTotal = OriginalNetTotal + addValue;
-
-                        // Update the txtRoundOff with the actual round-off amount (negative value)
-                        txtRoundOff.Text = (-addValue).ToString("0.00");
-                    }
-                    else
-                    {
-                        // Invalid number format after +
-                        NetTotal = OriginalNetTotal;
-                    }
-                }
-                // Original round-off logic
-                else if (!string.IsNullOrWhiteSpace(input) && float.TryParse(input, out float roundOff))
-                {
-                    // Apply the round off to the original net total
-                    NetTotal = OriginalNetTotal - roundOff;
-                }
-                else
-                {
-                    // If round off is cleared or invalid, reset to original total
-                    NetTotal = OriginalNetTotal;
-                }
-
-                // Update UI with the new total
-
-                label4.Text = NetTotal.ToString("N2");
-
-                // Update invoice amount text field
-                txtInvoiceAmt.Text = NetTotal.ToString("N2");
+                adjustment = Math.Round(unrounded, 0, MidpointRounding.AwayFromZero) - unrounded;
             }
-            catch (Exception ex)
+            else if (_purchaseGridTotal != 0m)
             {
-                System.Diagnostics.Debug.WriteLine("Error applying round off: " + ex.Message);
+                string roundingText = txtRoundOff.Text.Trim();
+                if (roundingText.Length != 0 && !decimal.TryParse(roundingText, out adjustment))
+                    return "Enter a valid rounding amount.";
+
+                // Purchase has historically stored and accepted unsigned round-off as a deduction.
+                if (!roundingText.StartsWith("+", StringComparison.Ordinal))
+                    adjustment = -adjustment;
+                adjustment = Math.Round(adjustment, 2, MidpointRounding.AwayFromZero);
             }
+
+            if (unrounded > 0m && adjustment > decimal.MaxValue - unrounded)
+                return "The rounding amount is too large.";
+            decimal payable = unrounded + adjustment;
+            if (payable < 0m)
+                return "Discount and rounding cannot make the purchase total negative.";
+
+            _billDiscountAmount = discount;
+            _billDiscountPercent = discountPercent;
+            _purchaseRoundOff = -adjustment;
+            _purchasePayable = payable;
+            NetTotal = (float)payable;
+
+            if (ultraCheckEditor1.Checked)
+            {
+                _updatingPurchaseTotals = true;
+                try
+                {
+                    txtRoundOff.Text = adjustment.ToString("0.00");
+                }
+                finally
+                {
+                    _updatingPurchaseTotals = false;
+                }
+            }
+
+            string totalText = payable.ToString("N2");
+            label4.Text = totalText;
+            label6.Text = totalText;
+            txtInvoiceAmt.Text = totalText;
+            ultraPanel11.Visible = !_isNetTotalManuallySet;
+            ultraPanel12.Visible = _isNetTotalManuallySet;
+            return null;
+        }
+
+        private bool ValidatePurchasePayable()
+        {
+            ultraGrid1.PerformAction(UltraGridAction.ExitEditMode);
+            ultraGrid1.UpdateData();
+            CalculatePurchaseGridTotals();
+            string error = UpdatePurchasePayable();
+            if (error == null)
+                return true;
+
+            MessageBox.Show(this, error, "Purchase Total", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            return false;
+        }
+
+        private void ApplyPurchaseBillTotals(PurchaseMaster purchase)
+        {
+            purchase.BillDiscountPer = (double)_billDiscountPercent;
+            purchase.BillDiscountAmt = (double)_billDiscountAmount;
+            purchase.RoundOff = (double)_purchaseRoundOff;
+            purchase.GrandTotal = purchase.NetTotal = (double)_purchasePayable;
+        }
+
+        private void CalculatePurchaseGridTotals()
+        {
+            SubTotal = 0;
+            decimal gross = 0m;
+            if (ultraGrid1.DataSource is DataTable dt)
+            {
+                foreach (DataRow row in dt.Rows)
+                {
+                    SubTotal += GetDataRowFloat(row, "BaseCost") * GetDataRowFloat(row, "Qty");
+                    if (dt.Columns.Contains("NetAmt") && decimal.TryParse(Convert.ToString(row["NetAmt"]), out decimal net))
+                        gross += net;
+                }
+            }
+
+            _purchaseGridTotal = Math.Round(gross, 2, MidpointRounding.AwayFromZero);
+            OriginalNetTotal = (float)_purchaseGridTotal;
+            lblSubTotalAmt.Text = SubTotal.ToString("N2");
         }
 
         public void CaluateTotals()
         {
-            // Reset totals
-            SubTotal = 0;
-            NetTotal = 0;
-
-            // Calculate totals from grid
-            DataTable dt = ultraGrid1.DataSource as DataTable;
-            if (dt != null)
-            {
-                for (int i = 0; i < dt.Rows.Count; i++)
-                {
-                    // SubTotal should be tax-excluded (BaseCost * Qty)
-                    if (dt.Rows[i]["BaseCost"] != DBNull.Value && dt.Rows[i]["Qty"] != DBNull.Value)
-                    {
-                        float baseCost = float.Parse(dt.Rows[i]["BaseCost"].ToString());
-                        float qty = float.Parse(dt.Rows[i]["Qty"].ToString());
-                        SubTotal += baseCost * qty;
-                    }
-
-                    // Use NetAmt column for totals since it is populated for both Incl and Excl
-                    if (dt.Columns.Contains("NetAmt") && dt.Rows[i]["NetAmt"] != null && dt.Rows[i]["NetAmt"] != DBNull.Value)
-                    {
-                        if (float.TryParse(dt.Rows[i]["NetAmt"].ToString(), out float netAmt))
-                        {
-                            NetTotal += netAmt;
-                        }
-                    }
-                }
-            }
-
-            // finalTotal is exactly NetTotal
-            float finalTotal = NetTotal;
-
-            // Store original net total for round off calculations
-            OriginalNetTotal = finalTotal;
-
-            // Apply any existing round off
-            float roundOff = 0;
-            if (!string.IsNullOrWhiteSpace(txtRoundOff.Text) &&
-                float.TryParse(txtRoundOff.Text, out roundOff))
-            {
-                finalTotal = OriginalNetTotal - roundOff;
-            }
-
-            // Update UI labels with the calculated totals
-            lblSubTotalAmt.Text = SubTotal.ToString("N2");
-
-            // label4 should show NetAmt total if any item has excl tax type, otherwise show Amount total
-            label4.Text = finalTotal.ToString("N2");
-
-            // Set invoice amount text field
-            txtInvoiceAmt.Text = finalTotal.ToString("N2");
-
-            // Also update footer values when totals are calculated
+            CalculatePurchaseGridTotals();
+            UpdatePurchasePayable();
             UpdateFooterValues();
 
-            // Set focus to barcode field
             this.ActiveControl = txtBarcode;
             txtBarcode.Focus();
         }
@@ -7062,6 +7089,12 @@ namespace PosBranch_Win.Transaction
         }
 
         // Method to handle loading purchase data from the display dialog
+        private double GetSavedPurchaseLineWeight(PurchaseDetails detail)
+        {
+            double weight = detail.Cost * detail.Qty;
+            return NormalizeTaxType(detail.TaxType) == "excl" ? weight + detail.TaxAmt : weight;
+        }
+
         public void LoadPurchaseData(int purchaseId)
         {
             bool isPaidOrHalfPaid = false;
@@ -7069,6 +7102,7 @@ namespace PosBranch_Win.Transaction
             {
                 _isLoadingPurchaseForActivitySnapshot = true;
                 _originalSellingPrices.Clear();
+                SetBillAdjustmentControls(0m, 0m, false, false);
                 // First clear the grid
                 DataTable dt = ultraGrid1.DataSource as DataTable;
                 if (dt != null)
@@ -7126,22 +7160,28 @@ namespace PosBranch_Win.Transaction
                         if (!string.IsNullOrEmpty(pm.BilledBy))
                             txtBilledBy.Text = pm.BilledBy;
 
-                        // Load round off value
-                        txtRoundOff.Text = pm.RoundOff.ToString("0.00");
                     }
 
                     // Load purchase details into grid
                     if (purchaseInvoiceGrid.Listpdetails != null && purchaseInvoiceGrid.Listpdetails.Count() > 0)
                     {
-                        // Get GrandTotal from PMaster for NetAmt calculation
-                        // This is the saved value that user may have edited
-                        float grandTotalFromMaster = (float)purchaseInvoiceGrid.Listpmaster.First().GrandTotal;
-                        int totalItems = purchaseInvoiceGrid.Listpdetails.Count();
+                        decimal discount = Convert.ToDecimal(loadedMaster.BillDiscountAmt);
+                        decimal roundOff = Convert.ToDecimal(loadedMaster.RoundOff);
+                        bool legacyOverride = discount != 0m &&
+                            Math.Abs(loadedMaster.GrandTotal - loadedMaster.NetTotal) >= 0.005d;
+                        decimal savedPayable = Convert.ToDecimal(legacyOverride ? loadedMaster.NetTotal : loadedMaster.GrandTotal);
+                        // Recover line totals before header adjustments so loading cannot apply the discount twice.
+                        decimal savedGross = Math.Round(savedPayable + discount + roundOff, 2, MidpointRounding.AwayFromZero);
+                        var details = purchaseInvoiceGrid.Listpdetails.ToList();
+                        double totalWeight = details.Sum(GetSavedPurchaseLineWeight);
+                        decimal allocatedGross = 0m;
+                        SetBillAdjustmentControls(discount, roundOff, false, legacyOverride || discount < 0m,
+                            Convert.ToDecimal(loadedMaster.BillDiscountPer));
 
                         // Use a counter to ensure sequential SLNO values
                         int slnoCounter = 1;
 
-                        foreach (PurchaseDetails pd in purchaseInvoiceGrid.Listpdetails)
+                        foreach (PurchaseDetails pd in details)
                         {
                             // Store the original selling price for activity logging comparison
                             float initialPriceVal = GetWholeSalePriceFromPriceSettings(pd.ItemID, pd.UnitId);
@@ -7233,33 +7273,13 @@ namespace PosBranch_Win.Transaction
                             double qty = Convert.ToDouble(pd.Qty.ToString());
                             float amount = (float)(costWithTax * qty);
 
-                            // NetAmt: ALWAYS use GrandTotal from PMaster (this is the saved/edited value)
-                            // Do NOT use calculated value or value from PDetails
-                            // For single item: NetAmt = GrandTotal from PMaster
-                            // For multiple items: distribute proportionally
-                            if (totalItems == 1)
-                            {
-                                // Single item: NetAmt = GrandTotal from PMaster (user's saved value)
-                                newRow["NetAmt"] = grandTotalFromMaster;
-                            }
-                            else
-                            {
-                                // Multiple items: calculate proportional share based on amount
-                                float totalAmount = 0;
-                                foreach (PurchaseDetails pdItem in purchaseInvoiceGrid.Listpdetails)
-                                {
-                                    totalAmount += Convert.ToSingle(pdItem.Cost) * Convert.ToSingle(pdItem.Qty);
-                                }
-                                if (totalAmount > 0)
-                                {
-                                    float proportion = amount / totalAmount;
-                                    newRow["NetAmt"] = proportion * grandTotalFromMaster;
-                                }
-                                else
-                                {
-                                    newRow["NetAmt"] = grandTotalFromMaster / totalItems;
-                                }
-                            }
+                            decimal lineGross = slnoCounter > details.Count
+                                ? savedGross - allocatedGross
+                                : Math.Round(totalWeight > 0d
+                                    ? savedGross * Convert.ToDecimal(GetSavedPurchaseLineWeight(pd) / totalWeight)
+                                    : savedGross / details.Count, 2, MidpointRounding.AwayFromZero);
+                            newRow["NetAmt"] = (float)lineGross;
+                            allocatedGross += lineGross;
 
                             // Gross: Try to load from database, or calculate if not available
                             bool grossLoaded = false;
@@ -7344,19 +7364,6 @@ namespace PosBranch_Win.Transaction
 
                         // Calculate totals and update displays
                         CaluateTotals();
-
-                        // Restore manually-set total if BillDiscountAmt was saved (user used ".." shortcut)
-                        var pmLoaded = purchaseInvoiceGrid.Listpmaster.First();
-                        if (pmLoaded.BillDiscountAmt > 0)
-                        {
-                            _isNetTotalManuallySet = true;
-                            // Hide label4 panel, show label6 panel with saved NetTotal
-                            ultraPanel11.Visible = false;
-                            ultraPanel12.Visible = true;
-                            label6.Text = pmLoaded.NetTotal.ToString("N2");
-                            txtInvoiceAmt.Text = pmLoaded.NetTotal.ToString("N2");
-                            textBox2.Text = pmLoaded.BillDiscountAmt.ToString("N2");
-                        }
 
                         // Update NetAmt and Gross column visibility after loading, and Amount caption
                         UpdateNetAmtColumnVisibility();
@@ -7447,6 +7454,9 @@ namespace PosBranch_Win.Transaction
                     return;
                 }
 
+                if (!ValidatePurchasePayable())
+                    return;
+
                 // Setup purchase master data for update
                 ObjPurchaseMaster.BranchId = GetBranchId();
                 ObjPurchaseMaster.CompanyId = GetCompanyId();
@@ -7470,23 +7480,16 @@ namespace PosBranch_Win.Transaction
                 ObjPurchaseMaster.SubTotal = SubTotal;
                 ObjPurchaseMaster.SpDisPer = 0;
                 ObjPurchaseMaster.SpDsiAmt = 0;
-                ObjPurchaseMaster.BillDiscountPer = 0;
-                ObjPurchaseMaster.BillDiscountAmt = _isNetTotalManuallySet
-                    ? (double.TryParse(textBox2.Text, out double updBd) ? updBd : 0)
-                    : 0;
                 ObjPurchaseMaster.TaxPer = 0;
                 ObjPurchaseMaster.TaxAmt = 0;
                 ObjPurchaseMaster.Frieght = 0;
                 ObjPurchaseMaster.ExpenseAmt = 0;
                 ObjPurchaseMaster.OtherExpAmt = 0;
-                ObjPurchaseMaster.GrandTotal = NetTotal;
                 ObjPurchaseMaster.CancelFlag = false;
                 ObjPurchaseMaster.UserID = GetUserId();
                 ObjPurchaseMaster.UserName = GetUserName();
                 ObjPurchaseMaster.TaxType = "I";
                 ObjPurchaseMaster.Remarks = "";
-                ObjPurchaseMaster.RoundOff = string.IsNullOrWhiteSpace(txtRoundOff.Text) ?
-                    0 : (float.TryParse(txtRoundOff.Text, out float roundOff) ? roundOff : 0);
                 ObjPurchaseMaster.CessPer = 0;
                 ObjPurchaseMaster.CessAmt = 0;
                 ObjPurchaseMaster.CalAfterTax = 0;
@@ -7503,10 +7506,7 @@ namespace PosBranch_Win.Transaction
                 ObjPurchaseMaster.BilledBy = txtBilledBy.Text;
                 ObjPurchaseMaster.TrnsType = "Purchase"; // Set transaction type for proper update
 
-                // NetTotal: if user overrode via ".." shortcut, save label6 value; otherwise same as GrandTotal
-                ObjPurchaseMaster.NetTotal = _isNetTotalManuallySet
-                    ? (double.TryParse(label6.Text, out double updNt) ? updNt : NetTotal)
-                    : NetTotal;
+                ApplyPurchaseBillTotals(ObjPurchaseMaster);
 
                 // Get data from ultraGrid1
                 DataTable dt = ultraGrid1.DataSource as DataTable;

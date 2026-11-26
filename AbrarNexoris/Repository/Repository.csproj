@@ -187,6 +187,7 @@
     <None Include="Scripts\POS_VendorLedger.sql" />
     <None Include="Scripts\POS_DatewiseCustomerPaymentReport.sql" />
     <None Include="Scripts\POS_DatewiseExpenseReport.sql" />
+    <None Include="Scripts\POS_DeletionAuditReport.sql" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

@@ -801,13 +801,14 @@ namespace PosBranch_Win.Reports.FinancialReports
                 {
                     return;
                 }
+                if (string.IsNullOrWhiteSpace(voucherNo))
+                    voucherNo = voucherId.ToString();
 
                 // Identify voucher category and open appropriate entry form
                 if (voucherType.IndexOf("Payment", StringComparison.OrdinalIgnoreCase) >= 0 ||
                     voucherType.IndexOf("GENPAY", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
-                    var paymentForm = new FrmGeneralPayment();
-                    paymentForm.LoadVoucherByNumber(voucherNo);
+                    var paymentForm = new FrmGeneralPayment(voucherNo);
                     OpenFormInTabOrModal(paymentForm, $"Payment #{voucherNo}");
                 }
                 else if (voucherType.IndexOf("Journal", StringComparison.OrdinalIgnoreCase) >= 0)
@@ -819,8 +820,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                 else if (voucherType.IndexOf("Receipt", StringComparison.OrdinalIgnoreCase) >= 0 ||
                          voucherType.IndexOf("GENREC", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
-                    var receiptForm = new FrmGeneralReceipt();
-                    receiptForm.LoadVoucherByNumber(voucherNo);
+                    var receiptForm = new FrmGeneralReceipt(voucherNo);
                     OpenFormInTabOrModal(receiptForm, $"Receipt #{voucherNo}");
                 }
                 else
@@ -841,30 +841,14 @@ namespace PosBranch_Win.Reports.FinancialReports
 
         private void OpenFormInTabOrModal(Form form, string title)
         {
-            try
+            var homeForm = Application.OpenForms.OfType<Home>().FirstOrDefault();
+            if (homeForm != null)
             {
-                var homeForm = Application.OpenForms.OfType<Home>().FirstOrDefault();
-                if (homeForm != null)
-                {
-                    var openFormInTabMethod = homeForm.GetType().GetMethod("OpenFormInTabSafe",
-                        System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
-                        ?? homeForm.GetType().GetMethod("OpenFormInTab",
-                        System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-
-                    if (openFormInTabMethod != null)
-                    {
-                        openFormInTabMethod.Invoke(homeForm, new object[] { form, title });
-                        return;
-                    }
-                }
-                form.Show();
-                form.BringToFront();
+                homeForm.OpenFormInTabSafe(form, title);
+                return;
             }
-            catch
-            {
-                form.Show();
-                form.BringToFront();
-            }
+            form.Show();
+            form.BringToFront();
         }
         #endregion
 

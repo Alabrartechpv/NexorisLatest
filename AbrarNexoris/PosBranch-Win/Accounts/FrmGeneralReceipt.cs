@@ -360,10 +360,13 @@ namespace PosBranch_Win.Accounts
                 this.Close();
                 return true;
             }
-            // Ribbon Delete hotkey: Ctrl+B (also supports Ctrl+D, Ctrl+Delete)
+            // Ctrl+B matches the ribbon's voucher delete action for a loaded voucher.
             if (keyData == (Keys.Control | Keys.B) || keyData == (Keys.Control | Keys.D) || keyData == (Keys.Control | Keys.Delete))
             {
-                DeleteActiveGridRow();
+                if (keyData == (Keys.Control | Keys.B) && currentVoucherId > 0)
+                    Delete();
+                else
+                    DeleteActiveGridRow();
                 return true;
             }
             // History hotkey: F5 / Ctrl+H
@@ -1150,6 +1153,13 @@ namespace PosBranch_Win.Accounts
             {
                 MessageBox.Show("Load a receipt voucher before deleting.", "Information",
                     MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
+
+            if (!SessionContext.CanDelete("generalreceipt") && !SessionContext.CanDelete(nameof(FrmGeneralReceipt)))
+            {
+                MessageBox.Show(this, "You do not have permission to delete General Receipt vouchers.",
+                    "Access Denied", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 

@@ -64,10 +64,6 @@ namespace Repository.ReportRepository
                     }
                 }
             }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"GetDeletionAuditReport error: {ex.Message}");
-            }
             finally
             {
                 if (DataConnection.State == ConnectionState.Open)
@@ -96,6 +92,12 @@ namespace Repository.ReportRepository
                         SELECT UserName FROM dbo.PReturnMaster WHERE CancelFlag = 1 AND UserName IS NOT NULL AND UserName <> ''
                         UNION
                         SELECT UserName FROM dbo.Vouchers WHERE CancelFlag = 1 AND UserName IS NOT NULL AND UserName <> ''
+                        UNION
+                        SELECT DeletedBy FROM dbo.VoucherDeletionAudit WHERE DeletedBy <> ''
+                        UNION
+                        SELECT u.UserName FROM dbo.VendorPaymentMaster p
+                        JOIN dbo.Users u ON u.UserId = p.UserId
+                        WHERE p.CancelFlag = 1 AND u.UserName IS NOT NULL AND u.UserName <> ''
                         UNION
                         SELECT UserName FROM dbo.SalesActivityLog WHERE ActivityType = 'DELETE' AND UserName IS NOT NULL AND UserName <> ''
                         UNION
