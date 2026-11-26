@@ -1262,6 +1262,13 @@ namespace ModelClass
                         RegisterAlias("customer ledger statement", p);
                         RegisterAlias("frmcustomerledgerreport", p);
                     }
+                    if (normKey.Contains("vendorledger") || normName.Contains("vendor ledger"))
+                    {
+                        RegisterAlias("vendorledger", p);
+                        RegisterAlias("vendorledgerreport", p);
+                        RegisterAlias("frmvendorledgerreport", p);
+                        RegisterAlias("vendor ledger statement", p);
+                    }
                     if (normKey.Contains("vendoroutstanding") || normName.Contains("vendor outstanding"))
                     {
                         RegisterAlias("vendoroutstanding", p);

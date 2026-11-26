@@ -104,6 +104,7 @@ namespace PosBranch_Win
             new ReportNavigatorDefinition("Customer", "Customer Ledger Statement", "CustomerLedgerReport"),
             new ReportNavigatorDefinition("Customer", "Customer Report Details", "CustomerReportDetails"),
             new ReportNavigatorDefinition("Vendor", "Vendor Outstanding Listing", "VendorOutstandingReport"),
+            new ReportNavigatorDefinition("Vendor", Reports.FinancialReports.frmVendorLedgerReport.Title, "VendorLedgerReport"),
             new ReportNavigatorDefinition("Vendor", "Vendor Payment Report", "VendorPaymentReport"),
             new ReportNavigatorDefinition("Vendor", "Date-wise Vendor Payment Report", "DatewiseVendorPaymentReport"),
             new ReportNavigatorDefinition("Vendor", "Unallocated Purchase Returns", "UnallocatedPurchaseReturns"),
@@ -3360,6 +3361,8 @@ namespace PosBranch_Win
             if (tk == "CustomerOutstandingReport") return "customeroutstanding";
             if (tk == "CustomerReceiptReport") return "customerreceiptreport";
             if (tk == "CustomerLedgerReport") return "customerledger";
+            if (tk == "VendorLedgerReport" || tk == nameof(Reports.FinancialReports.frmVendorLedgerReport) ||
+                tk == Reports.FinancialReports.frmVendorLedgerReport.Title) return "vendorledger";
             if (tk == "VendorOutstandingReport") return "vendoroutstanding";
             if (tk == "VendorPaymentReport") return "vendorpaymentreport";
             if (tk == "DatewiseVendorPaymentReport") return "datewisevendorpaymentreport";
@@ -4527,6 +4530,11 @@ namespace PosBranch_Win
             {
                 PosBranch_Win.Reports.FinancialReports.frmCustomerLedgerReport customerLedgerReport = new PosBranch_Win.Reports.FinancialReports.frmCustomerLedgerReport();
                 OpenFormInTab(customerLedgerReport, "Customer Ledger Statement");
+            }
+            if (e.Tool.Key == "VendorLedgerReport")
+            {
+                OpenFormInTab(new Reports.FinancialReports.frmVendorLedgerReport(),
+                    Reports.FinancialReports.frmVendorLedgerReport.Title);
             }
             if (e.Tool.Key == "CustomerReportDetails" || e.Tool.Key == "frmcustomerreportdetails" || e.Tool.Key == "CustomerDetailsReport")
             {
@@ -7053,6 +7061,7 @@ namespace PosBranch_Win
                     keyToExecute == "VendorReportDetails" ||
                     keyToExecute == "CustomerReceiptReport" ||
                     keyToExecute == "CustomerLedgerReport" ||
+                    keyToExecute == "VendorLedgerReport" ||
                     keyToExecute == "CustomerReportDetails" ||
                     keyToExecute == "StockValuationReport" ||
                     keyToExecute == "LowStockAlertReport" ||

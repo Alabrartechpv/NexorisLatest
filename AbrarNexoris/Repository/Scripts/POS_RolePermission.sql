@@ -267,6 +267,7 @@ BEGIN
         ('shiftreconciliation', 'Shift Reconciliation Report', 'Reports'),
         ('vendoroutstanding', 'Vendor Outstanding Report', 'Reports'),
         ('customerledger', 'Customer Ledger Report', 'Reports'),
+        ('vendorledger', 'Vendor Ledger Statement', 'Reports'),
         ('customeroutstanding', 'Customer Outstanding Report', 'Reports'),
         ('customerreceiptreport', 'Customer Receipt Report', 'Reports'),
         ('salesprofit', 'Sales Profit Report', 'Reports'),

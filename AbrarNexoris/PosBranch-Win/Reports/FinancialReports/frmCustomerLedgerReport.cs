@@ -17,7 +17,9 @@ namespace PosBranch_Win.Reports.FinancialReports
     public partial class frmCustomerLedgerReport : Form
     {
         // ── Repository ─────────────────────────────────────────────
-        private readonly CustomerLedgerReportRepository _repository;
+        private readonly LedgerReportRepository _repository;
+        private readonly bool _isVendor;
+        private string PartyLabel => _isVendor ? "Vendor" : "Customer";
 
         // ── Data ────────────────────────────────────────────────────
         private List<CustomerLedgerReportRow> _allFetchedRows;   // raw DB result
@@ -60,13 +62,29 @@ namespace PosBranch_Win.Reports.FinancialReports
         private static readonly Color ButtonTextBlue       = Color.FromArgb(14, 47, 108);
 
         // ════════════════════════════════════════════════════════════
-        public frmCustomerLedgerReport()
+        public frmCustomerLedgerReport() : this(false)
         {
-            _repository     = new CustomerLedgerReportRepository();
+        }
+
+        protected frmCustomerLedgerReport(bool isVendor)
+        {
+            _isVendor = isVendor;
+            _repository = isVendor
+                ? (LedgerReportRepository)new VendorLedgerReportRepository()
+                : new CustomerLedgerReportRepository();
             _allFetchedRows = new List<CustomerLedgerReportRow>();
             _reportRows     = new List<CustomerLedgerReportRow>();
 
             InitializeComponent();
+            if (_isVendor)
+            {
+                Name = nameof(frmVendorLedgerReport);
+                Text = "Vendor Ledger Statement";
+                lblCustomer.Text = "Vendor:";
+                btnSelectCustomer.Text = "Select Vendor";
+                txtCustomerName.NullText = "Click \"Select Vendor\" or press F3…";
+                lblStatus.Text = "Ready. Select a vendor to view the ledger.";
+            }
 
             Load                         += frmCustomerLedgerReport_Load;
             btnSearch.Click              += btnSearch_Click;
@@ -99,7 +117,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             try
             {
                 WindowState = FormWindowState.Maximized;
-                Text        = "Customer Ledger Statement";
+                Text        = $"{PartyLabel} Ledger Statement";
 
                 ApplyTheme();
                 InitializeDateControls();
@@ -107,7 +125,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                 StyleFilterControls();
                 ApplyButtonStyles();
                 ApplyGridStyles();
-                SetStatus("Ready  |  Select a customer and press Search (F5)  |  Ctrl+E = Export  |  Ctrl+P = Print  |  Esc = Close");
+                SetStatus($"Ready  |  Select a {PartyLabel.ToLowerInvariant()} and press Search (F5)  |  Ctrl+E = Export  |  Ctrl+P = Print  |  Esc = Close");
             }
             finally
             {
@@ -444,7 +462,7 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             if (_selectedCustomerId <= 0)
             {
-                MessageBox.Show("Please select a Customer first (click \"Select Customer\" or press F3).",
+                MessageBox.Show($"Please select a {PartyLabel} first (click \"Select {PartyLabel}\" or press F3).",
                                  "Validation", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
@@ -517,23 +535,31 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             // Create list for binding (always prepend virtual Opening Balance row)
             var bindingList = new List<CustomerLedgerReportRow>();
-            bindingList.Add(new CustomerLedgerReportRow
+            CustomerLedgerReportRow opening = _isVendor
+                ? (CustomerLedgerReportRow)new VendorLedgerReportRow()
+                : new CustomerLedgerReportRow();
+            opening.VoucherDate = Convert.ToDateTime(dtFrom.Value).Date;
+            opening.VoucherNo = "-";
+            opening.VoucherTypeName = "Opening Balance";
+            opening.Particulars = "Balance Brought Forward";
+            opening.Narration = "Opening Balance";
+            opening.RunningBalance = _openingBalance;
+            if (opening is VendorLedgerReportRow vendorOpening)
             {
-                VoucherID       = 0,
-                VoucherDate     = Convert.ToDateTime(dtFrom.Value).Date,
-                VoucherNo       = "-",
-                VoucherTypeName = "Opening Balance",
-                Particulars     = "Balance Brought Forward",
-                Narration       = "Opening Balance",
-                ReceiptAmount   = 0,
-                PaymentAmount   = 0,
-                RunningBalance  = _openingBalance
-            });
+                vendorOpening.Bills.Add(new VendorLedgerBillRow
+                {
+                    Document = "Opening Balance",
+                    Detail = "Balance brought forward from before the selected period."
+                });
+            }
+            bindingList.Add(opening);
             bindingList.AddRange(filteredList);
 
             _reportRows = bindingList;
             _filterManager?.ClearFilters();
-            gridReport.DataSource = _reportRows;
+            gridReport.DataSource = _isVendor
+                ? (object)bindingList.Cast<VendorLedgerReportRow>().ToList()
+                : bindingList;
             _filterManager?.UpdateHeaderFilterIcons();
             UpdateSummaryCards();
 
@@ -636,7 +662,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                 ultraComboPreset.Value     = "ThisMonth";
 
                 ResetSummaryCards();
-                SetStatus("Ready  |  Select a customer and press Search (F5)");
+                SetStatus($"Ready  |  Select a {PartyLabel.ToLowerInvariant()} and press Search (F5)");
             }
             finally
             {
@@ -654,16 +680,16 @@ namespace PosBranch_Win.Reports.FinancialReports
             }
             try
             {
-                string safeCustomer = SanitizeFileName(_selectedCustomerName);
+                string safeParty = SanitizeFileName(_selectedCustomerName, PartyLabel);
                 using (var dlg = new SaveFileDialog())
                 {
                     dlg.Filter = ReportPdfExporter.CsvAndPdfFilter;
-                    dlg.FileName = $"CustomerLedger_{safeCustomer}_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
+                    dlg.FileName = $"{PartyLabel}Ledger_{safeParty}_{DateTime.Now:yyyyMMdd_HHmmss}.csv";
 
                     if (dlg.ShowDialog() != DialogResult.OK) return;
 
                     var sb = new StringBuilder();
-                    if (ReportPdfExporter.CheckAndExportPdf(dlg, gridReport, "Customer Ledger Report", $"Customer: {_selectedCustomerName}")) return;
+                    if (ReportPdfExporter.CheckAndExportPdf(dlg, gridReport, $"{PartyLabel} Ledger Report", $"{PartyLabel}: {_selectedCustomerName}")) return;
 
                     sb.AppendLine("Date,Voucher No,Voucher Type,Particulars,Narration,Debit (Dr),Credit (Cr),Running Balance");
 
@@ -707,37 +733,51 @@ namespace PosBranch_Win.Reports.FinancialReports
 
         private void btnClose_Click(object sender, EventArgs e) => Close();
 
-        /// <summary>Opens frmCustomerDialog and stores the selection.</summary>
-        private void btnSelectCustomer_Click(object sender, EventArgs e)
+        private void btnSelectCustomer_Click(object sender, EventArgs e) => OpenPartyDialog();
+
+        private void OpenPartyDialog()
         {
-            OpenCustomerDialog();
+            if (_isVendor)
+            {
+                using (var dialog = new PosBranch_Win.DialogBox.frmVendorDig())
+                {
+                    if (dialog.ShowDialog(this) == DialogResult.OK)
+                        SelectLedger(dialog.SelectedVendorId, dialog.SelectedVendorName);
+                }
+            }
+            else
+            {
+                using (var dialog = new PosBranch_Win.DialogBox.frmCustomerDialog())
+                {
+                    if (dialog.ShowDialog(this) == DialogResult.OK)
+                        SelectLedger(dialog.SelectedCustomerId, dialog.SelectedCustomerName);
+                }
+            }
         }
 
-        private void OpenCustomerDialog()
+        private void SelectLedger(int ledgerId, string ledgerName)
         {
-            using (var dlg = new PosBranch_Win.DialogBox.frmCustomerDialog())
-            {
-                if (dlg.ShowDialog(this) != DialogResult.OK) return;
-                if (dlg.SelectedCustomerId <= 0) return;
+            if (ledgerId <= 0)
+                return;
 
-                _selectedCustomerId   = dlg.SelectedCustomerId;
-                _selectedCustomerName = dlg.SelectedCustomerName ?? string.Empty;
-                txtCustomerName.Text  = _selectedCustomerName;
-
-                // Auto-search once a customer is selected
-                FetchFromDatabase();
-            }
+            _selectedCustomerId = ledgerId;
+            _selectedCustomerName = ledgerName ?? string.Empty;
+            txtCustomerName.Text = _selectedCustomerName;
+            FetchFromDatabase();
         }
 
         /// <summary>
         /// External drill-down launcher from Balance Sheet or Executive Dashboard
         /// </summary>
-        public void LoadForCustomer(int customerId, string customerName, DateTime fromDate, DateTime toDate)
+        public void LoadForCustomer(int customerId, string customerName, DateTime fromDate, DateTime toDate) =>
+            LoadForLedger(customerId, customerName, fromDate, toDate);
+
+        protected void LoadForLedger(int ledgerId, string ledgerName, DateTime fromDate, DateTime toDate)
         {
             try
             {
-                _selectedCustomerId = customerId;
-                _selectedCustomerName = customerName ?? string.Empty;
+                _selectedCustomerId = ledgerId;
+                _selectedCustomerName = ledgerName ?? string.Empty;
                 if (txtCustomerName != null) txtCustomerName.Text = _selectedCustomerName;
                 if (dtFrom != null) dtFrom.Value = fromDate;
                 if (dtTo != null) dtTo.Value = toDate;
@@ -808,6 +848,21 @@ namespace PosBranch_Win.Reports.FinancialReports
             SetCol(band, "ReceiptAmount",  "Debit (Dr)",      115, "N2",         HAlign.Right,  5);
             SetCol(band, "PaymentAmount",  "Credit (Cr)",     115, "N2",         HAlign.Right,  6);
             SetCol(band, "RunningBalance", "Running Balance", 135, "N2",         HAlign.Right,  7);
+            if (_isVendor && e.Layout.Bands.Count > 1)
+            {
+                e.Layout.ViewStyleBand = ViewStyleBand.Vertical;
+                e.Layout.Override.ExpansionIndicator = ShowExpansionIndicator.CheckOnDisplay;
+                var bills = e.Layout.Bands[1];
+                SetCol(bills, nameof(VendorLedgerBillRow.Document), "Document", 105, null, HAlign.Left, 0);
+                SetCol(bills, nameof(VendorLedgerBillRow.BillNumber), "Bill No", 80, null, HAlign.Left, 1);
+                SetCol(bills, nameof(VendorLedgerBillRow.InvoiceNumber), "Invoice No", 110, null, HAlign.Left, 2);
+                SetCol(bills, nameof(VendorLedgerBillRow.BillDate), "Bill Date", 88, "dd/MM/yyyy", HAlign.Center, 3);
+                SetCol(bills, nameof(VendorLedgerBillRow.Detail), "Bill Details", 270, null, HAlign.Left, 4);
+                SetCol(bills, nameof(VendorLedgerBillRow.Quantity), "Qty", 72, "0.###", HAlign.Right, 5);
+                SetCol(bills, nameof(VendorLedgerBillRow.Amount), "Amount", 105, "N2", HAlign.Right, 6);
+                SetCol(bills, nameof(VendorLedgerBillRow.Applied), "Applied", 105, "N2", HAlign.Right, 7);
+                SetCol(bills, nameof(VendorLedgerBillRow.BillBalance), "Bill Balance", 105, "N2", HAlign.Right, 8);
+            }
             _filterManager?.UpdateHeaderFilterIcons();
         }
 
@@ -864,6 +919,9 @@ namespace PosBranch_Win.Reports.FinancialReports
 
         private void gridReport_InitializeRow(object sender, InitializeRowEventArgs e)
         {
+            if (_isVendor && e.Row.Band.Index == 0 && e.Row.ListObject is VendorLedgerReportRow)
+                e.Row.ExpansionIndicator = ShowExpansionIndicator.Always;
+
             if (!e.Row.Cells.Exists("RunningBalance")) return;
             object val = e.Row.Cells["RunningBalance"].Value;
             if (val == null || val == DBNull.Value) return;
@@ -881,7 +939,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             {
                 case Keys.Escape:                              Close();             break;
                 case Keys.F5:                                  FetchFromDatabase(); break;
-                case Keys.F3:                                  OpenCustomerDialog(); break;
+                case Keys.F3:                                  OpenPartyDialog(); break;
                 case Keys.E when e.Control:                    btnExport_Click(this, e); break;
                 case Keys.P when e.Control:                    btnPrint_Click(this, e);  break;
             }
@@ -894,9 +952,9 @@ namespace PosBranch_Win.Reports.FinancialReports
         private static bool ContainsIgnoreCase(string source, string lower)
             => source != null && source.ToLowerInvariant().Contains(lower);
 
-        private static string SanitizeFileName(string name)
+        private static string SanitizeFileName(string name, string partyLabel)
         {
-            if (string.IsNullOrWhiteSpace(name)) return "Customer";
+            if (string.IsNullOrWhiteSpace(name)) return partyLabel;
             foreach (char c in Path.GetInvalidFileNameChars())
                 name = name.Replace(c.ToString(), "");
             return name.Trim();

@@ -1357,6 +1357,9 @@
     <Compile Include="Reports\FinancialReports\frmCustomerLedgerReport.cs">
       <SubType>Form</SubType>
     </Compile>
+    <Compile Include="Reports\FinancialReports\frmVendorLedgerReport.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="Reports\FinancialReports\frmCustomerLedgerReport.Designer.cs">
       <DependentUpon>frmCustomerLedgerReport.cs</DependentUpon>
     </Compile>

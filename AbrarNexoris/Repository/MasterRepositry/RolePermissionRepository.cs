@@ -687,6 +687,7 @@ namespace Repository.MasterRepositry
             add("customeroutstanding", "Customer Outstanding Report", "Reports");
             add("customerreceiptreport", "Customer Receipt Report", "Reports");
             add("customerledger", "Customer Ledger Report", "Reports");
+            add("vendorledger", "Vendor Ledger Statement", "Reports");
             add("vendoroutstanding", "Vendor Outstanding Report", "Reports");
             add("vendorpaymentreport", "Vendor Payment Report", "Reports");
             add("combinedpartybalancereport", "Combined Party Balance Report", "Reports");

@@ -121,6 +121,8 @@
     <Compile Include="ReportRepository\CombinedPartyBalanceReportRepository.cs" />
     <Compile Include="ReportRepository\CustomerOutstandingReportRepository.cs" />
     <Compile Include="ReportRepository\CustomerLedgerReportRepository.cs" />
+    <Compile Include="ReportRepository\LedgerReportRepository.cs" />
+    <Compile Include="ReportRepository\VendorLedgerReportRepository.cs" />
     <Compile Include="ReportRepository\CustomerReceiptReportRepository.cs" />
     <Compile Include="ReportRepository\DashboardOverviewRepository.cs" />
     <Compile Include="ReportRepository\FinalAnalysisRepository.cs" />
@@ -182,6 +184,7 @@
     <None Include="Scripts\POS_DatewiseProfitReport.sql" />
     <None Include="Scripts\POS_DatewiseItemStockReport.sql" />
     <None Include="Scripts\POS_DatewiseVendorPaymentReport.sql" />
+    <None Include="Scripts\POS_VendorLedger.sql" />
     <None Include="Scripts\POS_DatewiseCustomerPaymentReport.sql" />
     <None Include="Scripts\POS_DatewiseExpenseReport.sql" />
   </ItemGroup>
