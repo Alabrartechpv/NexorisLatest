@@ -18,6 +18,7 @@ namespace PosBranch_Win.DialogBox
     {
         private int vendorLedgerId;
         private string billNo;
+        private decimal originalBillAmount;
         private VendorPaymentRepository paymentRepo;
 
         public FrmViewPayment()
@@ -31,7 +32,18 @@ namespace PosBranch_Win.DialogBox
         {
             this.vendorLedgerId = vendorLedgerId;
             this.billNo = billNo;
+            this.originalBillAmount = 0m;
             lblBillNo.Text = billNo;
+        }
+
+        public FrmViewPayment(int vendorLedgerId, string billNo, decimal originalBillAmount) : this(vendorLedgerId, billNo)
+        {
+            this.originalBillAmount = originalBillAmount;
+        }
+
+        public void SetOriginalBillAmount(decimal amount)
+        {
+            this.originalBillAmount = amount;
         }
 
         private void FrmViewPayment_Load(object sender, EventArgs e)
@@ -77,12 +89,14 @@ namespace PosBranch_Win.DialogBox
 
                         if (i == 0)
                         {
-                            // First row: use BillAmount if exists, otherwise use original bill amount
-                            if (paymentHistory.Columns.Contains("BillAmount"))
+                            // First row: use BillAmount if exists and > 0, otherwise use original bill amount
+                            if (paymentHistory.Columns.Contains("BillAmount") && paymentHistory.Rows[i]["BillAmount"] != DBNull.Value && Convert.ToDecimal(paymentHistory.Rows[i]["BillAmount"]) > 0)
                             {
-                                runningInvoiceAmount = paymentHistory.Rows[i]["BillAmount"] != DBNull.Value
-                                    ? Convert.ToDecimal(paymentHistory.Rows[i]["BillAmount"])
-                                    : 0;
+                                runningInvoiceAmount = Convert.ToDecimal(paymentHistory.Rows[i]["BillAmount"]);
+                            }
+                            else if (originalBillAmount > 0)
+                            {
+                                runningInvoiceAmount = originalBillAmount;
                             }
                             else
                             {
@@ -149,12 +163,28 @@ namespace PosBranch_Win.DialogBox
 
                 if (band.Columns.Exists("BillDate"))
                 {
-                    band.Columns["BillDate"].Header.Caption = "Purchase Date";
-                    band.Columns["BillDate"].Width = 100;
+                    band.Columns["BillDate"].Header.Caption = "Payment Date";
+                    band.Columns["BillDate"].Width = 110;
                     band.Columns["BillDate"].CellActivation = Infragistics.Win.UltraWinGrid.Activation.NoEdit;
                     // Format date to show only date part
                     band.Columns["BillDate"].Format = "dd-MM-yyyy";
                     band.Columns["BillDate"].CellAppearance.TextHAlign = Infragistics.Win.HAlign.Center;
+                }
+
+                if (band.Columns.Exists("VoucherNo"))
+                {
+                    band.Columns["VoucherNo"].Header.Caption = "Voucher No";
+                    band.Columns["VoucherNo"].Width = 90;
+                    band.Columns["VoucherNo"].CellActivation = Infragistics.Win.UltraWinGrid.Activation.NoEdit;
+                    band.Columns["VoucherNo"].CellAppearance.TextHAlign = Infragistics.Win.HAlign.Center;
+                }
+
+                if (band.Columns.Exists("Type"))
+                {
+                    band.Columns["Type"].Header.Caption = "Type";
+                    band.Columns["Type"].Width = 110;
+                    band.Columns["Type"].CellActivation = Infragistics.Win.UltraWinGrid.Activation.NoEdit;
+                    band.Columns["Type"].CellAppearance.TextHAlign = Infragistics.Win.HAlign.Center;
                 }
 
                 if (band.Columns.Exists("InvoiceAmount"))
@@ -185,30 +215,34 @@ namespace PosBranch_Win.DialogBox
                     band.Columns["BalanceAmount"].CellAppearance.TextHAlign = Infragistics.Win.HAlign.Right;
                 }
 
+                if (band.Columns.Exists("Remarks"))
+                {
+                    band.Columns["Remarks"].Header.Caption = "Remarks";
+                    band.Columns["Remarks"].Width = 150;
+                    band.Columns["Remarks"].CellActivation = Infragistics.Win.UltraWinGrid.Activation.NoEdit;
+                    band.Columns["Remarks"].CellAppearance.TextHAlign = Infragistics.Win.HAlign.Left;
+                }
+
                 // Remove BillAmount column from display if it exists
                 if (band.Columns.Exists("BillAmount"))
                 {
                     band.Columns["BillAmount"].Hidden = true;
                 }
-
-                if (band.Columns.Exists("Type"))
+                if (band.Columns.Exists("VoucherId") && band.Columns.Exists("VoucherNo"))
                 {
-                    band.Columns["Type"].Header.Caption = "Type";
-                    band.Columns["Type"].Width = 100;
-                    band.Columns["Type"].CellActivation = Infragistics.Win.UltraWinGrid.Activation.NoEdit;
-                    band.Columns["Type"].CellAppearance.TextHAlign = Infragistics.Win.HAlign.Center;
+                    band.Columns["VoucherId"].Hidden = true;
                 }
 
                 // Set column order
-                band.Columns["BillNo"].Header.VisiblePosition = 0;
-                band.Columns["BillDate"].Header.VisiblePosition = 1;
-                if (band.Columns.Exists("Type"))
-                {
-                    band.Columns["Type"].Header.VisiblePosition = 2;
-                }
-                band.Columns["InvoiceAmount"].Header.VisiblePosition = 3;
-                band.Columns["PaymentAmount"].Header.VisiblePosition = 4;
-                band.Columns["BalanceAmount"].Header.VisiblePosition = 5;
+                int pos = 0;
+                if (band.Columns.Exists("BillNo")) band.Columns["BillNo"].Header.VisiblePosition = pos++;
+                if (band.Columns.Exists("BillDate")) band.Columns["BillDate"].Header.VisiblePosition = pos++;
+                if (band.Columns.Exists("VoucherNo")) band.Columns["VoucherNo"].Header.VisiblePosition = pos++;
+                if (band.Columns.Exists("Type")) band.Columns["Type"].Header.VisiblePosition = pos++;
+                if (band.Columns.Exists("InvoiceAmount")) band.Columns["InvoiceAmount"].Header.VisiblePosition = pos++;
+                if (band.Columns.Exists("PaymentAmount")) band.Columns["PaymentAmount"].Header.VisiblePosition = pos++;
+                if (band.Columns.Exists("BalanceAmount")) band.Columns["BalanceAmount"].Header.VisiblePosition = pos++;
+                if (band.Columns.Exists("Remarks")) band.Columns["Remarks"].Header.VisiblePosition = pos++;
 
                 // Set alternating row colors for better readability
                 ultraGrid1.DisplayLayout.Override.RowAlternateAppearance.BackColor = Color.FromArgb(242, 242, 242);
@@ -231,7 +265,7 @@ namespace PosBranch_Win.DialogBox
                 using (var connection = new SqlConnection(paymentRepo.DataConnection.ConnectionString))
                 {
                     connection.Open();
-                    using (var cmd = new SqlCommand("SELECT NetAmount FROM PMaster WHERE PurchaseNo = @BillNo AND BranchId = @BranchId", connection))
+                    using (var cmd = new SqlCommand("SELECT ISNULL(GrandTotal, 0) FROM PMaster WHERE PurchaseNo = @BillNo AND BranchId = @BranchId", connection))
                     {
                         cmd.Parameters.AddWithValue("@BillNo", billNo);
                         cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId); // Use dynamic branch ID

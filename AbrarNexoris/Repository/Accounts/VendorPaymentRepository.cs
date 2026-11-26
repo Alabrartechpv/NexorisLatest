@@ -1234,15 +1234,81 @@ namespace Repository.Accounts
             DataConnection.Open();
             try
             {
+                // 1. Direct query combining Vendor Payments, Debit Notes, and Purchase Returns
                 try
                 {
-                    using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._VendorPaymentMaster, (SqlConnection)DataConnection))
+                    const string combinedQuery = @"
+                        SELECT 
+                            VPD.BillNo,
+                            VPM.VoucherDate AS BillDate,
+                            ISNULL(PM.PayModeName, 'Cash') AS Type,
+                            VPD.BillAmount,
+                            VPD.PaymentAmount,
+                            VPD.BalanceAmount,
+                            ISNULL(VPM.VoucherId, VPM.Id) AS VoucherId,
+                            CAST(ISNULL(VPM.VoucherId, VPM.Id) AS VARCHAR(50)) AS VoucherNo,
+                            ISNULL(VPM.Narration, '') AS Remarks
+                        FROM VendorPaymentDetails VPD
+                        INNER JOIN VendorPaymentMaster VPM ON VPM.Id = VPD.PaymentMasterId
+                        LEFT JOIN PayMode PM ON PM.PayModeID = VPM.PaymentMethodLedgerId
+                        WHERE (VPD.BillNo = @BillNo OR @BillNo IS NULL OR @BillNo = 0)
+                          AND (VPM.VendorLedgerId = @VendorLedgerId OR @VendorLedgerId IS NULL OR @VendorLedgerId = 0)
+                          AND (@BranchId IS NULL OR @BranchId = 0 OR VPD.BranchId = @BranchId)
+                          AND VPD.CancelFlag = 0
+                          AND VPM.CancelFlag = 0
+
+                        UNION ALL
+
+                        SELECT 
+                            DND.BillNo,
+                            DNM.VoucherDate AS BillDate,
+                            'Debit Note' AS Type,
+                            DND.BillAmount,
+                            DND.DebitAmount AS PaymentAmount,
+                            DND.BalanceAmount,
+                            ISNULL(DNM.VoucherId, DNM.Id) AS VoucherId,
+                            CAST(ISNULL(DNM.VoucherId, DNM.Id) AS VARCHAR(50)) AS VoucherNo,
+                            ISNULL(DNM.Narration, '') AS Remarks
+                        FROM DebitNoteDetails DND
+                        INNER JOIN DebitNoteMaster DNM ON DNM.Id = DND.DebitNoteMasterId
+                        WHERE (DND.BillNo = @BillNo OR @BillNo IS NULL OR @BillNo = 0)
+                          AND (DNM.VendorLedgerId = @VendorLedgerId OR @VendorLedgerId IS NULL OR @VendorLedgerId = 0)
+                          AND (@BranchId IS NULL OR @BranchId = 0 OR DND.BranchId = @BranchId)
+                          AND DND.CancelFlag = 0
+                          AND DNM.CancelFlag = 0
+
+                        UNION ALL
+
+                        SELECT 
+                            TRY_CAST(ISNULL(NULLIF(PRM.InvoiceNo, ''), PRM.PInvoice) AS BIGINT) AS BillNo,
+                            PRM.PReturnDate AS BillDate,
+                            'Purchase Return' AS Type,
+                            ISNULL(PM.GrandTotal, PRM.GrandTotal) AS BillAmount,
+                            PRM.GrandTotal AS PaymentAmount,
+                            0 AS BalanceAmount,
+                            PRM.PReturnNo AS VoucherId,
+                            CAST(PRM.PReturnNo AS VARCHAR(50)) AS VoucherNo,
+                            ISNULL(PRM.Remarks, '') AS Remarks
+                        FROM PReturnMaster PRM
+                        LEFT JOIN PMaster PM ON PM.PurchaseNo = TRY_CAST(ISNULL(NULLIF(PRM.InvoiceNo, ''), PRM.PInvoice) AS INT) AND PM.BranchId = PRM.BranchId
+                        WHERE (PRM.InvoiceNo = CAST(@BillNo AS VARCHAR(50)) OR PRM.PInvoice = CAST(@BillNo AS VARCHAR(50)))
+                          AND (PRM.LedgerID = @VendorLedgerId OR @VendorLedgerId IS NULL OR @VendorLedgerId = 0)
+                          AND (@BranchId IS NULL OR @BranchId = 0 OR PRM.BranchId = @BranchId)
+                          AND PRM.CancelFlag = 0
+                          AND NOT EXISTS (
+                              SELECT 1 FROM DebitNoteMaster DNM 
+                              WHERE DNM.PReturnNo = PRM.PReturnNo 
+                                AND DNM.BranchId = PRM.BranchId 
+                                AND DNM.CancelFlag = 0
+                          )
+
+                        ORDER BY BillDate ASC, VoucherId ASC";
+
+                    using (SqlCommand cmd = new SqlCommand(combinedQuery, (SqlConnection)DataConnection))
                     {
-                        cmd.CommandType = CommandType.StoredProcedure;
-                        cmd.Parameters.AddWithValue("@VendorLedgerId", vendorLedgerId);
-                        cmd.Parameters.AddWithValue("@BillNoUntil", billNo);
-                        cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
-                        cmd.Parameters.AddWithValue("@_Operation", "VIEWPAYMENT");
+                        cmd.Parameters.AddWithValue("@BillNo", billNo > 0 ? (object)billNo : DBNull.Value);
+                        cmd.Parameters.AddWithValue("@VendorLedgerId", vendorLedgerId > 0 ? (object)vendorLedgerId : DBNull.Value);
+                        cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId > 0 ? (object)SessionContext.BranchId : DBNull.Value);
 
                         using (SqlDataAdapter da = new SqlDataAdapter(cmd))
                         {
@@ -1252,7 +1318,32 @@ namespace Repository.Accounts
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Error calling SP _VendorPaymentMaster VIEWPAYMENT: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"Error querying combined payment history: {ex.Message}");
+                }
+
+                // Fallback to Stored Procedure STOREDPROCEDURE._VendorPaymentMaster (VIEWPAYMENT) if direct query returned no rows
+                if (dt == null || dt.Rows.Count == 0)
+                {
+                    try
+                    {
+                        using (SqlCommand cmd = new SqlCommand(STOREDPROCEDURE._VendorPaymentMaster, (SqlConnection)DataConnection))
+                        {
+                            cmd.CommandType = CommandType.StoredProcedure;
+                            cmd.Parameters.AddWithValue("@VendorLedgerId", vendorLedgerId);
+                            cmd.Parameters.AddWithValue("@BillNoUntil", billNo);
+                            cmd.Parameters.AddWithValue("@BranchId", SessionContext.BranchId);
+                            cmd.Parameters.AddWithValue("@_Operation", "VIEWPAYMENT");
+
+                            using (SqlDataAdapter da = new SqlDataAdapter(cmd))
+                            {
+                                da.Fill(dt);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"Error calling SP _VendorPaymentMaster VIEWPAYMENT: {ex.Message}");
+                    }
                 }
 
                 if (dt == null || dt.Rows.Count == 0)

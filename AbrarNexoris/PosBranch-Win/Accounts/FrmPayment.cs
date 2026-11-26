@@ -2106,8 +2106,14 @@ namespace PosBranch_Win.Accounts
 
                 string billNo = selectedRow.Cells["BillNo"].Value.ToString();
 
+                decimal originalBillAmount = 0m;
+                if (selectedRow.Cells.Exists("InvoiceAmount") && selectedRow.Cells["InvoiceAmount"].Value != null)
+                {
+                    decimal.TryParse(selectedRow.Cells["InvoiceAmount"].Value.ToString(), out originalBillAmount);
+                }
+
                 // Open the payment history form using our FrmViewPayment class
-                FrmViewPayment paymentHistoryForm = new FrmViewPayment(currentVendorLedgerId, billNo);
+                FrmViewPayment paymentHistoryForm = new FrmViewPayment(currentVendorLedgerId, billNo, originalBillAmount);
                 paymentHistoryForm.ShowDialog();
             }
             catch (Exception ex)
