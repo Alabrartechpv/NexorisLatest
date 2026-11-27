@@ -40,12 +40,12 @@ namespace Repository.TransactionRepository
                         if (wasClosed) DataConnection.Open();
 
                         DataConnection.Execute(
-                            STOREDPROCEDURE.POS_PurchaseInvoiceSupport,
+                            STOREDPROCEDURE.POS_Purchase,
                             new { _Operation = "ENSURE_SCHEMA" },
                             commandType: CommandType.StoredProcedure);
 
                         _schemaEnsured = true;
-                        System.Diagnostics.Debug.WriteLine("Successfully verified and updated PMaster CurSymbol schema constraint via stored procedure.");
+                        System.Diagnostics.Debug.WriteLine("Successfully verified and updated PMaster CurSymbol schema constraint via POS_Purchase.");
                     }
                     finally
                     {
@@ -518,7 +518,7 @@ namespace Repository.TransactionRepository
                     }
 
                     DataConnection.Execute(
-                        STOREDPROCEDURE.POS_PurchaseInvoiceSupport,
+                        STOREDPROCEDURE.POS_Purchase,
                         new
                         {
                             _Operation = "SET_TRANSACTION_GUID",
@@ -1001,7 +1001,7 @@ namespace Repository.TransactionRepository
                     if (ObjPmaster.TransactionGuid == Guid.Empty)
                     {
                         ObjPmaster.TransactionGuid = DataConnection.QueryFirstOrDefault<Guid?>(
-                            STOREDPROCEDURE.POS_PurchaseInvoiceSupport,
+                            STOREDPROCEDURE.POS_Purchase,
                             new
                             {
                                 _Operation = "GET_TRANSACTION_GUID",
@@ -1017,7 +1017,7 @@ namespace Repository.TransactionRepository
                     }
 
                     DataConnection.Execute(
-                        STOREDPROCEDURE.POS_PurchaseInvoiceSupport,
+                        STOREDPROCEDURE.POS_Purchase,
                         new
                         {
                             _Operation = "SET_TRANSACTION_GUID",
@@ -1199,7 +1199,7 @@ namespace Repository.TransactionRepository
                 try
                 {
                     Guid deleteGuid = DataConnection.QueryFirstOrDefault<Guid?>(
-                        STOREDPROCEDURE.POS_PurchaseInvoiceSupport,
+                        STOREDPROCEDURE.POS_Purchase,
                         new
                         {
                             _Operation = "GET_TRANSACTION_GUID",
@@ -1260,7 +1260,7 @@ namespace Repository.TransactionRepository
             try
             {
                 var result = DataConnection.QueryFirstOrDefault(
-                    STOREDPROCEDURE.POS_PurchaseInvoiceSupport,
+                    STOREDPROCEDURE.POS_PurchaseInvoice_PriceSettings,
                     new
                     {
                         _Operation = "GET_ITEM_PRICES",
@@ -1401,7 +1401,7 @@ namespace Repository.TransactionRepository
             try
             {
                 var results = DataConnection.Query<PurchaseDetails>(
-                    STOREDPROCEDURE.POS_PurchaseInvoiceSupport,
+                    STOREDPROCEDURE.POS_Purchase,
                     new
                     {
                         _Operation = "GET_OLD_DETAILS",
@@ -1431,7 +1431,7 @@ namespace Repository.TransactionRepository
             {
                 int targetBranchId = SessionContext.BranchId > 0 ? SessionContext.BranchId : Convert.ToInt32(DataBase.BranchId);
                 var result = DataConnection.QueryFirstOrDefault(
-                    STOREDPROCEDURE.POS_PurchaseInvoiceSupport,
+                    STOREDPROCEDURE.POS_PurchaseInvoice_PriceSettings,
                     new
                     {
                         _Operation = "GET_BASE_UNIT_PRICES",
@@ -1471,7 +1471,7 @@ namespace Repository.TransactionRepository
                 float baseCostToApply = costWasChangedByUser ? calculatedBaseAvgCost : existingBaseCost;
 
                 DataConnection.Execute(
-                    STOREDPROCEDURE.POS_PurchaseInvoiceSupport,
+                    STOREDPROCEDURE.POS_PurchaseInvoice_PriceSettings,
                     new
                     {
                         _Operation = "SET_ITEM_COST",
@@ -1501,7 +1501,7 @@ namespace Repository.TransactionRepository
                 float baseUnitCost = calculatedCost / packingVal;
 
                 DataConnection.Execute(
-                    STOREDPROCEDURE.POS_PurchaseInvoiceSupport,
+                    STOREDPROCEDURE.POS_PurchaseInvoice_PriceSettings,
                     new
                     {
                         _Operation = "SET_ITEM_COST",
@@ -1829,19 +1829,19 @@ namespace Repository.TransactionRepository
                 var p = new
                 {
                     _Operation = "GET_CASH_BALANCE",
-                    BranchId = branchId,
-                    CashGroupId = (int)AccountGroup.CASH_IN_HAND,
-                    LedgerId = cashLedgerId
+                    BranchID = branchId,
+                    GroupID = (int)AccountGroup.CASH_IN_HAND,
+                    LedgerID = cashLedgerId
                 };
 
                 if (trans != null)
-                    return DataConnection.ExecuteScalar<double>(STOREDPROCEDURE.POS_PurchaseInvoiceSupport, p, trans, commandType: CommandType.StoredProcedure);
+                    return DataConnection.ExecuteScalar<double>(STOREDPROCEDURE.POS_Vouchers, p, trans, commandType: CommandType.StoredProcedure);
 
                 bool wasClosed = DataConnection.State == ConnectionState.Closed;
                 try
                 {
                     if (wasClosed) DataConnection.Open();
-                    return DataConnection.ExecuteScalar<double>(STOREDPROCEDURE.POS_PurchaseInvoiceSupport, p, commandType: CommandType.StoredProcedure);
+                    return DataConnection.ExecuteScalar<double>(STOREDPROCEDURE.POS_Vouchers, p, commandType: CommandType.StoredProcedure);
                 }
                 finally
                 {
@@ -1864,19 +1864,19 @@ namespace Repository.TransactionRepository
                 var p = new
                 {
                     _Operation = "GET_OLD_CASH_CREDIT",
-                    VoucherId = voucherId,
-                    BranchId = branchId,
-                    CashGroupId = (int)AccountGroup.CASH_IN_HAND
+                    VoucherID = (int)voucherId,
+                    BranchID = branchId,
+                    GroupID = (int)AccountGroup.CASH_IN_HAND
                 };
 
                 if (trans != null)
-                    return DataConnection.ExecuteScalar<double>(STOREDPROCEDURE.POS_PurchaseInvoiceSupport, p, trans, commandType: CommandType.StoredProcedure);
+                    return DataConnection.ExecuteScalar<double>(STOREDPROCEDURE.POS_Vouchers, p, trans, commandType: CommandType.StoredProcedure);
 
                 bool wasClosed = DataConnection.State == ConnectionState.Closed;
                 try
                 {
                     if (wasClosed) DataConnection.Open();
-                    return DataConnection.ExecuteScalar<double>(STOREDPROCEDURE.POS_PurchaseInvoiceSupport, p, commandType: CommandType.StoredProcedure);
+                    return DataConnection.ExecuteScalar<double>(STOREDPROCEDURE.POS_Vouchers, p, commandType: CommandType.StoredProcedure);
                 }
                 finally
                 {
