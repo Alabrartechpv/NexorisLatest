@@ -371,6 +371,9 @@ namespace PosBranch_Win.Reports.FinancialReports
                     AddDetail(details, key, change, section);
                 }
 
+                if (action == "DELETE" && changes.Any(change => change.Text.Contains("Cancelled No → Yes")))
+                    row[Snapshot] = $"{row[Snapshot]} · Cancelled";
+
                 if (action == "UPDATE")
                 {
                     string summary = string.Join(" · ", changes.Where(change => change.Text.Contains(" → "))
@@ -538,6 +541,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             Column("UserName", "User", 125);
             Column("CounterName", "Counter", 125);
             Column("Amount", "Amount", 105, "N2", HAlign.Right);
+            Column("DocumentStatus", "Status at Event", 110);
             Column(Snapshot, "Snapshot", 385);
             main.Columns["Module"].CellAppearance.FontData.Bold = DefaultableBoolean.True;
 
