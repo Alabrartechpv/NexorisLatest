@@ -1151,12 +1151,11 @@ namespace Repository.TransactionRepository
 
                 trans.Commit();
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 if (trans != null)
                     trans.Rollback();
-                if (ex.InnerException != null)
-                    throw; // Re-throw without losing stack trace
+                throw;
             }
             finally
             {
