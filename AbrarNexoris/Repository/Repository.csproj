@@ -139,6 +139,8 @@
     <Compile Include="ReportRepository\VendorPaymentReportRepository.cs" />
     <Compile Include="ReportRepository\VendorOutstandingReportRepository.cs" />
     <Compile Include="ReportRepository\InputGSTReportRepository.cs" />
+    <Compile Include="ActivityConnectionContext.cs" />
+    <Compile Include="ReportRepository\ActivityReportRepository.cs" />
     <Compile Include="ReportRepository\DeletionAuditReportRepository.cs" />
     <Compile Include="ReportRepository\OutputGSTReportRepository.cs" />
     <Compile Include="ReportRepository\GovtGSTReturnReportRepository.cs" />
@@ -187,6 +189,9 @@
     <None Include="Scripts\POS_VendorLedger.sql" />
     <None Include="Scripts\POS_DatewiseCustomerPaymentReport.sql" />
     <None Include="Scripts\POS_DatewiseExpenseReport.sql" />
+    <None Include="Scripts\POS_ActivityCapture.sql" />
+    <None Include="Scripts\POS_ActivityReport.sql" />
+    <None Include="Scripts\POS_ActivityReportDetails.sql" />
     <None Include="Scripts\POS_DeletionAuditReport.sql" />
     <None Include="Scripts\POS_PurchaseInvoiceSupport.sql" />
   </ItemGroup>

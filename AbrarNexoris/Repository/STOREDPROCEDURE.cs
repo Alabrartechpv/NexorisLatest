@@ -145,6 +145,10 @@ namespace Repository
         public static string _POS_ExecutiveDashboardKPIs = "_POS_ExecutiveDashboardKPIs";
         public static string POS_InactiveItemsReport = "POS_InactiveItemsReport";
         public static string POS_DeletionAuditReport = "POS_DeletionAuditReport";
+        public const string POS_ActivityReport = "dbo.POS_ActivityReport";
+        public const string POS_ActivityReportFilters = "dbo.POS_ActivityReportFilters";
+        public const string POS_ActivityReportDetails = "dbo.POS_ActivityReportDetails";
+        public const string POS_SetActivityContext = "dbo.POS_SetActivityContext";
         public static string _POS_CashInOutReport = "_POS_CashInOutReport";
 
         #endregion

@@ -137,6 +137,7 @@ namespace PosBranch_Win
             new ReportNavigatorDefinition("GST Reports", "Input GST Report", "InputGSTReport"),
             new ReportNavigatorDefinition("GST Reports", "Output GST Report", "OutputGSTReport"),
             new ReportNavigatorDefinition("GST Reports", "Government GST Return Report", "GovtGSTReturnReport"),
+            new ReportNavigatorDefinition("Audit", "Activity Report", "ActivityReport"),
             new ReportNavigatorDefinition("Audit", "Deletion & Cancellation Audit Report", "DeletionAuditReport")
         };
 
@@ -4561,6 +4562,16 @@ namespace PosBranch_Win
                 PosBranch_Win.Reports.FinancialReports.frmvendorreportdetails vendorDetailsReport = new PosBranch_Win.Reports.FinancialReports.frmvendorreportdetails();
                 OpenFormInTab(vendorDetailsReport, "Vendor Report Details");
             }
+            if (e.Tool.Key == "ActivityReport")
+            {
+                if (!SessionContext.IsAdmin)
+                {
+                    MessageBox.Show("The Activity Report is available to administrators.", "Activity Report",
+                        MessageBoxButtons.OK, MessageBoxIcon.Stop);
+                    return;
+                }
+                OpenFormInTab(new Reports.FinancialReports.frmactivityreport(), "Activity Report");
+            }
             if (e.Tool.Key == "DeletionAuditReport" || e.Tool.Key == "frmDeletionAuditReport" || e.Tool.Key == "DeletedTransactionsReport")
             {
                 if (!SessionContext.IsAdmin && !string.Equals(SessionContext.UserName, "admin", StringComparison.OrdinalIgnoreCase) && SessionContext.RoleId != 1)
@@ -7079,6 +7090,7 @@ namespace PosBranch_Win
                     keyToExecute == "UnallocatedPurchaseReturns" ||
                     keyToExecute == "ProfitLossAccount" ||
                     keyToExecute == "StockListingReport" ||
+                    keyToExecute == "ActivityReport" ||
                     keyToExecute == "DeletionAuditReport" ||
                     keyToExecute == "InputGSTReport" ||
                     keyToExecute == "OutputGSTReport" ||
