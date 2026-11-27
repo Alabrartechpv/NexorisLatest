@@ -370,6 +370,9 @@ BEGIN
         a.ActionType, a.DocumentNo, a.RowVersion, a.Amount, a.SourceTable, a.Details, a.EventId
     FROM #ActivityImages a
     WHERE a.EventId=a.AnchorId AND a.Category IN (N'Transaction',N'Payment',N'Master')
+      -- The form logs above are proof of direct edits. Raw UPDATE snapshots can
+      -- describe automatic posting, cancellation or stock maintenance.
+      AND (a.ActionType<>N'UPDATE' OR a.DirectVoucherEditId IS NOT NULL)
       AND NOT EXISTS (SELECT 1 FROM #MatchedLogs m WHERE m.EventId=a.EventId);
 
     SELECT e.ActivityDate, COALESCE(NULLIF(b.BranchName, ''), CONVERT(nvarchar(20), e.BranchId), N'Shared / Unassigned') AS BranchName,

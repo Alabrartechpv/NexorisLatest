@@ -14,9 +14,12 @@ BEGIN
         SELECT EventId, FIRST_VALUE(EventId) OVER
         (
             PARTITION BY CompanyId, BranchId, FinYearId, UserId, CounterId, SourceTable, Module, DocumentNo, ActionType,
+                DirectVoucherEditId,
                 CASE WHEN SourceTable IN (N'Vouchers',N'ItemMaster') THEN WriteTransactionId END,
-                CASE WHEN SourceTable NOT IN (N'Vouchers',N'ItemMaster') OR WriteTransactionId IS NULL THEN WriteStatementId END,
-                CASE WHEN WriteStatementId IS NULL AND (SourceTable NOT IN (N'Vouchers',N'ItemMaster') OR WriteTransactionId IS NULL)
+                CASE WHEN DirectVoucherEditId IS NULL AND
+                    (SourceTable NOT IN (N'Vouchers',N'ItemMaster') OR WriteTransactionId IS NULL) THEN WriteStatementId END,
+                CASE WHEN DirectVoucherEditId IS NULL AND WriteStatementId IS NULL
+                    AND (SourceTable NOT IN (N'Vouchers',N'ItemMaster') OR WriteTransactionId IS NULL)
                     THEN ActivityDate END
             ORDER BY CASE WHEN RowVersion = 'After' THEN 0 ELSE 1 END,
                 CASE WHEN Amount IS NOT NULL THEN 0 ELSE 1 END, ActivityDate, EventId
@@ -45,15 +48,21 @@ BEGIN
         (N'VanSaleStockMaster',N'VanSaleStockDetails'), (N'MobileOrderMaster',N'MobileOrderDetails'),
         (N'ManualPartyBalance',N'ManualPartyBalanceSettlement');
 
+    DECLARE @OperationHeaders TABLE (TableName sysname PRIMARY KEY);
+    INSERT @OperationHeaders
+        SELECT HeaderTable FROM @DocumentTables GROUP BY HeaderTable;
+    INSERT @OperationHeaders VALUES (N'ItemMaster'), (N'LedgerMaster'), (N'VendorMaster'),
+        (N'Vouchers'), (N'BankReconciliation');
+
     -- Match a related statement to one unambiguous header. Older audit rows have
     -- no transaction ID. Item status rules are also written by a separate repository.
     -- For those cases, require the same document, operator, counter and a narrow time window.
     ;WITH Candidates AS
     (
         SELECT d.EventId, h.EventId AS HeaderId,
-            CASE WHEN d.WriteTransactionId = h.WriteTransactionId THEN 0 ELSE 2 END +
-            CASE WHEN h.SourceTable=N'ItemMaster' AND h.ActionType='SAVE'
-                      AND h.WriteTransactionId=d.WriteTransactionId AND h.ActivityDate<=d.ActivityDate THEN 0
+            CASE WHEN d.WriteTransactionId = h.WriteTransactionId THEN 0 ELSE 3 END +
+            CASE WHEN h.ActionType='SAVE' AND h.WriteTransactionId=d.WriteTransactionId
+                      AND h.ActivityDate<=d.ActivityDate THEN 0
                  WHEN d.ActionType=h.ActionType THEN 1 ELSE 2 END AS Priority
         FROM #ActivityStatements d
         JOIN #ActivityStatements h ON h.EventId <> d.EventId
@@ -67,7 +76,12 @@ BEGIN
                      AND d.DocumentNo=h.DocumentNo))
                 AND h.ActivityDate BETWEEN DATEADD(millisecond,-1000,d.ActivityDate) AND DATEADD(millisecond,1000,d.ActivityDate)))
         WHERE
-            (EXISTS (SELECT 1 FROM @DocumentTables m WHERE m.HeaderTable=h.SourceTable AND m.DetailTable=d.SourceTable)
+            (d.ActionType='UPDATE' AND d.DirectVoucherEditId IS NULL
+             AND h.ActionType='SAVE' AND d.SourceTable=h.SourceTable
+             AND d.Module=h.Module AND d.DocumentNo=h.DocumentNo AND h.ActivityDate<=d.ActivityDate
+             AND d.WriteTransactionId=h.WriteTransactionId
+             AND EXISTS (SELECT 1 FROM @OperationHeaders m WHERE m.TableName=h.SourceTable))
+         OR (EXISTS (SELECT 1 FROM @DocumentTables m WHERE m.HeaderTable=h.SourceTable AND m.DetailTable=d.SourceTable)
              AND (h.DocumentNo=d.DocumentNo OR
                   (h.WriteTransactionId=d.WriteTransactionId AND h.SourceTable IN
                       (N'StockAdjustmentMaster',N'StockTransferMaster',N'VendorPaymentMaster',N'CustomerReceiptMaster',
@@ -85,12 +99,13 @@ BEGIN
          OR (h.SourceTable=N'ItemMaster' AND d.DocumentNo=h.DocumentNo AND
               (d.SourceTable IN (N'PriceSettings',N'POS_ItemMasterStatusRules',N'ItemBatch',N'ItemAlternativeBarcode',N'ItemDimension')
                OR (d.SourceTable=N'ItemMaster' AND h.ActionType='SAVE' AND d.ActionType='UPDATE'
-                   AND (h.WriteTransactionId=d.WriteTransactionId OR NOT EXISTS
+                   AND (h.WriteTransactionId IS NULL OR d.WriteTransactionId IS NULL)
+                   AND NOT EXISTS
                    (
                        SELECT a.Details FROM #ActivityImages a WHERE a.AnchorId=d.EventId AND a.RowVersion='Before'
                        EXCEPT
                        SELECT a.Details FROM #ActivityImages a WHERE a.AnchorId=d.EventId AND a.RowVersion='After'
-                   )) AND h.ActivityDate<=d.ActivityDate)))
+                   ) AND h.ActivityDate<=d.ActivityDate)))
     ),
     Ranked AS
     (

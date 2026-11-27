@@ -364,7 +364,12 @@ namespace PosBranch_Win.Reports.FinancialReports
                 }
 
                 foreach (ActivityReportText.Detail change in changes)
-                    AddDetail(details, key, change);
+                {
+                    string section = action == "SAVE" &&
+                        (change.Section == "Changed" || change.Section == "Updated values")
+                        ? "Save details" : change.Section;
+                    AddDetail(details, key, change, section);
+                }
 
                 if (action == "UPDATE")
                 {
@@ -391,9 +396,9 @@ namespace PosBranch_Win.Reports.FinancialReports
             return data;
         }
 
-        private static void AddDetail(DataTable table, int key, ActivityReportText.Detail detail)
+        private static void AddDetail(DataTable table, int key, ActivityReportText.Detail detail, string section = null)
         {
-            table.Rows.Add(key, detail.Section, (object)detail.Line ?? DBNull.Value, detail.Record, detail.Text);
+            table.Rows.Add(key, section ?? detail.Section, (object)detail.Line ?? DBNull.Value, detail.Record, detail.Text);
         }
 
         private async void LoadRowDetails(object sender, CancelableRowEventArgs e)
