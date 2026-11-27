@@ -264,6 +264,11 @@ namespace PosBranch_Win.Master
             string hsn = textBox4?.Text?.Trim() ?? string.Empty;
             if (!string.IsNullOrEmpty(hsn)) details.Add($"- HSN: {hsn}");
 
+            string taxType = txt_TaxType?.Text?.Trim() ?? string.Empty;
+            if (!string.IsNullOrEmpty(taxType)) details.Add($"- Tax type: {taxType}");
+            decimal taxRate = ParseNullableDecimal(txt_TaxPer?.Text) ?? 0m;
+            details.Add($"- Tax rate: {taxRate:0.####}%");
+
             string customerType = txt_CustomerType?.Text?.Trim() ?? string.Empty;
             if (!string.IsNullOrEmpty(customerType)) details.Add($"- Customer Type: {customerType}");
 

@@ -1,4 +1,4 @@
--- Report data stays company-scoped. Install POS_ActivityCapture.sql first.
+-- Install POS_ActivityCapture.sql and POS_ActivityReportGrouping.sql before this procedure.
 IF OBJECT_ID(N'dbo.POS_RequireActivityAdministrator', N'P') IS NULL
     EXEC(N'CREATE PROCEDURE dbo.POS_RequireActivityAdministrator AS RETURN 0;');
 GO
@@ -39,7 +39,8 @@ ALTER PROCEDURE dbo.POS_ActivityReport
     @Search nvarchar(200) = NULL,
     @ActionType nvarchar(100) = NULL,
     @AsOfNow bit = 0,
-    @IncludeDetailKeys bit = 0
+    @IncludeDetailKeys bit = 0,
+    @IncludeGroupedDetails bit = 0
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -64,19 +65,24 @@ BEGIN
     DECLARE @Filter nvarchar(410) = N'%' + REPLACE(REPLACE(REPLACE(REPLACE(@Search, N'~', N'~~'),
         N'%', N'~%'), N'_', N'~_'), N'[', N'~[') + N'%';
 
+    SELECT a.*, a.EventId AS AnchorId
+    INTO #ActivityImages
+    FROM dbo.POS_ActivityChange a
+    WHERE a.ActivityDate >= @FromDate AND a.ActivityDate < @ToExclusive
+      AND a.Category IN (N'Transaction',N'Payment',N'Master',N'Detail')
+      AND (@BranchId IS NULL OR a.BranchId = @BranchId)
+      AND (a.CompanyId = @CompanyId OR (a.CompanyId IS NULL AND
+            (a.BranchId IS NULL OR EXISTS (SELECT 1 FROM dbo.Branches b WHERE b.Id = a.BranchId AND b.CompanyId = @CompanyId))));
+    CREATE UNIQUE CLUSTERED INDEX IX_ActivityImages_Event ON #ActivityImages(EventId);
+    EXEC dbo.POS_GroupActivityReportChanges;
+    CREATE INDEX IX_ActivityImages_Anchor ON #ActivityImages(AnchorId);
+
     ;WITH Events (ActivityDate, CompanyId, BranchId, FinYearId, UserId, UserName, CounterId, CounterName,
         Category, Module, ActionType, DocumentNo, RowVersion, Amount, Source, Details) AS
     (
-    SELECT a.ActivityDate, a.CompanyId, a.BranchId, a.FinYearId, a.UserId, NULL, a.CounterId, NULL,
-        a.Category, a.Module, a.ActionType, a.DocumentNo, a.RowVersion, a.Amount, a.SourceTable, a.Details
-    FROM dbo.POS_ActivityChange a
-    WHERE a.ActivityDate >= @FromDate AND a.ActivityDate < @ToExclusive
-      AND (a.CompanyId = @CompanyId OR (a.CompanyId IS NULL AND
-            (a.BranchId IS NULL OR EXISTS (SELECT 1 FROM dbo.Branches b WHERE b.Id = a.BranchId AND b.CompanyId = @CompanyId))))
-    UNION ALL
     SELECT CreatedOn, CompanyId, BranchId, FinYearId, UserId, UserName, CounterId, CounterName,
-        N'Transaction', N'Sales Invoice', ActivityType, CONVERT(nvarchar(100), TransactionNo), NULL,
-        NetAmount, N'Activity log', CONCAT(NULLIF(InvoiceNo, ''), CASE WHEN NULLIF(PartyName, '') IS NOT NULL THEN N' | ' + PartyName END,
+        N'Transaction', CONVERT(nvarchar(100), N'Sales Invoice'), ActivityType, CONVERT(nvarchar(100), TransactionNo), CAST(NULL AS varchar(6)),
+        NetAmount, CONVERT(nvarchar(128), N'Activity log'), CONCAT(NULLIF(InvoiceNo, ''), CASE WHEN NULLIF(PartyName, '') IS NOT NULL THEN N' | ' + PartyName END,
             CASE WHEN NULLIF(PaymentMode, '') IS NOT NULL THEN N' | ' + PaymentMode END,
             CASE WHEN NULLIF(ActivityDetails, '') IS NOT NULL THEN N' | ' + CONVERT(nvarchar(max), ActivityDetails) END)
     FROM dbo.SalesActivityLog WHERE CompanyId = @CompanyId AND CreatedOn >= @FromDate AND CreatedOn < @ToExclusive
@@ -326,20 +332,61 @@ BEGIN
         OpeningCash, N'Document record', CASE WHEN IsDelete = 1 THEN N'Currently cancelled or deleted' END
     FROM dbo.DayOpenings WHERE CompanyId = @CompanyId AND DateTimeFrom >= @FromDate AND DateTimeFrom < @LegacyTo
     )
+    SELECT IDENTITY(int,1,1) AS ReportRowId, CONVERT(datetime2(3),e.ActivityDate) AS ActivityDate,
+        e.CompanyId, e.BranchId, e.FinYearId, e.UserId, e.UserName, e.CounterId, e.CounterName,
+        e.Category, e.Module, e.ActionType, e.DocumentNo, e.RowVersion, e.Amount, e.Source, e.Details,
+        CONVERT(uniqueidentifier,NULL) AS AuditGroupId
+    INTO #Events FROM Events e WHERE e.Category IN (N'Transaction',N'Payment',N'Master');
+
+    -- Prefer the application snapshot when it describes the same captured operation.
+    -- A one-to-one match leaves separate rapid saves or ambiguous events visible.
+    ;WITH LogMatches AS
+    (
+        SELECT e.ReportRowId, a.EventId,
+            COUNT(*) OVER (PARTITION BY e.ReportRowId) AS Captures,
+            COUNT(*) OVER (PARTITION BY a.EventId) AS Logs
+        FROM #Events e
+        JOIN #ActivityImages a ON a.EventId=a.AnchorId AND a.Module=e.Module
+          AND a.BranchId=e.BranchId AND a.FinYearId=e.FinYearId
+          AND (a.UserId=e.UserId OR (a.UserId IS NULL AND e.UserId IS NULL))
+          AND (a.CounterId=e.CounterId OR (a.CounterId IS NULL AND e.CounterId IS NULL))
+          AND a.ActionType=UPPER(LTRIM(RTRIM(e.ActionType)))
+          AND a.ActivityDate BETWEEN DATEADD(second,-2,e.ActivityDate) AND DATEADD(second,1,e.ActivityDate)
+        WHERE (e.Source=N'Activity log' AND a.DocumentNo=e.DocumentNo)
+           OR (e.Source=N'Item activity log' AND EXISTS
+               (SELECT 1 FROM dbo.ItemActivityLog l
+                WHERE l.CompanyId=@CompanyId AND l.BranchId=e.BranchId AND l.FinYearId=e.FinYearId
+                  AND l.CreatedOn=CONVERT(datetime,e.ActivityDate) AND l.ItemNo=e.DocumentNo
+                  AND CONVERT(nvarchar(100),l.ItemId)=a.DocumentNo))
+    )
+    SELECT ReportRowId, EventId INTO #MatchedLogs FROM LogMatches WHERE Captures=1 AND Logs=1;
+    CREATE UNIQUE CLUSTERED INDEX IX_MatchedLogs_Row ON #MatchedLogs(ReportRowId);
+    CREATE UNIQUE INDEX IX_MatchedLogs_Event ON #MatchedLogs(EventId);
+
+    INSERT #Events (ActivityDate, CompanyId, BranchId, FinYearId, UserId, UserName, CounterId, CounterName,
+                    Category, Module, ActionType, DocumentNo, RowVersion, Amount, Source, Details, AuditGroupId)
+    SELECT a.ActivityDate, a.CompanyId, a.BranchId, a.FinYearId, a.UserId, NULL, a.CounterId, NULL,
+        a.Category, CASE WHEN a.SourceTable=N'POS_ItemMasterStatusRules' THEN N'Item Master' ELSE a.Module END,
+        a.ActionType, a.DocumentNo, a.RowVersion, a.Amount, a.SourceTable, a.Details, a.EventId
+    FROM #ActivityImages a
+    WHERE a.EventId=a.AnchorId AND a.Category IN (N'Transaction',N'Payment',N'Master')
+      AND NOT EXISTS (SELECT 1 FROM #MatchedLogs m WHERE m.EventId=a.EventId);
+
     SELECT e.ActivityDate, COALESCE(NULLIF(b.BranchName, ''), CONVERT(nvarchar(20), e.BranchId), N'Shared / Unassigned') AS BranchName,
         e.Category, e.Module, activity.ActionType, e.DocumentNo,
         actor.UserName, actor.CounterName, e.RowVersion, TRY_CONVERT(decimal(28,4), e.Amount) AS Amount, e.Source, e.Details,
-        e.BranchId AS EventBranchId, e.FinYearId AS EventFinYearId, e.CounterId AS EventCounterId
+        e.BranchId AS EventBranchId, e.FinYearId AS EventFinYearId, e.CounterId AS EventCounterId,
+        COALESCE(log.EventId, e.AuditGroupId) AS AuditGroupId
     INTO #ReportRows
-    FROM Events e
+    FROM #Events e
+    LEFT JOIN #MatchedLogs log ON log.ReportRowId=e.ReportRowId
     LEFT JOIN dbo.Branches b ON b.CompanyId = @CompanyId AND b.Id = e.BranchId
     LEFT JOIN dbo.Users u ON u.CompanyId = @CompanyId AND u.UserId = e.UserId
     LEFT JOIN dbo.CounterMaster c ON c.CounterId = e.CounterId
     CROSS APPLY (VALUES (COALESCE(NULLIF(e.UserName,''), NULLIF(u.UserName,''), CONVERT(nvarchar(20),e.UserId), N'Unrecorded'),
         COALESCE(NULLIF(e.CounterName,''), NULLIF(c.CounterName,''), CONVERT(nvarchar(20),e.CounterId), N'Unrecorded'))) actor(UserName, CounterName)
     CROSS APPLY (VALUES (UPPER(LTRIM(RTRIM(e.ActionType))))) activity(ActionType)
-    WHERE e.Category IN (N'Transaction', N'Payment', N'Master')
-      AND (@BranchId IS NULL OR e.BranchId = @BranchId)
+    WHERE (@BranchId IS NULL OR e.BranchId = @BranchId)
       AND (@UserName IS NULL OR actor.UserName = @UserName)
       AND (@CounterName IS NULL OR actor.CounterName = @CounterName)
       AND (@Category IS NULL OR e.Category = @Category)
@@ -347,10 +394,24 @@ BEGIN
       AND (@Filter IS NULL OR e.Module LIKE @Filter ESCAPE N'~' OR e.DocumentNo LIKE @Filter ESCAPE N'~'
            OR e.ActionType LIKE @Filter ESCAPE N'~' OR e.Details LIKE @Filter ESCAPE N'~'
            OR e.Source LIKE @Filter ESCAPE N'~' OR actor.UserName LIKE @Filter ESCAPE N'~'
-           OR actor.CounterName LIKE @Filter ESCAPE N'~')
+           OR actor.CounterName LIKE @Filter ESCAPE N'~'
+           OR EXISTS (SELECT 1 FROM #ActivityImages child WHERE child.AnchorId=COALESCE(log.EventId,e.AuditGroupId)
+                      AND (child.Details LIKE @Filter ESCAPE N'~' OR child.DocumentNo LIKE @Filter ESCAPE N'~')))
     OPTION (RECOMPILE);
 
-    IF @IncludeDetailKeys = 1
+    IF @IncludeGroupedDetails = 1
+    BEGIN
+        SELECT ActivityDate, BranchName, Category, Module, ActionType, DocumentNo, UserName, CounterName,
+            RowVersion, Amount, Source, Details, EventBranchId, EventFinYearId, EventCounterId, AuditGroupId
+        FROM #ReportRows ORDER BY ActivityDate DESC, Category, Module, DocumentNo, RowVersion DESC, Source;
+
+        SELECT a.AnchorId, a.Module, a.DocumentNo, a.ActionType, a.RowVersion, a.Details, a.ActivityDate, a.WriteStatementId, a.WriteTransactionId
+        FROM #ActivityImages a
+        WHERE EXISTS (SELECT 1 FROM #ReportRows r WHERE r.AuditGroupId=a.AnchorId)
+        ORDER BY a.AnchorId, a.ActivityDate, a.SourceTable,
+                 CASE WHEN a.RowVersion='Before' THEN 0 ELSE 1 END, a.EventId;
+    END
+    ELSE IF @IncludeDetailKeys = 1
         SELECT ActivityDate, BranchName, Category, Module, ActionType, DocumentNo, UserName, CounterName,
             RowVersion, Amount, Source, Details, EventBranchId, EventFinYearId, EventCounterId
         FROM #ReportRows ORDER BY ActivityDate DESC, Category, Module, DocumentNo, RowVersion DESC, Source;

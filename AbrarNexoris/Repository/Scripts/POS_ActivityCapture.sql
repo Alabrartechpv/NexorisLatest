@@ -4,6 +4,8 @@ BEGIN
     CREATE TABLE dbo.POS_ActivityChange
     (
         EventId uniqueidentifier NOT NULL,
+        WriteTransactionId bigint NULL,
+        WriteStatementId uniqueidentifier NULL,
         ActivityDate datetime2(3) NOT NULL,
         CompanyId int NULL,
         BranchId int NULL,
@@ -21,6 +23,12 @@ BEGIN
         CONSTRAINT PK_POS_ActivityChange PRIMARY KEY CLUSTERED (ActivityDate, EventId)
     );
 END;
+GO
+
+IF COL_LENGTH(N'dbo.POS_ActivityChange', N'WriteTransactionId') IS NULL
+    ALTER TABLE dbo.POS_ActivityChange ADD WriteTransactionId bigint NULL;
+IF COL_LENGTH(N'dbo.POS_ActivityChange', N'WriteStatementId') IS NULL
+    ALTER TABLE dbo.POS_ActivityChange ADD WriteStatementId uniqueidentifier NULL;
 GO
 
 IF OBJECT_ID(N'dbo.POS_ActivityCaptureInstallation', N'U') IS NULL
@@ -178,19 +186,19 @@ INSERT @Sources VALUES
 -- numbers, contact data, configuration values, and arbitrary free text are excluded.
 DECLARE @Fields TABLE (ColumnName sysname PRIMARY KEY);
 INSERT @Fields VALUES
-    ('Id'), ('SlNo'), ('ItemId'), ('ItemNo'), ('Description'), ('Barcode'), ('BarCodeId'),
-    ('LedgerId'), ('LedgerName'), ('GroupId'), ('GroupName'), ('VendorLedgerId'), ('CustomerLedgerId'),
+    ('Id'), ('SlNo'), ('ItemId'), ('ItemNo'), ('ItemName'), ('Description'), ('HSNCode'), ('Barcode'), ('BarCodeId'),
+    ('VoucherID'), ('LedgerId'), ('LedgerName'), ('GroupId'), ('GroupName'), ('VendorLedgerId'), ('CustomerLedgerId'),
     ('UnitId'), ('Unit'), ('UnitName'), ('Packing'), ('Qty'), ('Quantity'), ('Free'),
     ('Cost'), ('UnitCost'), ('Rate'), ('RetailPrice'), ('WalkinPrice'), ('SPrice'),
     ('OpeningStock'), ('Stock'), ('BalanceStock'), ('Available'), ('OpeningQty'), ('ClosingQty'),
-    ('DiscountAmt'), ('DiscountAmount'), ('DiscountPer'), ('DiscountPercentage'), ('TaxAmt'), ('TaxPer'),
+    ('DiscountAmt'), ('DiscountAmount'), ('DiscountPer'), ('DiscountPercentage'), ('TaxAmt'), ('TaxPer'), ('TaxType'),
     ('SubTotal'), ('NetAmount'), ('TotalAmount'), ('TotalPrice'), ('GrandTotal'), ('Gross'),
     ('Amount'), ('BillAmount'), ('BalanceAmount'), ('PaymentAmount'), ('ReceiptAmount'), ('SettlementAmount'),
     ('DebitAmount'), ('CreditAmount'), ('Debit'), ('Credit'), ('RoundAmount'), ('RoundOff'),
     ('OpeningCash'), ('ClosingCash'), ('CashDifference'), ('Denomination'), ('Count'),
     ('PaymentType'), ('FormName'), ('PayModeId'), ('PayModeName'), ('PaymentMethodLedgerId'), ('VoucherType'), ('Mode'),
     ('CancelFlag'), ('IsDelete'), ('IsDeleted'), ('IsActive'), ('IsBilled'), ('Status'), ('ItemStatus'),
-    ('OrderStatus'), ('OfficeSupplyStatus'), ('ApprovedStatus'), ('BlockSale'), ('BlockPurchase'),
+    ('OrderStatus'), ('OfficeSupplyStatus'), ('ApprovedStatus'), ('BlockSale'), ('BlockPurchase'), ('StatusName'), ('StatusReason'), ('StatusDate'),
     ('OfferId'), ('Name'), ('CategoryName'), ('SubCategoryName'), ('BrandName'), ('ItemType'),
     ('CurrencyName'), ('CountryName'), ('StateName'), ('BranchName'), ('CompanyName'), ('CounterName'),
     ('UserName'), ('UserLevelId'), ('RoleId'), ('RoleName'), ('FormKey'), ('CanView'), ('CanAdd'),
@@ -281,14 +289,18 @@ BEGIN
                @FinYearId = NULLIF(CONVERT(int, SUBSTRING(@Context, 13, 4)),0),
                @UserId = NULLIF(CONVERT(int, SUBSTRING(@Context, 17, 4)),0),
                @CounterId = NULLIF(CONVERT(int, SUBSTRING(@Context, 21, 4)),0);
+    DECLARE @WriteTransactionId bigint, @WriteStatementId uniqueidentifier = NEWID();
+    IF HAS_PERMS_BY_NAME(NULL, NULL, ''VIEW SERVER STATE'') = 1
+        SELECT @WriteTransactionId = transaction_id FROM sys.dm_tran_current_transaction;
+
     INSERT dbo.POS_ActivityChange
-        (EventId, ActivityDate, Category, Module, SourceTable, ActionType, RowVersion,
+        (EventId, WriteTransactionId, WriteStatementId, ActivityDate, Category, Module, SourceTable, ActionType, RowVersion,
          CompanyId, BranchId, FinYearId, UserId, CounterId, DocumentNo, Amount, Details)
-    SELECT NEWID(), @Stamp, N''' + @Category + N''', ' + @ModuleSql + N', N''' + @Table + N''', @Action, ''Before'',
+    SELECT NEWID(), @WriteTransactionId, @WriteStatementId, @Stamp, N''' + @Category + N''', ' + @ModuleSql + N', N''' + @Table + N''', @Action, ''Before'',
            ' + @Projection + N'
     FROM deleted r
     UNION ALL
-    SELECT NEWID(), @Stamp, N''' + @Category + N''', ' + @ModuleSql + N', N''' + @Table + N''', @Action, ''After'',
+    SELECT NEWID(), @WriteTransactionId, @WriteStatementId, @Stamp, N''' + @Category + N''', ' + @ModuleSql + N', N''' + @Table + N''', @Action, ''After'',
            ' + @Projection + N'
     FROM inserted r;
 END;';

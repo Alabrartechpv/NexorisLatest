@@ -25,6 +25,7 @@ namespace PosBranch_Win.Reports.FinancialReports
         private const string DetailsRelation = "ActivityDetails";
         private const string ActivityKey = "ActivityKey";
         private const string Snapshot = "Snapshot";
+        private const string ActionLabelColumn = "ActionLabel";
         private enum ReportPeriod
         {
             Range,
@@ -256,8 +257,9 @@ namespace PosBranch_Win.Reports.FinancialReports
                         if (refreshOptions)
                             filters = repository.GetFilters();
 
-                        newData = AddActivityDetails(repository.GetActivity(from.Value, to, selectedBranch,
-                            selectedUser, selectedCounter, selectedCategory, selectedSearch, selectedAction, asOfNow));
+                        using (DataSet data = repository.GetActivity(from.Value, to, selectedBranch,
+                            selectedUser, selectedCounter, selectedCategory, selectedSearch, selectedAction, asOfNow))
+                            newData = AddActivityDetails(data);
                     }
                 });
 
@@ -269,7 +271,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                     PopulateOptions(branch, filters.Tables[0], "All branches");
                     PopulateOptions(user, filters.Tables[1], "All users");
                     PopulateOptions(counter, filters.Tables[2], "All counters");
-                    PopulateOptions(action, filters.Tables[3], "All actions");
+                    PopulateOptions(action, filters.Tables[3], "All actions", ActivityReportText.ActionLabel);
                 }
 
                 DataSet previous = activityData;
@@ -296,7 +298,8 @@ namespace PosBranch_Win.Reports.FinancialReports
             }
         }
 
-        private static void PopulateOptions(UltraComboEditor editor, DataTable options, string allCaption)
+        private static void PopulateOptions(UltraComboEditor editor, DataTable options, string allCaption,
+            Func<string, string> formatCaption = null)
         {
             object selected = editor.Value;
             editor.Items.Clear();
@@ -307,17 +310,21 @@ namespace PosBranch_Win.Reports.FinancialReports
                 {
                     object key = option[0];
                     string caption = Convert.ToString(option[option.Table.Columns.Count - 1]);
-                    editor.Items.Add(key, caption);
+                    editor.Items.Add(key, formatCaption == null ? caption : formatCaption(caption));
                 }
             }
             editor.Value = editor.Items.Cast<ValueListItem>().Any(item => Equals(item.DataValue, selected)) ? selected : "";
         }
 
-        private static DataSet AddActivityDetails(DataTable rows)
+        private static DataSet AddActivityDetails(DataSet result)
         {
+            DataTable rows = result.Tables[0];
+            var images = result.Tables[1].AsEnumerable().ToLookup(row => row.Field<Guid>("AnchorId"));
+            result.Tables.Remove(rows);
             rows.TableName = ActivityTable;
             rows.Columns.Add(ActivityKey, typeof(int));
             rows.Columns.Add(Snapshot, typeof(string));
+            rows.Columns.Add(ActionLabelColumn, typeof(string));
             var details = new DataTable("ActivityDetail");
             details.Columns.Add(ActivityKey, typeof(int));
             details.Columns.Add("Section", typeof(string));
@@ -329,21 +336,52 @@ namespace PosBranch_Win.Reports.FinancialReports
             foreach (DataRow row in rows.Rows)
             {
                 row[ActivityKey] = ++key;
-                string snapshot = Convert.ToString(row["Details"]).Trim(' ', '|', '\r', '\n');
-                string version = Convert.ToString(row["RowVersion"]);
-                row[Snapshot] = version.Length == 0 ? snapshot
-                    : snapshot.Length == 0 ? version : version + " | " + snapshot;
+                string module = Convert.ToString(row["Module"]);
+                string action = Convert.ToString(row["ActionType"]);
+                string source = Convert.ToString(row["Source"]);
+                string snapshot = Convert.ToString(row["Details"]);
+                string document = $"{module} {row["DocumentNo"]}".Trim();
+                row[ActionLabelColumn] = ActivityReportText.ActionLabel(action);
+                row[Snapshot] = ActivityReportText.Summary(action, module, snapshot, row["Amount"]);
+                if (source == "POS_ItemMasterStatusRules")
+                    row[Snapshot] = $"{row[ActionLabelColumn]} · Item status";
 
-                string document = $"{row["Module"]} {row["DocumentNo"]}".Trim();
-                string auditSummary = $"{row["ActionType"]}  |  {row["ActivityDate"]:dd-MMM-yyyy HH:mm:ss}"
-                    + $"{Environment.NewLine}Branch: {row["BranchName"]}"
-                    + $"  |  User: {row["UserName"]}  |  Counter: {row["CounterName"]}";
-                if (!row.IsNull("Amount"))
-                    auditSummary += $"{Environment.NewLine}Amount: {row["Amount"]:N2}";
+                IEnumerable<DataRow> captured = row["AuditGroupId"] is Guid group
+                    ? images[group] : Enumerable.Empty<DataRow>();
+                var changes = ActivityReportText.CapturedChanges(captured).ToList();
 
-                details.Rows.Add(key, "Activity", DBNull.Value, document, auditSummary);
-                if (!string.IsNullOrEmpty((string)row[Snapshot]))
-                    details.Rows.Add(key, "Recorded snapshot", DBNull.Value, document, row[Snapshot]);
+                if (module == "Item Master" && action == "SAVE")
+                {
+                    var savedDetails = ActivityReportText.SavedItemDetails(snapshot, captured, document);
+                    if (savedDetails != null)
+                        changes.Insert(0, savedDetails);
+                }
+                else if (source == "Item activity log" && action == "UPDATE")
+                {
+                    string classification = ActivityReportText.ItemClassificationChanges(snapshot);
+                    if (classification.Length > 0)
+                        changes.Add(new ActivityReportText.Detail("Item details", null, document, classification));
+                }
+
+                foreach (ActivityReportText.Detail change in changes)
+                    AddDetail(details, key, change);
+
+                if (action == "UPDATE")
+                {
+                    string summary = string.Join(" · ", changes.Where(change => change.Text.Contains(" → "))
+                        .Select(change => change.Text).Take(2));
+                    if (summary.Length > 0)
+                        row[Snapshot] = summary;
+                }
+
+                bool applicationLog = source == "Activity log" || source == "Item activity log";
+                // Use the application notes for history without snapshots, or when they can explain an edit.
+                string notes = applicationLog && changes.Count == 0
+                    ? ActivityReportText.ReadLog(snapshot) : string.Empty;
+                if (!string.IsNullOrWhiteSpace(notes))
+                    details.Rows.Add(key, "Recorded notes", DBNull.Value, document, notes);
+                else if (changes.Count == 0)
+                    details.Rows.Add(key, "Activity", DBNull.Value, document, row[Snapshot]);
             }
 
             var data = new DataSet();
@@ -351,6 +389,11 @@ namespace PosBranch_Win.Reports.FinancialReports
             data.Tables.Add(details);
             data.Relations.Add(DetailsRelation, rows.Columns[ActivityKey], details.Columns[ActivityKey], false);
             return data;
+        }
+
+        private static void AddDetail(DataTable table, int key, ActivityReportText.Detail detail)
+        {
+            table.Rows.Add(key, detail.Section, (object)detail.Line ?? DBNull.Value, detail.Record, detail.Text);
         }
 
         private async void LoadRowDetails(object sender, CancelableRowEventArgs e)
@@ -365,6 +408,12 @@ namespace PosBranch_Win.Reports.FinancialReports
             DataTable detailRows = dataset.Relations[DetailsRelation].ChildTable;
             int key = (int)activity[ActivityKey];
             object document = activity["DocumentNo"];
+            string actionType = Convert.ToString(activity["ActionType"]);
+            if (!activity.Row.IsNull("AuditGroupId") &&
+                (actionType == "UPDATE" || activity.Row.GetChildRows(DetailsRelation)
+                    .Any(detail => detail.Field<string>("Section") != "Activity")))
+                return;
+
             if (!requestedDetails.Add(activity.Row))
                 return;
 
@@ -377,7 +426,6 @@ namespace PosBranch_Win.Reports.FinancialReports
                 status["Section"] = "Bill details";
                 status["Details"] = "Loading...";
             }
-            string actionType = Convert.ToString(activity["ActionType"]);
             string module = Convert.ToString(activity["Module"]);
             string source = Convert.ToString(activity["Source"]);
             string docNo = Convert.ToString(document);
@@ -404,8 +452,16 @@ namespace PosBranch_Win.Reports.FinancialReports
                     }
                     else
                     {
-                        foreach (DataRow detail in current.Rows)
-                            detailRows.Rows.Add(key, detail["Section"], detail["Line"], detail["Record"], detail["Details"]);
+                        var recorded = activity.Row.GetChildRows(DetailsRelation);
+                        bool postingsRecorded = recorded.Any(detail => detail.Field<string>("Section") == "Ledger posting");
+                        bool statusRecorded = recorded.Any(detail => detail.Field<string>("Section") == "Item status");
+                        var currentDetails = current.AsEnumerable().Select(ActivityReportText.CurrentDetail)
+                            .Where(detail => detail != null &&
+                                !(postingsRecorded && detail.Section == "Current postings") &&
+                                !(statusRecorded && detail.Section == "Current item status"))
+                            .GroupBy(detail => detail.Key).Select(group => group.First());
+                        foreach (ActivityReportText.Detail detail in currentDetails)
+                            AddDetail(detailRows, key, detail);
                         detailRows.Rows.Remove(status);
                     }
                 }
@@ -416,7 +472,8 @@ namespace PosBranch_Win.Reports.FinancialReports
                 {
                     requestedDetails.Remove(activity.Row);
                     status["Section"] = "Lookup failed";
-                    status["Details"] = "Unable to load bill details. Reopen the row to retry. " + ex.Message;
+                    status["Details"] = "Couldn’t load the record. Reopen this row to try again.";
+                    System.Diagnostics.Debug.WriteLine(ex);
                 }
             }
         }
@@ -459,7 +516,7 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             e.Layout.AutoFitStyle = AutoFitStyle.None;
             var main = e.Layout.Bands[0];
-            foreach (string key in new[] { ActivityKey, "RowVersion", "Details", "Source", "EventBranchId", "EventFinYearId", "EventCounterId" })
+            foreach (string key in new[] { ActivityKey, "RowVersion", "Details", "Source", "ActionType", "EventBranchId", "EventFinYearId", "EventCounterId", "AuditGroupId" })
                 HideInternalColumn(main.Columns[key]);
             int position = 0;
             void Column(string key, string caption, int width, string format = null, HAlign align = HAlign.Left)
@@ -469,7 +526,7 @@ namespace PosBranch_Win.Reports.FinancialReports
 
             Column("ActivityDate", "Date and Time", 147, "dd-MMM-yyyy HH:mm:ss");
             Column("Module", "Form / Module", 184);
-            Column("ActionType", "Action", 95);
+            Column(ActionLabelColumn, "Action", 95);
             Column("DocumentNo", "Document / ID", 110);
             Column("Category", "Category", 95);
             Column("BranchName", "Branch", 145);

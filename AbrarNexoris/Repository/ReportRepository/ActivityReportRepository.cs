@@ -12,10 +12,10 @@ namespace Repository.ReportRepository
             return Read(STOREDPROCEDURE.POS_ActivityReportFilters);
         }
 
-        public DataTable GetActivity(DateTime from, DateTime to, int? branchId, string user, string counter,
+        public DataSet GetActivity(DateTime from, DateTime to, int? branchId, string user, string counter,
             string category, string search, string action, bool asOfNow)
         {
-            using (DataSet result = Read(STOREDPROCEDURE.POS_ActivityReport, parameters =>
+            return Read(STOREDPROCEDURE.POS_ActivityReport, parameters =>
             {
                 parameters.Add("@FromDate", SqlDbType.Date).Value = from.Date;
                 parameters.Add("@ToDate", SqlDbType.Date).Value = to.Date;
@@ -26,11 +26,8 @@ namespace Repository.ReportRepository
                 AddOptionalText(parameters, "@Search", 200, search);
                 AddOptionalText(parameters, "@ActionType", 100, action);
                 parameters.Add("@AsOfNow", SqlDbType.Bit).Value = asOfNow;
-                parameters.Add("@IncludeDetailKeys", SqlDbType.Bit).Value = true;
-            }))
-            {
-                return DetachRows(result);
-            }
+                parameters.Add("@IncludeGroupedDetails", SqlDbType.Bit).Value = true;
+            });
         }
 
         public DataTable GetDetails(int? branchId, int? finYearId, int? counterId, string module, string documentNo,
