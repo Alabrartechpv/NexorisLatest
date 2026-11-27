@@ -72,6 +72,7 @@ namespace PosBranch_Win.Reports.FinancialReports
                 case "CANCEL":
                 case "CANCELLED": return "Cancelled";
                 case "HOLD": return "Held";
+                case "REACTIVATE": return "Reactivated";
                 case "ON FILE": return "On file";
                 default: return CultureInfo.CurrentCulture.TextInfo.ToTitleCase(value.ToLower(CultureInfo.CurrentCulture));
             }

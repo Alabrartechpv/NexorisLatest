@@ -338,6 +338,46 @@ BEGIN
         CONVERT(uniqueidentifier,NULL) AS AuditGroupId
     INTO #Events FROM Events e WHERE e.Category IN (N'Transaction',N'Payment',N'Master');
 
+    -- Report real state transitions, even if an older client did not record an operator.
+    -- Grouping keeps the bill allocations and ledger postings with their parent.
+    SELECT header.EventId, CASE WHEN MAX(state.AfterCancelled)=1 THEN N'DELETE' ELSE N'REACTIVATE' END AS ActionType
+    INTO #DocumentStateChanges
+    FROM #ActivityImages header
+    JOIN #ActivityImages afterImage ON afterImage.AnchorId=header.EventId
+        AND afterImage.SourceTable=header.SourceTable AND afterImage.Module=header.Module
+        AND afterImage.DocumentNo=header.DocumentNo AND afterImage.RowVersion='After'
+    JOIN #ActivityImages beforeImage ON beforeImage.AnchorId=header.EventId
+        AND beforeImage.SourceTable=afterImage.SourceTable AND beforeImage.Module=afterImage.Module
+        AND beforeImage.DocumentNo=afterImage.DocumentNo AND beforeImage.RowVersion='Before'
+        AND (beforeImage.WriteStatementId=afterImage.WriteStatementId OR
+             (beforeImage.WriteStatementId IS NULL AND afterImage.WriteStatementId IS NULL
+              AND beforeImage.ActivityDate=afterImage.ActivityDate))
+    CROSS APPLY (VALUES
+    (
+        CASE
+            WHEN CHARINDEX(N' | CancelFlag=1 | ', N' | '+beforeImage.Details+N' | ')>0 THEN 1
+            WHEN CHARINDEX(N' | CancelFlag=0 | ', N' | '+beforeImage.Details+N' | ')>0
+              OR CHARINDEX(N' | CancelFlag=(null) | ', N' | '+beforeImage.Details+N' | ')>0 THEN 0
+        END,
+        CASE
+            WHEN CHARINDEX(N' | CancelFlag=1 | ', N' | '+afterImage.Details+N' | ')>0 THEN 1
+            WHEN CHARINDEX(N' | CancelFlag=0 | ', N' | '+afterImage.Details+N' | ')>0
+              OR CHARINDEX(N' | CancelFlag=(null) | ', N' | '+afterImage.Details+N' | ')>0 THEN 0
+        END
+    )) state(BeforeCancelled, AfterCancelled)
+    WHERE header.EventId=header.AnchorId AND header.ActionType='UPDATE'
+      AND header.DirectVoucherEditId IS NULL
+      AND header.SourceTable IN (N'VendorPaymentMaster',N'CustomerReceiptMaster',N'CreditNoteMaster',N'DebitNoteMaster',
+          N'TransporterReceiptMaster',N'Vouchers',N'SMaster',N'SMasterHold',N'PMaster',N'SReturnMaster',N'PReturnMaster',
+          N'StockAdjustmentMaster',N'StockTransferMaster',N'POrderMaster',N'SOrderMaster',N'QuotationMaster',
+          N'DeliveryOrderMaster',N'OfficeSuppliesMaster',N'OfficeSuppliesWithdrawMaster')
+      AND state.BeforeCancelled<>state.AfterCancelled
+      AND (header.SourceTable<>N'Vouchers' OR
+           (header.Module NOT IN (N'Purchase Posting',N'Sales Posting',N'Vendor Payment Posting',N'Customer Receipt Posting',
+                                   N'Credit Note Posting',N'Debit Note Posting',N'PhysicalStock Posting')))
+    GROUP BY header.EventId;
+    CREATE UNIQUE CLUSTERED INDEX IX_DocumentStateChanges ON #DocumentStateChanges(EventId);
+
     -- Prefer the application snapshot when it describes the same captured operation.
     -- A one-to-one match leaves separate rapid saves or ambiguous events visible.
     ;WITH LogMatches AS
@@ -350,14 +390,18 @@ BEGIN
           AND a.BranchId=e.BranchId AND a.FinYearId=e.FinYearId
           AND (a.UserId=e.UserId OR (a.UserId IS NULL AND e.UserId IS NULL))
           AND (a.CounterId=e.CounterId OR (a.CounterId IS NULL AND e.CounterId IS NULL))
-          AND a.ActionType=UPPER(LTRIM(RTRIM(e.ActionType)))
           AND a.ActivityDate BETWEEN DATEADD(second,-2,e.ActivityDate) AND DATEADD(second,1,e.ActivityDate)
-        WHERE (e.Source=N'Activity log' AND a.DocumentNo=e.DocumentNo)
+        LEFT JOIN #DocumentStateChanges state ON state.EventId=a.EventId
+        CROSS APPLY (VALUES (UPPER(LTRIM(RTRIM(e.ActionType))))) formAction(ActionType)
+        WHERE (a.ActionType=formAction.ActionType AND state.EventId IS NULL
+               OR state.ActionType=N'DELETE' AND formAction.ActionType IN (N'DELETE',N'DELETED',N'CANCEL',N'CANCELLED')
+               OR state.ActionType=N'REACTIVATE' AND formAction.ActionType=N'REACTIVATE')
+          AND ((e.Source=N'Activity log' AND a.DocumentNo=e.DocumentNo)
            OR (e.Source=N'Item activity log' AND EXISTS
                (SELECT 1 FROM dbo.ItemActivityLog l
                 WHERE l.CompanyId=@CompanyId AND l.BranchId=e.BranchId AND l.FinYearId=e.FinYearId
                   AND l.CreatedOn=CONVERT(datetime,e.ActivityDate) AND l.ItemNo=e.DocumentNo
-                  AND CONVERT(nvarchar(100),l.ItemId)=a.DocumentNo))
+                  AND CONVERT(nvarchar(100),l.ItemId)=a.DocumentNo)))
     )
     SELECT ReportRowId, EventId INTO #MatchedLogs FROM LogMatches WHERE Captures=1 AND Logs=1;
     CREATE UNIQUE CLUSTERED INDEX IX_MatchedLogs_Row ON #MatchedLogs(ReportRowId);
@@ -367,28 +411,47 @@ BEGIN
                     Category, Module, ActionType, DocumentNo, RowVersion, Amount, Source, Details, AuditGroupId)
     SELECT a.ActivityDate, a.CompanyId, a.BranchId, a.FinYearId, a.UserId, NULL, a.CounterId, NULL,
         a.Category, CASE WHEN a.SourceTable=N'POS_ItemMasterStatusRules' THEN N'Item Master' ELSE a.Module END,
-        a.ActionType, a.DocumentNo, a.RowVersion, a.Amount, a.SourceTable, a.Details, a.EventId
+        COALESCE(state.ActionType, a.ActionType),
+        a.DocumentNo, a.RowVersion, a.Amount, a.SourceTable, a.Details, a.EventId
     FROM #ActivityImages a
+    LEFT JOIN #DocumentStateChanges state ON state.EventId=a.EventId
     WHERE a.EventId=a.AnchorId AND a.Category IN (N'Transaction',N'Payment',N'Master')
       -- The form logs above are proof of direct edits. Raw UPDATE snapshots can
-      -- describe automatic posting, cancellation or stock maintenance.
-      AND (a.ActionType<>N'UPDATE' OR a.DirectVoucherEditId IS NOT NULL)
+      -- describe automatic posting or stock maintenance. Cancellations are deletions.
+      AND (a.ActionType<>N'UPDATE' OR a.DirectVoucherEditId IS NOT NULL OR state.EventId IS NOT NULL)
       AND NOT EXISTS (SELECT 1 FROM #MatchedLogs m WHERE m.EventId=a.EventId);
 
     SELECT e.ActivityDate, COALESCE(NULLIF(b.BranchName, ''), CONVERT(nvarchar(20), e.BranchId), N'Shared / Unassigned') AS BranchName,
         e.Category, e.Module, activity.ActionType, e.DocumentNo,
         actor.UserName, actor.CounterName, e.RowVersion, TRY_CONVERT(decimal(28,4), e.Amount) AS Amount, e.Source, e.Details,
         e.BranchId AS EventBranchId, e.FinYearId AS EventFinYearId, e.CounterId AS EventCounterId,
-        COALESCE(log.EventId, e.AuditGroupId) AS AuditGroupId
+        COALESCE(log.EventId, e.AuditGroupId) AS AuditGroupId,
+        CASE WHEN e.Category=N'Payment' THEN
+            CASE WHEN activity.ActionType=N'REACTIVATE' THEN N'Active'
+                 WHEN activity.ActionType=N'DELETE' THEN
+                    CASE WHEN state.ActionType=N'DELETE' OR e.Source=N'Voucher deletion audit'
+                                   OR e.ActionType IN (N'CANCEL',N'CANCELLED') THEN N'Cancelled' ELSE N'Deleted' END
+                 WHEN CHARINDEX(N' | CancelFlag=1 | ',N' | '+e.Details+N' | ')>0
+                      OR (activity.ActionType=N'ON FILE' AND e.Details LIKE N'%Currently cancelled%') THEN N'Cancelled'
+                 WHEN CHARINDEX(N' | CancelFlag=0 | ',N' | '+e.Details+N' | ')>0
+                      OR CHARINDEX(N' | CancelFlag=(null) | ',N' | '+e.Details+N' | ')>0
+                      OR e.Source=N'Voucher posting record'
+                      OR (e.Source=N'Document record' AND e.Module IN
+                          (N'Vendor Payment',N'Customer Receipt',N'Credit Note',N'Debit Note',N'Transporter Receipt'))
+                      THEN N'Active' END
+        END AS DocumentStatus
     INTO #ReportRows
     FROM #Events e
     LEFT JOIN #MatchedLogs log ON log.ReportRowId=e.ReportRowId
+    LEFT JOIN #DocumentStateChanges state ON state.EventId=COALESCE(log.EventId,e.AuditGroupId)
     LEFT JOIN dbo.Branches b ON b.CompanyId = @CompanyId AND b.Id = e.BranchId
     LEFT JOIN dbo.Users u ON u.CompanyId = @CompanyId AND u.UserId = e.UserId
     LEFT JOIN dbo.CounterMaster c ON c.CounterId = e.CounterId
     CROSS APPLY (VALUES (COALESCE(NULLIF(e.UserName,''), NULLIF(u.UserName,''), CONVERT(nvarchar(20),e.UserId), N'Unrecorded'),
         COALESCE(NULLIF(e.CounterName,''), NULLIF(c.CounterName,''), CONVERT(nvarchar(20),e.CounterId), N'Unrecorded'))) actor(UserName, CounterName)
-    CROSS APPLY (VALUES (UPPER(LTRIM(RTRIM(e.ActionType))))) activity(ActionType)
+    CROSS APPLY (VALUES (CASE UPPER(LTRIM(RTRIM(e.ActionType)))
+        WHEN N'CANCEL' THEN N'DELETE' WHEN N'CANCELLED' THEN N'DELETE' WHEN N'DELETED' THEN N'DELETE'
+        ELSE UPPER(LTRIM(RTRIM(e.ActionType))) END)) activity(ActionType)
     WHERE (@BranchId IS NULL OR e.BranchId = @BranchId)
       AND (@UserName IS NULL OR actor.UserName = @UserName)
       AND (@CounterName IS NULL OR actor.CounterName = @CounterName)
@@ -405,7 +468,7 @@ BEGIN
     IF @IncludeGroupedDetails = 1
     BEGIN
         SELECT ActivityDate, BranchName, Category, Module, ActionType, DocumentNo, UserName, CounterName,
-            RowVersion, Amount, Source, Details, EventBranchId, EventFinYearId, EventCounterId, AuditGroupId
+            RowVersion, Amount, Source, Details, EventBranchId, EventFinYearId, EventCounterId, AuditGroupId, DocumentStatus
         FROM #ReportRows ORDER BY ActivityDate DESC, Category, Module, DocumentNo, RowVersion DESC, Source;
 
         SELECT a.AnchorId, a.Module, a.DocumentNo, a.ActionType, a.RowVersion, a.Details, a.ActivityDate, a.WriteStatementId, a.WriteTransactionId
@@ -459,7 +522,7 @@ BEGIN
     SELECT DISTINCT UPPER(LTRIM(RTRIM(a.ActionType))) AS ActionType
     FROM
     (
-        SELECT ActionType FROM (VALUES (N'SAVE'), (N'UPDATE'), (N'DELETE'), (N'ON FILE')) standard(ActionType)
+        SELECT ActionType FROM (VALUES (N'SAVE'), (N'UPDATE'), (N'DELETE'), (N'REACTIVATE'), (N'ON FILE')) standard(ActionType)
         UNION ALL SELECT ActionType FROM dbo.POS_ActivityChange
             WHERE CompanyId = @CompanyId AND Category IN (N'Transaction', N'Payment', N'Master')
         UNION ALL SELECT ActivityType FROM dbo.SalesActivityLog WHERE CompanyId = @CompanyId
@@ -470,6 +533,7 @@ BEGIN
         UNION ALL SELECT ActivityType FROM dbo.ItemActivityLog WHERE CompanyId = @CompanyId
     ) a
     WHERE NULLIF(LTRIM(RTRIM(a.ActionType)), N'') IS NOT NULL
+      AND UPPER(LTRIM(RTRIM(a.ActionType))) NOT IN (N'CANCEL',N'CANCELLED',N'DELETED')
     ORDER BY ActionType;
 END;
 GO

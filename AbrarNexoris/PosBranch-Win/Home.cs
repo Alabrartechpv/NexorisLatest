@@ -6631,6 +6631,9 @@ namespace PosBranch_Win
 
         private void AddReportItem(ReportNavigatorDefinition definition)
         {
+            if (definition.Key == "ActivityReport" && !SessionContext.IsAdmin)
+                return;
+
             var group = ultraExplorerBarReportNavigator.Groups[$"Grp_{definition.Category}"];
             if (group != null)
             {
