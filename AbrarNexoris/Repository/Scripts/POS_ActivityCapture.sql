@@ -4,6 +4,9 @@ BEGIN
     CREATE TABLE dbo.POS_ActivityChange
     (
         EventId uniqueidentifier NOT NULL,
+        WriteTransactionId bigint NULL,
+        WriteStatementId uniqueidentifier NULL,
+        DirectVoucherEditId uniqueidentifier NULL,
         ActivityDate datetime2(3) NOT NULL,
         CompanyId int NULL,
         BranchId int NULL,
@@ -23,6 +26,14 @@ BEGIN
 END;
 GO
 
+IF COL_LENGTH(N'dbo.POS_ActivityChange', N'WriteTransactionId') IS NULL
+    ALTER TABLE dbo.POS_ActivityChange ADD WriteTransactionId bigint NULL;
+IF COL_LENGTH(N'dbo.POS_ActivityChange', N'WriteStatementId') IS NULL
+    ALTER TABLE dbo.POS_ActivityChange ADD WriteStatementId uniqueidentifier NULL;
+IF COL_LENGTH(N'dbo.POS_ActivityChange', N'DirectVoucherEditId') IS NULL
+    ALTER TABLE dbo.POS_ActivityChange ADD DirectVoucherEditId uniqueidentifier NULL;
+GO
+
 IF OBJECT_ID(N'dbo.POS_ActivityCaptureInstallation', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.POS_ActivityCaptureInstallation
@@ -38,13 +49,16 @@ IF OBJECT_ID(N'dbo.POS_SetActivityContext', N'P') IS NULL
     EXEC(N'CREATE PROCEDURE dbo.POS_SetActivityContext AS RETURN 0;');
 GO
 ALTER PROCEDURE dbo.POS_SetActivityContext
-    @CompanyId int, @BranchId int, @FinYearId int, @UserId int, @CounterId int
+    @CompanyId int, @BranchId int, @FinYearId int, @UserId int, @CounterId int,
+    @DirectVoucherEdit bit = 0
 AS
 BEGIN
     SET NOCOUNT ON;
     DECLARE @Context varbinary(128) = 0x504F5341 + CONVERT(binary(4), @CompanyId)
         + CONVERT(binary(4), @BranchId) + CONVERT(binary(4), @FinYearId)
         + CONVERT(binary(4), @UserId) + CONVERT(binary(4), @CounterId);
+    IF @DirectVoucherEdit = 1 AND @UserId > 0
+        SET @Context += 0x01 + CONVERT(binary(16), NEWID());
     SET CONTEXT_INFO @Context;
 END;
 GO
@@ -178,19 +192,19 @@ INSERT @Sources VALUES
 -- numbers, contact data, configuration values, and arbitrary free text are excluded.
 DECLARE @Fields TABLE (ColumnName sysname PRIMARY KEY);
 INSERT @Fields VALUES
-    ('Id'), ('SlNo'), ('ItemId'), ('ItemNo'), ('Description'), ('Barcode'), ('BarCodeId'),
-    ('LedgerId'), ('LedgerName'), ('GroupId'), ('GroupName'), ('VendorLedgerId'), ('CustomerLedgerId'),
+    ('Id'), ('SlNo'), ('ItemId'), ('ItemNo'), ('ItemName'), ('Description'), ('HSNCode'), ('Barcode'), ('BarCodeId'),
+    ('VoucherID'), ('LedgerId'), ('LedgerName'), ('GroupId'), ('GroupName'), ('VendorLedgerId'), ('CustomerLedgerId'),
     ('UnitId'), ('Unit'), ('UnitName'), ('Packing'), ('Qty'), ('Quantity'), ('Free'),
     ('Cost'), ('UnitCost'), ('Rate'), ('RetailPrice'), ('WalkinPrice'), ('SPrice'),
     ('OpeningStock'), ('Stock'), ('BalanceStock'), ('Available'), ('OpeningQty'), ('ClosingQty'),
-    ('DiscountAmt'), ('DiscountAmount'), ('DiscountPer'), ('DiscountPercentage'), ('TaxAmt'), ('TaxPer'),
+    ('DiscountAmt'), ('DiscountAmount'), ('DiscountPer'), ('DiscountPercentage'), ('TaxAmt'), ('TaxPer'), ('TaxType'),
     ('SubTotal'), ('NetAmount'), ('TotalAmount'), ('TotalPrice'), ('GrandTotal'), ('Gross'),
     ('Amount'), ('BillAmount'), ('BalanceAmount'), ('PaymentAmount'), ('ReceiptAmount'), ('SettlementAmount'),
     ('DebitAmount'), ('CreditAmount'), ('Debit'), ('Credit'), ('RoundAmount'), ('RoundOff'),
     ('OpeningCash'), ('ClosingCash'), ('CashDifference'), ('Denomination'), ('Count'),
     ('PaymentType'), ('FormName'), ('PayModeId'), ('PayModeName'), ('PaymentMethodLedgerId'), ('VoucherType'), ('Mode'),
     ('CancelFlag'), ('IsDelete'), ('IsDeleted'), ('IsActive'), ('IsBilled'), ('Status'), ('ItemStatus'),
-    ('OrderStatus'), ('OfficeSupplyStatus'), ('ApprovedStatus'), ('BlockSale'), ('BlockPurchase'),
+    ('OrderStatus'), ('OfficeSupplyStatus'), ('ApprovedStatus'), ('BlockSale'), ('BlockPurchase'), ('StatusName'), ('StatusReason'), ('StatusDate'),
     ('OfferId'), ('Name'), ('CategoryName'), ('SubCategoryName'), ('BrandName'), ('ItemType'),
     ('CurrencyName'), ('CountryName'), ('StateName'), ('BranchName'), ('CompanyName'), ('CounterName'),
     ('UserName'), ('UserLevelId'), ('RoleId'), ('RoleName'), ('FormKey'), ('CanView'), ('CanAdd'),
@@ -281,14 +295,23 @@ BEGIN
                @FinYearId = NULLIF(CONVERT(int, SUBSTRING(@Context, 13, 4)),0),
                @UserId = NULLIF(CONVERT(int, SUBSTRING(@Context, 17, 4)),0),
                @CounterId = NULLIF(CONVERT(int, SUBSTRING(@Context, 21, 4)),0);
+    DECLARE @DirectVoucherEditId uniqueidentifier;
+    IF N''' + @Table + N''' = N''Vouchers'' AND @UserId IS NOT NULL AND SUBSTRING(@Context,25,1)=0x01
+        SET @DirectVoucherEditId = CONVERT(uniqueidentifier, SUBSTRING(@Context,26,16));
+    IF @DirectVoucherEditId IS NOT NULL SET @Action = ''UPDATE'';
+
+    DECLARE @WriteTransactionId bigint, @WriteStatementId uniqueidentifier = NEWID();
+    IF HAS_PERMS_BY_NAME(NULL, NULL, ''VIEW SERVER STATE'') = 1
+        SELECT @WriteTransactionId = transaction_id FROM sys.dm_tran_current_transaction;
+
     INSERT dbo.POS_ActivityChange
-        (EventId, ActivityDate, Category, Module, SourceTable, ActionType, RowVersion,
+        (EventId, WriteTransactionId, WriteStatementId, DirectVoucherEditId, ActivityDate, Category, Module, SourceTable, ActionType, RowVersion,
          CompanyId, BranchId, FinYearId, UserId, CounterId, DocumentNo, Amount, Details)
-    SELECT NEWID(), @Stamp, N''' + @Category + N''', ' + @ModuleSql + N', N''' + @Table + N''', @Action, ''Before'',
+    SELECT NEWID(), @WriteTransactionId, @WriteStatementId, @DirectVoucherEditId, @Stamp, N''' + @Category + N''', ' + @ModuleSql + N', N''' + @Table + N''', @Action, ''Before'',
            ' + @Projection + N'
     FROM deleted r
     UNION ALL
-    SELECT NEWID(), @Stamp, N''' + @Category + N''', ' + @ModuleSql + N', N''' + @Table + N''', @Action, ''After'',
+    SELECT NEWID(), @WriteTransactionId, @WriteStatementId, @DirectVoucherEditId, @Stamp, N''' + @Category + N''', ' + @ModuleSql + N', N''' + @Table + N''', @Action, ''After'',
            ' + @Projection + N'
     FROM inserted r;
 END;';

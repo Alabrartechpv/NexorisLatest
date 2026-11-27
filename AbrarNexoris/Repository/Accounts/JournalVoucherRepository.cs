@@ -36,6 +36,7 @@ namespace Repository.Accounts
                 }
                 else
                 {
+                    ActivityConnectionContext.MarkDirectVoucherEdit(transaction);
                     DeleteVoucherLines(journal, transaction);
                 }
 

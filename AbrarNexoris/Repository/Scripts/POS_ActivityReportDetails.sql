@@ -191,6 +191,9 @@ BEGIN
         SELECT @DocumentNo = CONVERT(nvarchar(100), @ItemId), @Header = N'ItemMaster', @Key = N'ItemId';
     END;
 
+    IF @Source=N'POS_ItemMasterStatusRules'
+        SELECT @Header=N'ItemMaster', @Key=N'ItemId';
+
     IF @Header IS NULL
         SELECT @Header = TableName, @Key = KeyColumn FROM @Masters WHERE TableName = @Source;
 
@@ -243,7 +246,8 @@ BEGIN
         INSERT @Plan VALUES (30, N'Current units and prices', N'PriceSettings', N'ItemId', N'ItemId'),
                             (40, N'Current barcodes', N'ItemAlternativeBarcode', N'ItemId', N'ItemId'),
                             (50, N'Current item batches', N'ItemBatch', N'ItemId', N'ItemId'),
-                            (60, N'Current item dimensions', N'ItemDimension', N'ItemId', N'ItemId');
+                            (60, N'Current item dimensions', N'ItemDimension', N'ItemId', N'ItemId'),
+                            (65, N'Current item status', N'POS_ItemMasterStatusRules', N'ItemId', N'ItemId');
     IF @Header = N'LedgerMaster'
         INSERT @Plan VALUES (30, N'Current ledger terms', N'LedgerDetails', N'LedgerID', N'LedgerID');
     IF @Header = N'QuickPurchasePreset'

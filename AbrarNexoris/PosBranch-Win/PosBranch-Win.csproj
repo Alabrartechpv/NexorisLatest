@@ -381,6 +381,7 @@
       <DependentUpon>frmAuditReport.cs</DependentUpon>
     </Compile>
     <Compile Include="Reports\FinancialReports\FinancialReportGrid.cs" />
+    <Compile Include="Reports\FinancialReports\ActivityReportText.cs" />
     <Compile Include="Reports\FinancialReports\frmactivityreport.cs">
       <SubType>Form</SubType>
     </Compile>

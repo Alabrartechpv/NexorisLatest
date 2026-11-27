@@ -190,6 +190,7 @@
     <None Include="Scripts\POS_DatewiseCustomerPaymentReport.sql" />
     <None Include="Scripts\POS_DatewiseExpenseReport.sql" />
     <None Include="Scripts\POS_ActivityCapture.sql" />
+    <None Include="Scripts\POS_ActivityReportGrouping.sql" />
     <None Include="Scripts\POS_ActivityReport.sql" />
     <None Include="Scripts\POS_ActivityReportDetails.sql" />
     <None Include="Scripts\POS_DeletionAuditReport.sql" />

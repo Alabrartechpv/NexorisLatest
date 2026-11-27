@@ -13,7 +13,18 @@ namespace Repository
             if (e.CurrentState != ConnectionState.Open || SessionContext.UserId <= 0)
                 return;
 
-            using (var command = new SqlCommand(STOREDPROCEDURE.POS_SetActivityContext, (SqlConnection)sender))
+            SetActivityContext((SqlConnection)sender);
+        }
+
+        internal static void MarkDirectVoucherEdit(IDbTransaction transaction)
+        {
+            if (SessionContext.UserId > 0)
+                SetActivityContext((SqlConnection)transaction.Connection, (SqlTransaction)transaction);
+        }
+
+        private static void SetActivityContext(SqlConnection connection, SqlTransaction edit = null)
+        {
+            using (var command = new SqlCommand(STOREDPROCEDURE.POS_SetActivityContext, connection, edit))
             {
                 command.CommandType = CommandType.StoredProcedure;
                 command.CommandTimeout = 5;
@@ -22,6 +33,8 @@ namespace Repository
                 command.Parameters.Add("@FinYearId", SqlDbType.Int).Value = SessionContext.FinYearId;
                 command.Parameters.Add("@UserId", SqlDbType.Int).Value = SessionContext.UserId;
                 command.Parameters.Add("@CounterId", SqlDbType.Int).Value = SessionContext.CounterId;
+                if (edit != null)
+                    command.Parameters.Add("@DirectVoucherEdit", SqlDbType.Bit).Value = true;
                 try
                 {
                     command.ExecuteNonQuery();
@@ -29,7 +42,7 @@ namespace Repository
                 catch (SqlException ex)
                 {
                     // Older databases can continue to use the application before the audit migration.
-                    if (ex.Number != 2812)
+                    if (ex.Number != 2812 && ex.Number != 8144)
                         Trace.TraceWarning("Could not set POS activity context. SQL error {0}.", ex.Number);
                 }
             }

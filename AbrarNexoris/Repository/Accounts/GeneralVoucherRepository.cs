@@ -34,6 +34,7 @@ namespace Repository.Accounts
                 else
                 {
                     // For updates, the SP operation 'UPDATE' deletes the existing lines first
+                    ActivityConnectionContext.MarkDirectVoucherEdit(transaction);
                     DeleteVoucherLinesForUpdate(voucher, transaction);
                 }
 
