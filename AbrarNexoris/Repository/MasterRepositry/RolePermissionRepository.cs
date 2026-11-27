@@ -695,7 +695,7 @@ namespace Repository.MasterRepositry
             add("tradingpl", "Trading & Profit / Loss Account", "Reports");
             add("profitloss", "Profit and Loss Account", "Reports");
             add("balancesheet", "Balance Sheet", "Reports");
-            add("trialbalance", "Trial Balance", "Reports");s
+            add("trialbalance", "Trial Balance", "Reports");
             //add("businessexpense", "Business Expense Report", "Reports");
             add("inputgst", "Input GST Report", "Reports");
 
