@@ -613,6 +613,34 @@ namespace Repository.TransactionRepository
                 // This is needed to reverse the old purchase's effect on stock and cost
                 List<PurchaseDetails> oldPurchaseDetails = GetOldPurchaseDetails(ObjPmaster.PurchaseNo, originalFinYearId, trans);
 
+                int targetBranchIdForValidation = ObjPmaster.BranchId > 0 ? ObjPmaster.BranchId : SessionContext.BranchId;
+
+                // 1. Strict Accounting Rule: Block editing if active Vendor Payment(s) exist for this purchase bill
+                var paymentVouchers = GetActiveVendorPaymentVouchers(ObjPmaster.PurchaseNo, targetBranchIdForValidation, originalFinYearId, trans);
+                if (paymentVouchers != null && paymentVouchers.Count > 0)
+                {
+                    trans.Rollback();
+                    string vouchersList = string.Join(", ", paymentVouchers.Select(v => "#" + v));
+                    return $"Cannot edit Purchase Bill #{ObjPmaster.PurchaseNo} because active Vendor Payment(s) [{vouchersList}] exist. Cancel or unlink the payment(s) first.";
+                }
+
+                // 2. Strict Accounting Rule: Block editing if active Purchase Return(s) exist for this purchase bill
+                var returnNos = GetActivePurchaseReturnNumbers(ObjPmaster.PurchaseNo, targetBranchIdForValidation, originalFinYearId, trans);
+                if (returnNos != null && returnNos.Count > 0)
+                {
+                    trans.Rollback();
+                    string returnsList = string.Join(", ", returnNos.Select(r => "#" + r));
+                    return $"Cannot edit Purchase Bill #{ObjPmaster.PurchaseNo} because active Purchase Return(s) [{returnsList}] exist. Cancel the purchase return first.";
+                }
+
+                // 3. Stock Balance Rule: Block editing if reducing/removing item quantities would cause negative stock
+                string editStockError = ValidatePurchaseEditStock(ObjPmaster.PurchaseNo, targetBranchIdForValidation, oldPurchaseDetails, dgvPurchase, trans);
+                if (!string.IsNullOrEmpty(editStockError))
+                {
+                    trans.Rollback();
+                    return editStockError;
+                }
+
                 // Calculate and set total tax amount in PurchaseMaster
                 float totalTaxAmount = CalculateTotalTaxAmount(dgvPurchase);
                 ObjPmaster.TaxAmt = totalTaxAmount;
@@ -1132,26 +1160,7 @@ namespace Repository.TransactionRepository
                 trans = DataConnection.BeginTransaction();
 
                 // 1. Strict Accounting Rule: Block deleting if active Vendor Payment(s) exist for this purchase bill
-                string checkPaymentSql = @"
-                    SELECT DISTINCT VPM.VoucherId
-                    FROM VendorPaymentDetails VPD
-                    INNER JOIN VendorPaymentMaster VPM
-                        ON VPM.Id = VPD.PaymentMasterId AND VPM.BranchId = VPD.BranchId
-                    INNER JOIN PMaster PM
-                        ON PM.PurchaseNo = VPD.BillNo AND PM.BranchId = VPD.BranchId
-                       AND PM.LedgerID = VPM.VendorLedgerId
-                    WHERE VPD.BillNo = @PurchaseNo
-                      AND (@BranchId IS NULL OR @BranchId = 0 OR VPD.BranchId = @BranchId)
-                      AND (@FinYearId IS NULL OR @FinYearId = 0 OR PM.FinYearId = @FinYearId)
-                      AND ISNULL(PM.CancelFlag, 0) = 0
-                      AND ISNULL(VPD.CancelFlag, 0) = 0
-                      AND ISNULL(VPM.CancelFlag, 0) = 0";
-
-                var paymentVouchers = DataConnection.Query<int>(
-                    checkPaymentSql,
-                    new { PurchaseNo = purchaseNo, BranchId = branchId, FinYearId = finYearId },
-                    trans).ToList();
-
+                var paymentVouchers = GetActiveVendorPaymentVouchers(purchaseNo, branchId, finYearId, trans);
                 if (paymentVouchers != null && paymentVouchers.Count > 0)
                 {
                     trans.Rollback();
@@ -1160,21 +1169,7 @@ namespace Repository.TransactionRepository
                 }
 
                 // 2. Strict Accounting Rule: Block deleting if active Purchase Return(s) exist for this purchase bill
-                string checkReturnSql = @"
-                    SELECT DISTINCT PRM.PReturnNo
-                    FROM PReturnMaster PRM
-                    WHERE (PRM.InvoiceNo = CAST(@PurchaseNo AS VARCHAR(50)) 
-                        OR PRM.PInvoice = CAST(@PurchaseNo AS VARCHAR(50))
-                        OR (EXISTS (SELECT 1 FROM PMaster PM WHERE PM.PurchaseNo = @PurchaseNo AND (@BranchId IS NULL OR @BranchId = 0 OR PM.BranchId = @BranchId) AND PM.InvoiceNo = PRM.InvoiceNo AND PRM.LedgerID = PM.LedgerID)))
-                      AND (@BranchId IS NULL OR @BranchId = 0 OR PRM.BranchId = @BranchId)
-                      AND (@FinYearId IS NULL OR @FinYearId = 0 OR PRM.FinYearId = @FinYearId)
-                      AND ISNULL(PRM.CancelFlag, 0) = 0";
-
-                var returnNos = DataConnection.Query<int>(
-                    checkReturnSql,
-                    new { PurchaseNo = purchaseNo, BranchId = branchId, FinYearId = finYearId },
-                    trans).ToList();
-
+                var returnNos = GetActivePurchaseReturnNumbers(purchaseNo, branchId, finYearId, trans);
                 if (returnNos != null && returnNos.Count > 0)
                 {
                     trans.Rollback();
@@ -1182,8 +1177,75 @@ namespace Repository.TransactionRepository
                     return $"Cannot delete Purchase Bill #{purchaseNo} because active Purchase Return(s) [{returnsList}] exist. Cancel the purchase return first.";
                 }
 
-                // Reverse stock in PriceSettings for all items in this purchase invoice BEFORE deleting
+                // 3. Stock Balance Rule:
+                // Block deletion ONLY IF removing this purchase would cause any item's stock to go negative.
+                // Logic: projected_stock = current_stock - purchase_qty_in_base_units
+                // If projected_stock < 0  -->  block with clear message
+                // If projected_stock >= 0 -->  allow (even if sales happened, stock is still sufficient)
+                string checkStockNegativeSql = @"
+                    SELECT
+                        PD.ItemID,
+                        IM.Description                                                      AS ItemName,
+                        ISNULL(PS.Stock, 0)                                                 AS CurrentStock,
+                        (PD.Qty + ISNULL(PD.Free, 0)) * ISNULL(PD.Packing, 1)             AS PurchaseQty,
+                        ISNULL(PS.Stock, 0) - ((PD.Qty + ISNULL(PD.Free, 0)) * ISNULL(PD.Packing, 1)) AS ProjectedStock
+                    FROM PDetails PD
+                    INNER JOIN ItemMaster IM ON IM.ItemId = PD.ItemID
+                    LEFT  JOIN PriceSettings PS ON PS.ItemId  = PD.ItemID
+                                                AND PS.BranchId = PD.BranchID
+                                                AND ISNULL(PS.IsBaseUnit, 'N') = 'Y'
+                    WHERE PD.PurchaseNo = @PurchaseNo
+                      AND (@BranchId  IS NULL OR @BranchId  = 0 OR PD.BranchId  = @BranchId)
+                      AND (@FinYearId IS NULL OR @FinYearId = 0 OR PD.FinYearId = @FinYearId)
+                      AND (ISNULL(PS.Stock, 0) - ((PD.Qty + ISNULL(PD.Free, 0)) * ISNULL(PD.Packing, 1))) < 0";
+
+                var negativeStockItems = DataConnection.Query<dynamic>(
+                    checkStockNegativeSql,
+                    new { PurchaseNo = purchaseNo, BranchId = branchId, FinYearId = finYearId },
+                    trans).ToList();
+
+                if (negativeStockItems != null && negativeStockItems.Count > 0)
+                {
+                    trans.Rollback();
+                    var lines = negativeStockItems.Select(r =>
+                        $"• {r.ItemName}: Current Stock = {r.CurrentStock:0.##}, " +
+                        $"Purchase Qty = {r.PurchaseQty:0.##}, " +
+                        $"Stock after deletion = {r.ProjectedStock:0.##}");
+                    string detail = string.Join("\n", lines);
+                    return $"Cannot delete Purchase Bill #{purchaseNo} — deleting it would cause negative stock:\n{detail}\n\n" +
+                           $"First cancel the sales/transfers that consumed this stock, then retry.";
+                }
+
+                // Capture old purchase details BEFORE POS_Purchase DELETE removes PDetails
                 List<PurchaseDetails> oldPurchaseDetails = GetOldPurchaseDetails(purchaseNo, finYearId, trans);
+
+                // Create a parameter object with the DELETE operation
+                var parameters = new
+                {
+                    CompanyId = Convert.ToInt32(DataBase.CompanyId),
+                    BranchId = branchId,
+                    FinYearId = finYearId,
+                    PurchaseNo = purchaseNo,
+                    VoucherID = voucherId,
+                    TrnsType = "Purchase",  // Needed for the stored procedure
+                    _Operation = "DELETE"
+                };
+
+                // Execute POS_Purchase DELETE BEFORE reversing PriceSettings so the SP validates against current stock
+                List<dynamic> results = DataConnection.Query<dynamic>(
+                    STOREDPROCEDURE.POS_Purchase,
+                    parameters,
+                    trans,
+                    commandType: CommandType.StoredProcedure).ToList();
+
+                // Check if the operation was successful
+                if (results != null && results.Count > 0)
+                {
+                    // The stored procedure should return "SUCCESS"
+                    result = results[0].ToString();
+                }
+
+                // Reverse stock in PriceSettings for all items in this purchase invoice AFTER POS_Purchase DELETE succeeds
                 if (oldPurchaseDetails != null && oldPurchaseDetails.Count > 0)
                 {
                     foreach (var oldDetail in oldPurchaseDetails)
@@ -1213,32 +1275,6 @@ namespace Repository.TransactionRepository
 
                         System.Diagnostics.Debug.WriteLine($"DELETE Purchase Invoice - Reversing stock for ItemId={oldDetail.ItemID}, UnitId={oldDetail.UnitId}, Qty={oldDetail.Qty}, Free={oldDetail.Free} from PriceSettings.");
                     }
-                }
-
-                // Create a parameter object with the DELETE operation
-                var parameters = new
-                {
-                    CompanyId = Convert.ToInt32(DataBase.CompanyId),
-                    BranchId = branchId,
-                    FinYearId = finYearId,
-                    PurchaseNo = purchaseNo,
-                    VoucherID = voucherId,
-                    TrnsType = "Purchase",  // Needed for the stored procedure
-                    _Operation = "DELETE"
-                };
-
-                // Execute the stored procedure
-                List<dynamic> results = DataConnection.Query<dynamic>(
-                    STOREDPROCEDURE.POS_Purchase,
-                    parameters,
-                    trans,
-                    commandType: CommandType.StoredProcedure).ToList();
-
-                // Check if the operation was successful
-                if (results != null && results.Count > 0)
-                {
-                    // The stored procedure should return "SUCCESS"
-                    result = results[0].ToString();
                 }
 
                 // ATOMIC SYNC QUEUE ENQUEUE (CANCEL/DELETE via Stored Procedure POS_SyncQueue)
@@ -1413,6 +1449,150 @@ namespace Repository.TransactionRepository
                 // Return existing cost if calculation fails
                 return existingCost;
             }
+        }
+
+        /// <summary>
+        /// Returns active vendor payment voucher IDs linked to a purchase bill.
+        /// </summary>
+        private List<int> GetActiveVendorPaymentVouchers(int purchaseNo, int branchId, int finYearId, IDbTransaction trans)
+        {
+            const string sql = @"
+                SELECT DISTINCT VPM.VoucherId
+                FROM VendorPaymentDetails VPD
+                INNER JOIN VendorPaymentMaster VPM
+                    ON VPM.Id = VPD.PaymentMasterId AND VPM.BranchId = VPD.BranchId
+                INNER JOIN PMaster PM
+                    ON PM.PurchaseNo = VPD.BillNo AND PM.BranchId = VPD.BranchId
+                   AND PM.LedgerID = VPM.VendorLedgerId
+                WHERE VPD.BillNo = @PurchaseNo
+                  AND (@BranchId IS NULL OR @BranchId = 0 OR VPD.BranchId = @BranchId)
+                  AND (@FinYearId IS NULL OR @FinYearId = 0 OR PM.FinYearId = @FinYearId)
+                  AND ISNULL(PM.CancelFlag, 0) = 0
+                  AND ISNULL(VPD.CancelFlag, 0) = 0
+                  AND ISNULL(VPM.CancelFlag, 0) = 0";
+
+            return DataConnection.Query<int>(
+                sql,
+                new { PurchaseNo = purchaseNo, BranchId = branchId, FinYearId = finYearId },
+                trans).ToList();
+        }
+
+        /// <summary>
+        /// Returns active purchase return numbers linked to a purchase bill.
+        /// </summary>
+        private List<int> GetActivePurchaseReturnNumbers(int purchaseNo, int branchId, int finYearId, IDbTransaction trans)
+        {
+            const string sql = @"
+                SELECT DISTINCT PRM.PReturnNo
+                FROM PReturnMaster PRM
+                WHERE (PRM.InvoiceNo = CAST(@PurchaseNo AS VARCHAR(50))
+                    OR PRM.PInvoice = CAST(@PurchaseNo AS VARCHAR(50))
+                    OR (EXISTS (SELECT 1 FROM PMaster PM WHERE PM.PurchaseNo = @PurchaseNo AND (@BranchId IS NULL OR @BranchId = 0 OR PM.BranchId = @BranchId) AND PM.InvoiceNo = PRM.InvoiceNo AND PRM.LedgerID = PM.LedgerID)))
+                  AND (@BranchId IS NULL OR @BranchId = 0 OR PRM.BranchId = @BranchId)
+                  AND (@FinYearId IS NULL OR @FinYearId = 0 OR PRM.FinYearId = @FinYearId)
+                  AND ISNULL(PRM.CancelFlag, 0) = 0";
+
+            return DataConnection.Query<int>(
+                sql,
+                new { PurchaseNo = purchaseNo, BranchId = branchId, FinYearId = finYearId },
+                trans).ToList();
+        }
+
+        /// <summary>
+        /// Validates that reducing or removing items while editing a purchase will not cause negative stock.
+        /// </summary>
+        private string ValidatePurchaseEditStock(
+            int purchaseNo,
+            int branchId,
+            List<PurchaseDetails> oldPurchaseDetails,
+            DataGridView dgvPurchase,
+            IDbTransaction trans)
+        {
+            if (oldPurchaseDetails == null || oldPurchaseDetails.Count == 0)
+                return null;
+
+            var oldQtyByItem = new Dictionary<int, double>();
+            foreach (var oldDetail in oldPurchaseDetails)
+            {
+                double packing = oldDetail.Packing > 0 ? oldDetail.Packing : 1;
+                double baseQty = (oldDetail.Qty + oldDetail.Free) * packing;
+                if (oldQtyByItem.ContainsKey(oldDetail.ItemID))
+                    oldQtyByItem[oldDetail.ItemID] += baseQty;
+                else
+                    oldQtyByItem[oldDetail.ItemID] = baseQty;
+            }
+
+            var newQtyByItem = new Dictionary<int, double>();
+            if (dgvPurchase != null)
+            {
+                for (int i = 0; i < dgvPurchase.Rows.Count; i++)
+                {
+                    var row = dgvPurchase.Rows[i];
+                    if (row.Cells["ItemId"]?.Value == null || string.IsNullOrWhiteSpace(row.Cells["ItemId"].Value.ToString()))
+                        continue;
+
+                    if (!int.TryParse(row.Cells["ItemId"].Value.ToString(), out int itemId))
+                        continue;
+
+                    double.TryParse(row.Cells["Qty"]?.Value?.ToString(), out double qty);
+                    double.TryParse(row.Cells["Free"]?.Value?.ToString(), out double free);
+                    double.TryParse(row.Cells["Packing"]?.Value?.ToString(), out double packing);
+                    if (packing <= 0) packing = 1;
+
+                    double baseQty = (qty + free) * packing;
+                    if (newQtyByItem.ContainsKey(itemId))
+                        newQtyByItem[itemId] += baseQty;
+                    else
+                        newQtyByItem[itemId] = baseQty;
+                }
+            }
+
+            var reducedItemIds = oldQtyByItem
+                .Where(kv => (newQtyByItem.ContainsKey(kv.Key) ? newQtyByItem[kv.Key] : 0) < kv.Value)
+                .Select(kv => kv.Key)
+                .ToList();
+
+            if (reducedItemIds.Count == 0)
+                return null;
+
+            var stockRows = DataConnection.Query<dynamic>(@"
+                SELECT
+                    IM.ItemId,
+                    IM.Description AS ItemName,
+                    ISNULL(PS.Stock, 0) AS CurrentStock
+                FROM ItemMaster IM
+                LEFT JOIN PriceSettings PS
+                    ON PS.ItemId = IM.ItemId
+                   AND PS.BranchId = @BranchId
+                   AND ISNULL(PS.IsBaseUnit, 'N') = 'Y'
+                WHERE IM.ItemId IN @ItemIds",
+                new { BranchId = branchId, ItemIds = reducedItemIds },
+                trans).ToList();
+
+            var issues = new List<string>();
+            foreach (var row in stockRows)
+            {
+                int itemId = Convert.ToInt32(row.ItemId);
+                double currentStock = Convert.ToDouble(row.CurrentStock);
+                double oldBaseQty = oldQtyByItem[itemId];
+                double newBaseQty = newQtyByItem.ContainsKey(itemId) ? newQtyByItem[itemId] : 0;
+                double projectedStock = currentStock - oldBaseQty + newBaseQty;
+
+                if (projectedStock < 0)
+                {
+                    issues.Add(
+                        $"• {row.ItemName}: Current Stock = {currentStock:0.##}, " +
+                        $"Old Qty = {oldBaseQty:0.##}, New Qty = {newBaseQty:0.##}, " +
+                        $"Stock after edit = {projectedStock:0.##}");
+                }
+            }
+
+            if (issues.Count == 0)
+                return null;
+
+            return $"Cannot edit Purchase Bill #{purchaseNo} — reducing/removing item(s) would cause negative stock:\n" +
+                   string.Join("\n", issues) +
+                   "\n\nFirst cancel the sales/transfers that consumed this stock, then retry.";
         }
 
         /// <summary>
