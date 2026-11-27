@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 using ModelClass;
 using ModelClass.TransactionModels;
 using System.Data;
@@ -38,12 +40,12 @@ namespace Repository.TransactionRepository
                         if (wasClosed) DataConnection.Open();
 
                         DataConnection.Execute(
-                            STOREDPROCEDURE.POS_PurchaseInvoiceSupport,
+                            STOREDPROCEDURE.POS_Purchase,
                             new { _Operation = "ENSURE_SCHEMA" },
                             commandType: CommandType.StoredProcedure);
 
                         _schemaEnsured = true;
-                        System.Diagnostics.Debug.WriteLine("Successfully verified and updated PMaster CurSymbol schema constraint via stored procedure.");
+                        System.Diagnostics.Debug.WriteLine("Successfully verified and updated PMaster CurSymbol schema constraint via POS_Purchase.");
                     }
                     finally
                     {
@@ -52,33 +54,6 @@ namespace Repository.TransactionRepository
                             DataConnection.Close();
                         }
                     }
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine("EnsurePMasterSchema error: " + ex.Message);
-                }
-            }
-        }
-
-                            AND parent_column_id = COLUMNPROPERTY(OBJECT_ID('PMaster'), 'CurSymbol', 'ColumnId')
-                        )
-                        BEGIN
-                            ALTER TABLE dbo.PMaster ADD CONSTRAINT DF_PMaster_CurSymbol DEFAULT('RM') FOR CurSymbol;
-                        END
-                    ";
-
-                    using (SqlCommand cmd = new SqlCommand(sql, (SqlConnection)DataConnection))
-                    {
-                        cmd.ExecuteNonQuery();
-                    }
-
-                    if (wasClosed && DataConnection.State == ConnectionState.Open)
-                    {
-                        DataConnection.Close();
-                    }
-
-                    _schemaEnsured = true;
-                    System.Diagnostics.Debug.WriteLine("Successfully verified and updated PMaster CurSymbol schema constraint.");
                 }
                 catch (Exception ex)
                 {
@@ -136,7 +111,7 @@ namespace Repository.TransactionRepository
             return PurcaseNo;
         }
 
-        private DynamicParameters GetPurchaseMasterParameters(PurchaseMaster ObjPurchaseMaster, bool isCashPayment)
+        private DynamicParameters GetPurchaseMasterParameters(PurchaseMaster ObjPurchaseMaster)
         {
             var p = new DynamicParameters();
             p.Add("@CompanyId", ObjPurchaseMaster.CompanyId);
@@ -173,8 +148,8 @@ namespace Repository.TransactionRepository
             p.Add("@CessPer", ObjPurchaseMaster.CessPer);
             p.Add("@CessAmt", ObjPurchaseMaster.CessAmt);
             p.Add("@CalAfterTax", ObjPurchaseMaster.CalAfterTax);
-            p.Add("@CurrencyID", ObjPurchaseMaster.CurrencyID > 0 ? (int?)ObjPurchaseMaster.CurrencyID : null);
-            p.Add("@CurSymbol", string.IsNullOrWhiteSpace(ObjPurchaseMaster.CurSymbol) ? null : ObjPurchaseMaster.CurSymbol);
+            p.Add("@CurrencyID", ObjPurchaseMaster.CurrencyID > 0 ? ObjPurchaseMaster.CurrencyID : 1);
+            p.Add("@CurSymbol", !string.IsNullOrWhiteSpace(ObjPurchaseMaster.CurSymbol) ? ObjPurchaseMaster.CurSymbol : "RM");
             p.Add("@SeriesID", ObjPurchaseMaster.SeriesID);
             p.Add("@VoucherID", ObjPurchaseMaster.VoucherID);
             p.Add("@IsSyncd", ObjPurchaseMaster.IsSyncd);
@@ -182,7 +157,7 @@ namespace Repository.TransactionRepository
             p.Add("@Pid", ObjPurchaseMaster.Pid);
             p.Add("@POrderMasterId", ObjPurchaseMaster.POrderMasterId);
             double payedAmt = 0;
-            if (isCashPayment)
+            if (string.Equals(ObjPurchaseMaster.Paymode, "Cash", StringComparison.OrdinalIgnoreCase) || ObjPurchaseMaster.PaymodeID == 2)
             {
                 payedAmt = ObjPurchaseMaster.GrandTotal;
             }
@@ -190,7 +165,7 @@ namespace Repository.TransactionRepository
             p.Add("@BilledBy", ObjPurchaseMaster.BilledBy ?? "");
             p.Add("@TrnsType", !string.IsNullOrWhiteSpace(ObjPurchaseMaster.TrnsType) ? ObjPurchaseMaster.TrnsType : "Purchase");
             p.Add("@NetTotal", ObjPurchaseMaster.NetTotal);
-            p.Add("@TransactionGuid", ObjPurchaseMaster.TransactionGuid != Guid.Empty ? (Guid?)ObjPurchaseMaster.TransactionGuid : null);
+            p.Add("@TransactionGuid", ObjPurchaseMaster.TransactionGuid != Guid.Empty ? (object)ObjPurchaseMaster.TransactionGuid : (object)Guid.NewGuid());
             p.Add("@_Operation", ObjPurchaseMaster._Operation ?? "");
             return p;
         }
@@ -199,17 +174,24 @@ namespace Repository.TransactionRepository
         {
             string result = "";
             Voucher objVoucher = new Voucher();
+            EnsurePMasterSchema();
             DataConnection.Open();
             var trans = DataConnection.BeginTransaction();
             try
             {
-
-                bool isCashPayment = IsCashPaymentMode(ObjPurchaseMaster.PaymodeID, ObjPurchaseMaster.Paymode);
+                if (string.IsNullOrWhiteSpace(ObjPurchaseMaster.CurSymbol))
+                {
+                    ObjPurchaseMaster.CurSymbol = "RM";
+                }
+                if (ObjPurchaseMaster.CurrencyID <= 0)
+                {
+                    ObjPurchaseMaster.CurrencyID = 1;
+                }
 
                 ObjPurchaseMaster._Operation = "GENERATEPURCHASENO";
                 ObjPurchaseMaster.FinYearId = SessionContext.FinYearId;
 
-                var pGenerate = GetPurchaseMasterParameters(ObjPurchaseMaster, isCashPayment);
+                var pGenerate = GetPurchaseMasterParameters(ObjPurchaseMaster);
                 List<PurchaseMaster> ObjPurchasNo = DataConnection.Query<PurchaseMaster>(STOREDPROCEDURE.POS_Purchase, pGenerate, trans, commandType: CommandType.StoredProcedure).ToList<PurchaseMaster>();
                 if (ObjPurchasNo.Count > 0)
                 {
@@ -240,11 +222,8 @@ namespace Repository.TransactionRepository
                 ObjPurchaseMaster.TransactionGuid = Guid.NewGuid();
 
                 ObjPurchaseMaster._Operation = "CREATE";
-                var pCreate = GetPurchaseMasterParameters(ObjPurchaseMaster, isCashPayment);
-                ObjPurchaseMaster.PurchaseNo = DataConnection.QuerySingle<int>(
-                    STOREDPROCEDURE.POS_Purchase, pCreate, trans, commandType: CommandType.StoredProcedure);
-                if (ObjPurchaseMaster.PurchaseNo <= 0)
-                    throw new InvalidOperationException("The purchase procedure did not return a valid purchase number.");
+                var pCreate = GetPurchaseMasterParameters(ObjPurchaseMaster);
+                List<PurchaseMaster> PurchaseMaster = DataConnection.Query<PurchaseMaster>(STOREDPROCEDURE.POS_Purchase, pCreate, trans, commandType: CommandType.StoredProcedure).ToList<PurchaseMaster>();
 
                 if (dgvItem != null && dgvItem.Rows.Count > 0)
                 {
@@ -301,7 +280,6 @@ namespace Repository.TransactionRepository
                             objPurchaseDetails.TaxType = taxType;
 
                             objPurchaseDetails.PurchaseNo = ObjPurchaseMaster.PurchaseNo;
-                            objPurchaseDetails.TransactionGuid = ObjPurchaseMaster.TransactionGuid;
                             objPurchaseDetails.SlNo = i + 1;
 
                             // Store BaseCost using reflection if property exists in the model
@@ -405,7 +383,7 @@ namespace Repository.TransactionRepository
                 int targetCompanyId = SessionContext.CompanyId > 0 ? SessionContext.CompanyId : (ObjPurchaseMaster.CompanyId > 0 ? ObjPurchaseMaster.CompanyId : Convert.ToInt32(DataBase.CompanyId));
 
                 // Check Cash-In-Hand balance if payment mode is Cash
-                if (isCashPayment)
+                if (IsCashPaymentMode(ObjPurchaseMaster.PaymodeID, ObjPurchaseMaster.Paymode))
                 {
                     double currentCashBalance = GetAvailableCashBalance(targetBranchId, trans);
                     if (currentCashBalance - ObjPurchaseMaster.GrandTotal < 0)
@@ -418,7 +396,7 @@ namespace Repository.TransactionRepository
                 objVoucher.CompanyID = targetCompanyId;
                 objVoucher.BranchID = targetBranchId;
                 objVoucher.FinYearID = ObjPurchaseMaster.FinYearId;
-                if (isCashPayment)
+                if (IsCashPaymentMode(ObjPurchaseMaster.PaymodeID, ObjPurchaseMaster.Paymode))
                 {
                     int cashLedgerId = objLedgerRepository.GetLedgerId(DefaultLedgers.CASH, (int)AccountGroup.CASH_IN_HAND, targetBranchId);
                     if (cashLedgerId <= 0)
@@ -507,24 +485,21 @@ namespace Repository.TransactionRepository
                     objVoucher.LedgerID = objLedgerRepository.GetLedgerId(DefaultLedgers.PURCHASE, (int)AccountGroup.PURCHASE_ACCOUNT, targetBranchId);
                     objVoucher.LedgerName = DefaultLedgers.PURCHASE;
                     objVoucher.VoucherType = "Purchase";
-                    if (ObjPurchaseMaster.TransactionGuid == Guid.Empty)
-                    {
-                        ObjPurchaseMaster.TransactionGuid = Guid.NewGuid();
-                    }
-
-                    DataConnection.Execute(
-                        STOREDPROCEDURE.POS_PurchaseInvoiceSupport,
-                        new
-                        {
-                            _Operation = "SET_TRANSACTION_GUID",
-                            BranchId = targetBranchId,
-                            FinYearId = ObjPurchaseMaster.FinYearId,
-                            PurchaseNo = ObjPurchaseMaster.PurchaseNo,
-                            TransactionGuid = ObjPurchaseMaster.TransactionGuid
-                        },
-                        transaction: trans,
-                        commandType: CommandType.StoredProcedure);
-
+                    objVoucher.Debit = subtotalAmount;
+                    objVoucher.Credit = 0;
+                    objVoucher.Narration = "PURCHASE: #" + Convert.ToString(ObjPurchaseMaster.PurchaseNo) + "| PURCHASE WORTH:" + Convert.ToString(ObjPurchaseMaster.GrandTotal) + "| REMARKS:" + ObjPurchaseMaster.Remarks;
+                    objVoucher.SlNo = 2;
+                    objVoucher.Mode = ObjPurchaseMaster.Paymode ?? "";
+                    objVoucher.ModeID = ObjPurchaseMaster.PaymodeID;
+                    objVoucher.UserDate = DateTime.Now;
+                    objVoucher.UserName = SessionContext.UserName;
+                    objVoucher.UserID = SessionContext.UserId;
+                    objVoucher.CancelFlag = false;
+                    objVoucher.FinYearID = SessionContext.FinYearId;
+                    objVoucher.CounterID = SessionContext.CounterId;
+                    objVoucher.IsSyncd = false;
+                    List<Voucher> ObjSaveCreditVoucherCredit = DataConnection.Query<Voucher>(STOREDPROCEDURE.POS_Vouchers, objVoucher, trans, commandType: CommandType.StoredProcedure).ToList<Voucher>();
+                }
 
                 // Create tax voucher entries for CGST and SGST
                 Dictionary<float, float> taxAmountsByPercentage = AggregateTaxAmountsByPercentage(dgvItem);
@@ -543,14 +518,17 @@ namespace Repository.TransactionRepository
                     }
 
                     DataConnection.Execute(
-                        "UPDATE dbo.PMaster SET TransactionGuid = @TransactionGuid WHERE PurchaseNo = @PurchaseNo AND FinYearId = @FinYearId",
-                        new { ObjPurchaseMaster.TransactionGuid, ObjPurchaseMaster.PurchaseNo, ObjPurchaseMaster.FinYearId },
-                        transaction: trans);
-
-                    DataConnection.Execute(
-                        "UPDATE dbo.PDetails SET TransactionGuid = @TransactionGuid WHERE PurchaseNo = @PurchaseNo AND FinYearId = @FinYearId",
-                        new { ObjPurchaseMaster.TransactionGuid, ObjPurchaseMaster.PurchaseNo, ObjPurchaseMaster.FinYearId },
-                        transaction: trans);
+                        STOREDPROCEDURE.POS_Purchase,
+                        new
+                        {
+                            _Operation = "SET_TRANSACTION_GUID",
+                            BranchId = targetBranchId,
+                            FinYearId = ObjPurchaseMaster.FinYearId,
+                            PurchaseNo = ObjPurchaseMaster.PurchaseNo,
+                            TransactionGuid = ObjPurchaseMaster.TransactionGuid
+                        },
+                        transaction: trans,
+                        commandType: CommandType.StoredProcedure);
 
                     SyncQueueRepository.EnqueueTransaction(
                         DataConnection,
@@ -595,21 +573,21 @@ namespace Repository.TransactionRepository
             var trans = DataConnection.BeginTransaction();
             try
             {
-
-                bool isCashPayment = IsCashPaymentMode(ObjPmaster.PaymodeID, ObjPmaster.Paymode);
+                if (string.IsNullOrWhiteSpace(ObjPmaster.CurSymbol))
+                {
+                    ObjPmaster.CurSymbol = "RM";
+                }
+                if (ObjPmaster.CurrencyID <= 0)
+                {
+                    ObjPmaster.CurrencyID = 1;
+                }
 
                 // Get the original FinYearId from the database to ensure consistency
                 int originalFinYearId = ObjPmaster.FinYearId;
 
                 // IMPORTANT: Get old purchase details BEFORE any updates/deletes happen
                 // This is needed to reverse the old purchase's effect on stock and cost
-                List<PurchaseDetails> oldPurchaseDetails = GetOldPurchaseDetails(
-                    ObjPmaster.PurchaseNo, ObjPmaster.CompanyId, ObjPmaster.BranchId, originalFinYearId, trans);
-                if (ObjPmaster.TransactionGuid == Guid.Empty)
-                {
-                    ObjPmaster.TransactionGuid = ResolvePurchaseTransactionGuid(
-                        ObjPmaster.PurchaseNo, ObjPmaster.CompanyId, ObjPmaster.BranchId, originalFinYearId, trans);
-                }
+                List<PurchaseDetails> oldPurchaseDetails = GetOldPurchaseDetails(ObjPmaster.PurchaseNo, originalFinYearId, trans);
 
                 // Validate via stored procedure POS_Purchase that reducing/removing items will not cause negative stock
                 string itemQtyXml = BuildItemQtyXml(dgvPurchase);
@@ -631,7 +609,7 @@ namespace Repository.TransactionRepository
                 ObjPmaster.TaxAmt = totalTaxAmount;
 
                 ObjPmaster._Operation = "UPDATE";
-                var pUpdate = GetPurchaseMasterParameters(ObjPmaster, isCashPayment);
+                var pUpdate = GetPurchaseMasterParameters(ObjPmaster);
                 List<PurchaseMaster> ObjUpdatePmaster = DataConnection.Query<PurchaseMaster>(STOREDPROCEDURE.POS_Purchase, pUpdate, trans, commandType: CommandType.StoredProcedure).ToList<PurchaseMaster>();
                 ObjVoucher.BranchID = SessionContext.BranchId;
                 ObjVoucher.VoucherID = ObjPmaster.VoucherID;
@@ -697,7 +675,6 @@ namespace Repository.TransactionRepository
                             objPdetails.TaxType = taxType;
 
                             objPdetails.PurchaseNo = ObjPmaster.PurchaseNo;
-                            objPdetails.TransactionGuid = ObjPmaster.TransactionGuid;
                             objPdetails.SlNo = i + 1;
 
                             // Store BaseCost using reflection if property exists in the model
@@ -889,7 +866,7 @@ namespace Repository.TransactionRepository
                 int targetCompanyIdUpd = SessionContext.CompanyId > 0 ? SessionContext.CompanyId : (ObjPmaster.CompanyId > 0 ? ObjPmaster.CompanyId : Convert.ToInt32(DataBase.CompanyId));
 
                 // Check Cash-In-Hand balance if payment mode is Cash
-                if (isCashPayment)
+                if (IsCashPaymentMode(ObjPmaster.PaymodeID, ObjPmaster.Paymode))
                 {
                     double currentCashBalance = GetAvailableCashBalance(targetBranchIdUpd, trans);
                     double oldCashCredit = GetOldCashVoucherCreditForPurchase(ObjPmaster.VoucherID, targetBranchIdUpd, trans);
@@ -904,7 +881,7 @@ namespace Repository.TransactionRepository
                 ObjVoucher.CompanyID = targetCompanyIdUpd;
                 ObjVoucher.BranchID = targetBranchIdUpd;
                 ObjVoucher.FinYearID = originalFinYearId;
-                if (isCashPayment)
+                if (IsCashPaymentMode(ObjPmaster.PaymodeID, ObjPmaster.Paymode))
                 {
                     int cashLedgerIdUpd = objLedgerRepository.GetLedgerId(DefaultLedgers.CASH, (int)AccountGroup.CASH_IN_HAND, targetBranchIdUpd);
                     if (cashLedgerIdUpd <= 0)
@@ -993,11 +970,38 @@ namespace Repository.TransactionRepository
                     ObjVoucher.LedgerID = objLedgerRepository.GetLedgerId(DefaultLedgers.PURCHASE, (int)AccountGroup.PURCHASE_ACCOUNT, targetBranchIdUpd);
                     ObjVoucher.LedgerName = DefaultLedgers.PURCHASE;
                     ObjVoucher.VoucherType = "Purchase";
+                    ObjVoucher.Debit = subtotalAmount;
+                    ObjVoucher.Credit = 0;
+                    ObjVoucher.Narration = "PURCHASE: #" + Convert.ToString(ObjPmaster.PurchaseNo) + "| PURCHASE WORTH:" + Convert.ToString(ObjPmaster.GrandTotal) + "| REMARKS:" + ObjPmaster.Remarks;
+                    ObjVoucher.SlNo = 2;
+                    ObjVoucher.Mode = ObjPmaster.Paymode ?? "";
+                    ObjVoucher.ModeID = ObjPmaster.PaymodeID;
+                    ObjVoucher.UserDate = DateTime.Now;
+                    ObjVoucher.UserName = SessionContext.UserName;
+                    ObjVoucher.UserID = SessionContext.UserId;
+                    ObjVoucher.CancelFlag = false;
+                    ObjVoucher.FinYearID = originalFinYearId;
+                    ObjVoucher.CounterID = SessionContext.CounterId;
+                    ObjVoucher.IsSyncd = false;
+                    List<Voucher> ObjSaveCreditVoucherCredit = DataConnection.Query<Voucher>(STOREDPROCEDURE.POS_Vouchers, ObjVoucher, trans, commandType: CommandType.StoredProcedure).ToList<Voucher>();
+                }
+
+                // Create tax voucher entries for CGST and SGST
+                Dictionary<float, float> taxAmountsByPercentage = AggregateTaxAmountsByPercentage(dgvPurchase);
+                if (taxAmountsByPercentage.Count > 0)
+                {
+                    int nextSlNo = 3; // Start after main voucher entries (SlNo 1 and 2)
+                    CreateTaxVoucherEntries(ObjVoucher, taxAmountsByPercentage, ObjPmaster.PurchaseNo, ObjPmaster.Remarks, trans, ref nextSlNo);
+                }
+
+                // ATOMIC SYNC QUEUE ENQUEUE (UPDATE via Stored Procedure POS_SyncQueue)
+                try
+                {
                     int targetBranchId = SessionContext.BranchId > 0 ? SessionContext.BranchId : 1;
                     if (ObjPmaster.TransactionGuid == Guid.Empty)
                     {
                         ObjPmaster.TransactionGuid = DataConnection.QueryFirstOrDefault<Guid?>(
-                            STOREDPROCEDURE.POS_PurchaseInvoiceSupport,
+                            STOREDPROCEDURE.POS_Purchase,
                             new
                             {
                                 _Operation = "GET_TRANSACTION_GUID",
@@ -1013,7 +1017,7 @@ namespace Repository.TransactionRepository
                     }
 
                     DataConnection.Execute(
-                        STOREDPROCEDURE.POS_PurchaseInvoiceSupport,
+                        STOREDPROCEDURE.POS_Purchase,
                         new
                         {
                             _Operation = "SET_TRANSACTION_GUID",
@@ -1025,37 +1029,10 @@ namespace Repository.TransactionRepository
                         transaction: trans,
                         commandType: CommandType.StoredProcedure);
 
-                    CreateTaxVoucherEntries(ObjVoucher, taxAmountsByPercentage, ObjPmaster.PurchaseNo, ObjPmaster.Remarks, trans, ref nextSlNo);
-                }
-
-                // ATOMIC SYNC QUEUE ENQUEUE (UPDATE via Stored Procedure POS_SyncQueue)
-                try
-                {
-                    int targetBranchId = SessionContext.BranchId > 0 ? SessionContext.BranchId : 1;
-                    if (ObjPmaster.TransactionGuid == Guid.Empty)
-                    {
-                        ObjPmaster.TransactionGuid = DataConnection.QueryFirstOrDefault<Guid?>(
-                            "SELECT TransactionGuid FROM dbo.PMaster WHERE PurchaseNo = @PurchaseNo AND BranchId = @BranchId AND FinYearId = @FinYearId",
-                            new { ObjPmaster.PurchaseNo, BranchId = targetBranchId, FinYearId = originalFinYearId },
-                            transaction: trans) 
-                            ?? SyncQueueRepository.GetExistingGuid(DataConnection, trans, targetBranchId, "PURCHASE", ObjPmaster.PurchaseNo.ToString()) 
-                            ?? Guid.NewGuid();
-                    }
-
-                    DataConnection.Execute(
-                        "UPDATE dbo.PMaster SET TransactionGuid = @TransactionGuid WHERE PurchaseNo = @PurchaseNo AND FinYearId = @FinYearId",
-                        new { ObjPmaster.TransactionGuid, ObjPmaster.PurchaseNo, FinYearId = originalFinYearId },
-                        transaction: trans);
-
-                    DataConnection.Execute(
-                        "UPDATE dbo.PDetails SET TransactionGuid = @TransactionGuid WHERE PurchaseNo = @PurchaseNo AND FinYearId = @FinYearId",
-                        new { ObjPmaster.TransactionGuid, ObjPmaster.PurchaseNo, FinYearId = originalFinYearId },
-                        transaction: trans);
-
                     SyncQueueRepository.EnqueueTransaction(
                         DataConnection,
                         trans,
-                        ObjPmaster.BranchId,
+                        targetBranchId,
                         "PURCHASE",
                         ObjPmaster.PurchaseNo.ToString(),
                         ObjPmaster.TransactionGuid,
@@ -1129,36 +1106,64 @@ namespace Repository.TransactionRepository
             {
                 throw Ex;
             }
+            finally
+            {
+                // Only close if we opened it
+                if (wasConnectionClosed && DataConnection.State == ConnectionState.Open)
+                {
+                    DataConnection.Close();
+                }
+            }
+            return ObjPurchaseInvoiceGrid;
+
+        }
+
+        public string DeletePurchaseInvoice(int purchaseNo, int branchId, int finYearId, int voucherId)
+        {
+            string result = "";
+            bool wasConnectionClosed = DataConnection.State == ConnectionState.Closed;
+            IDbTransaction trans = null;
+
+            try
+            {
+                // Only open if connection was closed
+                if (wasConnectionClosed)
+                {
+                    DataConnection.Open();
+                }
+                trans = DataConnection.BeginTransaction();
+
                 // Capture old purchase details BEFORE POS_Purchase DELETE removes PDetails
                 // POS_Purchase DELETE handles all validations (Vendor Payment, Purchase Return, and projected negative stock)
-                    INNER JOIN ItemMaster IM ON IM.ItemId = PD.ItemID
-                    LEFT  JOIN PriceSettings PS ON PS.ItemId  = PD.ItemID
-                                                AND PS.BranchId = PD.BranchID
-                                                AND ISNULL(PS.IsBaseUnit, 'N') = 'Y'
-                    WHERE PD.PurchaseNo = @PurchaseNo
-                      AND (@BranchId  IS NULL OR @BranchId  = 0 OR PD.BranchId  = @BranchId)
-                      AND (@FinYearId IS NULL OR @FinYearId = 0 OR PD.FinYearId = @FinYearId)
-                      AND (ISNULL(PS.Stock, 0) - ((PD.Qty + ISNULL(PD.Free, 0)) * ISNULL(PD.Packing, 1))) < 0";
+                List<PurchaseDetails> oldPurchaseDetails = GetOldPurchaseDetails(purchaseNo, finYearId, trans);
 
-                var negativeStockItems = DataConnection.Query<dynamic>(
-                    checkStockNegativeSql,
-                    new { PurchaseNo = purchaseNo, BranchId = branchId, FinYearId = finYearId },
-                    trans).ToList();
-
-                if (negativeStockItems != null && negativeStockItems.Count > 0)
+                // Create a parameter object with the DELETE operation
+                var parameters = new
                 {
-                    trans.Rollback();
-                    var lines = negativeStockItems.Select(r =>
-                        $"• {r.ItemName}: Current Stock = {r.CurrentStock:0.##}, " +
-                        $"Purchase Qty = {r.PurchaseQty:0.##}, " +
-                        $"Stock after deletion = {r.ProjectedStock:0.##}");
-                    string detail = string.Join("\n", lines);
-                    return $"Cannot delete Purchase Bill #{purchaseNo} — deleting it would cause negative stock:\n{detail}\n\n" +
-                           $"First cancel the sales/transfers that consumed this stock, then retry.";
+                    CompanyId = Convert.ToInt32(DataBase.CompanyId),
+                    BranchId = branchId,
+                    FinYearId = finYearId,
+                    PurchaseNo = purchaseNo,
+                    VoucherID = voucherId,
+                    TrnsType = "Purchase",  // Needed for the stored procedure
+                    _Operation = "DELETE"
+                };
+
+                // Execute POS_Purchase DELETE BEFORE reversing PriceSettings so the SP validates against current stock
+                List<dynamic> results = DataConnection.Query<dynamic>(
+                    STOREDPROCEDURE.POS_Purchase,
+                    parameters,
+                    trans,
+                    commandType: CommandType.StoredProcedure).ToList();
+
+                // Check if the operation was successful
+                if (results != null && results.Count > 0)
+                {
+                    // The stored procedure should return "SUCCESS"
+                    result = results[0].ToString();
                 }
 
-                // Capture old purchase details BEFORE POS_Purchase DELETE removes PDetails
-                List<PurchaseDetails> oldPurchaseDetails = GetOldPurchaseDetails(purchaseNo, finYearId, trans);
+                // Reverse stock in PriceSettings for all items in this purchase invoice AFTER POS_Purchase DELETE succeeds
                 if (oldPurchaseDetails != null && oldPurchaseDetails.Count > 0)
                 {
                     foreach (var oldDetail in oldPurchaseDetails)
@@ -1166,20 +1171,12 @@ namespace Repository.TransactionRepository
                         var existingPrices = GetExistingItemPrices(oldDetail.ItemID, oldDetail.UnitId, trans);
                         double packingValue = oldDetail.Packing > 0 ? oldDetail.Packing : 1;
 
-                    Guid deleteGuid = DataConnection.QueryFirstOrDefault<Guid?>(
-                        STOREDPROCEDURE.POS_PurchaseInvoiceSupport,
-                        new
-                        {
-                            _Operation = "GET_TRANSACTION_GUID",
-                            CompanyId = Convert.ToInt32(DataBase.CompanyId),
-                            BranchId = branchId,
-                            FinYearId = finYearId,
-                            PurchaseNo = purchaseNo
-                        },
-                        transaction: trans,
-                        commandType: CommandType.StoredProcedure)
-                        ?? SyncQueueRepository.GetExistingGuid(DataConnection, trans, branchId, "PURCHASE", purchaseNo.ToString())
-                        ?? Guid.NewGuid();
+                        var deleteObj = new PurchaseStockUpdateOnPricesettings();
+                        deleteObj._Operation = "DELETE";
+                        deleteObj.CompanyId = Convert.ToInt32(DataBase.CompanyId);
+                        deleteObj.BranchID = branchId;
+                        deleteObj.FinYearId = finYearId;
+                        deleteObj.ItemID = oldDetail.ItemID;
                         deleteObj.UnitId = oldDetail.UnitId;
                         deleteObj.Qty = oldDetail.Qty;
                         deleteObj.Free = GetAdditionalFreeQuantity(oldDetail.Qty, oldDetail.Free, oldDetail.Cost);
@@ -1202,10 +1199,18 @@ namespace Repository.TransactionRepository
                 try
                 {
                     Guid deleteGuid = DataConnection.QueryFirstOrDefault<Guid?>(
-                        "SELECT TransactionGuid FROM dbo.PMaster WHERE PurchaseNo = @PurchaseNo AND BranchId = @BranchId AND FinYearId = @FinYearId",
-                        new { PurchaseNo = purchaseNo, BranchId = branchId, FinYearId = finYearId },
-                        transaction: trans)
-                        ?? SyncQueueRepository.GetExistingGuid(DataConnection, trans, branchId, "PURCHASE", purchaseNo.ToString()) 
+                        STOREDPROCEDURE.POS_Purchase,
+                        new
+                        {
+                            _Operation = "GET_TRANSACTION_GUID",
+                            CompanyId = Convert.ToInt32(DataBase.CompanyId),
+                            BranchId = branchId,
+                            FinYearId = finYearId,
+                            PurchaseNo = purchaseNo
+                        },
+                        transaction: trans,
+                        commandType: CommandType.StoredProcedure)
+                        ?? SyncQueueRepository.GetExistingGuid(DataConnection, trans, branchId, "PURCHASE", purchaseNo.ToString())
                         ?? Guid.NewGuid();
                     SyncQueueRepository.EnqueueTransaction(
                         DataConnection,
@@ -1235,8 +1240,27 @@ namespace Repository.TransactionRepository
                 }
                 result = "Error: " + ex.Message;
             }
+            finally
+            {
+                // Only close if we opened it
+                if (wasConnectionClosed && DataConnection.State == ConnectionState.Open)
+                {
+                    DataConnection.Close();
+                }
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Gets existing item prices, cost, stock, and markdown values from the database
+        /// </summary>
+        private dynamic GetExistingItemPrices(int itemId, int unitId, IDbTransaction transaction)
+        {
+            try
+            {
                 var result = DataConnection.QueryFirstOrDefault(
-                    STOREDPROCEDURE.POS_PurchaseInvoiceSupport,
+                    STOREDPROCEDURE.POS_PurchaseInvoice_PriceSettings,
                     new
                     {
                         _Operation = "GET_ITEM_PRICES",
@@ -1263,33 +1287,6 @@ namespace Repository.TransactionRepository
                         MDMrpPrice = 0.0,
                         MDCardPrice = 0.0,
                         MDStaffPrice = 0.0,
-                        MDMinPrice = 0.0
-                    };
-                }
-
-                return result;
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error getting existing item prices: {ex.Message}");
-                // Return default values on error
-                return new
-                {
-                    Cost = 0.0,
-                    Stock = 0.0,
-                    RetailPrice = 0.0,
-                    WholeSalePrice = 0.0,
-                    CreditPrice = 0.0,
-                    MDRetailPrice = 0.0,
-                    MDWalkinPrice = 0.0,
-                    MDCreditPrice = 0.0,
-                    MDMrpPrice = 0.0,
-                    MDCardPrice = 0.0,
-                    MDStaffPrice = 0.0,
-                    MDMinPrice = 0.0
-                };
-            }
-        }
                         MDMinPrice = 0.0
                     };
                 }
@@ -1372,12 +1369,39 @@ namespace Repository.TransactionRepository
         private string BuildItemQtyXml(DataGridView dgvPurchase)
         {
             var sb = new System.Text.StringBuilder("<Items>");
+            if (dgvPurchase != null)
+            {
+                for (int i = 0; i < dgvPurchase.Rows.Count; i++)
+                {
+                    var row = dgvPurchase.Rows[i];
+                    if (row.Cells["ItemId"]?.Value == null || string.IsNullOrWhiteSpace(row.Cells["ItemId"].Value.ToString()))
+                        continue;
+
+                    if (!int.TryParse(row.Cells["ItemId"].Value.ToString(), out int itemId))
+                        continue;
+
+                    double.TryParse(row.Cells["Qty"]?.Value?.ToString(), out double qty);
+                    double.TryParse(row.Cells["Free"]?.Value?.ToString(), out double free);
+                    double.TryParse(row.Cells["Packing"]?.Value?.ToString(), out double packing);
+                    if (packing <= 0) packing = 1;
+
+                    double baseQty = (qty + free) * packing;
+                    sb.Append($"<Item ItemId=\"{itemId}\" BaseQty=\"{baseQty.ToString(System.Globalization.CultureInfo.InvariantCulture)}\" />");
+                }
+            }
+            sb.Append("</Items>");
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Gets old purchase details for a specific purchase number to reverse stock/cost effects
+        /// </summary>
         private List<PurchaseDetails> GetOldPurchaseDetails(int purchaseNo, int finYearId, IDbTransaction transaction)
         {
             try
             {
                 var results = DataConnection.Query<PurchaseDetails>(
-                    STOREDPROCEDURE.POS_PurchaseInvoiceSupport,
+                    STOREDPROCEDURE.POS_Purchase,
                     new
                     {
                         _Operation = "GET_OLD_DETAILS",
@@ -1396,15 +1420,18 @@ namespace Repository.TransactionRepository
                 System.Diagnostics.Debug.WriteLine($"Error getting old purchase details: {ex.Message}");
                 return new List<PurchaseDetails>();
             }
-                        ItemID,
-                        UnitId,
-                        ISNULL(Qty, 0) as Qty,
-                        ISNULL(Cost, 0) as Cost,
+        }
+
+        /// <summary>
+        /// Gets existing Base Unit prices, cost, and stock from PriceSettings table
+        /// </summary>
+        private dynamic GetExistingBaseUnitPrices(int itemId, IDbTransaction transaction)
+        {
             try
             {
                 int targetBranchId = SessionContext.BranchId > 0 ? SessionContext.BranchId : Convert.ToInt32(DataBase.BranchId);
                 var result = DataConnection.QueryFirstOrDefault(
-                    STOREDPROCEDURE.POS_PurchaseInvoiceSupport,
+                    STOREDPROCEDURE.POS_PurchaseInvoice_PriceSettings,
                     new
                     {
                         _Operation = "GET_BASE_UNIT_PRICES",
@@ -1433,18 +1460,18 @@ namespace Repository.TransactionRepository
         /// 1. If user ONLY changed Qty (gridUnitCost == existingBaseCost), PriceSettings.Cost is preserved (not changed).
         /// 2. If user changed Cost (gridUnitCost != existingBaseCost), PriceSettings.Cost is updated to the calculated Weighted Average Cost.
         /// </summary>
-
-        /// <summary>
-        /// Ensures PriceSettings table has SingleItemCost column for weighted average cost tracking
-        /// </summary>
+        private void UpdateItemMasterCostOnPurchase(int itemId, float existingBaseCost, float gridUnitCost, float calculatedBaseAvgCost, IDbTransaction transaction)
+        {
+            try
+            {
                 int targetBranchId = SessionContext.BranchId > 0 ? SessionContext.BranchId : Convert.ToInt32(DataBase.BranchId);
 
                 // Check if cost was changed by user during purchase (difference >= 0.01)
                 bool costWasChangedByUser = existingBaseCost <= 0 || Math.Abs(gridUnitCost - existingBaseCost) >= 0.01f;
                 float baseCostToApply = costWasChangedByUser ? calculatedBaseAvgCost : existingBaseCost;
-                                ELSE @CalculatedBaseAvgCost
+
                 DataConnection.Execute(
-                    STOREDPROCEDURE.POS_PurchaseInvoiceSupport,
+                    STOREDPROCEDURE.POS_PurchaseInvoice_PriceSettings,
                     new
                     {
                         _Operation = "SET_ITEM_COST",
@@ -1455,12 +1482,12 @@ namespace Repository.TransactionRepository
                     },
                     transaction,
                     commandType: CommandType.StoredProcedure);
-                    }, transaction);
-
-                    System.Diagnostics.Debug.WriteLine($"User changed Cost during purchase - Updated Weighted Average Cost ({calculatedBaseAvgCost}) for ItemId={itemId} in PriceSettings.");
-                }
-                else
-                {
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Error updating item master cost on purchase: {ex.Message}");
+            }
+        }
 
         /// <summary>
         /// Updates ItemMaster cost directly in PriceSettings table
@@ -1474,7 +1501,7 @@ namespace Repository.TransactionRepository
                 float baseUnitCost = calculatedCost / packingVal;
 
                 DataConnection.Execute(
-                    STOREDPROCEDURE.POS_PurchaseInvoiceSupport,
+                    STOREDPROCEDURE.POS_PurchaseInvoice_PriceSettings,
                     new
                     {
                         _Operation = "SET_ITEM_COST",
@@ -1490,33 +1517,8 @@ namespace Repository.TransactionRepository
                 System.Diagnostics.Debug.WriteLine($"Error updating ItemMaster cost directly: {ex.Message}");
             }
         }
-                float baseUnitCost = calculatedCost / packingVal;
 
-                // Update base unit and all packing units proportional to their packing factor
-                var updateQuery = @"
-                    UPDATE PriceSettings 
-                    SET Cost = CASE 
-                        WHEN ISNULL(Packing, 1) > 0 THEN @BaseUnitCost * ISNULL(Packing, 1)
-                        ELSE @BaseUnitCost 
-                    END
-                    WHERE BranchId = @BranchId 
-                        AND ItemId = @ItemId";
 
-                DataConnection.Execute(updateQuery, new
-                {
-                    BaseUnitCost = baseUnitCost,
-                    BranchId = Convert.ToInt32(DataBase.BranchId),
-                    ItemId = itemId
-                }, transaction);
-
-                System.Diagnostics.Debug.WriteLine($"Updated ItemMaster cost for ItemId={itemId} (BaseUnitCost={baseUnitCost}) directly in PriceSettings.");
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"Error updating ItemMaster cost directly: {ex.Message}");
-                // Don't throw - this is a secondary update, stored procedure might have already updated it
-            }
-        }
 
         /// <summary>
         /// Calculates average cost for UPDATE operation by reversing old purchase effect first
@@ -1797,101 +1799,89 @@ namespace Repository.TransactionRepository
 
                 if (pName.Equals("Credit", StringComparison.OrdinalIgnoreCase))
                     return false;
+            }
+
+            try
+            {
+                Dropdowns dropdowns = new Dropdowns();
+                PaymodeDDlGrid paymodes = dropdowns.PaymodeDDl();
+                PaymodeDDl paymode = paymodes.List?.FirstOrDefault(p => p.PayModeID == paymodeId);
+                return paymode != null &&
+                       !string.IsNullOrWhiteSpace(paymode.PayModeName) &&
+                       paymode.PayModeName.Trim().Equals("Cash", StringComparison.OrdinalIgnoreCase);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"IsCashPaymentMode lookup failed: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>Returns the current CASH-IN-HAND balance (Debit - Credit) for the given branch.</summary>
+        public double GetAvailableCashBalance(int branchId, IDbTransaction trans = null)
+        {
+            try
+            {
+                int cashLedgerId = objLedgerRepository.GetLedgerId(DefaultLedgers.CASH, (int)AccountGroup.CASH_IN_HAND, branchId);
+                if (cashLedgerId <= 0)
+                    cashLedgerId = objLedgerRepository.GetLedgerId("CASH", (int)AccountGroup.CASH_IN_HAND, branchId);
+
                 var p = new
                 {
                     _Operation = "GET_CASH_BALANCE",
-                    BranchId = branchId,
-                    CashGroupId = (int)AccountGroup.CASH_IN_HAND,
-                    LedgerId = cashLedgerId
+                    BranchID = branchId,
+                    GroupID = (int)AccountGroup.CASH_IN_HAND,
+                    LedgerID = cashLedgerId
                 };
 
                 if (trans != null)
-                    return DataConnection.ExecuteScalar<double>(STOREDPROCEDURE.POS_PurchaseInvoiceSupport, p, trans, commandType: CommandType.StoredProcedure);
+                    return DataConnection.ExecuteScalar<double>(STOREDPROCEDURE.POS_Vouchers, p, trans, commandType: CommandType.StoredProcedure);
 
                 bool wasClosed = DataConnection.State == ConnectionState.Closed;
                 try
                 {
                     if (wasClosed) DataConnection.Open();
-                    return DataConnection.ExecuteScalar<double>(STOREDPROCEDURE.POS_PurchaseInvoiceSupport, p, commandType: CommandType.StoredProcedure);
+                    return DataConnection.ExecuteScalar<double>(STOREDPROCEDURE.POS_Vouchers, p, commandType: CommandType.StoredProcedure);
                 }
                 finally
-                const string query = @"
-                    SELECT ISNULL(SUM((ISNULL(lm.OpnDebit, 0) - ISNULL(lm.OpnCredit, 0)) + (ISNULL(v.Debit, 0) - ISNULL(v.Credit, 0))), 0)
-                    FROM LedgerMaster lm
-                    LEFT JOIN (
-                        SELECT LedgerID, SUM(ISNULL(Debit, 0)) AS Debit, SUM(ISNULL(Credit, 0)) AS Credit 
-                        FROM Vouchers 
-                        WHERE (@BranchId = 0 OR BranchID = @BranchId) AND ISNULL(CancelFlag, 0) = 0 
-                        GROUP BY LedgerID
-                    ) v ON lm.LedgerID = v.LedgerID
-                    WHERE (@BranchId = 0 OR lm.BranchID = @BranchId)
-                      AND (lm.GroupID = @GroupId 
-                           OR lm.LedgerID = @LedgerId
-                           OR UPPER(lm.LedgerName) LIKE @CashPattern);";
-
-                var p = new { BranchId = branchId, GroupId = (int)AccountGroup.CASH_IN_HAND,
-                              LedgerId = cashLedgerId, CashPattern = "%CASH%" };
-
-                if (trans != null)
-                    return DataConnection.ExecuteScalar<double>(query, p, trans);
-
-                var p = new
                 {
-                    _Operation = "GET_OLD_CASH_CREDIT",
-                    VoucherId = voucherId,
-                    BranchId = branchId,
-                    CashGroupId = (int)AccountGroup.CASH_IN_HAND
-                };
+                    if (wasClosed && DataConnection.State == ConnectionState.Open) DataConnection.Close();
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"GetAvailableCashBalance error: {ex.Message}");
+                return 0;
+            }
+        }
 
-                if (trans != null)
-                    return DataConnection.ExecuteScalar<double>(STOREDPROCEDURE.POS_PurchaseInvoiceSupport, p, trans, commandType: CommandType.StoredProcedure);
-
-                bool wasClosed = DataConnection.State == ConnectionState.Closed;
-                try
-                {
-                    if (wasClosed) DataConnection.Open();
-                    return DataConnection.ExecuteScalar<double>(STOREDPROCEDURE.POS_PurchaseInvoiceSupport, p, commandType: CommandType.StoredProcedure);
-                }
-                finally
-                    return DataConnection.ExecuteScalar<double>(query, p);
-                }
-                finally
-                    return DataConnection.ExecuteScalar<double>(query, p);
-                }
-                finally
         /// <summary>Returns the cash credit amount recorded for a specific Purchase voucher (used during update to offset existing credit).</summary>
         public double GetOldCashVoucherCreditForPurchase(long voucherId, int branchId, IDbTransaction trans = null)
         {
             if (voucherId <= 0) return 0;
             try
             {
-                string query = @"
-                    SELECT ISNULL(SUM(ISNULL(Credit,0)), 0)
-                    FROM Vouchers
-                    WHERE VoucherID = @VoucherId
-                      AND BranchID = @BranchId
-                      AND VoucherType = 'Purchase'
-                      AND ISNULL(CancelFlag,0) = 0
-                      AND (GroupID = @GroupId OR LedgerName = 'CASH-IN-HAND' OR LedgerName = 'CASH')";
-
-                var p = new { VoucherId = voucherId, BranchId = branchId, GroupId = (int)AccountGroup.CASH_IN_HAND };
+                var p = new
+                {
+                    _Operation = "GET_OLD_CASH_CREDIT",
+                    VoucherID = (int)voucherId,
+                    BranchID = branchId,
+                    GroupID = (int)AccountGroup.CASH_IN_HAND
+                };
 
                 if (trans != null)
-                    return DataConnection.ExecuteScalar<double>(query, p, trans);
+                    return DataConnection.ExecuteScalar<double>(STOREDPROCEDURE.POS_Vouchers, p, trans, commandType: CommandType.StoredProcedure);
 
                 bool wasClosed = DataConnection.State == ConnectionState.Closed;
                 try
                 {
                     if (wasClosed) DataConnection.Open();
-                    return DataConnection.ExecuteScalar<double>(query, p);
+                    return DataConnection.ExecuteScalar<double>(STOREDPROCEDURE.POS_Vouchers, p, commandType: CommandType.StoredProcedure);
                 }
                 finally
                 {
-                    _Operation = "GET_OLD_CASH_CREDIT",
-                    VoucherId = voucherId,
-                    BranchId = branchId,
-                    CashGroupId = (int)AccountGroup.CASH_IN_HAND
-                }, trans, commandType: CommandType.StoredProcedure);
+                    if (wasClosed && DataConnection.State == ConnectionState.Open) DataConnection.Close();
+                }
             }
             catch
             {
