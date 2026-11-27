@@ -48,7 +48,9 @@ namespace Repository
                         string password = txtsplit[3].ToString(); // password
                         string Local = server + ';' + DataBase + ';' + userid + ';' + password + ';';
 
-                        DataConnection = new SqlConnection(Local);
+                        var connection = new SqlConnection(Local);
+                        connection.StateChange += ActivityConnectionContext.OnConnectionStateChange;
+                        DataConnection = connection;
                     }
                 }
                 catch (Exception ex)

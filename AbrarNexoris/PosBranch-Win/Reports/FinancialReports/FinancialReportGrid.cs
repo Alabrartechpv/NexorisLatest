@@ -877,7 +877,7 @@ namespace PosBranch_Win.Reports.FinancialReports
             menu.Show(gridReport, location);
         }
 
-        private void ShowColumnChooserForm()
+        internal void ShowColumnChooserForm()
         {
             if (columnChooserForm == null || columnChooserForm.IsDisposed)
             {
